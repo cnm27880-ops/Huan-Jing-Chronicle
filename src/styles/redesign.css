@@ -245,3 +245,146 @@ body { background: #676a6b; }
   .showcase { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+
+/* ---------- v6：全頁響應式、角色狀態面板、戰鬥結算卡片 ---------- */
+.view--page {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* 寬螢幕不再將內容鎖在中央窄欄；左右留白改成可用的卡片網格空間 */
+.rest-layout {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1.12fr) minmax(320px, .88fr);
+  padding-inline: clamp(.65rem, 2.25vw, 2.75rem);
+  align-items: start;
+}
+.actions, .results { min-width: 0; }
+
+/* 角色狀態面板：深色主列＋可辨識的資訊分格 */
+.status {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: .32rem;
+  padding: .38rem clamp(.65rem, 2.25vw, 2.75rem);
+  background: #131316;
+  border-bottom: 1px solid #2a2a30;
+  box-shadow: 0 4px 16px rgba(0,0,0,.34);
+  animation: status-enter .35s cubic-bezier(.2,.75,.25,1) both;
+}
+.status__who, .status__time, .status__prof, .status__num {
+  min-height: 32px;
+  padding: .25rem .52rem;
+  border: 1px solid #2a2a30;
+  border-radius: 6px;
+  background: #1a1a1f;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+.status__who:hover, .status__time:hover, .status__prof:hover, .status__num:hover {
+  transform: translateY(-1px);
+  border-color: #4a4a55;
+  background: #0d0d0f;
+  box-shadow: 0 4px 10px rgba(0,0,0,.24);
+}
+.status__who { flex: 1 1 180px; }
+.status__time { flex: 1 1 150px; }
+.status__prof { flex: 1 1 140px; }
+.status__num { flex: 0 1 110px; margin-left: 0; }
+.status__num + .status__num { margin-left: 0; }
+.status__name { color: #fdd835; font-size: .9rem; }
+.status__meta, .status__label { color: #6e6e78; font-size: .62rem; }
+.status__time strong, .status__prof > strong, .status__num strong { font-size: .88rem; }
+.status__prof > strong, .status__num strong { color: #fdd835; }
+.status__day { padding: .23rem .48rem; color: #fdd835; border-color: #b8860b; font-size: .68rem; }
+.status__day:hover { color: #2a1a00; background: #fdd835; }
+.pips { grid-template-columns: repeat(10, 7px); gap: 2px; }
+.pip { height: 9px; }
+.mini-slots { gap: 3px; }
+.mini-slot { width: 27px; height: 27px; font-size: .82rem; }
+
+/* 戰鬥結算區：本身就是一張面板，最新結果用金色聚焦 */
+.results {
+  position: sticky;
+  top: .65rem;
+  padding: .72rem;
+  background: #131316;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.2);
+  animation: result-panel-in .4s cubic-bezier(.2,.75,.25,1) both;
+}
+.results .section-title {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: 0 0 .55rem;
+  padding-bottom: .38rem;
+  color: #e8e8ec;
+  border-bottom: 1px solid #2a2a30;
+  font-size: .98rem;
+}
+.results .section-title::before { color: #fdd835; margin-right: 0; }
+.result-list { gap: .38rem; }
+.result {
+  position: relative;
+  overflow: hidden;
+  padding: .55rem .65rem;
+  background: #1a1a1f;
+  border-color: #2a2a30;
+  border-left-width: 3px;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.result::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 20%, rgba(253,216,53,.07) 48%, transparent 76%);
+  transform: translateX(-110%);
+  transition: transform .45s ease;
+}
+.result:hover { transform: translateX(4px); background: #202027; border-color: #4a4a55; box-shadow: 0 5px 14px rgba(0,0,0,.25); }
+.result:hover::after { transform: translateX(110%); }
+.result:first-child { border-color: var(--t, #fdd835); box-shadow: 0 0 0 1px var(--t, #fdd835), 0 6px 16px rgba(0,0,0,.25); }
+.result__big { font-size: 1.75rem; color: #fdd835; }
+.result__exp { color: #fdd835; font-size: .82rem; }
+.result__formula, .result__flash { font-size: .72rem; }
+.result--note { color: #6e6e78; background: #0d0d0f; }
+.empty { color: #6e6e78; font-size: .75rem; line-height: 1.6; }
+
+@keyframes status-enter { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes result-panel-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* 不同寬度的空間分配 */
+@media (min-width: 1500px) {
+  .rest-layout { grid-template-columns: minmax(0, 1.25fr) minmax(430px, .75fr); }
+  .status { gap: .45rem; }
+  .status__who { flex-basis: 240px; }
+  .status__num { flex-basis: 140px; }
+}
+@media (max-width: 900px) {
+  .rest-layout { grid-template-columns: minmax(0, 1fr); padding-inline: .7rem; }
+  .results { position: static; }
+}
+@media (max-width: 620px) {
+  .status { align-items: stretch; flex-wrap: wrap; padding: .42rem .55rem; }
+  .status__who { flex-basis: calc(100% - 1px); }
+  .status__time, .status__prof, .status__num { flex: 1 1 calc(50% - .32rem); }
+  .status__num { margin-left: 0; }
+  .rest-layout { padding-inline: .5rem; }
+  .results { padding: .55rem; }
+}
+@media (max-width: 380px) {
+  .status__time, .status__prof, .status__num { flex-basis: 100%; }
+  .results .section-title { font-size: .9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status, .results, .result { animation: none; }
+  .result::after { display: none; }
+}
