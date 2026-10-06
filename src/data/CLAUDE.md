@@ -32,4 +32,4 @@ factions: [{
 
 ## 設定集 `public/lore-data/<loreId>.json`
 由 `src/api/lore.js` 的 `getLocationDetail()` 讀取，依 entries 順序顯示標題、圖片、文字。
-圖片路徑（例如 `lore-img/xxx.webp`）會接在環境變數 `VITE_LORE_IMG_BASE`（Cloudflare R2 網址）後面；沒設定時圖片不顯示。
+圖片路徑（例如 `lore-img/xxx.webp`）會接在 R2 網址 `https://lore-img.yuci8660.uk` 後面；可用環境變數 `VITE_LORE_IMG_BASE` 覆蓋。

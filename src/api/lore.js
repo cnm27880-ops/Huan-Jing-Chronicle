@@ -12,8 +12,8 @@ import { LOCATIONS } from '../data/locations.js';
 
 const MARKERS_URL = './map-data/markers.json'; // 相對路徑，GitHub Pages 子路徑才不會壞
 const LORE_DIR = './lore-data/';
-// 設定集圖片放在 Cloudflare R2，網址前綴由環境變數提供（沒設定時退回相對路徑）
-const LORE_IMG_BASE = (import.meta.env.VITE_LORE_IMG_BASE ?? '.').replace(/\/+$/, '');
+// 設定集圖片放在 Cloudflare R2（公開網址），可用環境變數 VITE_LORE_IMG_BASE 覆蓋
+const LORE_IMG_BASE = (import.meta.env.VITE_LORE_IMG_BASE || 'https://lore-img.yuci8660.uk').replace(/\/+$/, '');
 const PUBLIC_FIELDS = ['id', 'name', 'region', 'x', 'y', 'w', 'h', 'type'];
 
 let markersPromise = null;
