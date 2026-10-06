@@ -51,7 +51,6 @@ button:active { transform: scale(.97); }
 .hotspot { transition: box-shadow .15s ease, background-color .15s ease; }
 .hotspot:hover, .hotspot:focus-visible { background: rgba(253,216,53,.13); box-shadow: 0 0 0 2px var(--gold), 0 0 14px 3px rgba(253,216,53,.38); }
 .hotspot.is-active { box-shadow: 0 0 0 3px var(--gold), 0 0 18px 4px rgba(253,216,53,.55); }
-.hotspot[data-locked='false']::after { background: var(--gold); box-shadow: 0 0 0 2px var(--panel); }
 .zoom-controls { right: 18px; bottom: 18px; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 5px 18px rgba(0,0,0,.42); }
 .zoom-btn { background: var(--card); color: var(--muted); }
 .zoom-btn:hover { color: var(--gold); background: var(--input); }
@@ -141,7 +140,7 @@ body { background: #676a6b; }
 
 /* 地圖兩側使用低對比背景，不干擾中央地圖 */
 .atlas { padding: 7px; background: #676a6b; }
-.map-viewport { inset: 7px; overflow: hidden; background: #08090b; }
+.map-viewport { inset: 7px; overflow: hidden; background: #08090b; z-index: 0; } /* z-index 0：讓地圖自成一層，不會蓋住下方的操作提示 */
 .map-viewport::before {
   display: block;
   content: '';
@@ -166,14 +165,12 @@ body { background: #676a6b; }
 .map-stage { z-index: 1; animation: map-stage-in .6s cubic-bezier(.2,.75,.25,1) both; }
 .hotspot { z-index: 2; }
 .hotspot:hover { transform: scale(1.035); }
-.hotspot[data-locked='false']::after { animation: marker-pulse 2.4s ease-in-out infinite; }
 .marker-card[data-open='true'] { animation: card-rise .24s ease-out both; }
 .dossier[data-open='true'] .dossier__body > * { animation: dossier-item-in .3s ease both; }
 .dossier[data-open='true'] .dossier__body > *:nth-child(2) { animation-delay: .04s; }
 .dossier[data-open='true'] .dossier__body > *:nth-child(3) { animation-delay: .08s; }
 @keyframes map-atmosphere { from { transform: scale(1.04); opacity: .58; } to { transform: scale(1.1); opacity: .76; } }
 @keyframes map-stage-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes marker-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.18); box-shadow: 0 0 0 2px var(--panel), 0 0 0 7px rgba(253,216,53,0); } }
 @keyframes card-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes dossier-item-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes view-in { from { opacity: 0; } to { opacity: 1; } }
@@ -387,4 +384,15 @@ body { background: #676a6b; }
 @media (prefers-reduced-motion: reduce) {
   .status, .results, .result { animation: none; }
   .result::after { display: none; }
+}
+
+/* ---------- v7：物品名稱一律單行、背包標題數量看得清楚 ---------- */
+.tile__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+.tile__note { contain: inline-size; } /* 說明文字可以換行，但不撐寬格子 */
+.tile-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.showcase { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.bag-group__head small, .bag-group__head::after { color: #c4c4cc; }
+@media (max-width: 700px) {
+  .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .showcase { grid-template-columns: minmax(0, 1fr); }
 }

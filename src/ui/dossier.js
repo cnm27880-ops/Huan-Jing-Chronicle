@@ -17,6 +17,7 @@ function img({ src, alt }, className) {
   node.alt = alt ?? '';
   node.loading = 'lazy';
   node.decoding = 'async';
+  node.addEventListener('error', () => node.remove(), { once: true }); // 圖片載不到就不留破圖
   return node;
 }
 
@@ -60,7 +61,19 @@ export function createDossier({ panel, onClose }) {
     return box;
   }
 
+  // 設定集（public/lore-data）：依原本順序列出每一則的標題、圖片與文字
+  function renderLore(loc, region) {
+    const nodes = [el('p', 'dossier__region', region.name), el('h2', 'dossier__title', loc.name)];
+    loc.lore.entries.forEach((entry) => {
+      if (entry.title) nodes.push(el('h3', 'dossier__section', entry.title));
+      entry.images.forEach((image) => nodes.push(img(image, 'dossier__cover')));
+      entry.paragraphs.forEach((p) => nodes.push(el('p', 'dossier__text', p)));
+    });
+    return nodes;
+  }
+
   function renderRevealed(loc, region) {
+    if (loc.lore?.entries.length) return renderLore(loc, region);
     const nodes = [el('p', 'dossier__region', region.name), el('h2', 'dossier__title', loc.name)];
     if (loc.cover) nodes.push(img(loc.cover, 'dossier__cover'));
     (loc.body ?? []).forEach((p) => nodes.push(el('p', 'dossier__text', p)));

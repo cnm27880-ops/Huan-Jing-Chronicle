@@ -11,6 +11,9 @@ import { REGIONS } from '../data/regions.js';
 import { LOCATIONS } from '../data/locations.js';
 
 const MARKERS_URL = './map-data/markers.json'; // 相對路徑，GitHub Pages 子路徑才不會壞
+const LORE_DIR = './lore-data/';
+// 設定集圖片放在 Cloudflare R2（公開網址），可用環境變數 VITE_LORE_IMG_BASE 覆蓋
+const LORE_IMG_BASE = (import.meta.env.VITE_LORE_IMG_BASE || 'https://lore-img.yuci8660.uk').replace(/\/+$/, '');
 const PUBLIC_FIELDS = ['id', 'name', 'region', 'x', 'y', 'w', 'h', 'type'];
 
 let markersPromise = null;
@@ -23,6 +26,44 @@ function loadMarkers() {
     })
     .then((data) => data.markers ?? []);
   return markersPromise;
+}
+
+const loreCache = new Map();
+
+/** 讀取一個地點的設定集（public/lore-data/<loreId>.json），整理成畫面好用的格式 */
+function loadLore(loreId, locName) {
+  if (!loreCache.has(loreId)) {
+    const url = LORE_DIR + encodeURIComponent(loreId) + '.json';
+    loreCache.set(
+      loreId,
+      fetch(url)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => (data ? toLore(data, locName) : null))
+        .catch(() => null)
+    );
+  }
+  return loreCache.get(loreId);
+}
+
+function toLore(data, locName) {
+  const entries = (data.entries ?? []).map((e) => {
+    const title = (e.title ?? '').trim();
+    const lines = (e.content ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+    if (title && lines[0] === title) lines.shift(); // 內文第一行常重複標題
+    return {
+      id: e.id,
+      title: title === locName ? '' : title,
+      paragraphs: lines,
+      images: (e.images ?? []).map((src) => ({
+        src: `${LORE_IMG_BASE}/${src.replace(/^\/+/, '')}`,
+        alt: title || locName,
+      })),
+    };
+  });
+  return {
+    category: data.category ?? '',
+    entries: entries.filter((e) => e.title || e.paragraphs.length || e.images.length),
+  };
 }
 
 function pick(obj, keys) {
@@ -61,6 +102,8 @@ export async function getMapLocations() {
 /**
  * 取得單一地點的詳細內容
  * 未揭露的地點只回傳公開摘要，不含任何劇情文字與圖片。
+ * 已揭露的地點附上 lore：{ category, entries: [{ id, title, paragraphs, images: [{ src, alt }] }] }
+ * （lore-data 裡每則的 status 目前都是 Discord 匯出的 draft，揭露與否改以 locations.js 的地點狀態為準）
  */
 export async function getLocationDetail(id) {
   const items = await loadPublicMarkers();
@@ -69,5 +112,7 @@ export async function getLocationDetail(id) {
   const pub = pick(found.marker, PUBLIC_FIELDS);
   if (!found.revealed) return { ...pub, locked: true };
   const content = LOCATIONS.find((x) => x.id === id);
-  return { ...content, ...pub, locked: false };
+  const loreId = found.marker.loreId ?? null;
+  const lore = loreId ? await loadLore(loreId, found.marker.name) : null;
+  return { ...content, ...pub, loreId, lore, locked: false };
 }

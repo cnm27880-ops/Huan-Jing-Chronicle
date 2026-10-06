@@ -42,6 +42,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |
 | `src/styles/pages.css` | 修整日、背包頁面 |
+| `src/styles/redesign.css` | 全站新版樣式（最後載入，覆蓋前面幾個檔案） |
+| `public/lore-data/*.json` | 設定集文字（Discord 匯出），點「查看設定集」時由 `lore.js` 讀取 |
 
 ## 不可違反的規則
 1. **防劇透**：未揭露（`hidden`）與草稿（`draft`）的內容只能在 `src/api/lore.js` 被過濾掉，不能只在畫面上隱藏。UI 拿到的資料就不該包含它們。

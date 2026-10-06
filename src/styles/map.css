@@ -74,25 +74,6 @@
   box-shadow: 0 0 0 3px var(--bronze), 0 0 18px 4px rgba(194, 154, 85, 0.7);
 }
 
-/* 已公開情報的地點：右上角一顆會呼吸的印記，告訴玩家「這裡可以看」 */
-.hotspot[data-locked='false']::after {
-  content: '';
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--bronze);
-  box-shadow: 0 0 0 2px var(--ink);
-  animation: seal-breathe 2.4s ease-in-out infinite;
-}
-
-@keyframes seal-breathe {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 2px var(--ink), 0 0 0 0 rgba(194, 154, 85, 0.6); }
-  50% { transform: scale(1.15); box-shadow: 0 0 0 2px var(--ink), 0 0 0 7px rgba(194, 154, 85, 0); }
-}
-
 /* 索引滑過某區域時，地圖上同區域的地點一起亮起 */
 .map-hotspots[data-highlight='west'] .hotspot[data-region='west'],
 .map-hotspots[data-highlight='north'] .hotspot[data-region='north'],
