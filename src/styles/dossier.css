@@ -1,0 +1,283 @@
+/* ============================================================
+   地點情報面板
+   每個區域有自己的主題：只要改 [data-theme] 底下的變數即可
+   ============================================================ */
+.dossier {
+  --d-bg: var(--ink-raised);
+  --d-text: var(--mist);
+  --d-muted: var(--mist-dim);
+  --d-accent: var(--bronze);
+  --d-rule: var(--ink-line);
+  --d-head-font: var(--font-display);
+  --d-seal-bg: var(--bronze);
+  --d-seal-text: var(--ink);
+
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(460px, 100%);
+  background: var(--d-bg);
+  color: var(--d-text);
+  border-left: 1px solid var(--d-rule);
+  box-shadow: -18px 0 40px rgba(0, 0, 0, 0.35);
+  transform: translateX(104%);
+  transition: transform 0.32s var(--ease);
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+}
+
+.dossier[data-open='true'] {
+  transform: none;
+}
+
+.dossier__close {
+  align-self: flex-end;
+  margin: 0.75rem 0.75rem 0;
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--d-muted);
+  background: transparent;
+  border: 1px solid var(--d-rule);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+}
+
+.dossier__close:hover {
+  color: var(--d-text);
+  border-color: var(--d-accent);
+}
+
+.dossier__body {
+  overflow-y: auto;
+  padding: 0.5rem 1.75rem 3rem;
+  flex: 1;
+  overscroll-behavior: contain;
+}
+
+.dossier__region {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--d-muted);
+  letter-spacing: 0.08em;
+}
+
+.dossier__title {
+  margin: 0.2rem 0 1.1rem;
+  font-family: var(--d-head-font);
+  font-size: 2.4rem;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--d-text);
+}
+
+.dossier__cover {
+  display: block;
+  width: calc(100% + 3.5rem);
+  margin: 0 -1.75rem 1.25rem;
+  aspect-ratio: 16 / 8;
+  object-fit: cover;
+}
+
+.dossier__text {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.95;
+  margin: 0 0 1em;
+  text-align: justify;
+}
+
+.dossier__section {
+  margin: 2rem 0 1rem;
+  font-family: var(--d-head-font);
+  font-size: 1.15rem;
+  font-weight: 700;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--d-rule);
+}
+
+.dossier__locked {
+  font-family: var(--font-body);
+  line-height: 1.9;
+  color: var(--d-muted);
+  padding: 1.25rem;
+  border: 1px dashed var(--d-rule);
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- 勢力 ---------- */
+.faction + .faction {
+  margin-top: 2.25rem;
+}
+
+.faction__head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+/* 勢力名做成印章 */
+.faction__name {
+  margin: 0;
+  font-family: var(--d-head-font);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0.2rem 0.6rem;
+  background: var(--d-seal-bg);
+  color: var(--d-seal-text);
+  border-radius: 2px;
+}
+
+.faction__seat {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--d-muted);
+}
+
+.faction__image {
+  display: block;
+  width: 100%;
+  border-radius: 2px;
+  margin-bottom: 0.9rem;
+}
+
+.faction__text {
+  font-family: var(--font-body);
+  line-height: 1.95;
+  margin: 0 0 1.25rem;
+  text-align: justify;
+}
+
+.leader {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 42% 1fr;
+  gap: 1rem;
+  align-items: end;
+  padding-top: 1rem;
+  border-top: 1px solid var(--d-rule);
+}
+
+.leader__portrait {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 2px;
+}
+
+.leader__role {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--d-muted);
+}
+
+.leader__name {
+  margin: 0.15rem 0 0.6rem;
+  font-family: var(--d-head-font);
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.leader__desc {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.8;
+}
+
+/* ============================================================
+   區域主題
+   ============================================================ */
+
+/* 東方蓬萊仙島：宣紙、墨字、朱紅印章 */
+.dossier[data-theme='east'] {
+  --d-bg: #ede4cf;
+  --d-text: #24211c;
+  --d-muted: #6d6556;
+  --d-accent: #a8322d;
+  --d-rule: #cbbd9e;
+  --d-seal-bg: #a8322d;
+  --d-seal-text: #f5ecd8;
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(36, 33, 28, 0.08), transparent 55%),
+    radial-gradient(ellipse at 0% 100%, rgba(36, 33, 28, 0.06), transparent 50%),
+    var(--d-bg);
+}
+
+/* 西方大陸：羊皮紙、褐墨、森林綠 */
+.dossier[data-theme='west'] {
+  --d-bg: #e4d2a6;
+  --d-text: #3a2a17;
+  --d-muted: #7a6342;
+  --d-accent: #4f6b2a;
+  --d-rule: #c4ab78;
+  --d-seal-bg: #4f6b2a;
+  --d-seal-text: #f2e7c9;
+  --d-head-font: var(--font-body);
+}
+
+/* 北方冰原：深色終端、青色與洋紅 */
+.dossier[data-theme='north'] {
+  --d-bg: #0f1d24;
+  --d-text: #d4eef0;
+  --d-muted: #7fa3aa;
+  --d-accent: #4fd2ca;
+  --d-rule: #23424b;
+  --d-seal-bg: transparent;
+  --d-seal-text: #4fd2ca;
+  --d-head-font: var(--font-ui);
+}
+
+.dossier[data-theme='north'] .faction__name {
+  border: 1px solid #4fd2ca;
+  box-shadow: inset 0 0 0 1px rgba(212, 91, 198, 0.5);
+}
+
+/* 南方現代都市：灰藍檔案夾、訊號藍 */
+.dossier[data-theme='south'] {
+  --d-bg: #1b2938;
+  --d-text: #e2eaf3;
+  --d-muted: #8ea3b8;
+  --d-accent: #4aa3e0;
+  --d-rule: #2f4358;
+  --d-seal-bg: #4aa3e0;
+  --d-seal-text: #0f1a25;
+  --d-head-font: var(--font-ui);
+}
+
+/* ---------- 手機：底部抽屜 ---------- */
+@media (max-width: 640px) {
+  .dossier {
+    top: auto;
+    left: 0;
+    width: 100%;
+    max-height: 78%;
+    border-left: 0;
+    border-top: 1px solid var(--d-rule);
+    border-radius: 12px 12px 0 0;
+    transform: translateY(104%);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .dossier__body {
+    padding: 0.25rem 1.25rem 2.5rem;
+  }
+  .dossier__cover {
+    width: calc(100% + 2.5rem);
+    margin: 0 -1.25rem 1rem;
+  }
+  .dossier__title {
+    font-size: 2rem;
+  }
+  .leader {
+    grid-template-columns: 40% 1fr;
+  }
+}

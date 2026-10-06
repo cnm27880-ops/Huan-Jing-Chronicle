@@ -1,0 +1,16 @@
+{
+  "name": "huanjing-chronicle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "幻境編年史：網遊世界觀網站（原型）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/engine.test.js"
+  },
+  "devDependencies": {
+    "vite": "^8.3.3"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+
+# 機密與玩家資料：絕對不要上傳
+.env
+.env.*
+.dev.vars
+players_data.json
+*.token

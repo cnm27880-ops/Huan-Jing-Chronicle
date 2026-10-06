@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./node_modules/**)",
+      "Read(./dist/**)",
+      "Read(./package-lock.json)",
+      "Read(./public/img/**)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./.dev.vars)",
+      "Read(./players_data.json)"
+    ]
+  }
+}

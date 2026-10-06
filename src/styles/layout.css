@@ -1,0 +1,214 @@
+/* ============================================================
+   整體版面：頂部列、按鈕、地點索引面板
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ink);
+  color: var(--mist);
+  font-family: var(--font-ui);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+:focus-visible {
+  outline: 2px solid var(--bronze);
+  outline-offset: 2px;
+}
+
+/* ---------- 頂部列 ---------- */
+.topbar {
+  height: var(--topbar-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--ink-line);
+  background: var(--ink);
+  position: relative;
+  z-index: 30;
+}
+
+.brand {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 0.2em;
+  color: var(--bronze);
+  white-space: nowrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-right: auto;
+}
+
+.tab {
+  font-size: 0.95rem;
+  padding: 0.4rem 0.75rem;
+  color: var(--mist-dim);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.tab[aria-current='page'] {
+  color: var(--mist);
+  border-bottom-color: var(--bronze);
+}
+
+.tab[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.btn--ghost {
+  color: var(--mist);
+  background: transparent;
+  border: 1px solid var(--ink-line);
+}
+
+.btn--ghost:hover,
+.btn--ghost[aria-expanded='true'] {
+  border-color: var(--bronze-dim);
+  color: var(--bronze);
+}
+
+/* ---------- 主區域 ---------- */
+.atlas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- 地點索引 ---------- */
+.index-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(300px, 86vw);
+  background: var(--ink-raised);
+  border-right: 1px solid var(--ink-line);
+  transform: translateX(-102%);
+  transition: transform 0.28s var(--ease);
+  z-index: 20;
+  overflow-y: auto;
+  padding: 0.5rem 0 2rem;
+}
+
+.index-panel[data-open='true'] {
+  transform: none;
+}
+
+.index-group {
+  padding: 0.75rem 1rem 0.25rem;
+}
+
+.index-group__title {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--region-sea);
+}
+
+.index-group[data-region='west'] .index-group__title { border-color: var(--region-west); }
+.index-group[data-region='north'] .index-group__title { border-color: var(--region-north); }
+.index-group[data-region='east'] .index-group__title { border-color: var(--region-east); }
+.index-group[data-region='south'] .index-group__title { border-color: var(--region-south); }
+
+.index-group__sub {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--mist-dim);
+}
+
+.index-group__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.index-item {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--mist);
+  background: none;
+  border: 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.index-item:hover {
+  background: var(--ink);
+  color: var(--bronze);
+}
+
+.index-item[data-locked='true'] {
+  color: var(--mist-dim);
+}
+
+.index-item__tag {
+  font-size: 0.7rem;
+  color: var(--mist-dim);
+  opacity: 0.8;
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    gap: 0.75rem;
+    padding: 0 0.75rem;
+  }
+  .brand {
+    font-size: 1.2rem;
+    letter-spacing: 0.1em;
+  }
+  .tab[aria-disabled='true'] {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation: none !important;
+  }
+}
