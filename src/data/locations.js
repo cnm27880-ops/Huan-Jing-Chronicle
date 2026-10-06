@@ -1,67 +1,49 @@
 // ============================================================
-// 地點資料（原型階段的假資料，之後會改由 Cloudflare Worker 提供）
-// 資料格式說明請看同資料夾的 CLAUDE.md
+// 地點內容資料（原型階段的假資料，之後會改由 Cloudflare Worker 提供）
+// 位置、名稱、類型改放在 public/map-data/markers.json（GM 日後在後台編輯）；
+// 這裡只留「揭露狀態」與內容文字。格式說明請看同資料夾的 CLAUDE.md
 // ============================================================
 
-// 地圖原圖尺寸（world.webp 為 1280 x 714）
-const MAP_W = 1280;
-const MAP_H = 714;
-
-// 以「原圖像素中心點」標位置，轉成百分比，地圖縮放時熱點才會跟著走。
-// boxW / boxH 是熱點框的像素大小，省略時依名稱長度自動估算。
-function at(px, py, name, boxW, boxH) {
-  const w = boxW ?? name.length * 20 + 18;
-  const h = boxH ?? 34;
-  return {
-    x: +(px / MAP_W * 100).toFixed(2),
-    y: +(py / MAP_H * 100).toFixed(2),
-    w: +(w / MAP_W * 100).toFixed(2),
-    h: +(h / MAP_H * 100).toFixed(2),
-  };
-}
-
-function loc(id, name, region, px, py, extra = {}) {
-  const { boxW, boxH, ...rest } = extra;
+function loc(id, name, region, extra = {}) {
   return {
     id,
     name,
     region,
-    ...at(px, py, name, boxW, boxH),
-    status: 'hidden', // revealed = 已揭露 | hidden = 未揭露 | draft = 草稿
-    ...rest,
+    status: 'revealed', // 目前全圖都已揭露；revealed = 已揭露 | hidden = 未揭露 | draft = 草稿
+    ...extra,
   };
 }
 
 export const LOCATIONS = [
   // ---------- 西方大陸 ----------
-  loc('ancient-range',  '遠古山脈', 'west', 269, 200),
-  loc('gloom-valley',   '幽暗谷',   'west', 297, 245),
-  loc('wizard-tower',   '巫師塔',   'west', 157, 264),
-  loc('dragon-bay',     '龍灣王國', 'west', 449, 284),
-  loc('death-rift',     '死亡裂谷', 'west', 153, 316),
-  loc('great-forest',   '大森林',   'west', 169, 370),
-  loc('crown-city',     '皇冠城',   'west', 270, 362),
-  loc('golden-plains',  '黃金平原', 'west', 356, 381),
-  loc('silverheart',    '銀心王國', 'west', 478, 381),
-  loc('falcon-kingdom', '獵鷹王國', 'west', 70, 381),
-  loc('world-tree',     '世界樹',   'west', 126, 440),
-  loc('iron-wall',      '鐵壁城',   'west', 220, 442),
-  loc('sword-gorge',    '劍峽林灣', 'west', 380, 458),
-  loc('khan-kingdom',   '可汗王國', 'west', 239, 494),
+  loc('ancient-range',  '遠古山脈', 'west'),
+  loc('gloom-valley',   '幽暗谷',   'west'),
+  loc('wizard-tower',   '巫師塔',   'west'),
+  loc('dragon-bay',     '龍灣王國', 'west'),
+  loc('death-rift',     '死亡裂谷', 'west'),
+  loc('great-forest',   '大森林',   'west'),
+  loc('crown-city',     '皇冠城',   'west'),
+  loc('golden-plains',  '黃金平原', 'west'),
+  loc('silverheart',    '銀心王國', 'west'),
+  loc('falcon-kingdom', '獵鷹王國', 'west'),
+  loc('world-tree',     '世界樹',   'west'),
+  loc('iron-wall',      '鐵壁城',   'west'),
+  loc('sword-gorge',    '劍峽林灣', 'west'),
+  loc('khan-kingdom',   '可汗王國', 'west'),
 
   // ---------- 北方冰原 ----------
-  loc('ice-pit',        '冰坑',       'north', 560, 82),
-  loc('gabet-city',     '嘉貝特企業城', 'north', 733, 100),
-  loc('old-capital',    '舊都',       'north', 845, 144),
-  loc('scrap-city',     '廢料城',     'north', 437, 168),
-  loc('core-factory',   '核心工廠',   'north', 456, 202),
-  loc('genesis-dome',   '創世紀穹頂', 'north', 645, 233),
-  loc('industry-port',  '工業港',     'north', 777, 209),
+  loc('ice-pit',        '冰坑',       'north'),
+  loc('gabet-city',     '嘉貝特企業城', 'north'),
+  loc('old-capital',    '舊都',       'north'),
+  loc('scrap-city',     '廢料城',     'north'),
+  loc('core-factory',   '核心工廠',   'north'),
+  loc('genesis-dome',   '創世紀穹頂', 'north'),
+  loc('industry-port',  '工業港',     'north'),
 
   // ---------- 東方蓬萊仙島 ----------
-  loc('wasteland',      '荒域',     'east', 1030, 169),
+  loc('wasteland',      '荒域',     'east'),
   {
-    ...loc('shushan', '蜀山', 'east', 1183, 218),
+    ...loc('shushan', '蜀山', 'east'),
     status: 'revealed',
     cover: { src: 'img/lore/shushan.webp', alt: '蜀山雲海與懸浮峭壁' },
     body: [
@@ -84,29 +66,29 @@ export const LOCATIONS = [
       },
     ],
   },
-  loc('peach-isle',     '桃心島',   'east', 898, 247),
-  loc('penglai',        '蓬萊仙島', 'east', 1012, 324),
-  loc('myriad-demon',   '萬妖谷',   'east', 1213, 323),
-  loc('wanxiang',       '萬象宗',   'east', 837, 363),
-  loc('jade-pool',      '白玉瑤池', 'east', 943, 488),
-  loc('kunlun',         '崑崙山',   'east', 1162, 455),
-  loc('fengshen-tower', '封神塔',   'east', 1053, 568),
+  loc('peach-isle',     '桃心島',   'east'),
+  loc('penglai',        '蓬萊仙島', 'east'),
+  loc('myriad-demon',   '萬妖谷',   'east'),
+  loc('wanxiang',       '萬象宗',   'east'),
+  loc('jade-pool',      '白玉瑤池', 'east'),
+  loc('kunlun',         '崑崙山',   'east'),
+  loc('fengshen-tower', '封神塔',   'east'),
 
   // ---------- 南方現代都市 ----------
-  loc('ghost-harbor',   '鬼港城',   'south', 536, 490),
-  loc('cursed-fog',     '詛咒霧都', 'south', 364, 569),
-  loc('twin-city',      '雙連市',   'south', 489, 569),
-  loc('dragon-capital', '龍城首都', 'south', 684, 553),
-  loc('harmony-city',   '和諧市',   'south', 847, 522),
-  loc('echo-bay',       '回聲海灣', 'south', 825, 586),
-  loc('fallen-a',       '淪陷A區',  'south', 631, 639),
-  loc('fallen-b',       '淪陷B區',  'south', 932, 606),
-  loc('fallen-c',       '淪陷C區',  'south', 452, 669),
+  loc('ghost-harbor',   '鬼港城',   'south'),
+  loc('cursed-fog',     '詛咒霧都', 'south'),
+  loc('twin-city',      '雙連市',   'south'),
+  loc('dragon-capital', '龍城首都', 'south'),
+  loc('harmony-city',   '和諧市',   'south'),
+  loc('echo-bay',       '回聲海灣', 'south'),
+  loc('fallen-a',       '淪陷A區',  'south'),
+  loc('fallen-b',       '淪陷B區',  'south'),
+  loc('fallen-c',       '淪陷C區',  'south'),
 
   // ---------- 中央海域 ----------
-  loc('end-trench',     '盡頭海溝', 'sea', 27, 459, { boxW: 44, boxH: 124 }),
-  loc('final-ice',      '終焉之冰', 'sea', 632, 274),
-  loc('cloud-sea',      '雲海',     'sea', 731, 309),
-  loc('lost-waters',    '迷失海域', 'sea', 534, 418),
-  loc('abyss-sea',      '深淵海',   'sea', 399, 533),
+  loc('end-trench',     '盡頭海溝', 'sea'),
+  loc('final-ice',      '終焉之冰', 'sea'),
+  loc('cloud-sea',      '雲海',     'sea'),
+  loc('lost-waters',    '迷失海域', 'sea'),
+  loc('abyss-sea',      '深淵海',   'sea'),
 ];

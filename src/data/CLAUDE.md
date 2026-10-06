@@ -1,11 +1,16 @@
 # 資料格式（只有在改 src/data/ 時才需要讀）
 
-## 地點 `locations.js`
-用 `loc(id, 名稱, 區域, 像素X, 像素Y, 額外欄位)` 建立。
-- 座標是**世界全圖原圖（1280×714）上地名標籤的中心點像素**，函式會自動轉成百分比。
-- `boxW` / `boxH`：熱點框像素大小，省略時依名稱長度估算（直排標籤要手動給，例如盡頭海溝）。
+## 標記位置 `public/map-data/markers.json`（GM 日後在後台編輯）
+`{ markers: [{ id, name, region, x, y, w, h, type, loreId, summary? }] }`
+- `x`、`y`：地名標籤中心點，**佔圖片寬高的百分比**（換底圖也不跑位）；`w`、`h`：熱點框大小（同為百分比）。
+- `type`：`kingdom` | `place` | `sea`。`loreId`：對應 `public/lore-data/` 的檔名（不含 .json），可為 `null`。
+- `summary`：小卡片簡介。**只有已揭露的地點才能寫**，這個檔案是公開的。
+- `id` 必須和 `locations.js` 的 id 一致，揭露狀態以 `locations.js` 為準。
+
+## 地點內容 `locations.js`
+用 `loc(id, 名稱, 區域, 額外欄位)` 建立，只管揭露狀態與內容，不放座標。
 - `region`：`west` | `north` | `east` | `south` | `sea`
-- `status`：`revealed`（已揭露）| `hidden`（未揭露，只顯示地名）| `draft`（草稿，完全不出現）
+- `status`：預設 `revealed`（目前全圖都已揭露）。可用值：`revealed`（已揭露）| `hidden`（未揭露，只顯示地名）| `draft`（草稿，完全不出現）
 
 已揭露地點可加的內容欄位：
 ```js
