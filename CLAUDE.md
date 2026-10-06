@@ -31,7 +31,9 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/dom.js` | 建立元素的小工具 |
 | `src/api/lore.js` | **資料存取層**。UI 只能透過這裡拿資料 |
 | `src/data/regions.js` | 四大區域＋中央海域 |
-| `src/data/locations.js` | 地點資料（座標、揭露狀態、內容）。格式見 `src/data/CLAUDE.md` |
+| `src/data/locations.js` | 地點內容與揭露狀態。格式見 `src/data/CLAUDE.md` |
+| `public/map-data/markers.json` | 地圖標記位置（百分比座標、類型、簡介、設定集 id） |
+| `src/ui/markerCard.js` | 點標記的小卡片 |
 | `src/ui/mapView.js` | 地圖拖曳、縮放、熱點 |
 | `src/ui/dossier.js` | 地點情報面板 |
 | `src/ui/indexList.js` | 地點索引清單 |

@@ -4,7 +4,7 @@
 
 const MAP_W = 1280;
 const MAP_H = 714;
-const MAX_ZOOM = 4; // 相對於「剛好塞滿畫面」的倍數
+const MAX_ZOOM = 2; // 相對於「剛好塞滿畫面」的倍數（原圖僅 1884 像素，再放大只會變糊）
 const DRAG_THRESHOLD = 6; // 移動超過幾像素就算拖曳，不算點擊
 
 export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {

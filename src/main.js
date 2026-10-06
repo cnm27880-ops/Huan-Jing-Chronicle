@@ -10,6 +10,7 @@ import './styles/pages.css';
 import { getRegions, getMapLocations, getLocationDetail } from './api/lore.js';
 import { createMapView } from './ui/mapView.js';
 import { createDossier } from './ui/dossier.js';
+import { createMarkerCard } from './ui/markerCard.js';
 import { createIndexList } from './ui/indexList.js';
 import { createRestView } from './ui/restView.js';
 import { createBagView } from './ui/bagView.js';
@@ -23,15 +24,24 @@ async function init() {
   const indexPanel = $('#index-panel');
   const indexToggle = $('#index-toggle');
 
+  const locationsById = Object.fromEntries(locations.map((l) => [l.id, l]));
+  const dossierPanel = $('#dossier');
+
   const map = createMapView({
     viewport: $('#map-viewport'),
     stage: $('#map-stage'),
     hotspotLayer: $('#map-hotspots'),
-    onSelect: (id) => openLocation(id, { fly: false }),
+    onSelect: (id) => showCard(id, { fly: false }),
   });
 
   const dossier = createDossier({
-    panel: $('#dossier'),
+    panel: dossierPanel,
+    onClose: () => map.setActive(null),
+  });
+
+  const card = createMarkerCard({
+    container: $('#marker-card'),
+    onViewLore: (id) => openLocation(id),
     onClose: () => map.setActive(null),
   });
 
@@ -39,16 +49,27 @@ async function init() {
     container: $('#index-list'),
     onSelect: (id) => {
       setIndexOpen(false);
-      openLocation(id, { fly: true });
+      showCard(id, { fly: true });
     },
     onRegionHover: (rid) => map.highlightRegion(rid),
   });
 
-  async function openLocation(id, { fly }) {
+  /** 點標記：顯示小卡片（簡介與「查看設定集」） */
+  function showCard(id, { fly }) {
+    const loc = locationsById[id];
+    if (!loc) return;
+    if (dossierPanel.dataset.open === 'true') dossier.close();
+    map.setActive(id);
+    if (fly) map.focusOn(loc.x, loc.y);
+    card.open(loc, regionsById[loc.region]);
+  }
+
+  /** 小卡片的「查看設定集」：打開完整情報面板 */
+  async function openLocation(id) {
     const detail = await getLocationDetail(id);
     if (!detail) return;
+    card.close();
     map.setActive(id);
-    if (fly) map.focusOn(detail.x, detail.y);
     dossier.open(detail, regionsById[detail.region]);
   }
 
