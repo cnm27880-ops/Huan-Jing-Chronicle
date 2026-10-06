@@ -6,6 +6,7 @@ import './styles/layout.css';
 import './styles/map.css';
 import './styles/dossier.css';
 import './styles/pages.css';
+import './styles/redesign.css';
 
 import { getRegions, getMapLocations, getLocationDetail } from './api/lore.js';
 import { createMapView } from './ui/mapView.js';
