@@ -10,7 +10,7 @@
 ## 地點內容 `locations.js`
 用 `loc(id, 名稱, 區域, 額外欄位)` 建立，只管揭露狀態與內容，不放座標。
 - `region`：`west` | `north` | `east` | `south` | `sea`
-- `status`：`revealed`（已揭露）| `hidden`（未揭露，只顯示地名）| `draft`（草稿，完全不出現）
+- `status`：預設 `revealed`（目前全圖都已揭露）。可用值：`revealed`（已揭露）| `hidden`（未揭露，只顯示地名）| `draft`（草稿，完全不出現）
 
 已揭露地點可加的內容欄位：
 ```js

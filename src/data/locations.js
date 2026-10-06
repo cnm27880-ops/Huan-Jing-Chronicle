@@ -9,7 +9,7 @@ function loc(id, name, region, extra = {}) {
     id,
     name,
     region,
-    status: 'hidden', // revealed = 已揭露 | hidden = 未揭露 | draft = 草稿
+    status: 'revealed', // 目前全圖都已揭露；revealed = 已揭露 | hidden = 未揭露 | draft = 草稿
     ...extra,
   };
 }
