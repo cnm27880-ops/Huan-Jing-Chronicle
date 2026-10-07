@@ -1,6 +1,6 @@
 # 幻境編年史（網遊網站）
 
-GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包、裝備、戰鬥五個分頁，加上隨時可開的「骰盤」，資料存在瀏覽器（localStorage）。
+GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包、裝備、戰鬥、交易、跑團（骰盤、遭遇戰）分頁，資料存在瀏覽器（localStorage）。
 **改到遊戲規則、擲骰、加值、胃袋、紀念品、裝備、戰鬥、藥水時，先讀 `GAME_RULES.md`，並在改完後執行 `npm test`。**
 開發者是程式新手：回覆用繁體中文，步驟要具體，指令要能直接複製貼上。
 **所有 UI 樣式依 `DESIGN.md`（黑金主題）。** 色碼只能寫在 `src/styles/theme.css`，其他檔案用變數。
@@ -20,7 +20,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | 檔案 | 用途 |
 |---|---|
 | `index.html` | 頁面骨架（頂部列、地圖、面板容器） |
-| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #battle / #market）、角色存檔串接、骰盤 |
+| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #battle / #session / #market）、角色存檔串接 |
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
 | `DESIGN.md` | 視覺設計規格（黑金主題） |
 | `RULES_OVERVIEW.md` | 規則原文整理（創角、每日養成、技能學習升級、資源、寶石、配方、特殊材料）；階段 2 的依據，含待確認清單 |
@@ -38,18 +38,18 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |
-| `src/ui/roomPanel.js` | 骰盤裡的房間區塊：狀態、GM、成員、新戰鬥、暫代 GM |
+| `src/ui/roomPanel.js` | 跑團頁裡的房間區塊：狀態、GM、成員、新戰鬥、暫代 GM |
 | `src/api/auth.js` | 前端登入 API：查詢登入者、登出；任何失敗都當未登入（維持單機試玩） |
 | `src/ui/userChip.js` | 頂部列的登入者頭像與登出 |
 | `src/state/rollLog.js` | 擲骰紀錄，**畫面與房間之間唯一的接線點**：房間模式走 WebSocket、伺服器擲骰；本機模式（沒登入／連不上）照舊存 localStorage |
 | `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔 |
 | `src/game/importBot.js` | 機器人存檔（players_data.json 的一位玩家）→ 網站角色（純函式）：只填機器人有的欄位，技能與基礎數值空白；可合併進既有角色 |
-| `src/ui/botImport.js` | GM 專用的「匯入機器人存檔」面板（在骰盤的房間區塊）：檔案只在瀏覽器讀取轉換，轉好才送伺服器（`charImport`）；`players_data.json` 永遠不能進 git |
+| `src/ui/botImport.js` | GM 專用的「匯入機器人存檔」面板（在跑團頁的房間區塊）：檔案只在瀏覽器讀取轉換，轉好才送伺服器（`charImport`）；`players_data.json` 永遠不能進 git |
 | `src/data/skills.js` | 技能目錄（**自動產生，不要手改**）：117 個技能、每級累積數值、位階／類型／系別／效果文字、升級經驗表。由 `tools/extract-skills.py` 從 GM 的自動角色卡產生 |
 | `tools/extract-skills.py` | 更新技能目錄用（需要 openpyxl，只在技能資料改版時才跑）：`python3 tools/extract-skills.py 標準卡.xlsx [補充卡.xlsx …]` |
 | `src/game/skillTable.js` | 技能數值：查表、啟動類技能（武裝）、skills 模式（`statMode: 'skills'`）的規則（純函式） |
 | `src/game/importSheet.js` | 試算表角色卡（貼上的文字）→ 網站角色：用標題文字找位置，不看固定格子；算出「手動調整」（純函式） |
-| `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（骰盤的房間區塊）：貼上文字、預覽、寫入伺服器 |
+| `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |
 | `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：看並改玩家的手動調整、技能等級、啟動 |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |
@@ -59,10 +59,12 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、寶石、背包裝備（不能丟棄，只能賣出） |
 | `src/ui/reveal.js` | 鑑定開獎動畫（翻牌、數值跳動；只是畫面，數值鑑定時就已存好） |
 | `src/ui/marketView.js` | 交易頁（交易大廳／黑市／特殊黑市）＋裝備頁「賣出」面板 |
-| `src/ui/battleView.js` | 戰鬥頁：頂部固定列（生命／資源）、行動／紀錄／狀態三分頁、招式、藥水、遭遇戰 |
+| `src/ui/battleView.js` | 戰鬥頁：頂部固定列（生命／資源）、行動／紀錄／狀態三分頁、招式、藥水（遭遇戰在跑團頁） |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
-| `src/ui/diceTray.js` | 骰盤抽屜：一鍵技能檢定、自訂骰、紀錄 |
-| `src/ui/rollFeed.js` | 擲骰紀錄的畫面（骰盤與戰鬥頁共用）：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要 |
+| `src/ui/sessionView.js` | 跑團頁（原骰盤抽屜，階段 B）：房間資訊、一鍵技能檢定、跑團胃袋與結束跑團、自訂骰、遭遇戰、擲骰紀錄；離開頁面會停掉紀錄更新 |
+| `src/ui/encounterCard.js` | 遭遇戰卡片（跑團頁用）：怪物、新增敵人、選招式出招、承受攻擊。目前自己建立，階段 C 改由 GM 建立 |
+| `src/ui/battleSelect.js` | 戰鬥頁與跑團頁共用的「目前選擇」（出招招式、怪物攻防模式），不存檔 |
+| `src/ui/rollFeed.js` | 擲骰紀錄的畫面（跑團頁與戰鬥頁共用）：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要 |
 | `src/ui/dom.js` | 建立元素的小工具 |
 | `src/api/lore.js` | **資料存取層**。UI 只能透過這裡拿資料 |
 | `src/data/regions.js` | 四大區域＋中央海域 |
@@ -76,7 +78,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |
 | `src/styles/pages.css` | 修整日、背包頁面 |
-| `src/styles/dice.css` | 骰盤、紀錄、裝備頁、戰鬥頁 |
+| `src/styles/dice.css` | 跑團頁、紀錄、裝備頁、戰鬥頁 |
 | `src/styles/redesign.css` | 全站新版樣式（覆蓋前面幾個檔案） |
 | `src/styles/polish.css` | 質感層：按鈕、卡片、物品格的舊版效果 |
 | `src/styles/blackgold.css` | 黑金主題（最後載入）：星點背景、面板、標題、擲骰紀錄三軌摘要、稀有度、三欄／手機版面與底部導覽列 |

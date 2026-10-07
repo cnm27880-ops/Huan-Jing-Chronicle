@@ -239,3 +239,9 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 .roll--divider { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; border-top: 1px dashed var(--bronze, var(--gold)); border-bottom: 1px dashed var(--bronze, var(--gold)); background: none; padding: .35rem .2rem; }
 .roll--divider .roll__label { color: var(--bronze, var(--gold)); }
 .roll__sub { flex-basis: 100%; color: var(--muted); font-size: .72rem; }
+
+/* 跑團頁（原骰盤抽屜改成獨立分頁） */
+.session-root { max-width: 760px; margin: 0 auto; padding: 0 .9rem calc(2rem + env(safe-area-inset-bottom, 0px)); }
+.session-root .skill-grid { margin-bottom: .6rem; }
+.session-root .btn--go { margin-top: .7rem; }
+.session-root > .tray__body { overflow: visible; padding: .6rem 0 0; }

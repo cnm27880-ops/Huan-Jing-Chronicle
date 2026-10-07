@@ -1,7 +1,7 @@
 // ============================================================
-// 骰盤：隨時可以從頂部列打開的抽屜，不用切換頁面。
-// 一鍵技能檢定、自訂骰式（取代機器人 !投骰）、所有人的擲骰紀錄。
-// 之後接上 Cloudflare：紀錄會變成「房間內所有玩家」共用（見 src/state/rollLog.js）。
+// 跑團頁（原本的骰盤抽屜，階段 B 改成獨立分頁 #session）：
+// 房間資訊、一鍵技能檢定、跑團胃袋、自訂骰式（取代機器人 !投骰）、遭遇戰、所有人的擲骰紀錄。
+// 紀錄是「房間內所有玩家」共用（見 src/state/rollLog.js）。
 // ============================================================
 import { h } from './dom.js';
 import { amountPicker, rollFailed } from './controls.js';
@@ -13,15 +13,16 @@ import { modifier, proficiency, endSession } from '../game/engine.js';
 import { parseDiceExpr, MAX_DICE } from '../game/dice.js';
 import { rollDice, rollCheck, clearLog, getRoomStatus } from '../state/rollLog.js';
 import { iconOf } from './items.js';
+import { createEncounterCard } from './encounterCard.js';
 
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
 
-export function createDiceTray({ getState, commit, toggleButton }) {
-  const ui = { open: false, sides: 20, count: 1, mod: 0, text: '' };
-  const node = h('aside', { class: 'tray', id: 'dice-tray', 'aria-label': '骰盤', 'aria-hidden': 'true', dataset: { open: 'false' } });
-  document.body.append(node);
+export function createSessionView({ root, getState, commit }) {
+  const ui = { sides: 20, count: 1, mod: 0, text: '' };
+  const node = root;
   let feeds = [];
   let roomPanel = null;
+  const encounter = createEncounterCard({ getState, commit, rerender: () => render() });
 
   // ---------- 一鍵技能檢定 ----------
   async function checkSkill(skill) {
@@ -95,13 +96,12 @@ export function createDiceTray({ getState, commit, toggleButton }) {
     const historyBox = h('div', { class: 'tray__history' });
     const prof = proficiency(state, 'session');
     const stomach = state.sessionStomach;
-    const scrollY = node.querySelector('.tray__body')?.scrollTop ?? 0;
+    const scrollY = root.scrollTop;
 
-    node.replaceChildren(
+    node.replaceChildren(h('div', { class: 'session-root' },
       h('header', { class: 'tray__head' },
-        h('h2', { class: 'tray__heading', text: '骰盤' }),
-        h('span', { class: 'tray__who', text: state.name }),
-        h('button', { type: 'button', class: 'sheet__close', onclick: () => setOpen(false) }, '關閉')),
+        h('h2', { class: 'tray__heading', text: '跑團' }),
+        h('span', { class: 'tray__who', text: state.name })),
       roomBox, // 房間狀態：只有登入後才會出現
       h('div', { class: 'tray__body' },
         latestBox, // 最新結果放在內容最上面，跟著一起捲動（不再釘在畫面上佔空間）
@@ -128,33 +128,26 @@ export function createDiceTray({ getState, commit, toggleButton }) {
           h('p', { class: 'field-label', text: '非生活技能' }),
           h('div', { class: 'skill-grid' }, ART_SKILLS.map((s) => skillButton(state, s, state.arts[s] ?? 0, false)))),
         customPanel(),
+        encounter.render(),
         h('section', { class: 'tray__section' },
           h('div', { class: 'tray__title-row' },
             h('h3', { class: 'tray__title', text: '紀錄' }),
             getRoomStatus().phase === 'online'
               ? h('span', { class: 'hint', text: '房間共用，保存最近 200 筆' })
               : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')),
-          historyBox)));
+          historyBox))));
     roomPanel = mountRoomPanel(roomBox);
     feeds = [mountFeed(latestBox, { limit: 1, empty: '按下任何一顆骰子，結果會出現在這裡。' }), mountFeed(historyBox, { limit: 30, skip: 1, empty: '' })];
-    const body = node.querySelector('.tray__body');
-    if (body) body.scrollTop = scrollY;
+    root.scrollTop = scrollY;
   }
 
-  function setOpen(open) {
-    ui.open = open;
-    node.dataset.open = String(open);
-    node.setAttribute('aria-hidden', String(!open));
-    toggleButton?.setAttribute('aria-expanded', String(open));
-    if (open) render();
-    else { // 關起來就停掉紀錄的自動更新，背景擲骰時不用重畫看不到的清單
-      feeds.forEach((f) => f.destroy());
-      feeds = [];
-    }
+  /** 離開跑團頁：停掉紀錄的自動更新，背景擲骰時不用重畫看不到的清單 */
+  function leave() {
+    feeds.forEach((f) => f.destroy());
+    feeds = [];
+    roomPanel?.destroy();
+    roomPanel = null;
   }
 
-  toggleButton?.addEventListener('click', () => setOpen(!ui.open));
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ui.open) setOpen(false); });
-
-  return { refresh: () => { if (ui.open) render(); }, open: () => setOpen(true), close: () => setOpen(false) };
+  return { render, leave };
 }

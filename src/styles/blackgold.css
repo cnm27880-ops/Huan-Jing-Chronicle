@@ -420,7 +420,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
     border: 0;
     border-top: 2px solid transparent;
   }
-  .tab[data-view-link='gear'], .tab[data-view-link='market'] { display: none; }
+  .tab[data-view-link='gear'], .tab[data-view-link='market'], .tab[data-view-link='session'] { display: none; }
   .tab[aria-current='page'], .tab--more[data-active] { color: var(--gold); border-bottom: 0; border-top: 2px solid var(--gold); }
   .tab--more { display: flex; font: inherit; background: transparent; cursor: pointer; }
   .tab--more[aria-expanded='true'] { color: var(--gold); }

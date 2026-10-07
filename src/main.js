@@ -20,7 +20,7 @@ import { createBagView } from './ui/bagView.js';
 import { createGearView } from './ui/gearView.js';
 import { createBattleView } from './ui/battleView.js';
 import { createMarketView } from './ui/marketView.js';
-import { createDiceTray } from './ui/diceTray.js';
+import { createSessionView } from './ui/sessionView.js';
 import { showCover } from './ui/cover.js';
 import { createUserChip } from './ui/userChip.js';
 import { getCurrentUser, consumeLoginResult } from './api/auth.js';
@@ -74,13 +74,11 @@ async function init() {
   let character = loadCharacter();
   const getState = () => character;
   let views;
-  let tray;
   let sync = null;
   const commit = () => {
     saveCharacter(character);
     sync?.markDirty(); // 已連上房間時，稍後同步到伺服器
     views[currentView]?.render();
-    tray?.refresh();
   };
   views = {
     rest: createRestView({ root: $('#view-rest'), getState, commit }),
@@ -95,6 +93,7 @@ async function init() {
     }),
     gear: createGearView({ root: $('#view-gear'), getState, commit }),
     battle: createBattleView({ root: $('#view-battle'), getState, commit }),
+    session: createSessionView({ root: $('#view-session'), getState, commit }),
     market: createMarketView({ root: $('#view-market'), getState, commit }),
   };
   sync = createCharSync({
@@ -104,15 +103,15 @@ async function init() {
     adopt: (data) => { // 伺服器的存檔套用到畫面（不經過 commit，免得又上傳一次）
       character = importCharacter(data);
       views[currentView]?.render();
-      tray?.refresh();
     },
   });
-  tray = createDiceTray({ getState, commit, toggleButton: $('#tray-toggle') });
 
   let currentView = 'map';
   function showView() {
     const id = (location.hash || '#map').slice(1);
-    currentView = ['map', 'rest', 'bag', 'gear', 'battle', 'market'].includes(id) ? id : 'map';
+    const previous = currentView;
+    currentView = ['map', 'rest', 'bag', 'gear', 'battle', 'session', 'market'].includes(id) ? id : 'map';
+    if (previous !== currentView) views[previous]?.leave?.(); // 離開的頁面可以停掉背景更新（跑團頁的紀錄）
     document.querySelectorAll('[data-view]').forEach((el) => {
       el.hidden = el.dataset.view !== currentView;
     });
@@ -120,7 +119,7 @@ async function init() {
       if (a.dataset.viewLink === currentView) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
-    moreBtn.toggleAttribute('data-active', currentView === 'gear' || currentView === 'market'); // 裝備、交易收在「更多」裡，手機版讓「更多」亮起
+    moreBtn.toggleAttribute('data-active', currentView === 'gear' || currentView === 'market' || currentView === 'session'); // 裝備、交易、跑團收在「更多」裡，手機版讓「更多」亮起
     if (currentView === 'map') map.reset(false);
     else views[currentView].render();
   }
