@@ -15,7 +15,9 @@ import {
 import {
   modifier, gather, craft, craftableTimes, keepsakeApplies, countOf,
 } from '../game/engine.js';
-import { SKILL_TABLE, MAX_SKILL_LEVEL, usesSkillTable, inCatalog, upgradeCost, upgradeSkill } from '../game/skillTable.js';
+import { SKILL_TABLE, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo } from '../game/skillTable.js';
+import { openSheet } from './sheet.js';
+import { skillTile, skillInfoBlock } from './skillTile.js';
 import { SKILL_CATALOG, moveFromCatalog } from '../game/skills.js';
 
 const ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
@@ -190,31 +192,68 @@ export function createRestView({ root, getState, commit }) {
   const TIER_RANK = { 初階: 0, 進階: 1, 大師: 2, 傳說: 3, 神級: 4 };
   const byTier = (a, b) => (TIER_RANK[SKILL_TABLE[a]?.tier] ?? 9) - (TIER_RANK[SKILL_TABLE[b]?.tier] ?? 9) || a.localeCompare(b, 'zh-TW');
 
-  function doUpgrade(name) {
-    const state = getState();
-    const r = upgradeSkill(state, name);
-    if (!r.ok) return toast(r.error);
-    if (SKILL_CATALOG[name] && !state.moves.some((m) => m.skill === name)) state.moves.push(moveFromCatalog(name));
-    const swapText = r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`).join('；');
-    toast(`${name} 升到 ${r.level} 級（−${fmt(r.cost)} 經驗）${swapText ? `。${swapText}` : ''}`);
-    commit();
+  /** 一個技能的學習／升級面板：選目標等級 → 看要付什麼 → 確認 */
+  function openLearnSheet(name) {
+    const pick = { target: null };
+    let sheet;
+
+    const costRow = (label, need, have) => h('li', { class: 'learn-cost__row', dataset: { ok: have >= need ? '1' : '0' } },
+      h('span', { text: label }),
+      h('span', { class: 'num', text: `${fmt(need)}（有 ${fmt(have)}）` }),
+      h('b', { 'aria-hidden': 'true', text: have >= need ? '✓' : `缺 ${fmt(need - have)}` }));
+
+    function doUpgrade(plan) {
+      const state = getState();
+      const bookText = Object.entries(plan.books).map(([n, q]) => `${n} ×${q}`).join('、');
+      if (!confirm(`${name}：${plan.from ? `${plan.from} 級` : '學習'} → ${plan.to} 級\n將消耗 ${fmt(plan.exp)} 經驗、${bookText}。\n確定嗎？`)) return;
+      const r = upgradeSkillTo(state, name, plan.to);
+      if (!r.ok) return toast(r.error);
+      if (SKILL_CATALOG[name] && !state.moves.some((m) => m.skill === name)) state.moves.push(moveFromCatalog(name));
+      const swapText = r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`).join('；');
+      toast(`${name} ${r.from ? `${r.from} 級升到` : '學會，升到'} ${r.level} 級${swapText ? `。${swapText}` : ''}`);
+      pick.target = null;
+      commit();
+      sheet.refresh();
+    }
+
+    function body() {
+      const state = getState();
+      const lv = Number(state.skills?.[name]) || 0;
+      const info = skillInfoBlock(name);
+      if (lv >= MAX_SKILL_LEVEL) return h('div', { class: 'learn' }, info, h('p', { class: 'notice', text: `${name} 已經滿級。` }));
+      const best = maxAffordableLevel(state, name);
+      if (!pick.target || pick.target <= lv || pick.target > MAX_SKILL_LEVEL) pick.target = Math.max(best, lv + 1);
+      const plan = upgradePlan(state, name, pick.target);
+      const set = (n) => { pick.target = n; sheet.refresh(); };
+      const swapAt = FOOL_SWAPS[name] ? FOOL_LEVELS.filter((x) => x > lv && x <= pick.target) : [];
+      return h('div', { class: 'learn' },
+        info,
+        h('p', { class: 'field-label', text: `目前 ${lv ? `${lv} 級` : '未學會'}　要升到幾級？` }),
+        h('div', { class: 'chip-row learn__levels', role: 'radiogroup', 'aria-label': '目標等級' },
+          Array.from({ length: MAX_SKILL_LEVEL - lv }, (_, i) => lv + 1 + i).map((n) =>
+            h('button', { type: 'button', class: 'chip', role: 'radio', 'aria-checked': String(n === pick.target), onclick: () => set(n) }, `${n} 級`))),
+        h('div', { class: 'row' },
+          h('button', { type: 'button', class: 'btn btn--small', onclick: () => set(lv + 1) }, lv ? '升一級' : '只學會'),
+          best > lv ? h('button', { type: 'button', class: 'btn btn--small', onclick: () => set(best) }, `材料夠的最高：${best} 級`) : null,
+          h('button', { type: 'button', class: 'btn btn--small', onclick: () => set(MAX_SKILL_LEVEL) }, '學滿 10 級')),
+        h('p', { class: 'field-label', text: `${lv ? `${lv} → ${plan.to} 級` : `學會並升到 ${plan.to} 級`}要消耗` }),
+        h('ul', { class: 'learn-cost' },
+          costRow('經驗', plan.exp, plan.haveExp),
+          Object.entries(plan.books).map(([n, q]) => costRow(`${iconOf(n)} ${n}`, q, getState().inventory[n] ?? 0))),
+        h('p', { class: 'hint', text: `學新技能要 3 本「${name}」技能書；之後每升到第 N 級要 N 本「${SKILL_TABLE[name].tier}技能書」。` }),
+        swapAt.length ? h('p', { class: 'hint', text: `會在 ${swapAt.join('、')} 級自動對調「${FOOL_SWAPS[name][0]}」與「${FOOL_SWAPS[name][1]}」。` }) : null,
+        h('button', {
+          type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: () => doUpgrade(plan),
+        }, plan.ok ? `${lv ? '升級' : '學習'}到 ${plan.to} 級` : '材料不夠'));
+    }
+
+    sheet = openSheet(name, body, { tall: true });
   }
 
-  function learnRow(state, name) {
-    const t = SKILL_TABLE[name];
+  function learnTile(state, name) {
     const lv = Number(state.skills?.[name]) || 0;
-    const cost = upgradeCost(state, name);
-    const can = cost != null && (Number(state.exp) || 0) >= cost;
-    return h('li', { class: 'skill-row skill-row--cat' },
-      h('div', { class: 'skill-row__main' },
-        h('strong', { text: name }),
-        h('small', { class: 'skill-row__tag', text: `${t.tier}・${t.kind}${t.school ? `・${t.school}` : ''}` }),
-        h('span', { class: 'num', text: lv ? `${lv} / ${MAX_SKILL_LEVEL} 級` : '未學會' }),
-        cost == null
-          ? h('small', { class: 'skill-row__tag', text: '已滿級' })
-          : h('button', { type: 'button', class: 'btn btn--primary btn--small', disabled: can ? null : true, onclick: () => doUpgrade(name) },
-              `${lv ? `升到 ${lv + 1} 級` : '學習'}（${fmt(cost)} 經驗）`)),
-      h('details', { class: 'skill-row__text' }, h('summary', { text: '效果' }), h('p', { text: t.text })));
+    const note = lv >= MAX_SKILL_LEVEL ? '已滿級' : maxAffordableLevel(state, name) > lv ? '可以升級' : '材料不足';
+    return skillTile(name, { level: lv, note, onOpen: () => openLearnSheet(name) });
   }
 
   function learnPanel(state) {
@@ -224,12 +263,12 @@ export function createRestView({ root, getState, commit }) {
     const learned = Object.keys(state.skills ?? {}).filter(inCatalog).sort(byTier);
     const unlearned = Object.keys(SKILL_TABLE).filter((n) => !(n in (state.skills ?? {}))).sort(byTier);
     return section('學習技能',
-      h('p', { class: 'hint', text: `花經驗學新技能或升級，不花時間。目前經驗 ${fmt(state.exp)}。愚者技能升到 1、5、10 級時會自動對調兩項數值（不含裝備與食物）。` }),
+      h('p', { class: 'hint', text: `點技能看效果並學習／升級，可以一次升到想要的等級，不花時間。目前經驗 ${fmt(state.exp)}。愚者技能升到 1、5、10 級時會自動對調兩項數值（不含裝備與食物）。` }),
       h('h3', { class: 'field-label', text: `已學會（${fmt(learned.length)}）` }),
-      learned.length ? h('ul', { class: 'skill-list' }, learned.map((n) => learnRow(state, n))) : h('p', { class: 'notice', text: '還沒有學會技能。' }),
+      learned.length ? h('div', { class: 'skill-tiles' }, learned.map((n) => learnTile(state, n))) : h('p', { class: 'notice', text: '還沒有學會技能。' }),
       h('details', { class: 'add-box', open: ui.learnOpen, ontoggle: (e) => { ui.learnOpen = e.target.open; } },
         h('summary', { text: `＋ 學新技能（${fmt(unlearned.length)}）` }),
-        h('ul', { class: 'skill-list' }, unlearned.map((n) => learnRow(state, n)))));
+        h('div', { class: 'skill-tiles' }, unlearned.map((n) => learnTile(state, n)))));
   }
 
   // ---------- 組合 ----------

@@ -19,6 +19,8 @@ import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVE
 import { publish, rollWith } from '../state/rollLog.js';
 import { openReveal } from './reveal.js';
 import { openGearSellSheet } from './marketView.js';
+import { openSheet } from './sheet.js';
+import { skillTile, skillInfoBlock } from './skillTile.js';
 
 const tierIndex = (g) => GEAR_TIERS.indexOf(g.tier);
 const SLOT_ICON = { weapon: '⚔️', armor: '🛡️', accessory: '💍' };
@@ -43,12 +45,10 @@ export function createGearView({ root, getState, commit }) {
   // ---------- 數值面板 ----------
   function statCell(p, stat, extra) {
     const x = p[stat];
-    const detail = x.parts.length > 1 ? x.parts.map((q) => `${q.label} ${fmt(q.value)}`).join('　') : '';
-    return h('div', { class: 'stat', title: detail },
+    return h('div', { class: 'stat' },
       h('span', { class: 'stat__name', text: stat }),
       h('strong', { class: 'stat__value', text: fmt(x.total) }),
-      extra ?? null,
-      detail ? h('small', { class: 'stat__detail', text: detail }) : null);
+      extra ?? null);
   }
 
   function panelCard(state) {
@@ -58,7 +58,7 @@ export function createGearView({ root, getState, commit }) {
       h('div', { class: 'stat-grid' }, list.map((s) => statCell(p, s, s === '生命' ? h('small', { class: 'stat__detail', text: `目前 ${fmt(state.hp)}` }) : null))));
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '數值面板' }),
-      h('p', { class: 'hint', text: usesSkillTable(state) ? '基礎 + 技能 + 手動調整 + 裝備 + 跑團胃袋的食物。滑過數字可看明細。' : '基礎 + 裝備 + 跑團胃袋的食物。滑過數字可看明細。' }),
+      h('p', { class: 'hint', text: usesSkillTable(state) ? '基礎 + 技能 + 手動調整 + 裝備 + 跑團胃袋的食物。' : '基礎 + 裝備 + 跑團胃袋的食物。' }),
       group('攻擊', ATK_STATS),
       group('防禦', DEF_STATS),
       group('資源', RESOURCE_STATS),
@@ -80,21 +80,19 @@ export function createGearView({ root, getState, commit }) {
       .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'zh-TW'));
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: `技能（已學會 ${fmt(learned.length)} 個）` }),
-      h('p', { class: 'hint', text: '數值面板依技能等級自動加總（等級只能在修整日「學習」用經驗升級）。「手動調整」（自由分配、愚者對調、還沒搬到網站的裝備）由 GM 設定。武裝類技能要打開「啟動」才有數值，同時扣算力上限。' }),
+      h('p', { class: 'hint', text: '數值面板依技能等級自動加總（等級只能在修整日「學習」用經驗與技能書升級）。「手動調整」（自由分配、愚者對調、還沒搬到網站的裝備）由 GM 設定。武裝類技能要打開「啟動」才有數值，同時扣算力上限。' }),
       learned.length
-        ? h('ul', { class: 'skill-list' }, learned.map(([name, lv]) => {
+        ? h('div', { class: 'skill-tiles' }, learned.map(([name, lv]) => {
             const t = SKILL_TABLE[name];
-            return h('li', { class: 'skill-row skill-row--cat' },
-              h('div', { class: 'skill-row__main' },
-                h('strong', { text: name }),
-                h('small', { class: 'skill-row__tag', text: `${t.tier}・${t.kind}${t.school ? `・${t.school}` : ''}${t.manual ? '・數值手動' : ''}` }),
-                h('span', { class: 'num', text: `${lv} 級` }),
-                needsActivation(name)
-                  ? h('label', { class: 'check' },
-                      h('input', { type: 'checkbox', checked: state.skillOn?.[name] ? true : null, onchange: (e) => { state.skillOn = { ...state.skillOn, [name]: e.target.checked }; commit(); } }),
-                      h('span', { text: `啟動（算力上限 −${t.activate.算力}）` }))
-                  : null),
-              h('details', { class: 'skill-row__text' }, h('summary', { text: '效果' }), h('p', { text: t.text })));
+            const footer = needsActivation(name)
+              ? h('label', { class: 'check skill-tile__on', onclick: (e) => e.stopPropagation() },
+                  h('input', { type: 'checkbox', checked: state.skillOn?.[name] ? true : null, onchange: (e) => { state.skillOn = { ...state.skillOn, [name]: e.target.checked }; commit(); } }),
+                  h('span', { text: `啟動（算力 −${t.activate.算力}）` }))
+              : null;
+            return skillTile(name, {
+              level: lv, footer, note: t.manual ? '數值手動' : null,
+              onOpen: () => openSheet(name, () => h('div', { class: 'learn' }, skillInfoBlock(name), h('p', { class: 'hint', text: `目前 ${lv} 級` }))),
+            });
           }))
         : h('p', { class: 'notice', text: '還沒有學會技能。' }),
       h('p', { class: 'hint', text: '學新技能與升級請到「修整日」的「學習」分頁。' }));

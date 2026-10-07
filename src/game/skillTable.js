@@ -10,6 +10,7 @@
 //   要把 state.skillOn[名稱] 打開才會有技能數值，同時扣算力上限（扣到 0 為止）。
 // ============================================================
 import { SKILL_TABLE, EXP_TABLE } from '../data/skills.js';
+import { countOf, removeItem } from './engine.js';
 
 export { SKILL_TABLE, EXP_TABLE };
 export const MAX_SKILL_LEVEL = 10;
@@ -111,16 +112,57 @@ export function upgradeCost(state, name) {
   return EXP_TABLE[tier]?.[lv] ?? null;
 }
 
-/** 付經驗升一級（不夠就不動）。回傳 { ok, error?, cost?, level?, swaps? } */
-export function upgradeSkill(state, name) {
+/** 學新技能（0→1）要 3 本「同名」技能書（物品名 = 技能名，需驗證）；升到 N 級要 N 本「同階」技能書 */
+export const LEARN_BOOKS = 3;
+export const bookOf = (name) => `${SKILL_TABLE[name].tier}技能書`;
+
+/**
+ * 從現在的等級一次升到 target 級要付的東西（不改任何資料）。
+ * 回傳 { from, to, exp, books: { 物品名: 數量 }, haveExp, missing: { 經驗?, 物品名? }, ok }；不能升回 null。
+ * 每一級各付一次：經驗 = EXP_TABLE 該級；書 = 0→1 付 3 本同名，其他級付「該級數」本同階。
+ */
+export function upgradePlan(state, name, target) {
+  const tier = SKILL_TABLE[name]?.tier;
+  const from = Number(state.skills?.[name]) || 0;
+  const to = Math.min(MAX_SKILL_LEVEL, Math.floor(Number(target)) || 0);
+  if (!tier || !EXP_TABLE[tier] || to <= from) return null;
+  let exp = 0;
+  const books = {};
+  for (let lv = from + 1; lv <= to; lv++) {
+    exp += EXP_TABLE[tier][lv - 1] ?? 0;
+    const [item, n] = lv === 1 ? [name, LEARN_BOOKS] : [bookOf(name), lv];
+    books[item] = (books[item] ?? 0) + n;
+  }
+  const haveExp = Number(state.exp) || 0;
+  const missing = {};
+  if (haveExp < exp) missing.經驗 = exp - haveExp;
+  for (const [item, n] of Object.entries(books)) if (countOf(state, item) < n) missing[item] = n - countOf(state, item);
+  return { from, to, exp, books, haveExp, missing, ok: Object.keys(missing).length === 0 };
+}
+
+/** 目前資源最多能升到幾級（一級都升不了回現在的等級） */
+export function maxAffordableLevel(state, name) {
+  let best = Number(state.skills?.[name]) || 0;
+  for (let t = best + 1; t <= MAX_SKILL_LEVEL; t++) {
+    if (!upgradePlan(state, name, t)?.ok) break;
+    best = t;
+  }
+  return best;
+}
+
+/** 一次升到 target 級：扣經驗與技能書（不夠就一樣都不動）。回傳 { ok, error?, exp?, books?, level?, swaps? } */
+export function upgradeSkillTo(state, name, target) {
   if (!usesSkillTable(state)) return { ok: false, error: '這是舊式存檔，請請 GM 用「匯入角色卡」更新。' };
   if (!inCatalog(name)) return { ok: false, error: '技能目錄裡沒有這個技能。' };
-  const cost = upgradeCost(state, name);
-  if (cost == null) return { ok: false, error: '已經滿級。' };
-  if ((Number(state.exp) || 0) < cost) return { ok: false, error: `經驗不足（需要 ${cost}）。` };
-  state.exp -= cost;
-  state.spentExp = (Number(state.spentExp) || 0) + cost;
-  const level = (Number(state.skills?.[name]) || 0) + 1;
-  const swaps = setSkillLevel(state, name, level);
-  return { ok: true, cost, level, swaps };
+  const plan = upgradePlan(state, name, target);
+  if (!plan) return { ok: false, error: '已經滿級，或目標等級沒有比現在高。' };
+  if (!plan.ok) return { ok: false, error: `材料不夠：${Object.entries(plan.missing).map(([k, n]) => `${k} 還差 ${n}`).join('、')}` };
+  state.exp -= plan.exp;
+  state.spentExp = (Number(state.spentExp) || 0) + plan.exp;
+  for (const [item, n] of Object.entries(plan.books)) removeItem(state, item, n);
+  const swaps = setSkillLevel(state, name, plan.to);
+  return { ok: true, exp: plan.exp, books: plan.books, from: plan.from, level: plan.to, swaps };
 }
+
+/** 升一級（等於 upgradeSkillTo 目前等級 + 1） */
+export const upgradeSkill = (state, name) => upgradeSkillTo(state, name, (Number(state.skills?.[name]) || 0) + 1);

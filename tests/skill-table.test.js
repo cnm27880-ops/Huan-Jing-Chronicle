@@ -96,7 +96,7 @@ test('skillParts 只在 skills 模式有內容', () => {
 });
 
 // ---------- 愚者對調與技能升級 ----------
-import { setSkillLevel, upgradeSkill, upgradeCost, markSwapsDone } from '../src/game/skillTable.js';
+import { setSkillLevel, upgradeSkill, upgradeSkillTo, upgradePlan, maxAffordableLevel, upgradeCost, markSwapsDone } from '../src/game/skillTable.js';
 
 test('愚者：升到 1 級先加屬性再對調，差額記進手動調整，同一級不重複', () => {
   const s = mk({}, { baseStats: { ...blankCharacter('x').baseStats, 體魄強韌: 10, 物理傷害: 30 } });
@@ -127,11 +127,15 @@ test('已學會的愚者匯入時標記已對調；舊存檔不對調', () => {
   assert.equal(setSkillLevel(old, '山脈愚者', 10).length, 0);
 });
 
-test('升級：付單次經驗、記 spentExp；經驗不足或滿級不動', () => {
-  const s = mk({}, { exp: 100, spentExp: 5 });
+test('升級：付單次經驗與技能書、記 spentExp；材料不足或滿級不動', () => {
+  const s = mk({}, { exp: 100, spentExp: 5, inventory: { 八卦掌: 3, 初階技能書: 2 } });
   assert.equal(upgradeCost(s, '八卦掌'), 30);
-  assert.equal(upgradeSkill(s, '八卦掌').ok, true); // 0→1 付 30
-  assert.equal(upgradeSkill(s, '八卦掌').cost, 60); // 1→2 付 60
+  const a = upgradeSkill(s, '八卦掌'); // 0→1 付 30 經驗 + 3 本同名書
+  assert.equal(a.ok, true);
+  assert.equal(s.inventory.八卦掌, undefined);
+  const b = upgradeSkill(s, '八卦掌'); // 1→2 付 60 經驗 + 2 本初階書
+  assert.equal(b.ok, true);
+  assert.equal(s.inventory.初階技能書, undefined);
   assert.equal(s.exp, 10);
   assert.equal(s.spentExp, 95);
   const r = upgradeSkill(s, '八卦掌');
@@ -139,4 +143,20 @@ test('升級：付單次經驗、記 spentExp；經驗不足或滿級不動', ()
   assert.equal(s.skills.八卦掌, 2);
   const max = mk({ 八卦掌: 10 }, { exp: 9999 });
   assert.equal(upgradeSkill(max, '八卦掌').ok, false);
+});
+
+test('一次升到滿級：總共 3 + 2~10 = 57 本書，經驗 = 各級費用加總；不夠就一樣都不扣', () => {
+  const plan = upgradePlan(mk({}, { exp: 0 }), '八卦掌', 10);
+  assert.equal(plan.books.八卦掌, 3);
+  assert.equal(plan.books.初階技能書, 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10);
+  assert.equal(plan.exp, 30 + 60 + 100 + 150 + 210 + 280 + 360 + 450 + 550 + 660);
+  assert.equal(plan.ok, false);
+  const poor = mk({}, { exp: 99999, inventory: { 八卦掌: 3, 初階技能書: 53 } }); // 少 1 本
+  assert.equal(upgradeSkillTo(poor, '八卦掌', 10).ok, false);
+  assert.equal(poor.exp, 99999);
+  assert.equal(poor.inventory.初階技能書, 53);
+  assert.equal(maxAffordableLevel(poor, '八卦掌'), 9);
+  poor.inventory.初階技能書 = 54;
+  assert.equal(upgradeSkillTo(poor, '八卦掌', 10).level, 10);
+  assert.equal(poor.skills.八卦掌, 10);
 });
