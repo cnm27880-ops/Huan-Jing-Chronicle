@@ -80,11 +80,13 @@ export function eat(state, food, ctx) {
   if (stomach.length >= STOMACH_SLOTS) return '胃袋已滿，最多 3 份。';
   if (!removeItem(state, food)) return `背包裡沒有${food}。`;
   stomach.push(ctx === 'rest' ? { food, left: REST_FOOD_CHECKS } : { food });
+  // 惜未央：吃下時獲得 1 時間，每次刷新之間最多 2 次（RULES_OVERVIEW §9）
+  if (food === '惜未央' && (state.xiweiTime ?? 0) < 2) { state.time += 1; state.xiweiTime = (state.xiweiTime ?? 0) + 1; }
   return null;
 }
 
 /** 每次修整檢定後呼叫：修整胃袋每份扣 1 次 */
-function tickRestStomach(state) {
+export function tickRestStomach(state) {
   state.restStomach.forEach((s) => (s.left -= 1));
   state.restStomach = state.restStomach.filter((s) => s.left > 0);
 }
@@ -97,10 +99,12 @@ export function newDay(state) {
   // 黑市付不出錢會「勞動抵債」讓時間變負的：換日時先還（-3 → 7）
   state.time = MAX_TIME + Math.min(0, state.time);
   state.loginDays += 1;
+  state.dailyDone = {}; // 特殊材料每個修整日每種 1 次（special.js）
+  state.xiweiTime = 0;
 }
 
 /** 消耗本次檢定用到的紀念品，回傳實際用掉的清單 */
-function consumeKeepsakes(state, action, keepsakes) {
+export function consumeKeepsakes(state, action, keepsakes) {
   const used = [];
   keepsakes.forEach((name) => {
     if (keepsakeApplies(state.keepsakes[name], action) && removeItem(state, name)) used.push(name);

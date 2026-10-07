@@ -151,3 +151,8 @@ async function init() {
 }
 
 init();
+
+// PWA：只在正式版註冊 Service Worker（開發時不註冊，避免快取讓畫面不更新）。失敗就當沒有，網站照常運作
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}

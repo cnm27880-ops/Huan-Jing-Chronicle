@@ -381,6 +381,15 @@ export function drinkPotion(state, name, rng = Math.random) {
     out.healed = state.hp - before;
     out.dice = `${def.heal.n}D${def.heal.sides}`;
   }
+  if (def.restore) {
+    out.restored = {};
+    for (const [res, pct] of Object.entries(def.restore)) {
+      const max = derivedStats(state)[res]?.total ?? 0;
+      const before = state.resources[res] ?? 0;
+      state.resources[res] = Math.min(max, before + Math.floor((max * pct) / 100));
+      out.restored[res] = state.resources[res] - before;
+    }
+  }
   if (def.atk) { state.buffs.atk += def.atk; out.atk = def.atk; }
   if (def.def) { state.buffs.def += def.def; out.def = def.def; }
   return out;

@@ -843,9 +843,9 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 #view-rest .status__day { min-height: 32px; padding: 0 12px; color: var(--gold); background: var(--goldbg); border: 1px solid var(--gold2); }
 #view-rest .status__day--yes { color: var(--on-gold); background: var(--gold); }
 
-/* 三個行動分頁 */
+/* 四個行動分頁 */
 #view-rest .rest-tabs {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
   margin-bottom: 12px; padding: 4px;
   background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-pill);
 }
@@ -1166,3 +1166,13 @@ input[type='number'], .amount__input { text-align: center; }
 .badge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .badge-row { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .badge-row__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.badge-made { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; font-size: 0.8rem; color: var(--soft); }
+.badge-made__name { min-width: 0; overflow-wrap: anywhere; }
+
+/* 修整日「特殊」分頁 */
+.special-list { display: grid; gap: 6px; margin-top: 6px; }
+.special-card { display: grid; gap: 6px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.special-card__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+.special-card .row { display: flex; flex-wrap: wrap; gap: 6px; }
+.special-card .field { flex: 1; min-width: 0; }
+@media (max-width: 420px) { #view-rest .rest-tab { gap: 3px; padding: 0 4px; font-size: 0.9rem; } #view-rest .rest-tab__icon { display: none; } }

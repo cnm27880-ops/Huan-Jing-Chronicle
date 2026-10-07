@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { blankCharacter } from '../src/game/importBot.js';
-import { badgeStatus, craftBadge, badgeName } from '../src/game/badges.js';
+import { badgeStatus, craftBadge, renameBadge, badgeName } from '../src/game/badges.js';
 import { drawBooks, chooseDraw, drawPool, hasPendingDraw } from '../src/game/skillDraw.js';
 import { upgradePlan, upgradeSkillTo } from '../src/game/skillTable.js';
 import { gather, craft } from '../src/game/engine.js';
@@ -80,4 +80,32 @@ test('學習門檻：進階要累計花費 3000、大師 13000、傳說 33000；
   // 已學會之後升級不看門檻
   const lv1 = mk({ exp: 99999, spentExp: 0, skills: { [adv]: 1 }, inventory: { 進階技能書: 2 } });
   assert.equal(upgradeSkillTo(lv1, adv, 2).ok, true);
+});
+
+test('徽章改名：製作時可自訂、之後可改，背包裡的徽章跟著改名；不能和別的東西同名', () => {
+  const s = mk({ inventory: { 鐵礦石: 3 } });
+  s.counters.釣魚 = 500;
+  assert.equal(craftBadge(s, '釣魚', '500次', '鐵礦石').ok, false); // 撞名
+  assert.equal(craftBadge(s, '釣魚', '500次', '   ').ok, false);
+  assert.equal(craftBadge(s, '釣魚', '500次', 'x'.repeat(21)).ok, false);
+  assert.equal(s.lifeSkills.釣魚, 0);
+  assert.equal(craftBadge(s, '釣魚', '500次', '我的釣魚章').ok, true);
+  assert.equal(s.inventory['我的釣魚章'], 1);
+  assert.equal(s.lifeSkills.釣魚, 1);
+  assert.equal(badgeStatus(s, '釣魚')[1].made, true);
+  assert.equal(renameBadge(s, '釣魚', '500次', '鐵礦石').ok, false);
+  assert.equal(renameBadge(s, '釣魚', '500次', '釣神之章').ok, true);
+  assert.equal(s.inventory['釣神之章'], 1);
+  assert.equal(s.inventory['我的釣魚章'], undefined);
+  assert.equal(s.lifeSkills.釣魚, 1); // 改名不再加等級
+});
+
+test('徽章改名：機器人匯入的預設名徽章也能改，且不會被當成沒做過', () => {
+  const s = mk({ inventory: { '【寒江問道一蓑翁】500次釣魚': 1 } });
+  s.counters.釣魚 = 692;
+  assert.equal(renameBadge(s, '釣魚', '500次', '老漁夫').ok, true);
+  assert.equal(s.inventory['老漁夫'], 1);
+  assert.equal(s.inventory['【寒江問道一蓑翁】500次釣魚'], undefined);
+  assert.equal(badgeStatus(s, '釣魚')[1].made, true);
+  assert.equal(craftBadge(s, '釣魚', '500次').ok, false);
 });
