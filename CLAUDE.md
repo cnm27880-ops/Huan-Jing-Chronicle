@@ -32,9 +32,9 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/market.js` | 交易：交易大廳（每日原價 5 個）、黑市（擲骰溢價／壓價、勞動抵債、代金券換金幣）、特殊黑市（黑市團、50 個）（純函式） |
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
-| `tests/*.test.js` | 規則測試：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
+| `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
-| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證 |
+| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家回報傷害、先攻純隨機） |
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |
@@ -62,7 +62,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/battleView.js` | 戰鬥頁：頂部固定列（生命／資源）、行動／紀錄／狀態三分頁、招式、藥水（遭遇戰在跑團頁） |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
 | `src/ui/sessionView.js` | 跑團頁（原骰盤抽屜，階段 B）：房間資訊、一鍵技能檢定、跑團胃袋與結束跑團、自訂骰、遭遇戰、擲骰紀錄；離開頁面會停掉紀錄更新 |
-| `src/ui/encounterCard.js` | 遭遇戰卡片（跑團頁用）：怪物、新增敵人、選招式出招、承受攻擊。目前自己建立，階段 C 改由 GM 建立 |
+| `src/ui/encounterCard.js` | 遭遇戰卡片（跑團頁用）：怪物、新增敵人、選招式出招、承受攻擊、先攻順序。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
 | `src/ui/battleSelect.js` | 戰鬥頁與跑團頁共用的「目前選擇」（出招招式、怪物攻防模式），不存檔 |
 | `src/ui/rollFeed.js` | 擲骰紀錄的畫面（跑團頁與戰鬥頁共用）：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要 |
 | `src/ui/dom.js` | 建立元素的小工具 |
@@ -93,4 +93,4 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 6. 圖片路徑用相對路徑（`img/...`，不要開頭的 `/`），GitHub Pages 子路徑才不會壞。
 
 ## 未來規劃（現在不要做，除非我明確要求）
-角色資料放伺服器（階段 2：**已開始**——伺服器保存角色並讓 GM 可讀，但資料仍由前端算、前端寫入，骰子的數量與加值仍由前端送出，伺服器只負責擲、記錄與保存；防作弊要把規則搬到伺服器，尚未做）、GM 控制遭遇戰與先攻、GM 後台（地圖點選放標記、表單編輯、圖片上傳到 R2、揭露開關）、依技能自動計算戰鬥面板、從試算表匯入角色。網站日後會掛到自己的網域（同站）。
+角色資料放伺服器（階段 2：**已開始**——伺服器保存角色並讓 GM 可讀，但資料仍由前端算、前端寫入，骰子的數量與加值仍由前端送出，伺服器只負責擲、記錄與保存；防作弊要把規則搬到伺服器，尚未做）、GM 後台（地圖點選放標記、表單編輯、圖片上傳到 R2、揭露開關）、依技能自動計算戰鬥面板、從試算表匯入角色。網站日後會掛到自己的網域（同站）。

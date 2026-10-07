@@ -9,6 +9,7 @@ import { parseDiceExpr, rollExpr, rollDie, MAX_SIDES } from '../../src/game/dice
 import { d20 } from '../../src/game/engine.js';
 import { diceEvent, checkEvent } from '../../src/game/events.js';
 import { LIFE_SKILLS, ART_SKILLS } from '../../src/game/rules.js';
+import { newEncounter, addMobs, addBosses, isDowned } from '../../src/game/combat.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
 import { serverRng } from './server-rng.js';
@@ -24,6 +25,7 @@ const SKILLS = new Set([...LIFE_SKILLS, ...ART_SKILLS]);
 const RID = /^[A-Za-z0-9_-]{1,40}$/;
 const UID = /^\d{1,25}$/;
 const CHAR_PREFIXES = ['{"t":"charPut"', '{"t":"charImport"']; // 前端組訊息時 t 一定排第一；只有這兩種訊息可以放寬大小上限
+const MAX_MONSTERS = 40;
 const isCharType = (t) => t === 'charPut' || t === 'charImport';
 
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
@@ -121,6 +123,7 @@ export class RoomCore {
       me: { uid: user.uid, name: user.name, avatarUrl: avatarUrl({ id: user.uid, avatar: user.avatar }), isGm: this.isGm(user.uid), isAdmin: this.isAdmin(user.uid) },
       gm: this.gmInfo(),
       battleNo: this.battleNo(),
+      encounter: this.encounter(),
       members: this.membersView(online),
       history: this.history(),
     };
@@ -185,6 +188,7 @@ export class RoomCore {
       case 'charPut': return this.onCharPut(user, msg, rid);
       case 'charList': return this.onCharList(user, rid);
       case 'charImport': return this.onCharImport(user, msg, rid);
+      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encNext': return this.onEncounter(user, msg, rid, online);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
     }
   }
@@ -289,6 +293,98 @@ export class RoomCore {
       lines: action === 'take' ? ['測試用：原 GM 暫時沒有 GM 權限，之後會還回去。'] : [],
     }, user);
     return this.broadcastEvent(ev, [{ to: 'all', msg: { t: 'gm', gm: this.gmInfo() } }]);
+  }
+
+  // ---------- 遭遇戰（階段 C） ----------
+  // 怪物由 GM 建立，存在房間裡，所有人即時看到。怪物生命只有伺服器會改：
+  // 玩家端算出傷害後回報「打了誰、扣多少」（和階段 1-B 一樣，傷害由前端算、伺服器負責保存與廣播）。
+  // 先攻：純隨機洗牌（GM 的決定），目前只顯示順序與輪到誰，不強制玩家只能在自己的回合行動。
+  encounter() {
+    const v = this.getMeta('encounter');
+    return v ? JSON.parse(v) : { ...newEncounter(), round: 0, order: [], turn: 0 };
+  }
+
+  saveEncounter(enc) { this.setMeta('encounter', JSON.stringify(enc)); }
+
+  encOk(enc, rid, user, note) {
+    const extra = [{ to: 'self', msg: { t: 'encOk', rid } }];
+    const out = [{ to: 'all', msg: { t: 'enc', encounter: enc } }, ...extra];
+    if (note) {
+      const ev = this.record({ who: '系統', kind: 'note', label: note.label, lines: note.lines ?? [] }, user);
+      out.push({ to: 'all', msg: { t: 'event', event: ev } });
+    }
+    return { out, close: null };
+  }
+
+  onEncounter(user, msg, rid, online = []) {
+    const enc = this.encounter();
+    if (msg.t === 'encHit') { // 玩家回報打到怪物：任何成員都可以
+      const hits = msg.hits;
+      if (!Array.isArray(hits) || hits.length < 1 || hits.length > 12) return err(rid, 'bad_enc', '傷害回報格式錯誤。');
+      let applied = 0;
+      for (const hit of hits) {
+        if (!hit || typeof hit.id !== 'string' || !isInt(hit.dmg, 0, 10_000_000)) return err(rid, 'bad_enc', '傷害回報格式錯誤。');
+        const m = enc.monsters.find((x) => x.id === hit.id);
+        if (!m) continue; // 怪物剛好被 GM 移除：略過
+        m.hp = Math.max(0, m.hp - hit.dmg);
+        applied++;
+      }
+      if (!applied) return err(rid, 'bad_enc', '找不到這些怪物，可能已被移除。');
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user);
+    }
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以操作遭遇戰。');
+
+    if (msg.t === 'encAdd') {
+      const sp = msg.spec;
+      if (!sp || typeof sp !== 'object' || (msg.kind !== 'mob' && msg.kind !== 'boss')) return err(rid, 'bad_enc', '敵人資料格式錯誤。');
+      if (!isInt(sp.count, 1, 20) || !isInt(sp.atkPower, 0, 100_000) || !isInt(sp.defPower, 0, 100_000) || !isInt(sp.hp, 1, 10_000_000) || !isInt(sp.absDef ?? 0, 0, 100_000)) {
+        return err(rid, 'bad_enc', '敵人的數量、強度或血量超出範圍。');
+      }
+      if (enc.monsters.length + sp.count > MAX_MONSTERS) return err(rid, 'bad_enc', `場上最多 ${MAX_MONSTERS} 隻敵人。`);
+      const spec = { count: sp.count, atkPower: sp.atkPower, defPower: sp.defPower, hp: sp.hp, absDef: sp.absDef ?? 0, atkMod: cleanStr(sp.atkMod, 40), defMod: cleanStr(sp.defMod, 40) };
+      const added = (msg.kind === 'boss' ? addBosses : addMobs)(enc, spec, this.rng);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：新增 ${added.map((m) => m.id).join('、')}` });
+    }
+    if (msg.t === 'encRemove') {
+      if (typeof msg.id !== 'string') return err(rid, 'bad_enc', '缺少敵人編號。');
+      enc.monsters = enc.monsters.filter((m) => m.id !== msg.id);
+      enc.order = enc.order.filter((o) => !(o.kind === 'monster' && o.id === msg.id));
+      enc.turn = enc.order.length ? Math.min(enc.turn, enc.order.length - 1) : 0;
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user);
+    }
+    if (msg.t === 'encClear') {
+      this.saveEncounter({ ...newEncounter(), round: 0, order: [], turn: 0 });
+      return this.encOk(this.encounter(), rid, user, { label: '遭遇：戰鬥結束，清空敵人' });
+    }
+    if (msg.t === 'encInit') { // 先攻：在線玩家（不含 GM）與還活著的怪物，純隨機洗牌
+      const players = this.db.exec('SELECT uid, name FROM members ORDER BY first_seen, uid')
+        .filter((m) => online.includes(m.uid) && !this.isGm(m.uid) && this.accessState(m.uid) === 'ok')
+        .map((m) => ({ kind: 'player', uid: m.uid, name: m.name }));
+      const monsters = enc.monsters.filter((m) => !isDowned(m)).map((m) => ({ kind: 'monster', id: m.id }));
+      const order = [...players, ...monsters];
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = this.rng.int(i + 1) - 1;
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      Object.assign(enc, { order, turn: 0, round: order.length ? 1 : 0 });
+      this.saveEncounter(enc);
+      const names = order.map((o, i) => `${i + 1}. ${o.kind === 'player' ? o.name : o.id}`);
+      return this.encOk(enc, rid, user, { label: '遭遇：先攻順序（隨機）', lines: names });
+    }
+    // encNext：換下一位；已倒下的怪物自動跳過；繞完一圈回合數 +1
+    if (!enc.order.length) return err(rid, 'bad_enc', '還沒有先攻順序，請先抽先攻。');
+    for (let step = 0; step < enc.order.length; step++) {
+      enc.turn += 1;
+      if (enc.turn >= enc.order.length) { enc.turn = 0; enc.round += 1; }
+      const cur = enc.order[enc.turn];
+      const m = cur.kind === 'monster' ? enc.monsters.find((x) => x.id === cur.id) : null;
+      if (cur.kind === 'player' || (m && !isDowned(m))) break;
+    }
+    this.saveEncounter(enc);
+    return this.encOk(enc, rid, user);
   }
 
   // ---------- 角色存檔（階段 2） ----------

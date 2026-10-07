@@ -11,7 +11,7 @@ import { openFoodSheet } from './statusBar.js';
 import { LIFE_SKILLS, ART_SKILLS, STOMACH_SLOTS } from '../game/rules.js';
 import { modifier, proficiency, endSession } from '../game/engine.js';
 import { parseDiceExpr, MAX_DICE } from '../game/dice.js';
-import { rollDice, rollCheck, clearLog, getRoomStatus } from '../state/rollLog.js';
+import { rollDice, rollCheck, clearLog, getRoomStatus, subscribeRoom, getEncounter } from '../state/rollLog.js';
 import { iconOf } from './items.js';
 import { createEncounterCard } from './encounterCard.js';
 
@@ -22,6 +22,9 @@ export function createSessionView({ root, getState, commit }) {
   const node = root;
   let feeds = [];
   let roomPanel = null;
+  let encBox = null;
+  let unsubRoom = null;
+  let encSig = '';
   const encounter = createEncounterCard({ getState, commit, rerender: () => render() });
 
   // ---------- 一鍵技能檢定 ----------
@@ -86,12 +89,22 @@ export function createSessionView({ root, getState, commit }) {
       }, expr.error ? '格式不對' : `🎲 擲 ${expr.text}`));
   }
 
+  /** 遭遇戰畫面相關的房間狀態：變了才需要重畫（presence 之類的更新不用） */
+  const encounterSig = () => `${getRoomStatus().phase}|${getRoomStatus().me?.isGm ? 1 : 0}|${JSON.stringify(getEncounter())}`;
+
   // ---------- 組合 ----------
   function render() {
     const state = getState();
     feeds.forEach((f) => f.destroy());
     roomPanel?.destroy();
     const roomBox = h('div', { class: 'tray__room' });
+    encBox = h('div', { class: 'session-encounter' }, encounter.render());
+    encSig = encounterSig();
+    unsubRoom?.();
+    unsubRoom = subscribeRoom(() => { // 房間的遭遇戰（敵人、先攻）有變才重畫這一塊，不動別的
+      const sig = encounterSig();
+      if (sig !== encSig) { encSig = sig; encBox.replaceChildren(encounter.render()); }
+    });
     const latestBox = h('div', { class: 'tray__latest', 'aria-live': 'polite' });
     const historyBox = h('div', { class: 'tray__history' });
     const prof = proficiency(state, 'session');
@@ -128,7 +141,7 @@ export function createSessionView({ root, getState, commit }) {
           h('p', { class: 'field-label', text: '非生活技能' }),
           h('div', { class: 'skill-grid' }, ART_SKILLS.map((s) => skillButton(state, s, state.arts[s] ?? 0, false)))),
         customPanel(),
-        encounter.render(),
+        encBox,
         h('section', { class: 'tray__section' },
           h('div', { class: 'tray__title-row' },
             h('h3', { class: 'tray__title', text: '紀錄' }),
@@ -143,6 +156,8 @@ export function createSessionView({ root, getState, commit }) {
 
   /** 離開跑團頁：停掉紀錄的自動更新，背景擲骰時不用重畫看不到的清單 */
   function leave() {
+    unsubRoom?.();
+    unsubRoom = null;
     feeds.forEach((f) => f.destroy());
     feeds = [];
     roomPanel?.destroy();
