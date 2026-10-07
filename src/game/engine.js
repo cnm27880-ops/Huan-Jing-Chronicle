@@ -91,7 +91,8 @@ export function endSession(state) {
 }
 
 export function newDay(state) {
-  state.time = MAX_TIME;
+  // 黑市付不出錢會「勞動抵債」讓時間變負的：換日時先還（-3 → 7）
+  state.time = MAX_TIME + Math.min(0, state.time);
   state.loginDays += 1;
 }
 

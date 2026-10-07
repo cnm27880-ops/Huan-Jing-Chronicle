@@ -20,7 +20,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | 檔案 | 用途 |
 |---|---|
 | `index.html` | 頁面骨架（頂部列、地圖、面板容器） |
-| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #battle）、角色存檔串接、骰盤 |
+| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #battle / #market）、角色存檔串接、骰盤 |
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
 | `DESIGN.md` | 視覺設計規格（黑金主題） |
 | `RULES_OVERVIEW.md` | 規則原文整理（創角、每日養成、技能學習升級、資源、寶石、配方、特殊材料）；階段 2 的依據，含待確認清單 |
@@ -29,9 +29,10 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/dice.js` | 骰子基礎：擲骰、自訂骰式解析（rng 可替換） |
 | `src/game/stats.js` | 數值面板：基礎 + 裝備 + 食物，附明細 |
 | `src/game/equipment.js` | 裝備：鑑定骰式、裝備欄、比較、整理；寶石鑑定與鑲嵌（純函式） |
+| `src/game/market.js` | 交易：交易大廳（每日原價 5 個）、黑市（擲骰溢價／壓價、勞動抵債、代金券換金幣）、特殊黑市（黑市團、50 個）（純函式） |
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
-| `tests/*.test.js` | 規則測試：engine（採集製作）、combat、equipment（含寶石）、dice |
+| `tests/*.test.js` | 規則測試：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
 | `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證 |
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
@@ -46,8 +47,9 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/restView.js` | 修整日頁面：上方 HUD、採集／製作／跑團檢定分頁、設定步驟＋大按鈕、結果卡 |
 | `src/ui/statusBar.js` | 修整日的 HUD（時間、熟練、胃袋）與「吃東西」面板 |
 | `src/ui/bagView.js` | 背包頁面 |
-| `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、整理 |
+| `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、寶石、背包裝備（不能丟棄，只能賣出） |
 | `src/ui/reveal.js` | 鑑定開獎動畫（翻牌、數值跳動；只是畫面，數值鑑定時就已存好） |
+| `src/ui/marketView.js` | 交易頁（交易大廳／黑市／特殊黑市）＋裝備頁「賣出」面板 |
 | `src/ui/battleView.js` | 戰鬥頁：頂部固定列（生命／資源）、行動／紀錄／狀態三分頁、招式、藥水、遭遇戰 |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
 | `src/ui/diceTray.js` | 骰盤抽屜：一鍵技能檢定、自訂骰、紀錄 |

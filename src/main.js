@@ -19,6 +19,7 @@ import { createRestView } from './ui/restView.js';
 import { createBagView } from './ui/bagView.js';
 import { createGearView } from './ui/gearView.js';
 import { createBattleView } from './ui/battleView.js';
+import { createMarketView } from './ui/marketView.js';
 import { createDiceTray } from './ui/diceTray.js';
 import { showCover } from './ui/cover.js';
 import { createUserChip } from './ui/userChip.js';
@@ -93,13 +94,14 @@ async function init() {
     }),
     gear: createGearView({ root: $('#view-gear'), getState, commit }),
     battle: createBattleView({ root: $('#view-battle'), getState, commit }),
+    market: createMarketView({ root: $('#view-market'), getState, commit }),
   };
   tray = createDiceTray({ getState, commit, toggleButton: $('#tray-toggle') });
 
   let currentView = 'map';
   function showView() {
     const id = (location.hash || '#map').slice(1);
-    currentView = ['map', 'rest', 'bag', 'gear', 'battle'].includes(id) ? id : 'map';
+    currentView = ['map', 'rest', 'bag', 'gear', 'battle', 'market'].includes(id) ? id : 'map';
     document.querySelectorAll('[data-view]').forEach((el) => {
       el.hidden = el.dataset.view !== currentView;
     });
@@ -107,7 +109,7 @@ async function init() {
       if (a.dataset.viewLink === currentView) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
-    moreBtn.toggleAttribute('data-active', currentView === 'gear'); // 裝備收在「更多」裡，手機版讓「更多」亮起
+    moreBtn.toggleAttribute('data-active', currentView === 'gear' || currentView === 'market'); // 裝備、交易收在「更多」裡，手機版讓「更多」亮起
     if (currentView === 'map') map.reset(false);
     else views[currentView].render();
   }

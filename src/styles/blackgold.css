@@ -420,7 +420,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
     border: 0;
     border-top: 2px solid transparent;
   }
-  .tab[data-view-link='gear'] { display: none; }
+  .tab[data-view-link='gear'], .tab[data-view-link='market'] { display: none; }
   .tab[aria-current='page'], .tab--more[data-active] { color: var(--gold); border-bottom: 0; border-top: 2px solid var(--gold); }
   .tab--more { display: flex; font: inherit; background: transparent; cursor: pointer; }
   .tab--more[aria-expanded='true'] { color: var(--gold); }
@@ -1011,3 +1011,68 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .fx-chip--gem { box-shadow: inset 0 0 0 1px var(--line3); }
 .fx-chip--gem .rarity-tag__gem { width: 7px; height: 7px; margin: 0 2px; background: var(--rainbow); align-self: center; }
 .fx-chip--gem strong { color: var(--ink); }
+
+/* ============================================================
+   交易頁（marketView.js）：HUD、三個分頁、商品列；裝備頁的「賣出」面板
+   ============================================================ */
+#view-market .mk-root { max-width: 1480px; margin: 0 auto; padding: 0 12px 12px; }
+#view-market .mk-hud {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px;
+  margin: 0 -12px 12px; padding: 10px 12px;
+  background: var(--paper2); border-bottom: 1px solid var(--line3); box-shadow: 0 6px 14px var(--shadow);
+}
+#view-market .mk-stat { display: inline-flex; align-items: baseline; gap: 6px; }
+#view-market .mk-stat small { color: var(--soft); font-size: 0.75rem; }
+#view-market .mk-stat strong { color: var(--gold); font-size: 1.05rem; }
+#view-market .mk-stat[data-tone='bad'] strong { color: var(--rose); }
+#view-market .mk-session {
+  display: inline-flex; align-items: center; gap: 8px; margin-left: auto;
+  min-height: 36px; padding: 0 12px; color: var(--soft); cursor: pointer;
+  background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill);
+}
+#view-market .mk-session input { accent-color: var(--gold); width: 16px; height: 16px; }
+#view-market .mk-session.is-on { color: var(--on-gold); background: var(--gold); border-color: var(--gold); }
+#view-market .mk-tabs {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px;
+  margin-bottom: 8px; padding: 4px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-pill);
+}
+#view-market .rest-tab {
+  display: flex; align-items: center; justify-content: center;
+  min-height: var(--touch); font: inherit; font-weight: 700; color: var(--soft);
+  background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer;
+}
+#view-market .rest-tab:hover { color: var(--gold); }
+#view-market .rest-tab[aria-selected='true'] { color: var(--on-gold); background: var(--gold); }
+#view-market .mk-note { margin: 0 0 12px; color: var(--faint); font-size: 0.78rem; }
+#view-market .mk-grid { display: grid; gap: 12px; align-items: start; }
+@media (min-width: 1000px) { #view-market .mk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.trade-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.trade-row {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 8px 10px; background: var(--raise); border-radius: 10px; border-left: 4px solid var(--line3);
+}
+.trade-row.rarity { border-left-color: var(--t); }
+.trade-row__icon { display: grid; place-items: center; width: 40px; height: 40px; font-size: 1.3rem; background: var(--paper); border-radius: 10px; }
+.trade-row__info { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+.trade-row__have { color: var(--soft); font-size: 0.75rem; }
+.trade-row__price { flex-basis: 100%; color: var(--ink2); font-size: 0.82rem; }
+.trade-row__sub { flex-basis: 100%; color: var(--gold); font-size: 0.78rem; }
+.trade-row__act { display: flex; align-items: center; gap: 6px; }
+.trade-row__qty { width: 4.6rem; text-align: right; }
+.trade-row__act .btn { min-width: 5.5rem; white-space: nowrap; }
+@media (max-width: 759px) {
+  #view-market .mk-session { margin-left: 0; }
+  .trade-row { grid-template-columns: 40px minmax(0, 1fr); }
+  .trade-row__act { grid-column: 1 / -1; justify-content: flex-end; }
+  .trade-row__qty { flex: 1; max-width: 8rem; }
+}
+
+.sell-sheet { display: grid; gap: 8px; }
+.sell-opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--raise); border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); }
+.sell-opt[aria-disabled='true'] { opacity: 0.55; }
+.sell-opt__text { display: grid; gap: 2px; }
+.sell-opt__text small { color: var(--soft); }
+.sell-opt__note { color: var(--rose) !important; }

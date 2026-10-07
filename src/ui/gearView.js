@@ -10,13 +10,14 @@ import {
   ATK_STATS, DEF_STATS, RESOURCE_STATS, EQUIP_SLOTS, EQUIP_SLOT_LABEL, GEAR_TIERS,
 } from '../game/rules.js';
 import {
-  identifiable, identify, equip, unequip, discard, compareGear, findJunk, gearName, effectText, gearDiceText,
+  identifiable, identify, equip, unequip, compareGear, findJunk, gearName, effectText, gearDiceText,
   identifiableGems, identifyGems, socketGem, socketTargets, gemDiceText, gemName,
 } from '../game/equipment.js';
 import { derivedStats } from '../game/stats.js';
 import { SKILL_CATALOG, RULE_SKILLS, moveFromCatalog } from '../game/skills.js';
 import { publish, rollWith } from '../state/rollLog.js';
 import { openReveal } from './reveal.js';
+import { openGearSellSheet } from './marketView.js';
 
 const tierIndex = (g) => GEAR_TIERS.indexOf(g.tier);
 const SLOT_ORDER = { weapon: 0, armor: 1, accessory: 2 };
@@ -294,7 +295,7 @@ export function createGearView({ root, getState, commit }) {
   }
 
   // ---------- 背包裝備 ----------
-  function ownedRow(state, g) {
+  function ownedRow(state, g, junk) {
     const cmp = compareGear(state, g);
     const accFull = g.slot === 'accessory' && state.equipment.acc1 && state.equipment.acc2;
     const putOn = (key) => { const err = equip(state, g.id, key); if (err) return toast(err); commit(); };
@@ -304,7 +305,8 @@ export function createGearView({ root, getState, commit }) {
         rarityTag(tierIndex(g)),
         h('span', { class: 'owned__effect', text: effectText(g) }),
         g.gem ? gemChip(g.gem) : null,
-        h('span', { class: 'badge', dataset: { tone: BADGE[cmp][1] }, text: BADGE[cmp][0] })),
+        h('span', { class: 'badge', dataset: { tone: BADGE[cmp][1] }, text: BADGE[cmp][0] }),
+        junk.has(g.id) ? h('span', { class: 'badge', title: '同欄位同屬性已經有更高的（身上穿的算在內），可以賣掉', text: '用不到' }) : null),
       g.special
         ? h('input', {
             class: 'field owned__note', type: 'text', placeholder: '記下特殊效果（例如：怪力）', value: g.note ?? '', maxlength: 60,
@@ -318,17 +320,15 @@ export function createGearView({ root, getState, commit }) {
                  h('button', { type: 'button', class: 'btn btn--small', onclick: () => putOn('acc2') }, '換飾品 2')]
               : h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => putOn(state.equipment.acc1 ? 'acc2' : 'acc1') }, '裝備'))
           : h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => putOn(g.slot) }, '裝備'),
+        // 裝備不能丟棄，只能到交易大廳／黑市賣掉（使用者 2026-10-07）；鑲了寶石的不能賣
         h('button', {
-          type: 'button', class: 'btn btn--ghost btn--small',
-          onclick: () => {
-            if (g.gem && !confirm(`這件鑲著${gemName(g.gem)}（${g.gem.stat} +${g.gem.value}），丟棄後寶石也會一起消失。確定丟棄？`)) return;
-            discard(state, [g.id]); commit();
-          },
-        }, '丟棄')));
+          type: 'button', class: 'btn btn--ghost btn--small', disabled: Boolean(g.gem), title: g.gem ? '鑲了寶石的裝備不能賣' : '',
+          onclick: () => openGearSellSheet(state, g, commit),
+        }, '賣出')));
   }
 
   function ownedCard(state) {
-    const junk = findJunk(state);
+    const junk = new Set(findJunk(state)); // 只用來標「用不到」，方便決定要賣哪些
     const list = state.gear
       .filter((g) => ui.filter === 'all' || g.slot === ui.filter)
       .sort((a, b) => SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot] || tierIndex(b) - tierIndex(a) || gearValue(b) - gearValue(a));
@@ -339,18 +339,9 @@ export function createGearView({ root, getState, commit }) {
           FILTERS.map(([id, label]) => h('button', {
             type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.filter === id),
             onclick: () => { ui.filter = id; render(); },
-          }, label))),
-        h('button', {
-          type: 'button', class: 'btn btn--ghost btn--small', disabled: !junk.length,
-          title: '同欄位同屬性只留最高的（武器、防具 1 件，飾品 2 件，身上穿的算在內）。特殊飾品不會動。',
-          onclick: () => {
-            if (!confirm(`丟棄 ${junk.length} 件用不到的裝備？\n（同欄位同屬性只留最高的；身上穿的與特殊飾品不會動）\n丟棄後無法復原。`)) return;
-            const n = discard(state, junk);
-            toast(`已丟棄 ${n} 件`);
-            commit();
-          },
-        }, junk.length ? `整理：丟棄 ${fmt(junk.length)} 件用不到的` : '沒有可整理的')),
-      list.length ? h('ul', { class: 'owned-list' }, list.map((g) => ownedRow(state, g))) : h('p', { class: 'empty', text: '這個分類沒有裝備。' }));
+          }, label)))),
+      h('p', { class: 'hint', text: '裝備不能丟棄；用不到的可以按「賣出」到交易大廳或黑市換錢（鑲了寶石的不能賣）。' }),
+      list.length ? h('ul', { class: 'owned-list' }, list.map((g) => ownedRow(state, g, junk))) : h('p', { class: 'empty', text: '這個分類沒有裝備。' }));
   }
 
   function render() {
