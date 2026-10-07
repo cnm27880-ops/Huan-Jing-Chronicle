@@ -78,9 +78,8 @@
 .dossier__cover {
   display: block;
   width: calc(100% + 3.5rem);
+  height: auto; /* GM 的圖片比例各不相同：照原比例完整顯示，不裁切頭腳 */
   margin: 0 -1.75rem 1.25rem;
-  aspect-ratio: 16 / 8;
-  object-fit: cover;
 }
 
 .dossier__text {
@@ -198,28 +197,24 @@
    區域主題
    ============================================================ */
 
-/* 東方蓬萊仙島：宣紙、墨字、朱紅印章 */
+/* 東方蓬萊仙島：深色底、朱紅印章（和其他區域一樣用灰黑底） */
 .dossier[data-theme='east'] {
-  --d-bg: #ede4cf;
-  --d-text: #24211c;
-  --d-muted: #6d6556;
-  --d-accent: #a8322d;
-  --d-rule: #cbbd9e;
+  --d-bg: #16141a;
+  --d-text: #ece6da;
+  --d-muted: #bdb3a2;
+  --d-accent: #e0645c;
+  --d-rule: #3a3238;
   --d-seal-bg: #a8322d;
   --d-seal-text: #f5ecd8;
-  background:
-    radial-gradient(ellipse at 100% 0%, rgba(36, 33, 28, 0.08), transparent 55%),
-    radial-gradient(ellipse at 0% 100%, rgba(36, 33, 28, 0.06), transparent 50%),
-    var(--d-bg);
 }
 
-/* 西方大陸：羊皮紙、褐墨、森林綠 */
+/* 西方大陸：深色底、森林綠印章 */
 .dossier[data-theme='west'] {
-  --d-bg: #e4d2a6;
-  --d-text: #3a2a17;
-  --d-muted: #7a6342;
-  --d-accent: #4f6b2a;
-  --d-rule: #c4ab78;
+  --d-bg: #15171a;
+  --d-text: #ebe6d8;
+  --d-muted: #bcb39c;
+  --d-accent: #9bc858;
+  --d-rule: #33382e;
   --d-seal-bg: #4f6b2a;
   --d-seal-text: #f2e7c9;
   --d-head-font: var(--font-body);
@@ -272,6 +267,7 @@
   }
   .dossier__cover {
     width: calc(100% + 2.5rem);
+    height: auto;
     margin: 0 -1.25rem 1rem;
   }
   .dossier__title {

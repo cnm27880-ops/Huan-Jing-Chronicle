@@ -49,22 +49,27 @@ export function createBagView({ root, getState, commit, onReset }) {
           h('button', { type: 'button', class: 'btn btn--primary', onclick: () => openAddSheet(state, commit) }, '＋ 放進背包'))),
       h('div', { class: 'bag' },
         groups.filter((g) => g.items.length).map((g) => {
-          const open = q || !ui.collapsed.has(g.id);
+          const open = Boolean(q) || !ui.collapsed.has(g.id);
+          const grid = h('div', { class: g.id === 'keepsake' ? 'showcase' : 'tile-grid', hidden: !open },
+            g.items.map((n) => itemTile(n, countOf(state, n), {
+              size: g.id === 'keepsake' ? 'lg' : 'md',
+              extra: g.id === 'keepsake' && state.keepsakes[n]
+                ? h('span', { class: 'tile__note', text: state.keepsakes[n].desc })
+                : null,
+              onClick: () => openItemSheet(state, n, commit),
+            })));
           return h('section', { class: `bag-group bag-group--${g.id}` },
             h('button', {
-              type: 'button', class: 'bag-group__head', 'aria-expanded': String(Boolean(open)),
-              onclick: () => { ui.collapsed.has(g.id) ? ui.collapsed.delete(g.id) : ui.collapsed.add(g.id); render(); },
+              type: 'button', class: 'bag-group__head', 'aria-expanded': String(open),
+              // 只切換這一組的顯示，不重畫整頁（整頁重畫會閃）
+              onclick: (e) => {
+                const nowOpen = grid.hidden;
+                grid.hidden = !nowOpen;
+                e.currentTarget.setAttribute('aria-expanded', String(nowOpen));
+                if (nowOpen) ui.collapsed.delete(g.id); else ui.collapsed.add(g.id);
+              },
             }, h('span', { text: g.name }), h('small', { text: `${g.items.length} 種` })),
-            open
-              ? h('div', { class: g.id === 'keepsake' ? 'showcase' : 'tile-grid' },
-                  g.items.map((n) => itemTile(n, countOf(state, n), {
-                    size: g.id === 'keepsake' ? 'lg' : 'md',
-                    extra: g.id === 'keepsake' && state.keepsakes[n]
-                      ? h('span', { class: 'tile__note', text: state.keepsakes[n].desc })
-                      : null,
-                    onClick: () => openItemSheet(state, n, commit),
-                  })))
-              : null);
+            grid);
         }),
         visible.length ? null : h('p', { class: 'empty', text: `背包裡沒有「${q}」。` }),
         h('div', { class: 'bag-foot' },

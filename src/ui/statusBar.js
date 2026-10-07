@@ -34,6 +34,38 @@ export function openFoodSheet(state, ctx, commit) {
   });
 }
 
+/**
+ * 「新的一天」：第一下只會在同一格裡變成「確定換日？」，再按「確定」才真的換日（避免誤觸）。
+ * 5 秒內沒確認就自動恢復原狀。
+ */
+function newDayButton(state, commit) {
+  const box = h('span', { class: 'day-confirm' });
+  let timer = null;
+  const showIdle = () => {
+    clearTimeout(timer);
+    box.replaceChildren(h('button', { type: 'button', class: 'status__day', onclick: showAsk }, '新的一天'));
+  };
+  function showAsk() {
+    const yes = h('button', {
+      type: 'button', class: 'status__day status__day--yes',
+      onclick: () => {
+        clearTimeout(timer);
+        newDay(state);
+        toast(`第 ${state.loginDays} 天，時間恢復 10 點`);
+        commit();
+      },
+    }, '確定');
+    box.replaceChildren(
+      h('span', { class: 'day-confirm__ask', text: '確定換日？' }),
+      yes,
+      h('button', { type: 'button', class: 'status__day status__day--no', onclick: showIdle }, '取消'));
+    yes.focus();
+    timer = setTimeout(() => { if (box.isConnected) showIdle(); }, 5000);
+  }
+  showIdle();
+  return box;
+}
+
 export function statusBar(state, commit, ctx = 'rest') {
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
   const prof = proficiency(state, ctx);
@@ -58,10 +90,7 @@ export function statusBar(state, commit, ctx = 'rest') {
           h('span', { class: 'pips', role: 'img', 'aria-label': `剩餘時間 ${state.time} 點` },
             Array.from({ length: MAX_TIME }, (_, i) => h('span', { class: `pip${i < state.time ? ' is-on' : ''}` }))),
           h('strong', { text: `${state.time}` }),
-          h('button', {
-            type: 'button', class: 'status__day',
-            onclick: () => { newDay(state); toast(`第 ${state.loginDays} 天，時間恢復 10 點`); commit(); },
-          }, '新的一天'))
+          newDayButton(state, commit))
       : null,
     h('div', { class: 'status__prof', title: prof.parts.map((p) => `${p.label} +${p.value}`).join('、') },
       h('span', { class: 'status__label', text: ctx === 'rest' ? '修整熟練' : '跑團熟練' }),

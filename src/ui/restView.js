@@ -244,6 +244,8 @@ export function createRestView({ root, getState, commit }) {
     );
     root.scrollTop = scrollY;
     if (fresh) {
+      const first = root.querySelector('.result');
+      if (first) first.dataset.fresh = '1'; // 只有新結果播進場動畫，其他重畫不閃
       rollNumbers();
       // 手機上結果在下方，按下後自動捲過去
       if (matchMedia('(max-width: 900px)').matches) {

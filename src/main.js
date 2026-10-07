@@ -8,11 +8,11 @@ import './styles/dossier.css';
 import './styles/pages.css';
 import './styles/redesign.css';
 import './styles/dice.css';
+import './styles/polish.css';
 
 import { getRegions, getMapLocations, getLocationDetail } from './api/lore.js';
 import { createMapView } from './ui/mapView.js';
 import { createDossier } from './ui/dossier.js';
-import { createMarkerCard } from './ui/markerCard.js';
 import { createIndexList } from './ui/indexList.js';
 import { createRestView } from './ui/restView.js';
 import { createBagView } from './ui/bagView.js';
@@ -37,7 +37,7 @@ async function init() {
     viewport: $('#map-viewport'),
     stage: $('#map-stage'),
     hotspotLayer: $('#map-hotspots'),
-    onSelect: (id) => showCard(id, { fly: false }),
+    onSelect: (id) => openLocation(id, { fly: false }),
   });
 
   const dossier = createDossier({
@@ -45,37 +45,25 @@ async function init() {
     onClose: () => map.setActive(null),
   });
 
-  const card = createMarkerCard({
-    container: $('#marker-card'),
-    onViewLore: (id) => openLocation(id),
-    onClose: () => map.setActive(null),
-  });
-
   const index = createIndexList({
     container: $('#index-list'),
     onSelect: (id) => {
       setIndexOpen(false);
-      showCard(id, { fly: true });
+      openLocation(id, { fly: true });
     },
     onRegionHover: (rid) => map.highlightRegion(rid),
   });
 
-  /** 點標記：顯示小卡片（簡介與「查看設定集」） */
-  function showCard(id, { fly }) {
+  /** 點標記或索引：直接打開右側的設定集面板 */
+  let openToken = 0;
+  async function openLocation(id, { fly = false } = {}) {
     const loc = locationsById[id];
     if (!loc) return;
-    if (dossierPanel.dataset.open === 'true') dossier.close();
+    const token = ++openToken; // 連點兩個地點時，只顯示最後點的那個（避免慢的請求蓋掉新的）
     map.setActive(id);
     if (fly) map.focusOn(loc.x, loc.y);
-    card.open(loc, regionsById[loc.region]);
-  }
-
-  /** 小卡片的「查看設定集」：打開完整情報面板 */
-  async function openLocation(id) {
     const detail = await getLocationDetail(id);
-    if (!detail) return;
-    card.close();
-    map.setActive(id);
+    if (!detail || token !== openToken) return;
     dossier.open(detail, regionsById[detail.region]);
   }
 
@@ -85,6 +73,12 @@ async function init() {
   }
 
   indexToggle.addEventListener('click', () => {
+    // 不在地圖頁時：先切回地圖再打開索引（按鈕常駐，頂部列才不會跳動）
+    if (currentView !== 'map') {
+      location.hash = '#map';
+      setIndexOpen(true);
+      return;
+    }
     setIndexOpen(indexPanel.dataset.open !== 'true');
   });
 
@@ -136,7 +130,6 @@ async function init() {
       if (a.dataset.viewLink === currentView) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
-    indexToggle.hidden = currentView !== 'map';
     if (currentView === 'map') map.reset(false);
     else views[currentView].render();
   }
