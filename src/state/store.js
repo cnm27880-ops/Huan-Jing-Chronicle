@@ -27,6 +27,8 @@ function upgrade(state) {
   for (const k of NEW_FIELDS) {
     if (state[k] === undefined) state[k] = clone(SAMPLE_CHARACTER[k]);
   }
+  state.adjust = state.adjust ?? {}; // 手動調整與啟動中的技能（statMode 'skills' 的角色才用得到，見 skillTable.js）
+  state.skillOn = state.skillOn ?? {};
   delete state.maxHp; // 最大生命改由數值面板計算
   // 招式沒有消耗資源欄的舊存檔：依招式名稱從示範角色補上；第一次升級時補上技能庫招式
   for (const m of state.moves) {
