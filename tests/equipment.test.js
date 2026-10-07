@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   parseGeneric, rollGear, identify, equip, unequip, discard, equipmentEffects, compareGear,
   identifiable, effectText, findJunk,
+  parseGem, rollGem, identifyGems, identifiableGems, socketGem, socketTargets,
 } from '../src/game/equipment.js';
 import { derivedStats } from '../src/game/stats.js';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
@@ -169,4 +170,64 @@ test('整理背包：同欄位同屬性只留最高（武器/防具 1 件、飾�
   // 再多一件魔力+40：飾品只能穿兩件，第三件才是多餘
   s.gear.push({ id: 999, tier: '傳說', slot: 'accessory', effects: [{ stat: '魔力', value: 40 }], roll: {} });
   assert.equal(findJunk(s).filter((id) => id === 999 || byId(id)?.effects?.[0]?.stat === '魔力').length, 1);
+});
+
+// ---------- 寶石（規則原文「寶石鑲嵌」；鑑定時擲數值） ----------
+test('寶石名稱解析', () => {
+  assert.equal(parseGem('生命寶石'), '生命');
+  assert.equal(parseGem('物理傷害寶石'), '物理傷害');
+  assert.equal(parseGem('傳說武器'), null);
+  assert.equal(parseGem('不存在寶石'), null);
+});
+
+test('寶石骰式：攻防與靈氣 1d12+10、生命／魔力 1d24+20、鬥氣 1d3+5、算力 1d8+8', () => {
+  const range = (stat, sides) => [rollGem(stat, rolls([1, sides])).value, rollGem(stat, rolls([sides, sides])).value];
+  assert.deepEqual(range('物理傷害', 12), [11, 22]);
+  assert.deepEqual(range('精神意志', 12), [11, 22]);
+  assert.deepEqual(range('靈氣', 12), [11, 22]);
+  assert.deepEqual(range('生命', 24), [21, 44]);
+  assert.deepEqual(range('魔力', 24), [21, 44]);
+  assert.deepEqual(range('鬥氣', 3), [6, 8]);
+  assert.deepEqual(range('算力', 8), [9, 16]);
+});
+
+test('鑑定寶石：消耗背包、存進 state.gems、數值固定', () => {
+  const s = fresh();
+  s.inventory.生命寶石 = 2;
+  assert.deepEqual(identifiableGems(s).find((x) => x.stat === '生命')?.qty, 2);
+  const made = identifyGems(s, '生命寶石', 5, rolls([24, 24], [1, 24]));
+  assert.equal(made.length, 2); // 只有 2 顆
+  assert.deepEqual(made.map((g) => g.value), [44, 21]);
+  assert.equal(s.inventory.生命寶石 ?? 0, 0);
+  assert.equal(s.gems.length, 2);
+  assert.notEqual(made[0].id, made[1].id);
+});
+
+test('鑲嵌：只能鑲傳說裝備、每件 1 顆，鑲在身上的會計入數值', () => {
+  const s = fresh();
+  s.inventory.生命寶石 = 2;
+  const [a, b] = identifyGems(s, '生命寶石', 2, rolls([10, 24]));
+  const before = derivedStats(s).生命.total;
+  const weapon = s.equipment.weapon; // 示範角色身上是傳說武器
+  assert.ok(socketTargets(s).some((g) => g.id === weapon.id));
+  assert.equal(socketGem(s, a.id, weapon.id), null);
+  assert.deepEqual(weapon.gem, { id: a.id, stat: '生命', value: 30 });
+  assert.equal(derivedStats(s).生命.total, before + 30);
+  assert.ok(!s.gems.some((g) => g.id === a.id));
+  assert.match(socketGem(s, b.id, weapon.id), /只能鑲 1 顆/);
+  assert.ok(!socketTargets(s).some((g) => g.id === weapon.id));
+  // 非傳說裝備不能鑲
+  const master = s.equipment.acc2; // 大師飾品
+  assert.match(socketGem(s, b.id, master.id), /只能鑲進傳說/);
+  assert.ok(s.gems.some((g) => g.id === b.id)); // 失敗時寶石還在
+});
+
+test('整理：背包裡鑲了寶石的裝備不會被列為可丟棄', () => {
+  const s = fresh();
+  s.inventory.生命寶石 = 1;
+  const [gem] = identifyGems(s, '生命寶石', 1, rolls([10, 24]));
+  const weak = s.gear.find((g) => g.slot === 'weapon' && g.effects[0].stat === '真實傷害' && g.effects[0].value === 27);
+  assert.ok(findJunk(s).includes(weak.id));
+  socketGem(s, gem.id, weak.id);
+  assert.ok(!findJunk(s).includes(weak.id));
 });

@@ -13,7 +13,7 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
  * 舊存檔升級：新增的欄位（戰鬥、裝備）舊存檔沒有，缺的就用示範角色的補上，
  * 已有的欄位一律保留，不會蓋掉玩家的資料。
  */
-const NEW_FIELDS = ['baseStats', 'equipment', 'gear', 'nextGearId', 'toxicity', 'buffs', 'moves', 'encounter', 'shield'];
+const NEW_FIELDS = ['baseStats', 'equipment', 'gear', 'nextGearId', 'gems', 'nextGemId', 'toxicity', 'buffs', 'moves', 'encounter', 'shield'];
 function upgrade(state) {
   // v2：暴徒加成改由程式計算。舊存檔（階段 0 第一版）的能量/靈魂基礎值含 80 點暴徒加成，要扣掉避免重複計算
   const firstTime = state.skills === undefined;

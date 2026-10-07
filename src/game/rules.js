@@ -181,5 +181,23 @@ export const ACC_VALUES = {
   傳說: { attr: 12, 生命: 40, 能量: 8, 魔力: 40, 鬥氣: 8, 算力: 16, 靈氣: 24 },
 };
 export const ACC_SPECIAL_ROLL = 15;
+/**
+ * 寶石（來源：規則原文「寶石鑲嵌」，RULES_OVERVIEW.md §8）：神級鍛造得到「XX寶石」，
+ * 鑑定時擲數值並固定（使用者 2026-10-07 確認）。只能鑲進傳說裝備，每件 1 顆。
+ */
+export const GEM_DICE = {
+  物理傷害: { n: 1, sides: 12, add: 10 },
+  能量傷害: { n: 1, sides: 12, add: 10 },
+  靈魂傷害: { n: 1, sides: 12, add: 10 },
+  體魄強韌: { n: 1, sides: 12, add: 10 },
+  抗性免疫: { n: 1, sides: 12, add: 10 },
+  精神意志: { n: 1, sides: 12, add: 10 },
+  生命: { n: 1, sides: 24, add: 20 },
+  魔力: { n: 1, sides: 24, add: 20 },
+  靈氣: { n: 1, sides: 12, add: 10 },
+  鬥氣: { n: 1, sides: 3, add: 5 },
+  算力: { n: 1, sides: 8, add: 8 },
+};
+export const GEM_SOCKET_TIER = '傳說';
 export const EQUIP_SLOTS = ['weapon', 'armor', 'acc1', 'acc2'];
 export const EQUIP_SLOT_LABEL = { weapon: '武器', armor: '防具', acc1: '飾品 1', acc2: '飾品 2' };

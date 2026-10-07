@@ -4,7 +4,7 @@
 // ============================================================
 import {
   GEAR_TIERS, GEAR_TIER_ALIAS, GEAR_SLOT_NAME, GEAR_BONUS, WEAPON_STATS, ARMOR_STATS,
-  ACC_STATS, ACC_VALUES, ACC_SPECIAL_ROLL, EQUIP_SLOTS,
+  ACC_STATS, ACC_VALUES, ACC_SPECIAL_ROLL, EQUIP_SLOTS, GEM_DICE, GEM_SOCKET_TIER,
 } from './rules.js';
 import { rollDie, rollSum } from './dice.js';
 import { removeItem, countOf } from './engine.js';
@@ -109,14 +109,82 @@ export function discard(state, ids) {
   return before - state.gear.length;
 }
 
-/** 目前身上裝備提供的數值：{ 屬性: 加成 } */
+/** 目前身上裝備提供的數值：{ 屬性: 加成 }（含鑲在裝備上的寶石） */
 export function equipmentEffects(state) {
   const out = {};
   for (const g of Object.values(state.equipment)) {
     if (!g) continue;
     for (const e of g.effects) out[e.stat] = (out[e.stat] ?? 0) + e.value;
+    if (g.gem) out[g.gem.stat] = (out[g.gem.stat] ?? 0) + g.gem.value;
   }
   return out;
+}
+
+// ---------- 寶石：鑑定時擲數值、只能鑲進傳說裝備（每件 1 顆，鑲上後目前不能取出） ----------
+/** 「生命寶石」→ '生命'；不是寶石回傳 null */
+export function parseGem(name) {
+  const m = String(name).match(/^(.+)寶石$/);
+  return m && GEM_DICE[m[1]] ? m[1] : null;
+}
+
+/** 擲一顆寶石的數值：n D sides + add */
+export function rollGem(stat, rng = Math.random) {
+  const d = GEM_DICE[stat];
+  const base = rollSum(d.n, d.sides, rng);
+  return { stat, value: base + d.add, roll: { base, add: d.add } };
+}
+
+export const gemDiceText = (stat) => { const d = GEM_DICE[stat]; return `${d.n}D${d.sides}+${d.add}`; };
+export const gemName = (gem) => `${gem.stat}寶石`;
+
+/** 背包裡還沒鑑定的寶石：[{ name, stat, qty }] */
+export function identifiableGems(state) {
+  return Object.entries(state.inventory)
+    .map(([name, qty]) => ({ name, qty, stat: parseGem(name) }))
+    .filter((x) => x.stat && x.qty > 0);
+}
+
+/** 鑑定 times 顆寶石（消耗背包裡的寶石），結果存入 state.gems。回傳新產生的寶石 */
+export function identifyGems(state, gemItemName, times, rng = Math.random) {
+  const stat = parseGem(gemItemName);
+  if (!stat) return [];
+  state.gems ??= [];
+  state.nextGemId ??= 1;
+  const made = [];
+  for (let i = 0; i < times; i++) {
+    if (!removeItem(state, gemItemName)) break;
+    const inst = { id: state.nextGemId++, ...rollGem(stat, rng) };
+    state.gems.push(inst);
+    made.push(inst);
+  }
+  return made;
+}
+
+/** 找一件已鑑定的裝備（背包或身上）。回傳 { g, worn } 或 null */
+function findAnyGear(state, gearId) {
+  const g = state.gear.find((x) => x.id === gearId);
+  if (g) return { g, worn: false };
+  const w = Object.values(state.equipment).find((x) => x?.id === gearId);
+  return w ? { g: w, worn: true } : null;
+}
+
+/** 可以鑲寶石的裝備：傳說、還沒鑲（身上的排前面） */
+export function socketTargets(state) {
+  const worn = Object.values(state.equipment).filter(Boolean);
+  return [...worn, ...state.gear].filter((g) => g.tier === GEM_SOCKET_TIER && !g.gem);
+}
+
+/** 把寶石鑲進裝備。回傳錯誤文字或 null。寶石會從 state.gems 移到裝備的 gem 欄位 */
+export function socketGem(state, gemId, gearId) {
+  const gem = (state.gems ?? []).find((x) => x.id === gemId);
+  if (!gem) return '找不到這顆寶石。';
+  const found = findAnyGear(state, gearId);
+  if (!found) return '找不到這件裝備。';
+  if (found.g.tier !== GEM_SOCKET_TIER) return `寶石只能鑲進${GEM_SOCKET_TIER}裝備。`;
+  if (found.g.gem) return '這件裝備已經鑲了寶石（每件只能鑲 1 顆）。';
+  state.gems = state.gems.filter((x) => x.id !== gemId);
+  found.g.gem = { id: gem.id, stat: gem.stat, value: gem.value };
+  return null;
 }
 
 /**
@@ -145,6 +213,7 @@ export function findJunk(state) {
   const groups = new Map();
   const add = (g, worn) => {
     if (g.special || g.effects.length !== 1) return;
+    if (g.gem && !worn) return; // 鑲了寶石的不丟，也不佔「保留名額」
     const key = `${g.slot}:${g.effects[0].stat}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push({ g, worn, value: g.effects[0].value });

@@ -11,6 +11,7 @@ import {
 } from '../game/rules.js';
 import {
   identifiable, identify, equip, unequip, discard, compareGear, findJunk, gearName, effectText, gearDiceText,
+  identifiableGems, identifyGems, socketGem, socketTargets, gemDiceText, gemName,
 } from '../game/equipment.js';
 import { derivedStats } from '../game/stats.js';
 import { SKILL_CATALOG, RULE_SKILLS, moveFromCatalog } from '../game/skills.js';
@@ -30,7 +31,7 @@ const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const FILTERS = [['all', '全部'], ['weapon', '武器'], ['armor', '防具'], ['accessory', '飾品']];
 
 export function createGearView({ root, getState, commit }) {
-  const ui = { filter: 'all', batch: null, newSkill: '', newSkillLv: 1, skillBoxOpen: false };
+  const ui = { filter: 'all', batch: null, gemTarget: {}, newSkill: '', newSkillLv: 1, skillBoxOpen: false };
 
   const gearValue = (g) => g.effects.reduce((a, e) => a + e.value, 0);
 
@@ -104,7 +105,13 @@ export function createGearView({ root, getState, commit }) {
           g.special ? h('span', { class: 'fx-chip fx-chip--special', text: '特殊' }) : null,
           ...g.effects.map((e) => h('span', { class: 'fx-chip' }, h('span', { text: e.stat }), h('strong', { class: 'num', dataset: { final: e.value }, text: `+${fmt(e.value)}` }))),
         ]
-      : h('span', { class: 'fx-chip fx-chip--special', text: effectText(g) }));
+      : h('span', { class: 'fx-chip fx-chip--special', text: effectText(g) }),
+    g.gem ? gemChip(g.gem) : null);
+
+  /** 鑲在裝備上的寶石（神話色、菱形） */
+  const gemChip = (gem) => h('span', { class: 'fx-chip fx-chip--gem', title: '鑲嵌的寶石（目前無法取出）' },
+    h('span', { class: 'rarity-tag__gem', 'aria-hidden': 'true' }),
+    h('span', { text: gem.stat }), h('strong', { class: 'num', text: `+${fmt(gem.value)}` }));
 
   function slotCard(state, key) {
     const g = state.equipment[key];
@@ -179,7 +186,96 @@ export function createGearView({ root, getState, commit }) {
                   h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentify(state, x.name, n) }, `鑑定 ${n}`)),
                 h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => runIdentify(state, x.name, x.qty) }, `全部 ${fmt(x.qty)}`)))))
         : h('p', { class: 'notice', text: '背包裡沒有通用裝備。到修整日鍛造（鑄造）就會得到。' }),
+      gemIdentifyList(state),
       batchCard(state));
+  }
+
+  // ---------- 寶石：鑑定（擲數值）、鑲嵌 ----------
+  function gemIdentifyList(state) {
+    const list = identifiableGems(state);
+    if (!list.length) return null;
+    return h('div', { class: 'identify-list identify-list--gems' },
+      h('p', { class: 'field-label', text: '寶石（神級鍛造，鑑定時擲出數值）' }),
+      list.map((x) =>
+        h('div', { class: 'identify rarity', dataset: { tier: 4, rarity: 4 } },
+          h('div', { class: 'identify__info' },
+            h('strong', { class: 'rarity__name', text: `💎 ${x.name}` }),
+            rarityTag(4),
+            h('span', { class: 'identify__qty', text: `×${fmt(x.qty)}` }),
+            h('small', { text: gemDiceText(x.stat) })),
+          h('div', { class: 'identify__btns' },
+            [1, 10].filter((n) => n < x.qty).map((n) =>
+              h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentifyGems(state, x.name, n) }, `鑑定 ${n}`)),
+            h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => runIdentifyGems(state, x.name, x.qty) }, `全部 ${fmt(x.qty)}`)))));
+  }
+
+  async function runIdentifyGems(state, name, times) {
+    let made;
+    let draw;
+    try { ({ r: made, draw } = await rollWith(state, (st, rng) => identifyGems(st, name, times, rng))); } catch (e) { return rollFailed(e); }
+    if (!made.length) return toast('沒有可以鑑定的寶石。');
+    const best = [...made].sort((a, b) => b.value - a.value)[0];
+    publish({
+      who: state.name, kind: 'identify', label: `鑑定 ${name} ×${made.length}`,
+      big: made.length === 1 ? `${best.stat}+${best.value}` : `最高 ${best.stat}+${best.value}`,
+      lines: [
+        ...made.slice(0, 5).map((g) => `${gemName(g)}：${gemDiceText(g.stat)} → ${g.stat}+${g.value}`),
+        made.length > 5 ? `…共 ${made.length} 顆` : null,
+      ].filter(Boolean),
+    }, { draw });
+    commit();
+    const top = new Set([...made].sort((a, b) => b.value - a.value).slice(0, 12).map((g) => g.id));
+    const picked = made.filter((g) => top.has(g.id));
+    openReveal({
+      title: `${name} ×${fmt(made.length)}`,
+      cards: picked.map((g) => ({
+        tier: 4, icon: '💎', name: gemName(g),
+        body: h('div', { class: 'fx-chips' }, h('span', { class: 'fx-chip' }, h('span', { text: g.stat }), h('strong', { class: 'num', dataset: { final: g.value }, text: `+${fmt(g.value)}` }))),
+        note: gemDiceText(g.stat),
+      })),
+      best: picked.findIndex((g) => g.id === best.id),
+      summary: made.length > 12 ? `只翻開數值最高的 12 顆；共 ${fmt(made.length)} 顆，都在下方「寶石」。` : `共 ${fmt(made.length)} 顆，到下方「寶石」鑲進傳說裝備。`,
+    });
+  }
+
+  function gemCard(state) {
+    const gems = [...(state.gems ?? [])].sort((a, b) => a.stat.localeCompare(b.stat) || b.value - a.value);
+    if (!gems.length) return null;
+    const targets = socketTargets(state);
+    const wornIds = new Set(Object.values(state.equipment).filter(Boolean).map((g) => g.id));
+    const label = (g) => `${wornIds.has(g.id) ? '【身上】' : ''}${gearName(g)}：${effectText(g)}`;
+    return h('section', { class: 'card' },
+      h('h2', { class: 'section-title', text: `寶石（${fmt(gems.length)} 顆未鑲嵌）` }),
+      h('p', { class: 'hint', text: '只能鑲進傳說裝備，每件 1 顆。鑲上後目前無法取出（需要「特殊剝離道具」，網站還沒有）。鑲在身上的裝備才會計入數值面板。' }),
+      targets.length ? null : h('p', { class: 'notice', text: '沒有可以鑲的傳說裝備（全部都已經鑲了，或還沒有傳說裝備）。' }),
+      h('ul', { class: 'gem-list' }, gems.map((gem) => {
+        const sel = targets.some((g) => g.id === ui.gemTarget[gem.id]) ? ui.gemTarget[gem.id] : targets[0]?.id;
+        return h('li', { class: 'gem-row rarity', dataset: { tier: 4, rarity: 4 } },
+          h('div', { class: 'gem-row__main' },
+            h('strong', { class: 'rarity__name', text: `💎 ${gemName(gem)}` }),
+            rarityTag(4),
+            h('span', { class: 'fx-chip' }, h('span', { text: gem.stat }), h('strong', { class: 'num', text: `+${fmt(gem.value)}` }))),
+          targets.length
+            ? h('div', { class: 'gem-row__socket' },
+                h('select', {
+                  class: 'field', 'aria-label': `把${gemName(gem)}鑲進哪一件`,
+                  onchange: (e) => { ui.gemTarget[gem.id] = Number(e.target.value); },
+                }, targets.map((g) => h('option', { value: String(g.id), selected: g.id === sel ? true : null, text: label(g) }))),
+                h('button', {
+                  type: 'button', class: 'btn btn--primary btn--small',
+                  onclick: () => {
+                    const target = targets.find((g) => g.id === (ui.gemTarget[gem.id] ?? sel));
+                    if (!target || !confirm(`把${gemName(gem)}（${gem.stat} +${gem.value}）鑲進「${label(target)}」？\n鑲上後目前無法取出。`)) return;
+                    const err = socketGem(state, gem.id, target.id);
+                    if (err) return toast(err);
+                    delete ui.gemTarget[gem.id];
+                    publish({ who: state.name, kind: 'note', label: `鑲嵌 ${gemName(gem)}`, lines: [`${gem.stat} +${gem.value} → ${gearName(target)}`] });
+                    toast(`已鑲進${gearName(target)}`);
+                    commit();
+                  },
+                }, '鑲嵌'))
+            : null);
+      })));
   }
 
   function batchCard(state) {
@@ -207,6 +303,7 @@ export function createGearView({ root, getState, commit }) {
         h('strong', { class: 'owned__name rarity__name', text: `${iconOf(gearName(g))} ${gearName(g)}` }),
         rarityTag(tierIndex(g)),
         h('span', { class: 'owned__effect', text: effectText(g) }),
+        g.gem ? gemChip(g.gem) : null,
         h('span', { class: 'badge', dataset: { tone: BADGE[cmp][1] }, text: BADGE[cmp][0] })),
       g.special
         ? h('input', {
@@ -221,7 +318,13 @@ export function createGearView({ root, getState, commit }) {
                  h('button', { type: 'button', class: 'btn btn--small', onclick: () => putOn('acc2') }, '換飾品 2')]
               : h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => putOn(state.equipment.acc1 ? 'acc2' : 'acc1') }, '裝備'))
           : h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => putOn(g.slot) }, '裝備'),
-        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { discard(state, [g.id]); commit(); } }, '丟棄')));
+        h('button', {
+          type: 'button', class: 'btn btn--ghost btn--small',
+          onclick: () => {
+            if (g.gem && !confirm(`這件鑲著${gemName(g.gem)}（${g.gem.stat} +${g.gem.value}），丟棄後寶石也會一起消失。確定丟棄？`)) return;
+            discard(state, [g.id]); commit();
+          },
+        }, '丟棄')));
   }
 
   function ownedCard(state) {
@@ -255,7 +358,7 @@ export function createGearView({ root, getState, commit }) {
     const scrollY = root.scrollTop;
     root.replaceChildren(
       h('div', { class: 'page-wrap gear-layout' },
-        h('div', { class: 'gear-col' }, slotsCard(state), identifyCard(state)),
+        h('div', { class: 'gear-col' }, slotsCard(state), identifyCard(state), gemCard(state)),
         h('div', { class: 'gear-col' }, panelCard(state), skillCard(state), ownedCard(state))));
     root.scrollTop = scrollY;
   }

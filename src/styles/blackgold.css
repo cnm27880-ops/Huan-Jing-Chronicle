@@ -995,3 +995,19 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
   #view-rest .rest-tab__sub { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { #view-rest .rres[data-fresh='1'] { animation: none; } }
+
+/* ============================================================
+   寶石：鑑定清單、未鑲嵌清單、裝備上的寶石小格（神話色＝虹彩菱形）
+   ============================================================ */
+.identify-list--gems { margin-top: 12px; }
+.gem-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.gem-row {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  padding: 8px 12px; background: var(--raise); border-radius: 10px;
+}
+.gem-row__main { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.gem-row__socket { display: flex; align-items: center; gap: 6px; flex: 1 1 260px; justify-content: flex-end; min-width: 0; }
+.gem-row__socket .field { flex: 1; min-width: 0; max-width: 340px; }
+.fx-chip--gem { box-shadow: inset 0 0 0 1px var(--line3); }
+.fx-chip--gem .rarity-tag__gem { width: 7px; height: 7px; margin: 0 2px; background: var(--rainbow); align-self: center; }
+.fx-chip--gem strong { color: var(--ink); }
