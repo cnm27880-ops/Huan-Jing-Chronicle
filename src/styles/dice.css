@@ -7,14 +7,11 @@
 .tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { white-space: nowrap; }
-#tray-toggle { flex: none; }
-#tray-toggle[aria-expanded='true'] { color: var(--gold); border-color: var(--gold-deep); }
 @media (max-width: 900px) {
   .topbar { gap: 8px; }
   .brand { padding: 0 4px 0 16px; font-size: 1.05rem; letter-spacing: .08em; }
   .brand::after { display: none; }
   .tab { padding: 8px 9px; font-size: .8rem; }
-  #tray-toggle { padding: 8px 9px; font-size: .78rem; }
 }
 
 /* ---------- 頁面共用 ---------- */
@@ -35,19 +32,11 @@
 .battle-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .battle-head .section-title { margin: 0 0 .5rem; }
 
-/* ---------- 骰盤抽屜 ---------- */
-.tray {
-  position: fixed; top: var(--topbar-h); right: 0; bottom: 0; z-index: 55;
-  width: min(390px, 100vw); display: flex; flex-direction: column;
-  background: var(--panel); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(var(--shadow-rgb), .45);
-  transform: translateX(104%); visibility: hidden;
-  transition: transform .22s var(--ease, ease), visibility 0s linear .22s;
-}
-.tray[data-open='true'] { transform: none; visibility: visible; transition: transform .22s var(--ease, ease); }
+/* ---------- 跑團頁（原骰盤抽屜；.tray__ 開頭的是內部區塊） ---------- */
 .tray__head { display: flex; align-items: center; gap: .6rem; padding: .7rem .9rem; border-bottom: 1px solid var(--line); }
 .tray__heading { margin: 0; font-family: var(--font-display); font-size: 1.1rem; }
 .tray__who { margin-right: auto; color: var(--dim); font-size: .78rem; }
-.tray__body { flex: 1; overflow-y: auto; padding: .6rem .9rem calc(1.5rem + env(safe-area-inset-bottom, 0px)); }
+.tray__body { padding: .6rem 0 0; }
 .tray__section { margin-top: .9rem; }
 .tray__title { margin: 0 0 .4rem; font-size: .9rem; color: var(--muted); }
 .tray__title-row { display: flex; align-items: center; justify-content: space-between; }
@@ -55,12 +44,6 @@
 .tray__stomach strong { font-family: var(--font-mono); color: var(--gold); }
 .tray__mod { margin-top: .5rem; }
 .tray__mod .field-label { flex: none; margin: 0; }
-.tray .skill-grid { margin-bottom: .6rem; }
-.tray .btn--go { margin-top: .7rem; }
-@media (max-width: 700px) {
-  .tray { top: auto; left: 0; width: 100%; height: min(82vh, 640px); border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; transform: translateY(104%); }
-  .tray[data-open='true'] { transform: none; }
-}
 
 /* ---------- 擲骰紀錄 ---------- */
 .roll-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
@@ -176,7 +159,7 @@
 .monster__btns { flex-wrap: wrap; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tray, .roll[data-fresh='1'], .bar__fill { transition: none; animation: none; }
+  .roll[data-fresh='1'], .bar__fill { transition: none; animation: none; }
 }
 
 .check { display: flex; gap: 0.5rem; align-items: center; margin-block: 0.5rem; font-size: 0.9rem; cursor: pointer; }
@@ -243,5 +226,3 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 /* 跑團頁（原骰盤抽屜改成獨立分頁） */
 .session-root { max-width: 760px; margin: 0 auto; padding: 0 .9rem calc(2rem + env(safe-area-inset-bottom, 0px)); }
 .session-root .skill-grid { margin-bottom: .6rem; }
-.session-root .btn--go { margin-top: .7rem; }
-.session-root > .tray__body { overflow: visible; padding: .6rem 0 0; }

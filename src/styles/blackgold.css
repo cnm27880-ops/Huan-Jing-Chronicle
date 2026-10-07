@@ -86,7 +86,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .tab--more, .more-menu { display: none; }
 
 /* ---------- 面板（不透明） ---------- */
-.card, .results, .showcase, .sheet__panel, .tray, .dossier, .map-hint, .status, .bag-bar {
+.card, .results, .showcase, .sheet__panel, .dossier, .map-hint, .status, .bag-bar {
   background: var(--card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -96,7 +96,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .card, .results, .showcase, .sheet__panel { border-radius: var(--r-panel); }
 .card { padding: 16px 18px; }
 .card:hover, .results:hover { box-shadow: var(--panel-shadow); }
-.tray, .dossier { background: var(--paper2); }
+.dossier { background: var(--paper2); }
 .status, .bag-bar { border-radius: 0; box-shadow: 0 1px 0 var(--line), 0 4px 12px var(--shadow); }
 .result, .stat, .monster, .mod { background: var(--raise); border: 0; box-shadow: 0 0 0 1px var(--line); border-radius: 10px; }
 
@@ -463,7 +463,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 /* 觸控目標至少 44px */
 @media (max-width: 759px), (pointer: coarse) {
   .btn, .seg, .toggle, .chip, .field, .amount__chip, .amount__input, .move__pick, .sheet__close, .dossier__close,
-  .status__day, .potion, .diff, .skill-btn, .bag-group__head, #tray-toggle { min-height: 44px; }
+  .status__day, .potion, .diff, .skill-btn, .bag-group__head { min-height: 44px; }
   .amount__step, .info-chip__btn { min-width: 44px; min-height: 44px; }
 }
 
