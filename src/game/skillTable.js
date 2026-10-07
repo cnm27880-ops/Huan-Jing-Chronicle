@@ -114,6 +114,8 @@ export function upgradeCost(state, name) {
 
 /** 學新技能（0→1）要 3 本「同名」技能書（物品名 = 技能名，需驗證）；升到 N 級要 N 本「同階」技能書 */
 export const LEARN_BOOKS = 3;
+/** 學新技能（0→1）要「累計花費過」的經驗（RULES_OVERVIEW 5.2）；升級不看門檻 */
+export const LEARN_GATE = { 初階: 0, 進階: 3000, 大師: 13000, 傳說: 33000 };
 export const bookOf = (name) => `${SKILL_TABLE[name].tier}技能書`;
 
 /**
@@ -135,9 +137,11 @@ export function upgradePlan(state, name, target) {
   }
   const haveExp = Number(state.exp) || 0;
   const missing = {};
+  const gate = from === 0 ? { need: LEARN_GATE[tier] ?? 0, have: Number(state.spentExp) || 0 } : null;
+  if (gate && gate.have < gate.need) missing['累計花費經驗門檻'] = gate.need - gate.have;
   if (haveExp < exp) missing.經驗 = exp - haveExp;
   for (const [item, n] of Object.entries(books)) if (countOf(state, item) < n) missing[item] = n - countOf(state, item);
-  return { from, to, exp, books, haveExp, missing, ok: Object.keys(missing).length === 0 };
+  return { from, to, exp, books, haveExp, gate, missing, ok: Object.keys(missing).length === 0 };
 }
 
 /** 目前資源最多能升到幾級（一級都升不了回現在的等級） */

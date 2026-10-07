@@ -1153,3 +1153,16 @@ input[type='number'], .amount__input { text-align: center; }
 /* 跑團頁的技能檢定按鈕：三格並排 */
 .session-root .skill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .session-root .skill-btn { padding: 6px 8px; }
+
+/* 抽取技能書、生活徽章 */
+.draw-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.draw-card { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.draw-card .row { display: flex; flex-wrap: wrap; gap: 6px; }
+.draw-set { display: grid; gap: 6px; }
+.draw-options { display: grid; gap: 6px; }
+.draw-option { display: grid; gap: 4px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.draw-option .skill-info__text { margin: 0; font-size: 0.82rem; }
+@media (min-width: 640px) { .draw-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.badge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.badge-row { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.badge-row__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
