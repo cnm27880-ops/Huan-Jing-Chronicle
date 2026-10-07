@@ -238,7 +238,7 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 .battle-float[data-open='true'] { transform: none; visibility: visible; transition: transform .22s var(--ease, ease); }
 .battle-float__head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .7rem .9rem; border-bottom: 1px solid var(--line); }
 .battle-float__body { flex: 1; overflow-y: auto; }
-.btn.battle-float__toggle { position: fixed; right: 14px; bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 50; box-shadow: 0 6px 18px var(--shadow); }
+.btn.battle-float__toggle { position: fixed; right: 14px; bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 40; box-shadow: 0 6px 18px var(--shadow); }
 .battle-float[data-open='true'] ~ .btn.battle-float__toggle { visibility: hidden; }
 .battle-float .bt-root { padding: 0 12px 12px; }
 .battle-float .bt-tabs { display: grid; }

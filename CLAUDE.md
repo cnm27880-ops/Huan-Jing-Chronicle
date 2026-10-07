@@ -54,11 +54,14 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/data/skills.js` | 技能目錄（**自動產生，不要手改**）：117 個技能、每級累積數值、位階／類型／系別／效果文字、升級經驗表。由 `tools/extract-skills.py` 從 GM 的自動角色卡產生 |
 | `tools/extract-skills.py` | 更新技能目錄用（需要 openpyxl，只在技能資料改版時才跑）：`python3 tools/extract-skills.py 標準卡.xlsx [補充卡.xlsx …]` |
 | `src/game/skillTable.js` | 技能數值：查表、啟動類技能（武裝）、skills 模式（`statMode: 'skills'`）的規則（純函式） |
+| `src/game/skillDraw.js` | 抽取技能書（3 選 1，結果存 `pendingDraws`，選完前不能做其他事）（純函式） |
+| `src/game/badges.js` | 生活技能徽章（神級、500 次）：判斷達標、製作後技能 +1（純函式） |
 | `src/game/importSheet.js` | 試算表角色卡（貼上的文字）→ 網站角色：用標題文字找位置，不看固定格子；算出「手動調整」（純函式） |
 | `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |
 | `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：看並改玩家的手動調整、技能等級、啟動 |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |
+| `src/ui/skillTile.js` | 技能方格（三格並排；電腦滑過浮動顯示效果、手機點開面板）：修整日學習與裝備頁技能共用 |
 | `src/ui/restView.js` | 修整日頁面：上方 HUD、採集／製作／跑團檢定分頁、設定步驟＋大按鈕、結果卡 |
 | `src/ui/statusBar.js` | 修整日的 HUD（時間、熟練、胃袋）與「吃東西」面板 |
 | `src/ui/bagView.js` | 背包頁面 |

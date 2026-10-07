@@ -15,10 +15,10 @@ export function closeSheet() {
 }
 
 /** build(close) 回傳面板內容；之後要更新內容可呼叫回傳的 refresh() */
-export function openSheet(title, build) {
+export function openSheet(title, build, { tall = false } = {}) {
   closeSheet();
   const body = h('div', { class: 'sheet__body' });
-  const panel = h('div', { class: 'sheet__panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+  const panel = h('div', { class: 'sheet__panel', dataset: { size: tall ? 'tall' : 'normal' }, role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
     h('header', { class: 'sheet__head' },
       h('h2', { class: 'sheet__title', text: title }),
       h('button', { type: 'button', class: 'sheet__close', onclick: closeSheet }, '關閉')),

@@ -123,6 +123,7 @@ export function gather(state, action, times, keepsakes = [], rng = Math.random) 
     const roll = d20(rng);
     const total = roll + mod.total;
     const { tier, exp: gained } = gatherTier(total);
+    if (tier === '神級') (state.godReached ??= {})[action] = true; // 徽章用：初次達到神級（badges.js）
     state.exp += gained;
     exp += gained;
     const got = {};
@@ -157,6 +158,7 @@ export function craft(state, action, diff, times, keepsakes = [], rng = Math.ran
     const roll = d20(rng);
     const total = roll + mod.total;
     const success = total >= recipe.dc;
+    if (success && diff === '神級') (state.godReached ??= {})[action] = true; // 徽章用：製作出神級
     const got = {};
     if (success) {
       for (let k = 0; k < recipe.count; k++) {

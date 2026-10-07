@@ -10,12 +10,16 @@ import { itemTile, amountPicker, toast } from './controls.js';
 import { iconOf, TIERS } from './items.js';
 import {
   GATHER_ACTIONS, CRAFT_ACTIONS, DIFFICULTIES, RECIPES,
-  CRAFT_COST_AMOUNT,
+  CRAFT_COST_AMOUNT, LIFE_SKILLS,
 } from '../game/rules.js';
 import {
   modifier, gather, craft, craftableTimes, keepsakeApplies, countOf,
 } from '../game/engine.js';
-import { SKILL_TABLE, MAX_SKILL_LEVEL, usesSkillTable, inCatalog, upgradeCost, upgradeSkill } from '../game/skillTable.js';
+import { SKILL_TABLE, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo } from '../game/skillTable.js';
+import { drawBooks, chooseDraw, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
+import { badgeStatus, craftBadge, BADGE_COUNT } from '../game/badges.js';
+import { openSheet } from './sheet.js';
+import { skillTile, skillInfoBlock, skillTag } from './skillTile.js';
 import { SKILL_CATALOG, moveFromCatalog } from '../game/skills.js';
 
 const ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
@@ -35,6 +39,14 @@ export function createRestView({ root, getState, commit }) {
 
   const partsText = (list) => list.map((p) => `${p.label} +${p.value}`).join('　');
   const pushResult = (r) => { ui.results.unshift(r); ui.results.length = Math.min(ui.results.length, 20); ui.fresh = true; commit(); };
+
+  /** 抽取的技能還沒選完就不能做其他事（RULES_OVERVIEW 5.1）：擋下並打開選擇面板 */
+  function blockedByDraw() {
+    if (!hasPendingDraw(getState())) return false;
+    toast('先把抽取的技能選完。');
+    openDrawSheet();
+    return true;
+  }
 
   // ---------- 共用 ----------
   const section = (title, ...children) => h('section', { class: 'card rest-step' }, h('h2', { class: 'section-title', text: title }), ...children);
@@ -104,7 +116,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: '今天的時間用完了。點上方的「新的一天」恢復 10 點。' })]
         : runBlock(state, a, {
             label: `${ICONS[a]} ${a} ${ui.times} 次`, hint: `每次 1 點時間，今天還剩 ${max} 點`, max, quick: [1, 3, 5],
-            onRun: () => pushResult({ kind: 'gather', action: a, ...gather(state, a, ui.times, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'gather', action: a, ...gather(state, a, ui.times, [...ui.keepsakes]) }),
           })),
     ];
   }
@@ -138,7 +150,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: `${recipe.cost}不足 ${CRAFT_COST_AMOUNT} 個，先去採集吧。` })]
         : runBlock(state, a, {
             label: `${ICONS[a]} ${a}（${d}）${ui.times} 次`, hint: '製作不消耗時間', max, quick: [1, 5, 10],
-            onRun: () => pushResult({ kind: 'craft', action: a, diff: d, ...craft(state, a, d, ui.times, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: a, diff: d, ...craft(state, a, d, ui.times, [...ui.keepsakes]) }),
           })),
     ];
   }
@@ -190,31 +202,146 @@ export function createRestView({ root, getState, commit }) {
   const TIER_RANK = { 初階: 0, 進階: 1, 大師: 2, 傳說: 3, 神級: 4 };
   const byTier = (a, b) => (TIER_RANK[SKILL_TABLE[a]?.tier] ?? 9) - (TIER_RANK[SKILL_TABLE[b]?.tier] ?? 9) || a.localeCompare(b, 'zh-TW');
 
-  function doUpgrade(name) {
-    const state = getState();
-    const r = upgradeSkill(state, name);
-    if (!r.ok) return toast(r.error);
-    if (SKILL_CATALOG[name] && !state.moves.some((m) => m.skill === name)) state.moves.push(moveFromCatalog(name));
-    const swapText = r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`).join('；');
-    toast(`${name} 升到 ${r.level} 級（−${fmt(r.cost)} 經驗）${swapText ? `。${swapText}` : ''}`);
-    commit();
+  /** 一個技能的學習／升級面板：選目標等級 → 看要付什麼 → 確認 */
+  function openLearnSheet(name) {
+    const pick = { target: null };
+    let sheet;
+
+    const costRow = (label, need, have) => h('li', { class: 'learn-cost__row', dataset: { ok: have >= need ? '1' : '0' } },
+      h('span', { text: label }),
+      h('span', { class: 'num', text: `${fmt(need)}（有 ${fmt(have)}）` }),
+      h('b', { 'aria-hidden': 'true', text: have >= need ? '✓' : `缺 ${fmt(need - have)}` }));
+
+    function doUpgrade(plan) {
+      if (blockedByDraw()) return;
+      const state = getState();
+      const bookText = Object.entries(plan.books).map(([n, q]) => `${n} ×${q}`).join('、');
+      if (!confirm(`${name}：${plan.from ? `${plan.from} 級` : '學習'} → ${plan.to} 級\n將消耗 ${fmt(plan.exp)} 經驗、${bookText}。\n確定嗎？`)) return;
+      const r = upgradeSkillTo(state, name, plan.to);
+      if (!r.ok) return toast(r.error);
+      if (SKILL_CATALOG[name] && !state.moves.some((m) => m.skill === name)) state.moves.push(moveFromCatalog(name));
+      const swapText = r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`).join('；');
+      toast(`${name} ${r.from ? `${r.from} 級升到` : '學會，升到'} ${r.level} 級${swapText ? `。${swapText}` : ''}`);
+      pick.target = null;
+      commit();
+      sheet.refresh();
+    }
+
+    function body() {
+      const state = getState();
+      const lv = Number(state.skills?.[name]) || 0;
+      const info = skillInfoBlock(name);
+      if (lv >= MAX_SKILL_LEVEL) return h('div', { class: 'learn' }, info, h('p', { class: 'notice', text: `${name} 已經滿級。` }));
+      const best = maxAffordableLevel(state, name);
+      if (!pick.target || pick.target <= lv || pick.target > MAX_SKILL_LEVEL) pick.target = Math.max(best, lv + 1);
+      const plan = upgradePlan(state, name, pick.target);
+      const set = (n) => { pick.target = n; sheet.refresh(); };
+      const swapAt = FOOL_SWAPS[name] ? FOOL_LEVELS.filter((x) => x > lv && x <= pick.target) : [];
+      return h('div', { class: 'learn' },
+        info,
+        h('p', { class: 'field-label', text: `目前 ${lv ? `${lv} 級` : '未學會'}　要升到幾級？` }),
+        h('div', { class: 'chip-row learn__levels', role: 'radiogroup', 'aria-label': '目標等級' },
+          Array.from({ length: MAX_SKILL_LEVEL - lv }, (_, i) => lv + 1 + i).map((n) =>
+            h('button', { type: 'button', class: 'chip', role: 'radio', 'aria-checked': String(n === pick.target), onclick: () => set(n) }, `${n} 級`))),
+        h('div', { class: 'row' },
+          h('button', { type: 'button', class: 'btn btn--small', onclick: () => set(lv + 1) }, lv ? '升一級' : '只學會'),
+          best > lv ? h('button', { type: 'button', class: 'btn btn--small', onclick: () => set(best) }, `材料夠的最高：${best} 級`) : null,
+          h('button', { type: 'button', class: 'btn btn--small', onclick: () => set(MAX_SKILL_LEVEL) }, '學滿 10 級')),
+        h('p', { class: 'field-label', text: `${lv ? `${lv} → ${plan.to} 級` : `學會並升到 ${plan.to} 級`}要消耗` }),
+        h('ul', { class: 'learn-cost' },
+          plan.gate && plan.gate.need > 0 ? costRow('累計花費經驗（門檻）', plan.gate.need, plan.gate.have) : null,
+          costRow('經驗', plan.exp, plan.haveExp),
+          Object.entries(plan.books).map(([n, q]) => costRow(`${iconOf(n)} ${n}`, q, getState().inventory[n] ?? 0))),
+        h('p', { class: 'hint', text: `學新技能要 3 本抽取後的「${name}」技能書（${SKILL_TABLE[name].tier}技能要累計花費過一定經驗才能學）；之後每升到第 N 級要 N 本還沒抽取的「${SKILL_TABLE[name].tier}技能書」。` }),
+        swapAt.length ? h('p', { class: 'hint', text: `會在 ${swapAt.join('、')} 級自動對調「${FOOL_SWAPS[name][0]}」與「${FOOL_SWAPS[name][1]}」。` }) : null,
+        h('button', {
+          type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: () => doUpgrade(plan),
+        }, plan.ok ? `${lv ? '升級' : '學習'}到 ${plan.to} 級` : '材料不夠'));
+    }
+
+    sheet = openSheet(name, body, { tall: true });
   }
 
-  function learnRow(state, name) {
-    const t = SKILL_TABLE[name];
+  /** 抽取結果：每組 3 個技能選 1（選了就不能反悔，所以先確認） */
+  function openDrawSheet() {
+    let sheet;
+    function body() {
+      const pending = getState().pendingDraws ?? [];
+      if (!pending.length) return h('p', { class: 'notice', text: '都選完了。到背包可以看到新的技能書。' });
+      return h('div', { class: 'learn' },
+        h('p', { class: 'hint', text: '每一組選一個技能，選到的技能會變成該技能的技能書。選完才能做其他事。' }),
+        pending.map((d, i) => h('section', { class: 'draw-set' },
+          h('h3', { class: 'field-label', text: `${d.tier}技能書　第 ${i + 1} / ${pending.length} 組` }),
+          h('div', { class: 'draw-options' }, d.options.map((n) => h('div', { class: 'draw-option' },
+            h('strong', { text: n }),
+            h('small', { class: 'skill-tile__tag', text: skillTag(n) }),
+            h('p', { class: 'skill-info__text', text: SKILL_TABLE[n].text }),
+            h('button', {
+              type: 'button', class: 'btn btn--primary btn--small',
+              onclick: () => {
+                if (!confirm(`選「${n}」？選了就不能改。`)) return;
+                const r = chooseDraw(getState(), i, n);
+                if (!r.ok) return toast(r.error);
+                toast(`得到 ${n} 技能書 ×1`);
+                commit();
+                sheet.refresh();
+              },
+            }, '選這個')))))));
+    }
+    sheet = openSheet(`選擇技能（${DRAW_CHOICES} 選 1）`, body, { tall: true });
+  }
+
+  function doDraw(tier, times) {
+    const r = drawBooks(getState(), tier, times);
+    if (!r.ok) return toast(r.error);
+    commit();
+    openDrawSheet();
+  }
+
+  function drawSection(state) {
+    const pending = state.pendingDraws ?? [];
+    return section('抽取技能書',
+      h('p', { class: 'hint', text: '用掉初階～傳說技能書，每本出現 3 個技能選 1，選到的技能會變成該技能的技能書（學新技能要 3 本同名）。可以先開多本再一一選；選完之前不能採集、製作或學習。' }),
+      pending.length
+        ? h('button', { type: 'button', class: 'btn btn--primary btn--go', onclick: openDrawSheet }, `選擇技能（還有 ${pending.length} 組沒選）`)
+        : h('div', { class: 'draw-cards' }, DRAW_TIERS.map((tier) => {
+            const book = `${tier}技能書`;
+            const n = countOf(state, book);
+            return h('div', { class: 'draw-card' },
+              h('strong', { text: `${iconOf(book)} ${book}` }),
+              h('span', { class: 'num', text: `有 ${fmt(n)}` }),
+              n ? h('div', { class: 'row' },
+                h('button', { type: 'button', class: 'btn btn--small', onclick: () => doDraw(tier, 1) }, '抽 1 本'),
+                n > 1 ? h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => doDraw(tier, Math.min(n, MAX_DRAW_AT_ONCE)) }, `抽 ${Math.min(n, MAX_DRAW_AT_ONCE)} 本`) : null) : null);
+          })));
+  }
+
+  function badgeSection(state) {
+    return section('生活徽章',
+      h('p', { class: 'hint', text: `每個生活技能「初次達到神級」和「累計 ${BADGE_COUNT} 次」（採集與製作都算）各可以做一個徽章，做的當下該技能等級 +1，每種只能做一次。` }),
+      h('ul', { class: 'badge-list' }, LIFE_SKILLS.map((skill) => h('li', { class: 'badge-row' },
+        h('strong', { text: `${ICONS[skill]} ${skill}　技能 ${state.lifeSkills[skill] ?? 0}` }),
+        h('div', { class: 'badge-row__btns' }, badgeStatus(state, skill).map((b) => {
+          const label = b.kind === '神級' ? '神級徽章' : `${BADGE_COUNT}次徽章（${fmt(Math.min(b.progress.have, BADGE_COUNT))}/${BADGE_COUNT}）`;
+          if (b.made) return h('button', { type: 'button', class: 'btn btn--small', disabled: true }, `${label} ✓ 已製作`);
+          if (!b.reached) return h('button', { type: 'button', class: 'btn btn--small', disabled: true }, `${label} 未達成`);
+          return h('button', {
+            type: 'button', class: 'btn btn--primary btn--small',
+            onclick: () => {
+              if (!confirm(`製作「${b.item}」？${skill}技能等級 +1，每種只能做一次。`)) return;
+              const r = craftBadge(getState(), skill, b.kind);
+              if (!r.ok) return toast(r.error);
+              toast(`做出 ${r.item}，${skill}技能升到 ${r.level}`);
+              commit();
+            },
+          }, `製作${label}`);
+        }))))));
+  }
+
+  function learnTile(state, name) {
     const lv = Number(state.skills?.[name]) || 0;
-    const cost = upgradeCost(state, name);
-    const can = cost != null && (Number(state.exp) || 0) >= cost;
-    return h('li', { class: 'skill-row skill-row--cat' },
-      h('div', { class: 'skill-row__main' },
-        h('strong', { text: name }),
-        h('small', { class: 'skill-row__tag', text: `${t.tier}・${t.kind}${t.school ? `・${t.school}` : ''}` }),
-        h('span', { class: 'num', text: lv ? `${lv} / ${MAX_SKILL_LEVEL} 級` : '未學會' }),
-        cost == null
-          ? h('small', { class: 'skill-row__tag', text: '已滿級' })
-          : h('button', { type: 'button', class: 'btn btn--primary btn--small', disabled: can ? null : true, onclick: () => doUpgrade(name) },
-              `${lv ? `升到 ${lv + 1} 級` : '學習'}（${fmt(cost)} 經驗）`)),
-      h('details', { class: 'skill-row__text' }, h('summary', { text: '效果' }), h('p', { text: t.text })));
+    const note = lv >= MAX_SKILL_LEVEL ? '已滿級' : maxAffordableLevel(state, name) > lv ? '可以升級' : '材料不足';
+    return skillTile(name, { level: lv, note, onOpen: () => openLearnSheet(name) });
   }
 
   function learnPanel(state) {
@@ -223,13 +350,13 @@ export function createRestView({ root, getState, commit }) {
     }
     const learned = Object.keys(state.skills ?? {}).filter(inCatalog).sort(byTier);
     const unlearned = Object.keys(SKILL_TABLE).filter((n) => !(n in (state.skills ?? {}))).sort(byTier);
-    return section('學習技能',
-      h('p', { class: 'hint', text: `花經驗學新技能或升級，不花時間。目前經驗 ${fmt(state.exp)}。愚者技能升到 1、5、10 級時會自動對調兩項數值（不含裝備與食物）。` }),
+    return [drawSection(state), badgeSection(state), section('學習技能',
+      h('p', { class: 'hint', text: `點技能看效果並學習／升級，可以一次升到想要的等級，不花時間。目前經驗 ${fmt(state.exp)}。愚者技能升到 1、5、10 級時會自動對調兩項數值（不含裝備與食物）。` }),
       h('h3', { class: 'field-label', text: `已學會（${fmt(learned.length)}）` }),
-      learned.length ? h('ul', { class: 'skill-list' }, learned.map((n) => learnRow(state, n))) : h('p', { class: 'notice', text: '還沒有學會技能。' }),
+      learned.length ? h('div', { class: 'skill-tiles' }, learned.map((n) => learnTile(state, n))) : h('p', { class: 'notice', text: '還沒有學會技能。' }),
       h('details', { class: 'add-box', open: ui.learnOpen, ontoggle: (e) => { ui.learnOpen = e.target.open; } },
         h('summary', { text: `＋ 學新技能（${fmt(unlearned.length)}）` }),
-        h('ul', { class: 'skill-list' }, unlearned.map((n) => learnRow(state, n)))));
+        h('div', { class: 'skill-tiles' }, unlearned.map((n) => learnTile(state, n)))))];
   }
 
   // ---------- 組合 ----------

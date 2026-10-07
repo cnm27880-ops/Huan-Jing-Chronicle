@@ -71,5 +71,5 @@ export function openGiftSheet(getState, commit) {
         ui.busy ? '送出中…' : total ? `🎁 送出（共 ${fmt(total)} 件）` : '🎁 送出'));
   }
 
-  sheet = openSheet('送給別人', body);
+  sheet = openSheet('送給別人', body, { tall: true });
 }
