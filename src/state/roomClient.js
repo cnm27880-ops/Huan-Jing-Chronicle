@@ -28,13 +28,24 @@ export function createRoomClient({ url, onMessage, onStatus, beforeRetry }) {
     let sock;
     try { sock = new WebSocket(url); } catch { return scheduleRetry(); }
     ws = sock;
+    const onClosed = (code) => {
+      clearInterval(pingTimer); clearTimeout(pongTimer);
+      if (ws === sock) ws = null;
+      if (stopped) return;
+      if (FATAL.has(code)) { stopped = true; onStatus('fatal', { code }); return; }
+      scheduleRetry(code === 4429 ? 10_000 : 0);
+    };
     sock.onopen = () => {
       attempt = 0;
       onStatus('open');
       pingTimer = setInterval(() => {
         try { sock.send('ping'); } catch { return; }
         clearTimeout(pongTimer);
-        pongTimer = setTimeout(() => { try { sock.close(); } catch { /* ignore */ } }, PONG_TIMEOUT_MS); // 沒回 pong = 連線已死
+        pongTimer = setTimeout(() => { // 沒回 pong = 連線已死：網路斷掉時瀏覽器可能很久才觸發 onclose，不等它，直接當作斷線
+          sock.onclose = null; sock.onmessage = null;
+          try { sock.close(); } catch { /* ignore */ }
+          onClosed(1006);
+        }, PONG_TIMEOUT_MS);
       }, PING_MS);
     };
     sock.onmessage = (e) => {
@@ -43,13 +54,7 @@ export function createRoomClient({ url, onMessage, onStatus, beforeRetry }) {
       try { msg = JSON.parse(e.data); } catch { return; }
       if (msg && typeof msg.t === 'string') onMessage(msg);
     };
-    sock.onclose = (e) => {
-      clearInterval(pingTimer); clearTimeout(pongTimer);
-      if (ws === sock) ws = null;
-      if (stopped) return;
-      if (FATAL.has(e.code)) { stopped = true; onStatus('fatal', { code: e.code }); return; }
-      scheduleRetry(e.code === 4429 ? 10_000 : 0);
-    };
+    sock.onclose = (e) => onClosed(e.code);
     sock.onerror = () => { /* 緊接著會有 onclose，由那邊處理 */ };
   }
 

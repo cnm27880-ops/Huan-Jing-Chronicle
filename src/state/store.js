@@ -48,8 +48,9 @@ function upgrade(state) {
     state.migrated.brute = true;
     if (state.skills.暴徒 && !state.moves.some((x) => x.skill === '暴徒')) state.moves.push(moveFromCatalog('暴徒'));
   }
+  const stats = derivedStats(state); // 面板不看目前資源量，算一次就好
   for (const r of Object.keys(state.resources)) {
-    state.resources[r] = Math.max(0, Math.min(state.resources[r], derivedStats(state)[r]?.total ?? Infinity));
+    state.resources[r] = Math.max(0, Math.min(state.resources[r], stats[r]?.total ?? Infinity));
   }
   state.hp = Math.max(0, Math.min(state.hp, maxHp(state)));
   return state;
