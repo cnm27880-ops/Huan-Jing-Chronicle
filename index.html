@@ -23,19 +23,15 @@
         <a class="tab" href="#rest" data-view-link="rest">修整日</a>
         <a class="tab" href="#bag" data-view-link="bag">背包</a>
         <a class="tab" href="#gear" data-view-link="gear">裝備</a>
-        <a class="tab" href="#battle" data-view-link="battle">戰鬥</a>
+        <a class="tab" href="#session" data-view-link="session">跑團</a>
         <a class="tab" href="#market" data-view-link="market">交易</a>
-        <!-- 手機底部導覽列的「更多」：裝備、交易、骰盤收在這裡（電腦版不顯示） -->
+        <!-- 手機底部導覽列的「更多」：裝備、交易收在這裡（電腦版不顯示） -->
         <button id="more-toggle" class="tab tab--more" type="button" aria-expanded="false" aria-controls="more-menu">更多</button>
       </nav>
       <div id="more-menu" class="more-menu" hidden>
         <a class="more-menu__item" href="#gear" data-view-link="gear">裝備</a>
         <a class="more-menu__item" href="#market" data-view-link="market">交易</a>
-        <button class="more-menu__item" type="button" data-more-click="tray-toggle">骰盤</button>
       </div>
-      <button id="tray-toggle" class="btn btn--ghost" type="button" aria-expanded="false" aria-controls="dice-tray" aria-label="骰盤">
-        <span aria-hidden="true">🎲</span><span class="btn__label">骰盤</span>
-      </button>
     </header>
 
     <main class="atlas view" id="view-map" data-view="map">
@@ -60,7 +56,7 @@
     <main class="view view--page" id="view-rest" data-view="rest" hidden></main>
     <main class="view view--page" id="view-bag" data-view="bag" hidden></main>
     <main class="view view--page" id="view-gear" data-view="gear" hidden></main>
-    <main class="view view--page" id="view-battle" data-view="battle" hidden></main>
+    <main class="view view--page" id="view-session" data-view="session" hidden></main>
     <main class="view view--page" id="view-market" data-view="market" hidden></main>
 
     <script type="module" src="/src/main.js"></script>

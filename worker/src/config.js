@@ -15,3 +15,8 @@ export const MAX_PENDING_DRAWS_PER_USER = 20;
 // 角色存檔（階段 2）：整份角色資料存在房間的 SQLite，每人一份
 export const MAX_CHAR_MESSAGE_CHARS = 262_144; // 只有 charPut 可以超過 MAX_MESSAGE_CHARS，上限 256K 字
 export const MAX_CHAR_JSON_CHARS = 200_000; // 角色 JSON 本身的上限
+
+// 信箱（送東西、餵藥）：對方不用同意；不在線時留在伺服器，上線才送達
+export const MAX_PENDING_MAIL = 50; // 每人最多同時放幾封未領取的
+export const MAX_MAIL_ITEM_KINDS = 30; // 一封最多幾種東西
+export const MAX_MAIL_ITEM_QTY = 9999; // 單一種東西的數量上限

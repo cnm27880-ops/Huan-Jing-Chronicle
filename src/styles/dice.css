@@ -7,14 +7,11 @@
 .tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { white-space: nowrap; }
-#tray-toggle { flex: none; }
-#tray-toggle[aria-expanded='true'] { color: var(--gold); border-color: var(--gold-deep); }
 @media (max-width: 900px) {
   .topbar { gap: 8px; }
   .brand { padding: 0 4px 0 16px; font-size: 1.05rem; letter-spacing: .08em; }
   .brand::after { display: none; }
   .tab { padding: 8px 9px; font-size: .8rem; }
-  #tray-toggle { padding: 8px 9px; font-size: .78rem; }
 }
 
 /* ---------- 頁面共用 ---------- */
@@ -35,19 +32,11 @@
 .battle-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .battle-head .section-title { margin: 0 0 .5rem; }
 
-/* ---------- 骰盤抽屜 ---------- */
-.tray {
-  position: fixed; top: var(--topbar-h); right: 0; bottom: 0; z-index: 55;
-  width: min(390px, 100vw); display: flex; flex-direction: column;
-  background: var(--panel); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(var(--shadow-rgb), .45);
-  transform: translateX(104%); visibility: hidden;
-  transition: transform .22s var(--ease, ease), visibility 0s linear .22s;
-}
-.tray[data-open='true'] { transform: none; visibility: visible; transition: transform .22s var(--ease, ease); }
+/* ---------- 跑團頁（原骰盤抽屜；.tray__ 開頭的是內部區塊） ---------- */
 .tray__head { display: flex; align-items: center; gap: .6rem; padding: .7rem .9rem; border-bottom: 1px solid var(--line); }
 .tray__heading { margin: 0; font-family: var(--font-display); font-size: 1.1rem; }
 .tray__who { margin-right: auto; color: var(--dim); font-size: .78rem; }
-.tray__body { flex: 1; overflow-y: auto; padding: .6rem .9rem calc(1.5rem + env(safe-area-inset-bottom, 0px)); }
+.tray__body { padding: .6rem 0 0; }
 .tray__section { margin-top: .9rem; }
 .tray__title { margin: 0 0 .4rem; font-size: .9rem; color: var(--muted); }
 .tray__title-row { display: flex; align-items: center; justify-content: space-between; }
@@ -55,12 +44,6 @@
 .tray__stomach strong { font-family: var(--font-mono); color: var(--gold); }
 .tray__mod { margin-top: .5rem; }
 .tray__mod .field-label { flex: none; margin: 0; }
-.tray .skill-grid { margin-bottom: .6rem; }
-.tray .btn--go { margin-top: .7rem; }
-@media (max-width: 700px) {
-  .tray { top: auto; left: 0; width: 100%; height: min(82vh, 640px); border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; transform: translateY(104%); }
-  .tray[data-open='true'] { transform: none; }
-}
 
 /* ---------- 擲骰紀錄 ---------- */
 .roll-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
@@ -176,7 +159,7 @@
 .monster__btns { flex-wrap: wrap; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tray, .roll[data-fresh='1'], .bar__fill { transition: none; animation: none; }
+  .roll[data-fresh='1'], .bar__fill { transition: none; animation: none; }
 }
 
 .check { display: flex; gap: 0.5rem; align-items: center; margin-block: 0.5rem; font-size: 0.9rem; cursor: pointer; }
@@ -239,3 +222,73 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 .roll--divider { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; border-top: 1px dashed var(--bronze, var(--gold)); border-bottom: 1px dashed var(--bronze, var(--gold)); background: none; padding: .35rem .2rem; }
 .roll--divider .roll__label { color: var(--bronze, var(--gold)); }
 .roll__sub { flex-basis: 100%; color: var(--muted); font-size: .72rem; }
+
+/* 跑團頁（原骰盤抽屜改成獨立分頁） */
+.session-root { max-width: 760px; margin: 0 auto; padding: 0 .9rem calc(2rem + env(safe-area-inset-bottom, 0px)); }
+.session-root .skill-grid { margin-bottom: .6rem; }
+
+/* 戰鬥面板（跑團頁的懸浮面板；原本的戰鬥頁）。裡面沿用 .bt-* 的版面，一律用「分頁」排法，不受視窗寬度影響 */
+.battle-float {
+  position: fixed; top: var(--topbar-h); right: 0; bottom: 0; z-index: 55;
+  width: min(440px, 100vw); display: flex; flex-direction: column;
+  background: var(--paper2); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(var(--shadow-rgb), .45);
+  transform: translateX(104%); visibility: hidden;
+  transition: transform .22s var(--ease, ease), visibility 0s linear .22s;
+}
+.battle-float[data-open='true'] { transform: none; visibility: visible; transition: transform .22s var(--ease, ease); }
+.battle-float__head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .7rem .9rem; border-bottom: 1px solid var(--line); }
+.battle-float__body { flex: 1; overflow-y: auto; }
+.btn.battle-float__toggle { position: fixed; right: 14px; bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 50; box-shadow: 0 6px 18px var(--shadow); }
+.battle-float[data-open='true'] ~ .btn.battle-float__toggle { visibility: hidden; }
+.battle-float .bt-root { padding: 0 12px 12px; }
+.battle-float .bt-tabs { display: grid; }
+.battle-float .bt-hud__res { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.battle-float .bt-layout { display: block; }
+.battle-float .bt-layout > .bt-pane { display: flex !important; }
+.battle-float .bt-layout[data-pane='action'] > .bt-pane:not([data-id='action']),
+.battle-float .bt-layout[data-pane='log'] > .bt-pane:not([data-id='log']),
+.battle-float .bt-layout[data-pane='state'] > .bt-pane:not([data-id='state']) { display: none !important; }
+.battle-float .bt-pane[data-id='log'] { position: static; max-height: none; overflow: visible; }
+@media (max-width: 700px) {
+  .battle-float { top: auto; left: 0; width: 100%; height: min(88vh, 720px); border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; transform: translateY(104%); }
+  .battle-float[data-open='true'] { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .battle-float { transition: none; } }
+
+/* 先攻位置 */
+.initiative { margin: .4rem 0 .6rem; }
+.initiative__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; }
+.initiative__item button { cursor: pointer; font: inherit; min-height: 36px; }
+.initiative__item button:disabled { cursor: default; opacity: .85; }
+.info-chip.is-warn { color: var(--gold); border-color: var(--gold); }
+
+/* 模擬戰（GM） */
+.simpanel { display: grid; gap: .6rem; }
+.simpanel .section-title { margin: .6rem 0 .2rem; }
+.simchart { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 4px 0 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.simchart__col { flex: 1 0 14px; min-width: 14px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; }
+.simchart__stack { display: flex; flex-direction: column; width: 100%; min-height: 0; }
+.simchart__bar { display: block; width: 100%; background: var(--gold); border-radius: 2px 2px 0 0; min-height: 2px; }
+.simchart__bar[data-tone='win'] { background: var(--gold); }
+.simchart__bar[data-tone='lose'] { background: var(--rose); }
+.simchart__bar[data-tone='mute'] { background: var(--faint); }
+.simchart__label { text-align: center; color: var(--soft); font-size: .62rem; margin-top: 2px; }
+.simbar { flex: 1; height: 10px; margin: 0 .6rem; background: var(--paper); border-radius: var(--r-pill); overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
+.simbar__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--rose2), var(--rose)); }
+
+/* 收到東西的通知面板、送禮與餵藥 */
+.mailbox {
+  position: fixed; right: 14px; bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 80;
+  width: min(340px, calc(100vw - 28px)); max-height: 60vh; overflow-y: auto; padding: .7rem .8rem;
+  background: var(--paper2); border: 1px solid var(--gold); border-radius: var(--r-panel); box-shadow: 0 10px 30px rgba(var(--shadow-rgb), .55);
+}
+.mailbox[hidden] { display: none; }
+.mailbox__head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .4rem; }
+.mailbox__list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.mailbox__item { display: grid; gap: 2px; padding-top: .4rem; border-top: 1px solid var(--line); }
+.mailbox__item strong { color: var(--gold); font-size: .9rem; }
+.mailbox__line { color: var(--ink2); font-size: .84rem; }
+.giftsheet { display: grid; gap: .6rem; }
+.gift-qty { width: 5.5rem; flex: none; }
+.feedbox { margin-top: .8rem; display: grid; gap: .4rem; }
+.feedbox .row { flex-wrap: wrap; }

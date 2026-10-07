@@ -1,7 +1,6 @@
 // ============================================================
-// 戰鬥頁：血量與倒地、藥水、招式、遭遇戰（小怪與 BOSS）
+// 戰鬥頁：血量與倒地、藥水、招式（遭遇戰在跑團頁，見 encounterCard.js）
 // 規則照機器人的 A/B/C 三軌道（見 GAME_RULES.md「戰鬥」）。結果會發布到骰盤紀錄，所有人看得到。
-// 目前遭遇戰由自己建立（等於單人試玩）；之後交給 GM 控制、全員共享。
 // ============================================================
 import { h, fmt } from './dom.js';
 import { toast, rollFailed } from './controls.js';
@@ -23,11 +22,15 @@ import { iconOf } from './items.js';
 import { publish, rollWith } from '../state/rollLog.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
+import { battleSel as sel } from './battleSelect.js';
+import { teammates } from './giftSheet.js';
+import { sendMail } from '../state/rollLog.js';
+import { takeItems, refundItems } from '../game/mail.js';
 
-// 戰鬥紀錄只放戰鬥相關事件；黑市、鑑定、鑲嵌、一般檢定與自訂骰只出現在骰盤
+// 戰鬥紀錄只放戰鬥相關事件；黑市、鑑定、鑲嵌、一般檢定與自訂骰只出現在跑團頁
 const BATTLE_KINDS = new Set(['attack', 'defend', 'potion', 'skill', 'divider']);
 const BATTLE_NOTE = /^(調整|戰鬥結束|魔女|遭遇)/;
-const isBattleEvent = (ev) => BATTLE_KINDS.has(ev.kind) || (ev.kind === 'note' && BATTLE_NOTE.test(ev.label ?? ''));
+export const isBattleEvent = (ev) => BATTLE_KINDS.has(ev.kind) || (ev.kind === 'note' && BATTLE_NOTE.test(ev.label ?? ''));
 
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const potionText = (p) => [
@@ -37,25 +40,11 @@ const potionText = (p) => [
   `毒性 +${p.toxicity}`,
 ].filter(Boolean).join('，');
 
-function hpBar(cur, max, downed) {
-  const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
-  return h('div', { class: `bar${downed ? ' is-downed' : ''}`, role: 'img', 'aria-label': `生命 ${cur} / ${max}` },
-    h('div', { class: 'bar__fill', style: `width:${pct}%` }),
-    h('span', { class: 'bar__text', text: `${fmt(cur)} / ${fmt(max)}` }));
-}
-
-function trackLines(result) {
-  return result.tracks.filter((t) => t.atkDice > 0).map(trackLine);
-}
-
 export function createBattleView({ root, getState, commit }) {
   const ui = {
-    moveId: null,
-    modes: {}, // 怪物 id → { atk, def }
-    form: { kind: 'mob', count: 1, atk: 10, def: 10, hp: 100, atkMod: '', defMod: '', absDef: 0 },
     moveForm: { name: '', mode: 'normal', school: '', tracks: ['C'], extra: { A: 0, B: 0, C: 0 }, cost: {}, global: true },
-    yuwai: false,
     pane: 'action', // 手機版目前的分頁：action（行動）／log（紀錄）／state（狀態）
+    feedTo: '', // 餵藥給誰（uid）
     openMoves: new Set(), // 展開完整內容的招式 id
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
   };
@@ -148,11 +137,41 @@ export function createBattleView({ root, getState, commit }) {
           type: 'button', class: 'btn btn--small',
           onclick: () => {
             if (!confirm('結束戰鬥？毒性歸零、藥水加成清除、敵人清空。')) return;
-            const r = endBattle(state); ui.modes = {};
+            const r = endBattle(state); sel.modes = {};
             publish({ who: state.name, kind: 'note', label: '戰鬥結束', lines: [`毒性 ${r.toxicity} → 0`] });
             commit();
           },
         }, '🏁 結束戰鬥')));
+  }
+
+  /** 餵回復藥水給隊友（倒地的也可以，等於拉起來）：藥水先從自己的背包扣，寄失敗會還回來；毒性算被救的人 */
+  async function feedPotion(state, name) {
+    if (!ui.feedTo) return toast('先選要餵誰。');
+    if (!takeItems(state, { [name]: 1 })) return toast(`背包裡沒有${name}。`);
+    commit();
+    try {
+      const res = await sendMail({ to: ui.feedTo, kind: 'potion', potion: name });
+      toast(`已餵出${name}（回復 ${res.heal}），紀錄會顯示在戰鬥紀錄裡。`);
+    } catch (e) {
+      refundItems(state, { [name]: 1 });
+      commit();
+      toast(`沒有餵出去：${e.message}`);
+    }
+  }
+
+  function feedBox(state) {
+    const mates = teammates();
+    const heals = Object.keys(POTIONS).filter((n) => POTIONS[n].heal && countOf(state, n) > 0);
+    if (!mates.length || !heals.length) return null;
+    return h('div', { class: 'feedbox' },
+      h('p', { class: 'field-label', text: '餵給隊友（對方不用同意；倒地的也能拉起來，毒性算對方的）' }),
+      h('div', { class: 'row' },
+        h('select', { class: 'field', 'aria-label': '餵給誰', onchange: (e) => { ui.feedTo = e.target.value; render(); } },
+          h('option', { value: '', text: '選擇隊友…' }),
+          mates.map((m) => h('option', { value: m.uid, selected: ui.feedTo === m.uid ? true : null, text: `${m.name}${m.online ? '' : '（離線）'}` }))),
+        heals.map((n) => h('button', {
+          type: 'button', class: 'btn btn--small', disabled: ui.feedTo ? null : true, onclick: () => feedPotion(state, n),
+        }, `餵 ${n}（×${fmt(countOf(state, n))}）`))));
   }
 
   function potionCard(state) {
@@ -187,7 +206,8 @@ export function createBattleView({ root, getState, commit }) {
           h('span', { class: 'potion__name', text: n }),
           h('span', { class: 'potion__qty', text: `×${fmt(countOf(state, n))}` }),
           h('small', { class: 'potion__fx', text: potionText(POTIONS[n]) }))))
-        : h('p', { class: 'notice', text: '背包裡沒有藥水。到修整日調劑就會得到。' }));
+        : h('p', { class: 'notice', text: '背包裡沒有藥水。到修整日調劑就會得到。' }),
+      feedBox(state));
   }
 
   // ---------- 招式 ----------
@@ -248,12 +268,12 @@ export function createBattleView({ root, getState, commit }) {
     const lack = shortfall(state, support ? actionCost(state, m, SKILL_CATALOG[m.skill].tiers[0].cost) : d.cost);
     const open = ui.openMoves.has(m.id);
     const tracks = support ? [] : (m.mode === 'all' ? TRACKS : m.tracks ?? []);
-    return h('li', { class: `move${lack ? ' is-short' : ''}`, 'aria-current': String(!support && m.id === ui.moveId), dataset: { open: String(open) } },
+    return h('li', { class: `move${lack ? ' is-short' : ''}`, 'aria-current': String(!support && m.id === sel.moveId), dataset: { open: String(open) } },
       h('div', { class: 'move__main' },
         h('button', {
           type: 'button', class: 'move__pick', disabled: !support && Boolean(lack), 'aria-expanded': String(open),
           onclick: () => {
-            if (!support) ui.moveId = m.id;
+            if (!support) sel.moveId = m.id;
             if (open) ui.openMoves.delete(m.id); else ui.openMoves.add(m.id);
             render();
           },
@@ -272,7 +292,7 @@ export function createBattleView({ root, getState, commit }) {
   }
 
   function moveCard(state) {
-    if (!state.moves.some((m) => m.id === ui.moveId)) ui.moveId = state.moves.find((m) => m.kind !== 'heal' && m.kind !== 'shield')?.id ?? state.moves[0]?.id ?? null;
+    if (!state.moves.some((m) => m.id === sel.moveId)) sel.moveId = state.moves.find((m) => m.kind !== 'heal' && m.kind !== 'shield')?.id ?? state.moves[0]?.id ?? null;
     const f = ui.moveForm;
     const trackToggle = (t) => h('button', {
       type: 'button', class: 'toggle', 'aria-pressed': String(f.tracks.includes(t)),
@@ -340,149 +360,6 @@ export function createBattleView({ root, getState, commit }) {
         }, '新增')));
   }
 
-  // ---------- 遭遇戰 ----------
-  function numField(label, key, min = 0) {
-    return h('label', { class: 'extra' },
-      h('span', { text: label }),
-      h('input', { class: 'field', type: 'number', min, value: ui.form[key], onchange: (e) => { ui.form[key] = num(e.target.value, min); } }));
-  }
-
-  function enemyForm(state) {
-    const f = ui.form;
-    return addBox('enemy', '＋ 新增敵人',
-      h('div', { class: 'toggle-row' },
-        [['mob', '小怪'], ['boss', 'BOSS']].map(([id, label]) => h('button', {
-          type: 'button', class: 'toggle', 'aria-pressed': String(f.kind === id), onclick: () => { f.kind = id; render(); },
-        }, label))),
-      h('div', { class: 'extra-row' }, numField('數量', 'count', 1), numField('攻擊強度', 'atk'), numField('防禦強度', 'def'), numField('血量', 'hp', 1), numField('絕對防禦（選填）', 'absDef')),
-      h('p', { class: 'hint', text: '強度會隨機分配到 A/B/C 三軌（照機器人）。區域補正選填，例如 5A 3C，會加在每隻身上。' }),
-      h('div', { class: 'extra-row' },
-        h('label', { class: 'extra' }, h('span', { text: '攻擊補正（選填）' }),
-          h('input', { class: 'field', type: 'text', placeholder: '5A 3C', value: f.atkMod, onchange: (e) => { f.atkMod = e.target.value; } })),
-        h('label', { class: 'extra' }, h('span', { text: '防禦補正（選填）' }),
-          h('input', { class: 'field', type: 'text', placeholder: '2B', value: f.defMod, onchange: (e) => { f.defMod = e.target.value; } }))),
-      h('button', {
-        type: 'button', class: 'btn btn--primary btn--small',
-        onclick: () => {
-          if (f.count > 20) return toast('一次最多 20 隻。');
-          const spec = { count: f.count, atkPower: f.atk, defPower: f.def, hp: f.hp, atkMod: f.atkMod, defMod: f.defMod, absDef: f.absDef };
-          const added = (f.kind === 'boss' ? addBosses : addMobs)(state.encounter, spec);
-          publish({ who: state.name, kind: 'note', label: `遭遇：新增 ${added.map((m) => m.id).join('、')}`, lines: [] });
-          commit();
-        },
-      }, '加入遭遇戰'));
-  }
-
-  function modeSelect(label, names, value, onChange) {
-    return h('label', { class: 'mode' },
-      h('span', { text: label }),
-      h('select', { class: 'field', onchange: (e) => onChange(Number(e.target.value)) },
-        names.map((n, i) => h('option', { value: String(i), selected: i === value ? true : null, text: n }))));
-  }
-
-  async function doAttack(state, m) {
-    const modes = ui.modes[m.id] ?? { atk: 0, def: 0 };
-    const move = state.moves.find((x) => x.id === ui.moveId);
-    const hpBefore = state.hp;
-    const befores = new Map(state.encounter.monsters.map((x) => [x.id, x.hp]));
-    let r;
-    let draw;
-    try {
-      ({ r, draw } = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, ui.moveId, m.id, modes.def, rng, { yuwai: ui.yuwai })));
-    } catch (e) { return rollFailed(e); }
-    if (r.error) return toast(r.error);
-    const multi = r.hits.length > 1;
-    const lines = [];
-    r.hits.forEach((h2) => {
-      if (multi) lines.push(targetLine(h2.target.id, h2.result.total));
-      lines.push(...trackLines(h2.result));
-      if (h2.ignoreAbs) lines.push('終焉武裝：無視絕對防禦'); else if (h2.abs) lines.push(`敵人絕對防禦 ${h2.abs}`);
-      lines.push(`${h2.target.id} 生命 ${fmt(befores.get(h2.target.id))} → ${fmt(h2.target.hp)} / ${fmt(h2.target.maxHp)}${h2.target.hp <= 0 ? '　倒下了！' : ''}`);
-    });
-    lines.push(...r.notes);
-    if (r.potion) lines.push(`藥水加成：真實傷害 +${r.potion} 骰`);
-    lines.push(`花費：${costText(r.cost)}`);
-    if (state.hp !== hpBefore) lines.push(`${state.name} 生命 ${fmt(hpBefore)} → ${fmt(state.hp)} / ${fmt(maxHp(state))}`);
-    publish({
-      who: state.name, kind: 'attack',
-      label: `${r.move.name} → ${r.hits.map((x) => x.target.id).join('、')}${m.kind === 'boss' ? `（${BOSS_DEF_MODES[modes.def]}）` : ''}`,
-      big: r.hits.reduce((a, x) => a + x.result.total + (x.bonus ?? 0) + (x.yuwai ?? 0), 0),
-      tone: r.hits.some((x) => x.result.total > 0) ? 'ok' : 'fail',
-      lines,
-    }, { draw });
-    commit();
-  }
-
-  async function doDefend(state, m) {
-    const modes = ui.modes[m.id] ?? { atk: 0, def: 0 };
-    const before = state.hp;
-    let r;
-    let draw;
-    try {
-      ({ r, draw } = await rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng)));
-    } catch (e) { return rollFailed(e); }
-    if (r.error) return toast(r.error);
-    publish({
-      who: state.name, kind: 'defend', label: `${m.id} 攻擊${m.kind === 'boss' ? `（${BOSS_ATK_MODES[modes.atk]}）` : ''}`,
-      big: r.result.total, tone: r.result.total > 0 ? 'fail' : 'ok',
-      lines: [
-        ...trackLines(r.result),
-        r.potion ? `藥水加成：絕對防禦 +${r.potion} 骰（三軌）` : null,
-        r.absorbed?.toShield ? `護盾吸收 ${fmt(r.absorbed.toShield)}` : null,
-        `${state.name} 生命 ${fmt(before)} → ${fmt(state.hp)} / ${fmt(maxHp(state))}`,
-        r.newlyDowned ? `${state.name} 倒地！（不會死亡）` : null,
-      ].filter(Boolean),
-    }, { draw });
-    commit();
-  }
-
-  function monsterCard(state, m) {
-    const downed = isDowned(m);
-    const modes = ui.modes[m.id] ?? (ui.modes[m.id] = { atk: 0, def: 0 });
-    const noMove = !state.moves.some((x) => x.id === ui.moveId);
-    return h('li', { class: `monster${downed ? ' is-downed' : ''}`, dataset: { kind: m.kind } },
-      h('div', { class: 'monster__head' },
-        h('strong', { text: `${m.kind === 'boss' ? '👹' : '👾'} ${m.id}` }),
-        downed ? h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒下' }) : null,
-        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { removeMonster(state.encounter, m.id); delete ui.modes[m.id]; commit(); } }, '移除')),
-      hpBar(m.hp, m.maxHp, downed),
-      h('dl', { class: 'monster__stats' },
-        h('div', {}, h('dt', { text: '攻擊' }), h('dd', { text: m.kind === 'boss' ? `${BOSS_ATK_MODES[modes.atk]}：${formatAbc(monsterAtk(m, modes.atk))}` : formatAbc(m.atk) })),
-        h('div', {}, h('dt', { text: m.kind === 'boss' ? `防禦（${BOSS_DEF_MODES[modes.def]}）` : '防禦' }),
-          h('dd', { class: 'abc' },
-            TRACKS.map((t) => h('span', { class: 'abc__cell', dataset: { track: t } }, h('b', { text: t }), h('span', { class: 'num', text: fmt(monsterDef(m, modes.def)[t]) }))),
-            monsterAbs(m) ? h('span', { class: 'abc__abs', text: `絕防 ${fmt(monsterAbs(m))}` }) : null))),
-      m.kind === 'boss'
-        ? h('div', { class: 'row modes' },
-            modeSelect('它的攻擊', BOSS_ATK_MODES, modes.atk, (v) => { modes.atk = v; render(); }),
-            modeSelect('它的防禦', BOSS_DEF_MODES, modes.def, (v) => { modes.def = v; render(); }))
-        : null,
-      h('div', { class: 'row monster__btns' },
-        h('button', {
-          type: 'button', class: 'btn btn--primary btn--small', disabled: downed || noMove || isDowned(state),
-          onclick: () => doAttack(state, m),
-        }, noMove ? '先選招式' : `⚔️ 用「${state.moves.find((x) => x.id === ui.moveId).name}」攻擊${(state.moves.find((x) => x.id === ui.moveId).targets ?? 1) > 1 ? `（連同後面最多共 ${state.moves.find((x) => x.id === ui.moveId).targets} 個）` : ''}`),
-        h('button', { type: 'button', class: 'btn btn--small', disabled: downed, onclick: () => doDefend(state, m) }, '🛡️ 承受它的攻擊')));
-  }
-
-  function encounterCard(state) {
-    const enc = state.encounter;
-    return h('section', { class: 'card' },
-      h('div', { class: 'battle-head' },
-        h('h2', { class: 'section-title', text: '遭遇戰' }),
-        enc.monsters.length
-          ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空所有敵人？')) { state.encounter = newEncounter(); ui.modes = {}; commit(); } } }, '清空')
-          : null),
-      state.skills?.域外魔祖 && state.moves.find((x) => x.id === ui.moveId)?.school === '修仙'
-        ? h('label', { class: 'check' },
-            h('input', { type: 'checkbox', checked: ui.yuwai ? true : null, onchange: (e) => { ui.yuwai = e.target.checked; } }),
-            h('span', { text: '域外魔祖：這次攻擊花 30 靈氣，追加扣目標現有生命 10%' }))
-        : null,
-      enc.monsters.length
-        ? h('ul', { class: 'monster-list' }, enc.monsters.map((m) => monsterCard(state, m)))
-        : h('p', { class: 'notice', text: '還沒有敵人。從下面新增，或之後由 GM 建立。' }),
-      enemyForm(state));
-  }
 
   function defenseCard(state) {
     const d = defenseDice(state);
@@ -506,7 +383,7 @@ export function createBattleView({ root, getState, commit }) {
     const pane = (id, ...cards) => h('div', { class: 'bt-pane', id: `bt-pane-${id}`, role: 'tabpanel', 'aria-labelledby': `bt-tab-${id}`, dataset: { id } }, ...cards);
     const layout = h('div', { class: 'bt-layout', dataset: { pane: ui.pane } },
       pane('state', statusCard(state), defenseCard(state)),
-      pane('action', encounterCard(state), moveCard(state), potionCard(state)),
+      pane('action', moveCard(state), potionCard(state)),
       pane('log', h('section', { class: 'card' }, h('h2', { class: 'section-title', text: '戰鬥紀錄' }), feedBox)));
     // 手機：頂部膠囊分頁（電腦版隱藏，三個區塊並排）。只切換顯示，不重畫
     const select = (id) => {
@@ -527,7 +404,7 @@ export function createBattleView({ root, getState, commit }) {
     }, label)));
     const hudEl = hud(state);
     root.replaceChildren(h('div', { class: 'bt-root' }, hudEl, tabs, layout));
-    feed = mountFeed(feedBox, { limit: 8, filter: isBattleEvent, empty: '出招或喝藥水後，結果會出現在這裡，也會出現在骰盤。' });
+    feed = mountFeed(feedBox, { limit: 8, filter: isBattleEvent, empty: '喝藥水或出招後，結果會出現在這裡，也會出現在跑團頁。' });
     // 電腦版右欄紀錄要貼在固定列下面：把固定列的高度記成 CSS 變數
     if (typeof ResizeObserver !== 'undefined') {
       hudWatcher = new ResizeObserver(() => root.style.setProperty('--bt-hud-h', `${hudEl.offsetHeight}px`));
@@ -536,5 +413,11 @@ export function createBattleView({ root, getState, commit }) {
     root.scrollTop = scrollY;
   }
 
-  return { render };
+  /** 面板關起來或離開頁面：停掉紀錄與固定列的監聽 */
+  function leave() {
+    feed?.destroy(); feed = null;
+    hudWatcher?.disconnect(); hudWatcher = null;
+  }
+
+  return { render, leave };
 }

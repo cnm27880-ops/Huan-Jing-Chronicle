@@ -94,3 +94,49 @@ test('skillParts 只在 skills 模式有內容', () => {
   assert.deepEqual(skillParts({ skills: { 引氣訣: 4 } }), {});
   assert.ok(skillParts(mk({ 引氣訣: 4 })).靈氣);
 });
+
+// ---------- 愚者對調與技能升級 ----------
+import { setSkillLevel, upgradeSkill, upgradeCost, markSwapsDone } from '../src/game/skillTable.js';
+
+test('愚者：升到 1 級先加屬性再對調，差額記進手動調整，同一級不重複', () => {
+  const s = mk({}, { baseStats: { ...blankCharacter('x').baseStats, 體魄強韌: 10, 物理傷害: 30 } });
+  const swaps = setSkillLevel(s, '山脈愚者', 1);
+  assert.equal(swaps.length, 1);
+  // 1 級：體魄強韌 10+4=14、物理 30 → 對調後 體魄 30、物理 14
+  const d = derivedStats(s);
+  assert.equal(d.體魄強韌.total, 30);
+  assert.equal(d.物理傷害.total, 14);
+  assert.deepEqual(s.swapDone.山脈愚者, [1]);
+  assert.equal(setSkillLevel(s, '山脈愚者', 1).length, 0);
+  setSkillLevel(s, '山脈愚者', 0); // 往下調不撤銷
+  assert.equal(derivedStats(s).體魄強韌.total, 30 - 4);
+});
+
+test('愚者：一次跳到 10 級會依序對調 1、5、10 三次', () => {
+  const s = mk({});
+  assert.equal(setSkillLevel(s, '太陽愚者', 10).length, 3);
+  assert.deepEqual(s.swapDone.太陽愚者, [1, 5, 10]);
+  assert.equal(s.skills.太陽愚者, 10);
+});
+
+test('已學會的愚者匯入時標記已對調；舊存檔不對調', () => {
+  const s = mk({ 夢境愚者: 6 });
+  markSwapsDone(s, '夢境愚者', 6);
+  assert.deepEqual(s.swapDone.夢境愚者, [1, 5]);
+  const old = { ...blankCharacter('舊'), skills: {} };
+  assert.equal(setSkillLevel(old, '山脈愚者', 10).length, 0);
+});
+
+test('升級：付單次經驗、記 spentExp；經驗不足或滿級不動', () => {
+  const s = mk({}, { exp: 100, spentExp: 5 });
+  assert.equal(upgradeCost(s, '八卦掌'), 30);
+  assert.equal(upgradeSkill(s, '八卦掌').ok, true); // 0→1 付 30
+  assert.equal(upgradeSkill(s, '八卦掌').cost, 60); // 1→2 付 60
+  assert.equal(s.exp, 10);
+  assert.equal(s.spentExp, 95);
+  const r = upgradeSkill(s, '八卦掌');
+  assert.equal(r.ok, false);
+  assert.equal(s.skills.八卦掌, 2);
+  const max = mk({ 八卦掌: 10 }, { exp: 9999 });
+  assert.equal(upgradeSkill(max, '八卦掌').ok, false);
+});

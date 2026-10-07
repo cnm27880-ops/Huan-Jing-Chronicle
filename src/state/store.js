@@ -3,7 +3,7 @@
 // 之後接上 Cloudflare 時，只要改這個檔案，其他程式不用動
 // ============================================================
 import { SAMPLE_CHARACTER } from '../data/sample/fude.js';
-import { moveFromCatalog } from '../game/skills.js';
+import { moveFromCatalog, basicMove } from '../game/skills.js';
 import { maxHp, derivedStats } from '../game/stats.js';
 
 const KEY = 'huanjing:character:v1';
@@ -34,6 +34,8 @@ function upgrade(state) {
   for (const m of state.moves) {
     if (!m.cost) m.cost = clone(SAMPLE_CHARACTER.moves.find((x) => x.name === m.name)?.cost ?? {});
   }
+  // 普攻：每人固定有一個（見 skills.js 的 basicMove）
+  if (!state.moves.some((m) => m.id === 'basic')) state.moves.push(basicMove());
   state.migrated = state.migrated ?? {};
   if (firstTime) {
     for (const m of SAMPLE_CHARACTER.moves.filter((x) => x.skill)) {
@@ -51,6 +53,11 @@ function upgrade(state) {
   }
   state.hp = Math.max(0, Math.min(state.hp, maxHp(state)));
   return state;
+}
+
+/** 把伺服器上的角色資料補齊成目前格式（不存檔、不改傳進來的物件）：GM 模擬戰用 */
+export function normalizeCharacter(data) {
+  return upgrade(clone(data));
 }
 
 export function loadCharacter() {

@@ -18,15 +18,15 @@ import { createDossier } from './ui/dossier.js';
 import { createRestView } from './ui/restView.js';
 import { createBagView } from './ui/bagView.js';
 import { createGearView } from './ui/gearView.js';
-import { createBattleView } from './ui/battleView.js';
 import { createMarketView } from './ui/marketView.js';
-import { createDiceTray } from './ui/diceTray.js';
+import { createSessionView } from './ui/sessionView.js';
 import { showCover } from './ui/cover.js';
 import { createUserChip } from './ui/userChip.js';
 import { getCurrentUser, consumeLoginResult } from './api/auth.js';
 import { startRoom, stopRoom } from './state/rollLog.js';
 import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
+import { createMailbox } from './state/mailbox.js';
 import { toast } from './ui/controls.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -74,13 +74,11 @@ async function init() {
   let character = loadCharacter();
   const getState = () => character;
   let views;
-  let tray;
   let sync = null;
   const commit = () => {
     saveCharacter(character);
     sync?.markDirty(); // 已連上房間時，稍後同步到伺服器
     views[currentView]?.render();
-    tray?.refresh();
   };
   views = {
     rest: createRestView({ root: $('#view-rest'), getState, commit }),
@@ -94,7 +92,7 @@ async function init() {
       },
     }),
     gear: createGearView({ root: $('#view-gear'), getState, commit }),
-    battle: createBattleView({ root: $('#view-battle'), getState, commit }),
+    session: createSessionView({ root: $('#view-session'), getState, commit }),
     market: createMarketView({ root: $('#view-market'), getState, commit }),
   };
   sync = createCharSync({
@@ -104,15 +102,18 @@ async function init() {
     adopt: (data) => { // 伺服器的存檔套用到畫面（不經過 commit，免得又上傳一次）
       character = importCharacter(data);
       views[currentView]?.render();
-      tray?.refresh();
     },
   });
-  tray = createDiceTray({ getState, commit, toggleButton: $('#tray-toggle') });
+
+  createMailbox({ getState, commit }); // 別人送的東西、餵的藥：領取後直接放進自己的角色
 
   let currentView = 'map';
   function showView() {
-    const id = (location.hash || '#map').slice(1);
-    currentView = ['map', 'rest', 'bag', 'gear', 'battle', 'market'].includes(id) ? id : 'map';
+    const raw = (location.hash || '#map').slice(1);
+    const id = raw === 'battle' ? 'session' : raw; // 戰鬥頁已改成跑團頁裡的戰鬥面板（舊連結導到跑團頁）
+    const previous = currentView;
+    currentView = ['map', 'rest', 'bag', 'gear', 'session', 'market'].includes(id) ? id : 'map';
+    if (previous !== currentView) views[previous]?.leave?.(); // 離開的頁面可以停掉背景更新（跑團頁的紀錄）
     document.querySelectorAll('[data-view]').forEach((el) => {
       el.hidden = el.dataset.view !== currentView;
     });

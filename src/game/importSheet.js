@@ -11,7 +11,7 @@
 // ============================================================
 import { ALL_STATS, RESOURCE_STATS, LIFE_SKILLS, ART_SKILLS, FOODS, STOMACH_SLOTS } from './rules.js';
 import { SKILL_CATALOG, moveFromCatalog } from './skills.js';
-import { inCatalog, needsActivation, MAX_SKILL_LEVEL } from './skillTable.js';
+import { inCatalog, needsActivation, MAX_SKILL_LEVEL, markSwapsDone } from './skillTable.js';
 import { derivedStats } from './stats.js';
 import { blankCharacter } from './importBot.js';
 
@@ -137,6 +137,8 @@ export function convertSheet(parsed, base = null, { activated = new Set() } = {}
     if (level === 0) zero.push(name);
   }
   data.skills = skills;
+  data.swapDone = {};
+  for (const [n, lv] of Object.entries(skills)) markSwapsDone(data, n, lv); // 愚者已過的門檻：過去的對調已含在手動調整裡
   data.statMode = 'skills';
   data.baseStats = Object.fromEntries(ALL_STATS.map((s) => [s, 0]));
   data.adjust = {};

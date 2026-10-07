@@ -4,6 +4,7 @@ import { h } from './dom.js';
 import { openBotImportSheet } from './botImport.js';
 import { openSheetImportSheet } from './sheetImport.js';
 import { openGmCharEditor } from './gmCharEdit.js';
+import { openSimPanel } from './simPanel.js';
 import { getRoomStatus, subscribeRoom, startNewBattle, setGmOverride } from '../state/rollLog.js';
 
 export function mountRoomPanel(container) {
@@ -39,6 +40,7 @@ export function mountRoomPanel(container) {
         btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openBotImportSheet }, '匯入機器人存檔'));
         btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openSheetImportSheet }, '匯入角色卡'));
         btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openGmCharEditor }, '玩家角色'));
+        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openSimPanel }, '模擬戰'));
       }
       if (r.me?.isAdmin) {
         btns.push(r.gm.override

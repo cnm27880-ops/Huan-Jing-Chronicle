@@ -6,6 +6,7 @@ import { h, fmt } from './dom.js';
 import { itemTile } from './controls.js';
 import { CATEGORIES, categoryOf } from './items.js';
 import { openItemSheet, openAddSheet } from './itemSheet.js';
+import { openGiftSheet } from './giftSheet.js';
 import { countOf } from '../game/engine.js';
 
 // 紀念品與收藏放最前面，是玩家的特色
@@ -46,6 +47,7 @@ export function createBagView({ root, getState, commit, onReset }) {
           h('span', { text: `${fmt(names.length)} 種　金幣 ${fmt(state.gold)}` })),
         h('div', { class: 'bag-bar__tools' },
           search,
+          h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openGiftSheet(getState, commit) }, '🎁 送給別人'),
           h('button', { type: 'button', class: 'btn btn--primary', onclick: () => openAddSheet(state, commit) }, '＋ 放進背包'))),
       h('div', { class: 'bag' },
         groups.filter((g) => g.items.length).map((g) => {

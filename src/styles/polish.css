@@ -64,12 +64,6 @@ body::before {
   text-shadow: 0 0 10px rgba(var(--gold-rgb), 0.35);
 }
 @media (max-width: 700px) { .tab { padding: 6px 9px; } }
-#tray-toggle { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
-/* 手機：骰盤只顯示圖示，分頁才放得下 */
-@media (max-width: 520px) {
-  .btn__label { display: none; }
-  #tray-toggle { padding: 7px 10px; font-size: 1rem; }
-}
 
 /* ---------- 按鈕：立體、內光、hover 發光，主要按鈕有掃光 ---------- */
 .btn, .btn--ghost, .sheet__close, .dossier__close {
@@ -119,7 +113,7 @@ body::before {
 .btn:active:not(:disabled) { transform: translateY(1px) scale(0.98); }
 
 /* ---------- 卡片：玻璃面板 ---------- */
-.card, .results, .showcase, .sheet__panel, .tray, .dossier, .map-hint {
+.card, .results, .showcase, .sheet__panel, .dossier, .map-hint {
   background: var(--glass);
   border: 1px solid var(--glass-line);
   backdrop-filter: blur(14px) saturate(1.2);
@@ -131,9 +125,8 @@ body::before {
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 .card:hover, .results:hover { border-color: var(--glass-line-hi); box-shadow: var(--glass-hi), 0 14px 36px rgba(var(--shadow-rgb), 0.45); }
-.sheet__panel, .tray, .dossier { background: var(--glass-strong); }
+.sheet__panel, .dossier { background: var(--glass-strong); }
 .sheet__panel { border-radius: 16px; box-shadow: var(--glass-hi), 0 24px 60px rgba(var(--shadow-rgb), 0.65); }
-.tray { box-shadow: -16px 0 40px rgba(var(--shadow-rgb), 0.55); }
 .dossier { border-left-color: rgba(var(--gold-rgb), 0.22); box-shadow: -18px 0 48px rgba(var(--shadow-rgb), 0.6); }
 
 .section-title { position: relative; padding-bottom: 0.4rem; text-shadow: 0 0 14px rgba(var(--gold-rgb), 0.12); }

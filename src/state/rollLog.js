@@ -95,6 +95,7 @@ const room = {
   gm: { uids: [], override: null, names: {} },
   members: [],
   battleNo: 0,
+  encounter: null, // GM 建立、全員共享的遭遇戰（階段 C）；本機模式是 null
   notice: '', // 伺服器回的錯誤（例如不是 GM 還按新戰鬥）
 };
 let roomLog = [];
@@ -155,14 +156,39 @@ function addRoomEvent(ev) {
   subs.forEach((fn) => fn(ev));
 }
 
+// ---------- 信箱（送東西、餵藥）：信件由 mailbox.js 領取並套用 ----------
+let mailListener = null;
+let mailQueue = []; // 畫面還沒準備好接信時先放著
+function deliverMail(list) {
+  if (!Array.isArray(list) || !list.length) return;
+  if (mailListener) mailListener(list); else mailQueue.push(...list);
+}
+/** mailbox.js 註冊：有新信（或重新連線後還沒領的信）就呼叫 fn(信件陣列) */
+export function setMailListener(fn) {
+  mailListener = fn;
+  if (mailQueue.length) { const q = mailQueue; mailQueue = []; fn(q); }
+}
+/** 寄東西或餵藥：msg = { to, kind: 'gift', items } 或 { to, kind: 'potion', potion }。失敗丟 RollError */
+export const sendMail = (msg) => request({ t: 'mailSend', ...msg });
+/** 領信：回傳 { mail }（已經被別的分頁領走就是 null） */
+export const claimMail = (id) => request({ t: 'mailClaim', id });
+
 function onRoomMessage(msg) {
   switch (msg.t) {
     case 'hello':
       roomLog = Array.isArray(msg.history) ? msg.history.slice(0, MAX_ROOM_LOG) : [];
-      setPhase('online', { me: msg.me, gm: msg.gm, members: msg.members ?? [], battleNo: msg.battleNo ?? 0, roomId: msg.room ?? room.roomId, notice: '' });
+      setPhase('online', { me: msg.me, gm: msg.gm, members: msg.members ?? [], battleNo: msg.battleNo ?? 0, encounter: msg.encounter ?? null, roomId: msg.room ?? room.roomId, notice: '' });
+      deliverMail(msg.mail); // 要等狀態變成「已加入」才能領信（領信要走房間連線）
       break;
     case 'event':
       if (msg.event) addRoomEvent(msg.event);
+      break;
+    case 'mail':
+      deliverMail(msg.mails);
+      break;
+    case 'enc':
+      room.encounter = msg.encounter ?? null;
+      notifyRoom();
       break;
     case 'presence':
       room.members = msg.members ?? room.members;
@@ -173,7 +199,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': case 'char': case 'charSaved': case 'charList': {
+    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'char': case 'charSaved': case 'charList': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;
@@ -237,7 +263,7 @@ export function stopRoom() {
   client?.close(); client = null;
   failPending('已離開房間。');
   roomLog = [];
-  if (room.phase !== 'local') setPhase('local', { me: null, members: [], gm: { uids: [], override: null, names: {} }, battleNo: 0, notice: '' });
+  if (room.phase !== 'local') setPhase('local', { me: null, members: [], gm: { uids: [], override: null, names: {} }, battleNo: 0, encounter: null, notice: '' });
 }
 
 /**
@@ -307,3 +333,9 @@ export function startNewBattle() {
 export function setGmOverride(action) {
   if (!isOnline() || !client?.send({ t: 'gm', action })) setNotice('尚未連上房間。');
 }
+
+/** 房間裡的遭遇戰（怪物、先攻）；不在房間（本機模式）時是 null，畫面改用角色自己的 state.encounter */
+export const getEncounter = () => (isOnline() ? room.encounter : null);
+
+/** 遭遇戰操作：GM 的 encAdd／encRemove／encClear／encInit／encNext，玩家的 encHit。失敗丟 RollError */
+export const encounterAction = (msg) => request(msg);
