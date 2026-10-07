@@ -386,6 +386,26 @@ export function drinkPotion(state, name, rng = Math.random) {
   return out;
 }
 
+/**
+ * 把回復藥水餵給隊友（倒地也可以，等於把對方拉起來）：藥水從 giver 的背包扣；
+ * 回復量照藥水的骰數，毒性算在「被救的人」身上（使用者 2026-10-07），超過 15 就不能餵。
+ * 只能是回復藥水；黃／綠藥水是自己的下次攻擊／防禦加成，不能給別人。
+ */
+export function giveHealPotion(giver, target, name, rng = Math.random) {
+  const def = POTIONS[name];
+  if (!def?.heal) return { error: `${name}不是回復藥水。` };
+  if (target.toxicity + def.toxicity > TOXICITY_MAX) {
+    return { error: `${target.name} 毒性 ${target.toxicity}，喝${name}（毒性 +${def.toxicity}）會超過 ${TOXICITY_MAX}，不能餵。` };
+  }
+  if (!removeItem(giver, name)) return { error: `背包裡沒有${name}。` };
+  const wasDowned = isDowned(target);
+  target.toxicity += def.toxicity;
+  const rolled = rollSum(def.heal.n, def.heal.sides, rng);
+  const before = target.hp;
+  healPlayer(target, rolled);
+  return { name, rolled, healed: target.hp - before, toxicity: target.toxicity, revived: wasDowned && !isDowned(target) };
+}
+
 /** 結束戰鬥：毒性歸零、藥水加成清除、清空遭遇戰（使用者口述：戰鬥結束毒性清零） */
 export function endBattle(state) {
   const out = { toxicity: state.toxicity, monsters: state.encounter.monsters.length };

@@ -55,6 +55,11 @@ function upgrade(state) {
   return state;
 }
 
+/** 把伺服器上的角色資料補齊成目前格式（不存檔、不改傳進來的物件）：GM 模擬戰用 */
+export function normalizeCharacter(data) {
+  return upgrade(clone(data));
+}
+
 export function loadCharacter() {
   try {
     const raw = localStorage.getItem(KEY);
