@@ -3,6 +3,7 @@
 GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包、裝備、戰鬥五個分頁，加上隨時可開的「骰盤」，資料存在瀏覽器（localStorage）。
 **改到遊戲規則、擲骰、加值、胃袋、紀念品、裝備、戰鬥、藥水時，先讀 `GAME_RULES.md`，並在改完後執行 `npm test`。**
 開發者是程式新手：回覆用繁體中文，步驟要具體，指令要能直接複製貼上。
+**所有 UI 樣式依 `DESIGN.md`（黑金主題）。** 色碼只能寫在 `src/styles/theme.css`，其他檔案用變數。
 
 ## 省 token 規則（最重要）
 - **不要掃描整個專案**。先看下面的檔案地圖，只開跟任務有關的檔案。
@@ -21,13 +22,14 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `index.html` | 頁面骨架（頂部列、地圖、面板容器） |
 | `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #battle）、角色存檔串接、骰盤 |
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
+| `DESIGN.md` | 視覺設計規格（黑金主題） |
 | `src/game/rules.js` | 規則數值：採集池、配方、DC、食物（照搬機器人） |
 | `src/game/engine.js` | 規則邏輯：加值、熟練、胃袋、採集、製作、跑團檢定（純函式） |
 | `src/game/dice.js` | 骰子基礎：擲骰、自訂骰式解析（rng 可替換） |
 | `src/game/stats.js` | 數值面板：基礎 + 裝備 + 食物，附明細 |
 | `src/game/equipment.js` | 裝備：鑑定骰式、裝備欄、比較、整理（純函式） |
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
-| `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js） |
+| `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試：engine（採集製作）、combat、equipment、dice |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
 | `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證 |
@@ -45,7 +47,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、整理 |
 | `src/ui/battleView.js` | 戰鬥頁：血量、藥水、招式、遭遇戰 |
 | `src/ui/diceTray.js` | 骰盤抽屜：一鍵技能檢定、自訂骰、紀錄 |
-| `src/ui/rollFeed.js` | 擲骰紀錄的畫面（骰盤與戰鬥頁共用） |
+| `src/ui/rollFeed.js` | 擲骰紀錄的畫面（骰盤與戰鬥頁共用）：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要 |
 | `src/ui/dom.js` | 建立元素的小工具 |
 | `src/api/lore.js` | **資料存取層**。UI 只能透過這裡拿資料 |
 | `src/data/regions.js` | 四大區域＋中央海域 |
@@ -54,14 +56,16 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/mapView.js` | 地圖拖曳、縮放、熱點 |
 | `src/ui/dossier.js` | 地點情報面板（點地圖標記或索引直接打開） |
 | `src/ui/indexList.js` | 地點索引清單 |
-| `src/styles/tokens.css` | 顏色、字體變數（改配色只改這裡） |
+| `src/styles/theme.css` | **主題檔**：全站色碼、字體、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
+| `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線） |
 | `src/styles/layout.css` | 頂部列、索引面板 |
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |
 | `src/styles/pages.css` | 修整日、背包頁面 |
 | `src/styles/dice.css` | 骰盤、紀錄、裝備頁、戰鬥頁 |
 | `src/styles/redesign.css` | 全站新版樣式（覆蓋前面幾個檔案） |
-| `src/styles/polish.css` | 質感層：玻璃面板、按鈕光暈、hover 效果（最後載入） |
+| `src/styles/polish.css` | 質感層：按鈕、卡片、物品格的舊版效果 |
+| `src/styles/blackgold.css` | 黑金主題（最後載入）：星點背景、面板、標題、擲骰紀錄三軌摘要、稀有度、三欄／手機版面與底部導覽列 |
 | `public/lore-data/*.json` | 設定集文字（Discord 匯出），點「查看設定集」時由 `lore.js` 讀取 |
 
 ## 不可違反的規則

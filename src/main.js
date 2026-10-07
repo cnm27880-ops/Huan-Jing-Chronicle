@@ -1,6 +1,7 @@
 // ============================================================
 // 進入點：把資料層和各個 UI 模組接起來
 // ============================================================
+import './styles/theme.css';
 import './styles/tokens.css';
 import './styles/layout.css';
 import './styles/map.css';
@@ -9,6 +10,7 @@ import './styles/pages.css';
 import './styles/redesign.css';
 import './styles/dice.css';
 import './styles/polish.css';
+import './styles/blackgold.css';
 
 import { getRegions, getMapLocations, getLocationDetail } from './api/lore.js';
 import { createMapView } from './ui/mapView.js';
@@ -133,10 +135,23 @@ async function init() {
       if (a.dataset.viewLink === currentView) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
+    moreBtn.toggleAttribute('data-active', currentView === 'rest'); // 修整日收在「更多」裡，手機版讓「更多」亮起
     if (currentView === 'map') map.reset(false);
     else views[currentView].render();
   }
-  window.addEventListener('hashchange', showView);
+  // 手機底部導覽列的「更多」選單
+  const moreBtn = $('#more-toggle');
+  const moreMenu = $('#more-menu');
+  const setMore = (open) => { moreMenu.hidden = !open; moreBtn.setAttribute('aria-expanded', String(open)); };
+  moreBtn.addEventListener('click', (e) => { e.stopPropagation(); setMore(moreMenu.hidden); });
+  moreMenu.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-more-click]');
+    setMore(false);
+    if (target) $(`#${target.dataset.moreClick}`).click();
+  });
+  document.addEventListener('click', (e) => { if (!moreMenu.hidden && !moreMenu.contains(e.target)) setMore(false); });
+
+  window.addEventListener('hashchange', () => { setMore(false); showView(); });
   showView();
   // 登入：封面先出現，不等網路；查到已登入才更新畫面。任何失敗都維持單機試玩。
   const chip = createUserChip(() => stopRoom());

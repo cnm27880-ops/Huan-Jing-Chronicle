@@ -8,7 +8,7 @@
   touch-action: none;
   cursor: grab;
   background:
-    radial-gradient(ellipse at 50% 45%, var(--ink-raised) 0%, var(--ink) 70%);
+    radial-gradient(ellipse at 50% 45%, var(--ink-raised) 0%, var(--paper) 70%);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -24,9 +24,9 @@
   transform-origin: 0 0;
   box-shadow:
     0 0 0 1px var(--bronze-dim),
-    0 0 0 6px var(--ink),
+    0 0 0 6px var(--paper),
     0 0 0 7px var(--ink-line),
-    0 24px 60px rgba(0, 0, 0, 0.45);
+    0 24px 60px rgba(var(--shadow-rgb), 0.45);
 }
 
 .map-stage.is-animating {
@@ -60,18 +60,18 @@
 .hotspot:hover,
 .hotspot:focus-visible {
   outline: none;
-  background: rgba(194, 154, 85, 0.12);
-  box-shadow: 0 0 0 2px var(--bronze), 0 0 14px 2px rgba(194, 154, 85, 0.55);
+  background: rgba(var(--gold-rgb), 0.12);
+  box-shadow: 0 0 0 2px var(--bronze), 0 0 14px 2px rgba(var(--gold-rgb), 0.55);
 }
 
 .hotspot[data-locked='true']:hover,
 .hotspot[data-locked='true']:focus-visible {
-  box-shadow: 0 0 0 2px rgba(223, 231, 226, 0.7);
-  background: rgba(20, 40, 44, 0.18);
+  box-shadow: 0 0 0 2px rgba(var(--ink-rgb), 0.7);
+  background: rgba(var(--paper-rgb), 0.18);
 }
 
 .hotspot.is-active {
-  box-shadow: 0 0 0 3px var(--bronze), 0 0 18px 4px rgba(194, 154, 85, 0.7);
+  box-shadow: 0 0 0 3px var(--bronze), 0 0 18px 4px rgba(var(--gold-rgb), 0.7);
 }
 
 /* 索引滑過某區域時，地圖上同區域的地點一起亮起 */
@@ -104,7 +104,7 @@
   font: inherit;
   font-size: 1.1rem;
   color: var(--mist);
-  background: var(--ink);
+  background: var(--paper);
   border: 0;
   cursor: pointer;
 }
@@ -127,7 +127,7 @@
   padding: 0.35rem 0.8rem;
   font-size: 0.8rem;
   color: var(--mist-dim);
-  background: rgba(20, 40, 44, 0.8);
+  background: rgba(var(--paper-rgb), 0.8);
   border-radius: var(--radius-sm);
   pointer-events: none;
   white-space: nowrap;

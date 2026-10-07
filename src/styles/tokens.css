@@ -1,35 +1,7 @@
 /* ============================================================
-   設計代號：要換整站配色或字體，只改這裡
+   非顏色的設計代號。顏色、字體一律在 theme.css（黑金主題，規格見 DESIGN.md）
    ============================================================ */
 :root {
-  /* 外框：深墨青，呼應地圖右下角的龍紋與東方雲海 */
-  --ink: #14282c;
-  --ink-raised: #1c373c;
-  --ink-line: #2f5157;
-  --bronze: #c29a55;
-  --bronze-dim: #8a6c3c;
-  --mist: #dfe7e2;
-  --mist-dim: #b6c4c0;
-
-  /* 區域色：取自地圖上各區的標籤底色 */
-  --region-west: #8fb04a;
-  --region-north: #4fd2ca;
-  --region-east: #e2c25e;
-  --region-south: #4aa3e0;
-  --region-sea: #d5dbdc;
-
-  /* 稀有度：簡單、普通、困難、史詩、神級 */
-  --tier-0: #a3aeab;
-  --tier-1: #7cc47f;
-  --tier-2: #5ea7ea;
-  --tier-3: #b98ae6;
-  --tier-4: #f0c454;
-  --fail: #e07b6a;
-
-  --font-display: 'LXGW WenKai TC', 'Noto Serif TC', 'Songti TC', serif;
-  --font-body: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
-  --font-ui: 'Noto Sans TC', 'Microsoft JhengHei', system-ui, sans-serif;
-
   --topbar-h: 56px;
   --radius-sm: 4px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);

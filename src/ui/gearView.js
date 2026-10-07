@@ -3,7 +3,7 @@
 // 設計原則：玩家會一次鍛造很多件再挑最好的，所以鑑定可以一次多件，並自動標出「比身上好」的
 // ============================================================
 import { h, fmt } from './dom.js';
-import { toast, rollFailed } from './controls.js';
+import { toast, rollFailed, rarityTag } from './controls.js';
 import { iconOf } from './items.js';
 import { openFoodSheet } from './statusBar.js';
 import {
@@ -59,11 +59,12 @@ export function createGearView({ root, getState, commit }) {
   // ---------- 裝備欄 ----------
   function slotCard(state, key) {
     const g = state.equipment[key];
-    return h('div', { class: `gear-slot${g ? '' : ' is-empty'}`, dataset: { tier: g ? tierIndex(g) : 'none' } },
+    return h('div', { class: `gear-slot${g ? ' rarity' : ' is-empty'}`, dataset: { tier: g ? tierIndex(g) : 'none', rarity: g ? tierIndex(g) : 'none' } },
       h('span', { class: 'gear-slot__label', text: EQUIP_SLOT_LABEL[key] }),
       g
         ? [
-            h('strong', { class: 'gear-slot__name', text: `${iconOf(gearName(g))} ${gearName(g)}` }),
+            h('strong', { class: 'gear-slot__name rarity__name', text: `${iconOf(gearName(g))} ${gearName(g)}` }),
+            rarityTag(tierIndex(g)),
             h('span', { class: 'gear-slot__effect', text: effectText(g) }),
             h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { unequip(state, key); commit(); } }, '卸下'),
           ]
@@ -104,9 +105,10 @@ export function createGearView({ root, getState, commit }) {
       h('p', { class: 'hint', text: '鍛造得到的是通用裝備。鑑定時才會骰出數值，每件固定下來。可以一次鑑定很多件，結果會出現在骰盤紀錄，所有人都看得到。' }),
       list.length
         ? h('div', { class: 'identify-list' }, list.map((x) =>
-            h('div', { class: 'identify', dataset: { tier: GEAR_TIERS.indexOf(x.tier) } },
+            h('div', { class: 'identify rarity', dataset: { tier: GEAR_TIERS.indexOf(x.tier), rarity: GEAR_TIERS.indexOf(x.tier) } },
               h('div', { class: 'identify__info' },
-                h('strong', { text: `${iconOf(x.name)} ${x.name}` }),
+                h('strong', { class: 'rarity__name', text: `${iconOf(x.name)} ${x.name}` }),
+                rarityTag(GEAR_TIERS.indexOf(x.tier)),
                 h('span', { class: 'identify__qty', text: `×${fmt(x.qty)}` }),
                 h('small', { text: gearDiceText(x.tier, x.slot) })),
               h('div', { class: 'identify__btns' },
@@ -137,9 +139,10 @@ export function createGearView({ root, getState, commit }) {
     const cmp = compareGear(state, g);
     const accFull = g.slot === 'accessory' && state.equipment.acc1 && state.equipment.acc2;
     const putOn = (key) => { const err = equip(state, g.id, key); if (err) return toast(err); commit(); };
-    return h('li', { class: 'owned', dataset: { tier: tierIndex(g) } },
+    return h('li', { class: 'owned rarity', dataset: { tier: tierIndex(g), rarity: tierIndex(g) } },
       h('div', { class: 'owned__main' },
-        h('strong', { class: 'owned__name', text: `${iconOf(gearName(g))} ${gearName(g)}` }),
+        h('strong', { class: 'owned__name rarity__name', text: `${iconOf(gearName(g))} ${gearName(g)}` }),
+        rarityTag(tierIndex(g)),
         h('span', { class: 'owned__effect', text: effectText(g) }),
         h('span', { class: 'badge', dataset: { tone: BADGE[cmp][1] }, text: BADGE[cmp][0] })),
       g.special

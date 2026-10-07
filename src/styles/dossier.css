@@ -3,14 +3,14 @@
    每個區域有自己的主題：只要改 [data-theme] 底下的變數即可
    ============================================================ */
 .dossier {
-  --d-bg: var(--ink-raised);
+  --d-bg: var(--card);
   --d-text: var(--mist);
   --d-muted: var(--mist-dim);
-  --d-accent: var(--bronze);
+  --d-accent: var(--gold);
   --d-rule: var(--ink-line);
   --d-head-font: var(--font-display);
   --d-seal-bg: var(--bronze);
-  --d-seal-text: var(--ink);
+  --d-seal-text: var(--on-gold);
 
   position: absolute;
   top: 0;
@@ -20,7 +20,7 @@
   background: var(--d-bg);
   color: var(--d-text);
   border-left: 1px solid var(--d-rule);
-  box-shadow: -18px 0 40px rgba(0, 0, 0, 0.35);
+  box-shadow: -18px 0 40px rgba(var(--shadow-rgb), 0.35);
   transform: translateX(104%);
   transition: transform 0.32s var(--ease);
   z-index: 25;
@@ -197,57 +197,12 @@
    區域主題
    ============================================================ */
 
-/* 東方蓬萊仙島：深色底、朱紅印章（和其他區域一樣用灰黑底） */
-.dossier[data-theme='east'] {
-  --d-bg: #16141a;
-  --d-text: #ece6da;
-  --d-muted: #bdb3a2;
-  --d-accent: #e0645c;
-  --d-rule: #3a3238;
-  --d-seal-bg: #a8322d;
-  --d-seal-text: #f5ecd8;
-}
-
-/* 西方大陸：深色底、森林綠印章 */
-.dossier[data-theme='west'] {
-  --d-bg: #15171a;
-  --d-text: #ebe6d8;
-  --d-muted: #bcb39c;
-  --d-accent: #9bc858;
-  --d-rule: #33382e;
-  --d-seal-bg: #4f6b2a;
-  --d-seal-text: #f2e7c9;
-  --d-head-font: var(--font-body);
-}
-
-/* 北方冰原：深色終端、青色與洋紅 */
-.dossier[data-theme='north'] {
-  --d-bg: #0f1d24;
-  --d-text: #d4eef0;
-  --d-muted: #7fa3aa;
-  --d-accent: #4fd2ca;
-  --d-rule: #23424b;
-  --d-seal-bg: transparent;
-  --d-seal-text: #4fd2ca;
-  --d-head-font: var(--font-ui);
-}
-
-.dossier[data-theme='north'] .faction__name {
-  border: 1px solid #4fd2ca;
-  box-shadow: inset 0 0 0 1px rgba(212, 91, 198, 0.5);
-}
-
-/* 南方現代都市：灰藍檔案夾、訊號藍 */
-.dossier[data-theme='south'] {
-  --d-bg: #1b2938;
-  --d-text: #e2eaf3;
-  --d-muted: #8ea3b8;
-  --d-accent: #4aa3e0;
-  --d-rule: #2f4358;
-  --d-seal-bg: #4aa3e0;
-  --d-seal-text: #0f1a25;
-  --d-head-font: var(--font-ui);
-}
+/* 四大區域：底色、文字、線條統一黑金，只有點綴色（標題、印章）依區域不同 */
+.dossier[data-theme='east'] { --d-accent: var(--region-east); --d-seal-bg: var(--region-east); --d-seal-text: var(--on-gold); }
+.dossier[data-theme='west'] { --d-accent: var(--region-west); --d-seal-bg: var(--region-west); --d-seal-text: var(--on-gold); }
+.dossier[data-theme='north'] { --d-accent: var(--region-north); --d-seal-bg: transparent; --d-seal-text: var(--region-north); }
+.dossier[data-theme='north'] .faction__name { border: 1px solid var(--region-north); }
+.dossier[data-theme='south'] { --d-accent: var(--region-south); --d-seal-bg: var(--region-south); --d-seal-text: var(--on-gold); }
 
 /* ---------- 手機：底部抽屜 ---------- */
 @media (max-width: 640px) {

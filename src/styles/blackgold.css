@@ -1,0 +1,535 @@
+/* ============================================================
+   黑金主題（最後載入）：依 DESIGN.md 覆蓋前面各檔的外觀。
+   只用 theme.css 的變數，不寫死色碼；只改外觀，不改互動與資料。
+   ============================================================ */
+
+/* ---------- 基礎：字體、字級、數字 ---------- */
+html { font-size: 14px; }
+body {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse 70% 55% at 0% 0%, rgba(var(--gold-rgb), 0.08), transparent 65%),
+    radial-gradient(ellipse 70% 55% at 100% 100%, rgba(var(--sky-rgb), 0.07), transparent 65%),
+    var(--paper);
+}
+.num, .roll__big, .roll__time, .roll__badge, .roll__formula, .die, .stat__value, .tile__qty, .bar__text,
+.identify__qty, .move__dice, .result__big, .status__num strong, .track__name b, .abc__cell, .brand::after {
+  font-family: var(--font-num);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* ---------- 背景點綴：兩層細小星點（只在背景層，面板不透明） ---------- */
+body::before,
+body::after {
+  content: '';
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  filter: none;
+  opacity: 1;
+}
+body::before { /* 靜止的 1px 星點，尺寸用質數避免看出重複 */
+  background:
+    radial-gradient(circle at 17px 29px, var(--star) 0 0.5px, transparent 1px),
+    radial-gradient(circle at 131px 83px, var(--star) 0 0.5px, transparent 1px),
+    radial-gradient(circle at 67px 163px, var(--star) 0 0.5px, transparent 1px),
+    radial-gradient(circle at 181px 191px, var(--star) 0 0.5px, transparent 1px);
+  background-size: 197px 211px;
+  opacity: 0.55;
+}
+body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
+  background:
+    radial-gradient(circle at 41px 61px, var(--star) 0 0.75px, transparent 1.25px),
+    radial-gradient(circle at 229px 137px, var(--star) 0 0.75px, transparent 1.25px),
+    radial-gradient(circle at 113px 251px, var(--star) 0 0.75px, transparent 1.25px);
+  background-size: 307px 283px;
+  animation: bg-twinkle 7s ease-in-out infinite alternate;
+}
+@keyframes bg-twinkle { from { opacity: 0.2; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { body::after { animation: none; opacity: 0.6; } }
+.atlas, .view--page { background: transparent; }
+
+/* ---------- 頁首 ---------- */
+.topbar {
+  background: var(--paper2);
+  backdrop-filter: none; /* 有 backdrop-filter 時，手機底部導覽列（position: fixed）會跟著頁首跑 */
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, var(--gold) 50%, transparent) 1;
+  box-shadow: 0 4px 12px var(--shadow);
+}
+.brand {
+  padding-left: 0;
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  text-shadow: none;
+}
+.brand::before { content: none; display: none; }
+.brand::after { color: var(--soft); font-size: 0.5rem; font-weight: 500; letter-spacing: 0.3em; }
+.tab { color: var(--soft); background: transparent; border-radius: 0; box-shadow: none; text-shadow: none; }
+.tab:hover { color: var(--ink); background: transparent; }
+.tab[aria-current='page'] {
+  color: var(--gold);
+  background: transparent;
+  border-color: transparent;
+  border-bottom: 2px solid var(--gold);
+  box-shadow: none;
+  text-shadow: none;
+}
+.tab--more, .more-menu { display: none; }
+
+/* ---------- 面板（不透明） ---------- */
+.card, .results, .showcase, .sheet__panel, .tray, .index-panel, .dossier, .zoom-controls, .map-hint, .status, .bag-bar {
+  background: var(--card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 0;
+  box-shadow: var(--panel-shadow);
+}
+.card, .results, .showcase, .sheet__panel { border-radius: var(--r-panel); }
+.card { padding: 16px 18px; }
+.card:hover, .results:hover { box-shadow: var(--panel-shadow); }
+.tray, .index-panel, .dossier { background: var(--paper2); }
+.status, .bag-bar { border-radius: 0; box-shadow: 0 1px 0 var(--line), 0 4px 12px var(--shadow); }
+.result, .stat, .monster, .mod { background: var(--raise); border: 0; box-shadow: 0 0 0 1px var(--line); border-radius: 10px; }
+
+/* ---------- 區塊標題：12px、金色、後接漸淡細線，前面不加符號 ---------- */
+.section-title, .tray__title, .results .section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  text-shadow: none;
+}
+.section-title::before, .tray__title::before, .results .section-title::before { content: none; display: none; }
+.section-title::after, .tray__title::after, .results .section-title::after {
+  content: '';
+  position: static;
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line3), transparent);
+}
+.battle-head .section-title { flex: 1; margin-bottom: 0; }
+.battle-head { margin-bottom: 12px; }
+
+/* ---------- 按鈕：hover 金色 1.5px 外框 ---------- */
+.btn, .btn--ghost, .sheet__close, .dossier__close, .zoom-btn {
+  color: var(--ink);
+  background: var(--raise);
+  border: 1px solid var(--line3);
+  border-radius: 10px;
+  box-shadow: none;
+  text-shadow: none;
+}
+.btn:hover:not(:disabled), .btn--ghost:hover, .sheet__close:hover, .dossier__close:hover, .zoom-btn:hover,
+.btn--ghost[aria-expanded='true'] {
+  color: var(--gold);
+  background: var(--raise);
+  border-color: var(--line3);
+  box-shadow: var(--hover-ring);
+}
+.btn--primary, .btn--go {
+  color: var(--on-gold);
+  background: var(--gold);
+  border: 1px solid var(--gold);
+  box-shadow: none;
+  text-shadow: none;
+}
+.btn--primary:hover:not(:disabled), .btn--go:hover:not(:disabled) {
+  color: var(--on-gold);
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1.5px var(--paper), 0 0 0 3px var(--gold);
+  transform: none;
+}
+.btn--primary::after, .btn--go::after { display: none; }
+
+/* 可點的卡片（物品格、選項、招式…）hover 同樣是金色 1.5px 外框 */
+.action-card, .diff, .skill-btn, .toggle, .potion, .move__pick, .chip, .amount__chip, .amount__step, .slot-add {
+  background: var(--raise);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+.action-card:hover, .diff:hover, .skill-btn:hover, .toggle:hover, .potion:hover:not(:disabled), .move__pick:hover:not(:disabled),
+.chip:hover, .amount__chip:hover, .amount__step:hover, .slot-add:hover, button.tile:hover {
+  background: var(--raise);
+  border-color: var(--line);
+  box-shadow: var(--hover-ring);
+  transform: none;
+}
+.action-card[aria-checked='true'], .diff[aria-checked='true'], .toggle[aria-pressed='true'], .amount__chip[aria-pressed='true'],
+.move[aria-current='true'] .move__pick {
+  background: var(--goldbg);
+  border-color: var(--gold2);
+  box-shadow: var(--hover-ring);
+}
+.tabs-seg { background: var(--paper); border: 1px solid var(--line); box-shadow: none; border-radius: var(--r-pill); }
+.seg { border-radius: var(--r-pill); }
+.seg[aria-selected='true'] { color: var(--on-gold); background: var(--gold); box-shadow: none; }
+.field, .amount__input { background: var(--paper); border: 1px solid var(--line3); box-shadow: none; color: var(--ink); }
+.field:focus, .amount__input:focus { border-color: var(--gold); box-shadow: 0 0 0 1.5px var(--gold); }
+
+/* ---------- 標籤與徽章：膠囊形 ---------- */
+.badge, .info-chip, .roll__badge, .track__tag, .status__day { border-radius: var(--r-pill); }
+.badge, .info-chip { background: var(--paper); border: 1px solid var(--line3); color: var(--ink2); box-shadow: none; }
+.badge[data-tone='good'], .info-chip.is-good { color: var(--sky); background: var(--skybg); border-color: var(--sky2); }
+.badge[data-tone='bad'], .info-chip.is-bad { color: var(--rose); background: var(--rosebg); border-color: var(--rose2); }
+
+/* ---------- 血條、資源條 ---------- */
+.bar { background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); }
+.bar__fill { background: linear-gradient(90deg, var(--rose2), var(--rose)); box-shadow: none; }
+.res-row .bar__fill { background: linear-gradient(90deg, var(--gold2), var(--gold)); }
+
+/* ============================================================
+   擲骰紀錄（骰盤、戰鬥頁共用）
+   ============================================================ */
+.roll-list { gap: 8px; }
+.roll {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 14px 12px 18px;
+  background: var(--card);
+  border: 0;
+  border-radius: 12px;
+  box-shadow: var(--panel-shadow);
+}
+.roll::before { /* 左側 4px 色條 */
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--line3), var(--line));
+}
+.roll[data-tone='ok']::before { background: linear-gradient(180deg, var(--sky), var(--sky2)); }
+.roll[data-tone='fail']::before { background: linear-gradient(180deg, var(--rose), var(--rose2)); }
+.roll[data-tone='warn']::before, .roll[data-tone='crit']::before { background: linear-gradient(180deg, var(--gold), var(--gold2)); }
+.tray__latest .roll { box-shadow: var(--panel-shadow), 0 0 0 1.5px var(--line3); }
+
+.roll__head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 0.86rem; }
+.roll__who { color: var(--ink); font-weight: 600; }
+.roll__label { color: var(--ink2); min-width: 0; }
+.roll__time { margin-left: auto; color: var(--faint); font-size: 0.72rem; }
+.roll__badge { /* 右上角結果徽章 */
+  padding: 1px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--gold);
+  background: var(--goldbg);
+  border: 1px solid var(--gold2);
+}
+.roll__badge[data-tone='ok'] { color: var(--sky); background: var(--skybg); border-color: var(--sky2); }
+.roll__badge[data-tone='fail'] { color: var(--rose); background: var(--rosebg); border-color: var(--rose2); }
+.roll__big { margin: 4px 0 0; color: var(--gold); font-size: 1.6rem; text-shadow: none; }
+.roll[data-tone='ok'] .roll__big { color: var(--sky); }
+.roll[data-tone='fail'] .roll__big { color: var(--rose); }
+.roll__lines { margin-top: 6px; color: var(--soft); font-size: 0.8rem; }
+
+/* 一般檢定：每一顆骰子（六角形骰面），下方公式與總和 */
+.roll__dice { display: grid; gap: 6px; margin-top: 8px; }
+.dice-faces { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.die {
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 34px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--line3);
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+.die::before {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  z-index: -1;
+  background: var(--die0);
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+.die[data-max='1'] { color: var(--gold); background: var(--gold2); }
+.die[data-min='1'] { color: var(--rose); }
+.dice-faces__more { color: var(--soft); font-size: 0.78rem; }
+.roll__formula { margin: 0; color: var(--soft); font-size: 0.86rem; }
+.roll__formula strong { color: var(--gold); font-size: 1.35rem; }
+
+/* 戰鬥擲骰：A／B／C 三軌摘要，不列骰子 */
+.tracks { display: grid; gap: 8px; margin-top: 8px; }
+.tracks__group { display: grid; gap: 4px; }
+.tracks__target { margin: 2px 0 0; color: var(--ink2); font-size: 0.8rem; font-weight: 600; }
+.track {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+  grid-template-areas: 'name atk tag' 'name def tag';
+  align-items: center;
+  column-gap: 8px;
+  padding: 5px 8px;
+  background: var(--paper2);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.track.is-unused { opacity: 0.38; grid-template-areas: 'name atk atk'; }
+.track__name { grid-area: name; display: grid; justify-items: center; line-height: 1.1; }
+.track__name b { color: var(--gold); font-size: 1.15rem; }
+.track__name small { color: var(--soft); font-size: 0.66rem; }
+.track__atk { grid-area: atk; color: var(--ink2); font-size: 0.86rem; }
+.track__atk strong { color: var(--ink); font-size: 1rem; }
+.track__def { grid-area: def; color: var(--soft); font-size: 0.78rem; }
+.track__tag { grid-area: tag; padding: 1px 10px; font-size: 0.78rem; font-weight: 700; white-space: nowrap; border: 1px solid; }
+.track__tag[data-good='1'] { color: var(--sky); background: var(--skybg); border-color: var(--sky2); }
+.track__tag[data-good='0'] { color: var(--rose); background: var(--rosebg); border-color: var(--rose2); }
+
+/* 戰鬥分隔線：兩側金色漸淡細線，中間是場次 */
+.roll--divider { display: block; padding: 6px 0; background: none; border: 0; box-shadow: none; }
+.roll--divider::before { content: none; display: none; }
+.divider { display: flex; align-items: center; gap: 12px; }
+.divider__line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--gold)); }
+.divider__line:last-child { background: linear-gradient(90deg, var(--gold), transparent); }
+.roll--divider .roll__label { color: var(--gold); font-size: 12px; letter-spacing: 0.14em; }
+.roll--divider .roll__sub { display: block; margin-top: 2px; text-align: center; color: var(--faint); font-size: 0.72rem; }
+.roll--divider .roll__time { margin: 0; }
+
+/* ============================================================
+   物品稀有度：左側色條＋菱形＋方框標籤（形狀和擲骰的膠囊不同，不可混用）
+   色由 data-tier／data-rarity 決定（--t），0~4 = 初階／進階／大師／傳說／神話
+   ============================================================ */
+.rarity[data-rarity='0'] { --t: var(--rarity-0); } /* 比 .gear-slot 等元件自己的 --t 優先 */
+.rarity[data-rarity='1'] { --t: var(--rarity-1); }
+.rarity[data-rarity='2'] { --t: var(--rarity-2); }
+.rarity[data-rarity='3'] { --t: var(--rarity-3); }
+.rarity[data-rarity='4'] { --t: var(--rarity-4); }
+.rarity { border-left: 4px solid var(--t); }
+.rarity .rarity__name { color: var(--t); }
+.rarity[data-rarity='2'] { box-shadow: 0 0 0 1px var(--line), 0 0 14px rgba(var(--rarity-2-rgb), 0.28); }
+.rarity[data-rarity='3'] {
+  border: 1.5px solid var(--rarity-3);
+  border-left: 4px solid var(--rarity-3);
+  box-shadow: 0 0 22px rgba(var(--rarity-3-rgb), 0.35);
+}
+.rarity[data-rarity='3'] .rarity__name {
+  color: var(--rarity-3);
+  background: linear-gradient(180deg, var(--ink), var(--rarity-3) 55%, var(--gold2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.rarity[data-rarity='4'] { /* 神話：2px 虹彩外框＋左側 5px 虹彩小條，無動態 */
+  border: 2px solid transparent;
+  background:
+    var(--rainbow-v) left top / 5px 100% no-repeat padding-box,
+    linear-gradient(var(--card), var(--card)) padding-box,
+    var(--rainbow) border-box;
+  padding-left: calc(0.6rem + 5px);
+}
+.rarity[data-rarity='4'] .rarity__name { color: var(--rarity-4); }
+.rarity[data-rarity='4']::before { content: none; display: none; }
+
+.rarity-tag { display: inline-flex; align-items: center; gap: 5px; color: var(--t); font-size: 11px; line-height: 1; white-space: nowrap; }
+.rarity-tag__gem { /* 12px 菱形：8.5px 方塊轉 45 度 */
+  flex: none;
+  width: 8.5px;
+  height: 8.5px;
+  margin: 1.75px;
+  background: var(--t);
+  transform: rotate(45deg);
+}
+.rarity-tag__name { padding: 2px 6px; border: 1.5px solid var(--t); border-radius: 2px; letter-spacing: 0.08em; }
+[data-rarity='4'] .rarity-tag { color: var(--rarity-4); }
+[data-rarity='4'] .rarity-tag__gem { background: var(--rainbow); }
+[data-rarity='4'] .rarity-tag__name { border-image: var(--rainbow) 1; }
+/* 基礎字級改成 14px 後，物品格的字要放大一點才看得清楚 */
+.tile__name { font-size: 0.86rem; }
+.tile__qty { font-size: 0.8rem; }
+.tile__note { font-size: 0.78rem; }
+.tile .rarity-tag { grid-column: 2 / -1; justify-self: start; }
+.tile.rarity { border-left-width: 4px; }
+.tile[data-rarity='4'] { border-left-width: 2px; }
+
+/* ============================================================
+   戰鬥頁：電腦三欄、平板兩欄、手機單欄
+   ============================================================ */
+.abc { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.abc__cell { display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 2px 4px; background: var(--paper); border-radius: 6px; }
+.abc__cell b { color: var(--gold); font-size: 0.8rem; }
+.abc__abs { grid-column: 1 / -1; color: var(--soft); font-size: 0.78rem; }
+.move-tabs { display: none; }
+
+@media (min-width: 1100px) {
+  .battle-layout { grid-template-columns: 280px minmax(0, 1fr) 360px; max-width: none; }
+  .battle-col--log { position: sticky; top: 12px; max-height: calc(100vh - var(--topbar-h) - 24px); overflow-y: auto; }
+}
+@media (min-width: 760px) and (max-width: 1099px) {
+  .page-wrap { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 12px; }
+  .battle-layout { grid-template-columns: 280px minmax(0, 1fr); }
+  .battle-col--log { grid-column: 2; }
+}
+
+/* ============================================================
+   手機（<760px）：單欄卡片堆疊、底部固定導覽列、觸控目標 44px
+   ============================================================ */
+@media (max-width: 759px) {
+  :root { --nav-h: 58px; }
+  .page-wrap { grid-template-columns: minmax(0, 1fr); padding: 10px 12px; }
+  .card { padding: 14px 16px; }
+
+  /* 頁首：分頁移到底部後，品牌字放左邊、骰盤與索引靠右 */
+  .brand { display: block; margin-right: auto; padding: 0; font-size: 1.15rem; letter-spacing: 0.2em; }
+  .brand::after { display: none; }
+
+  /* 戰鬥頁：三欄拆開，依實戰順序排 */
+  .battle-layout { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+  .battle-col { display: contents; }
+  [data-slot='status'] { order: 1; }
+  [data-slot='res'] { order: 2; }
+  [data-slot='enemy'] { order: 3; }
+  [data-slot='move'] { order: 4; }
+  [data-slot='log'] { order: 5; }
+  [data-slot='potion'] { order: 6; }
+  [data-slot='defense'] { order: 7; }
+  [data-slot='skill'] { order: 8; }
+
+  /* 資源條兩欄並排 */
+  [data-slot='res'] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; }
+  [data-slot='res'] > :not(.res-row) { grid-column: 1 / -1; }
+  .res-row { grid-template-columns: minmax(0, 1fr) 5.2rem; grid-template-areas: 'name input' 'bar bar'; gap: 4px; }
+  .res-row__name { grid-area: name; }
+  .res-row__bar { grid-area: bar; }
+  .res-row__input { grid-area: input; }
+
+  /* 招式：A／B／C 軌分頁 */
+  .move-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 8px; }
+  .move-list[data-filter='A'] .move:not([data-tracks*='A']),
+  .move-list[data-filter='B'] .move:not([data-tracks*='B']),
+  .move-list[data-filter='C'] .move:not([data-tracks*='C']) { display: none; }
+
+  /* 敵人：攻擊、防禦上下排，防禦三軌並排 */
+  .monster__stats { grid-template-columns: minmax(0, 1fr); }
+
+  /* 底部固定導覽列：地圖、背包、裝備、戰鬥、更多 */
+  .tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+    padding: 0 0 env(safe-area-inset-bottom, 0px);
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+    overflow: visible;
+    background: var(--paper2);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -4px 12px var(--shadow);
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 4px;
+    font-size: 0.95rem;
+    border: 0;
+    border-top: 2px solid transparent;
+  }
+  .tab[data-view-link='rest'] { display: none; }
+  .tab[aria-current='page'], .tab--more[data-active] { color: var(--gold); border-bottom: 0; border-top: 2px solid var(--gold); }
+  .tab--more { display: flex; font: inherit; background: transparent; cursor: pointer; }
+  .tab--more[aria-expanded='true'] { color: var(--gold); }
+  .more-menu {
+    position: fixed;
+    right: 8px;
+    bottom: calc(var(--nav-h) + 8px + env(safe-area-inset-bottom, 0px));
+    z-index: 60;
+    display: grid;
+    min-width: 10rem;
+    padding: 6px;
+    background: var(--card);
+    border-radius: var(--r-panel);
+    box-shadow: var(--panel-shadow);
+  }
+  .more-menu[hidden] { display: none; }
+  .more-menu__item {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 14px;
+    color: var(--ink);
+    font: inherit;
+    text-decoration: none;
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .more-menu__item:hover, .more-menu__item[aria-current='page'] { color: var(--gold); background: var(--goldbg); }
+
+  /* 底部導覽列佔的空間 */
+  .view--page { padding-bottom: calc(var(--nav-h) + 1.5rem + env(safe-area-inset-bottom, 0px)); }
+  .map-viewport { bottom: calc(var(--nav-h) + 5px + env(safe-area-inset-bottom, 0px)); }
+  .zoom-controls, .map-hint { bottom: calc(var(--nav-h) + 1rem + env(safe-area-inset-bottom, 0px)); }
+  .dossier { bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px)); max-height: calc(100% - var(--nav-h) - 1rem); }
+  .index-panel { padding-bottom: calc(var(--nav-h) + 1rem); }
+  .toast { bottom: calc(var(--nav-h) + 1rem + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* 觸控目標至少 44px */
+@media (max-width: 759px), (pointer: coarse) {
+  .btn, .seg, .toggle, .chip, .field, .amount__chip, .amount__input, .move__pick, .sheet__close, .dossier__close,
+  .status__day, .potion, .diff, .skill-btn, .bag-group__head, .index-item, #tray-toggle, #index-toggle { min-height: 44px; }
+  .zoom-btn, .amount__step, .info-chip__btn { min-width: 44px; min-height: 44px; }
+}
+
+/* ---------- 地圖、地點索引、設定集 ---------- */
+.map-viewport { box-shadow: var(--panel-shadow); border: 0; border-radius: var(--r-panel); }
+.map-stage { box-shadow: 0 0 0 1px rgba(var(--gold-rgb), 0.4), 0 8px 24px var(--shadow); }
+.hotspot:hover, .hotspot:focus-visible { background: rgba(var(--gold-rgb), 0.13); box-shadow: var(--hover-ring), 0 0 12px rgba(var(--gold-rgb), 0.35); }
+.hotspot.is-active { box-shadow: 0 0 0 2px var(--gold), 0 0 16px rgba(var(--gold-rgb), 0.5); }
+.map-hint { border-radius: var(--r-pill); color: var(--soft); }
+.index-item:hover { color: var(--gold); background: var(--goldbg); border-color: var(--gold2); }
+.dossier { --d-bg: var(--paper2); --d-text: var(--ink); --d-muted: var(--soft); --d-rule: var(--line); }
+.dossier__title { color: var(--ink); text-shadow: none; }
+.dossier__section { color: var(--gold); font-size: 12px; letter-spacing: 0.14em; }
+.dossier__section::after { background: linear-gradient(90deg, var(--line3), transparent); }
+
+/* ---------- 封面 ---------- */
+.cover {
+  background:
+    radial-gradient(ellipse 70% 55% at 0% 0%, rgba(var(--gold-rgb), 0.1), transparent 65%),
+    radial-gradient(ellipse 70% 55% at 100% 100%, rgba(var(--sky-rgb), 0.08), transparent 65%),
+    var(--paper);
+}
+.cover__kicker { color: var(--soft); font-family: var(--font-body); letter-spacing: 0.4em; }
+.cover__title { color: var(--gold); font-family: var(--font-body); font-weight: 900; letter-spacing: 0.24em; text-shadow: none; }
+.cover__title::after { /* 標題下的金色漸淡細線 */
+  content: '';
+  display: block;
+  height: 1px;
+  margin: 14px auto 0;
+  width: min(18rem, 70%);
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.cover__lead { color: var(--ink2); }
+.cover__note { color: var(--soft); font-family: var(--font-body); }
+.cover__btn--discord { color: var(--ink); border-color: var(--line3); }
+.cover__avatar { border-color: var(--gold); }

@@ -2,22 +2,34 @@
 // 共用小元件：物品格、數量選擇器、提示訊息
 // ============================================================
 import { h, fmt } from './dom.js';
-import { iconOf, tierOf, plainName, TIERS } from './items.js';
+import { iconOf, rarityOf, plainName, TIERS, RARITY_NAMES } from './items.js';
 import { RollError } from '../state/rollLog.js';
+
+/**
+ * 稀有度標籤：菱形圖示 + 方框寫出等級名稱（不能只靠顏色辨識，見 DESIGN.md）。
+ * 外層元素要有 data-rarity（0~4）才會上色。tier 為 null 時不顯示。
+ */
+export function rarityTag(tier) {
+  if (tier == null || tier < 0) return null;
+  return h('span', { class: 'rarity-tag', title: `${RARITY_NAMES[tier]}（製作難度 ${TIERS[tier]}）` },
+    h('span', { class: 'rarity-tag__gem', 'aria-hidden': 'true' }),
+    h('span', { class: 'rarity-tag__name', text: RARITY_NAMES[tier] }));
+}
 
 /** 物品格：圖示 + 名稱 + 數量，左側色條代表稀有度 */
 export function itemTile(name, qty, { onClick, size = 'md', extra } = {}) {
-  const tier = tierOf(name);
+  const tier = rarityOf(name);
   return h(onClick ? 'button' : 'div', {
     type: onClick ? 'button' : null,
-    class: `tile tile--${size}`,
-    dataset: { tier: tier ?? 'none' },
-    title: tier !== null ? `${TIERS[tier]}級` : null,
+    class: `tile tile--${size}${tier !== null ? ' rarity' : ''}`,
+    dataset: { tier: tier ?? 'none', rarity: tier ?? 'none' },
+    title: tier !== null ? `${RARITY_NAMES[tier]}（${TIERS[tier]}）` : null,
     onclick: onClick,
   },
   h('span', { class: 'tile__icon', 'aria-hidden': 'true', text: iconOf(name) }),
-  h('span', { class: 'tile__name', text: plainName(name) }),
+  h('span', { class: 'tile__name rarity__name', text: plainName(name) }),
   qty != null ? h('span', { class: 'tile__qty', text: `×${fmt(qty)}` }) : null,
+  rarityTag(tier),
   extra ?? null);
 }
 

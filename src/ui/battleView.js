@@ -21,6 +21,7 @@ import {
 import { countOf } from '../game/engine.js';
 import { iconOf } from './items.js';
 import { publish, rollWith } from '../state/rollLog.js';
+import { trackLine, targetLine } from '../game/events.js';
 
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const potionText = (p) => [
@@ -38,9 +39,7 @@ function hpBar(cur, max, downed) {
 }
 
 function trackLines(result) {
-  return result.tracks
-    .filter((t) => t.atkDice > 0)
-    .map((t) => `${t.track} 軌　攻 ${fmt(t.atkDice)} 顆＝${fmt(t.atkRoll)}　防 ${fmt(t.defDice)} 顆＝${fmt(t.defRoll)}　傷害 ${fmt(t.damage)}`);
+  return result.tracks.filter((t) => t.atkDice > 0).map(trackLine);
 }
 
 export function createBattleView({ root, getState, commit }) {
@@ -50,6 +49,7 @@ export function createBattleView({ root, getState, commit }) {
     form: { kind: 'mob', count: 1, atk: 10, def: 10, hp: 100, atkMod: '', defMod: '', absDef: 0 },
     moveForm: { name: '', mode: 'normal', school: '', tracks: ['C'], extra: { A: 0, B: 0, C: 0 }, cost: {}, global: true },
     yuwai: false, newSkill: '', newSkillLv: 1,
+    moveTrack: 'all', // 手機版招式清單的 A／B／C 分頁（只影響顯示）
     hpAdjust: 10,
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
   };
@@ -145,7 +145,7 @@ export function createBattleView({ root, getState, commit }) {
     const row = (r) => {
       const now = resourceNow(state, r);
       const max = resourceMax(state, r);
-      return h('div', { class: 'res-row' },
+      return h('div', { class: 'res-row', dataset: { res: r } },
         h('span', { class: 'res-row__name', text: r }),
         h('div', { class: 'bar res-row__bar', role: 'img', 'aria-label': `${r} ${now} / ${max}` },
           h('div', { class: 'bar__fill', style: `width:${max > 0 ? Math.min(100, (now / max) * 100) : 0}%` }),
@@ -269,10 +269,17 @@ export function createBattleView({ root, getState, commit }) {
       h('h2', { class: 'section-title', text: '招式' }),
       h('p', { class: 'hint', text: '一般招式：攻擊骰 = 該軌道傷害 + 真實傷害 + 招式加成，敵人只用對應軌道的防禦來擋。點一個招式選為「出招」用的招式；輔助技能直接按檔位使用。消耗已含魔女的額外魔力。' }),
       state.moves.length
-        ? h('ul', { class: 'move-list' }, state.moves.map((m) => {
+        ? h('div', { class: 'tabs-seg move-tabs', role: 'tablist', 'aria-label': '依軌道篩選招式' },
+            [['all', '全部'], ...TRACKS.map((t) => [t, `${t} 軌`])].map(([id, label]) => h('button', {
+              type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.moveTrack === id),
+              onclick: () => { ui.moveTrack = id; render(); },
+            }, label)))
+        : null,
+      state.moves.length
+        ? h('ul', { class: 'move-list', dataset: { filter: ui.moveTrack } }, state.moves.map((m) => {
             const d = moveDetail(state, m);
             const support = m.kind === 'heal' || m.kind === 'shield';
-            return h('li', { class: 'move', 'aria-current': String(m.id === ui.moveId) },
+            return h('li', { class: 'move', 'aria-current': String(m.id === ui.moveId), dataset: { tracks: support ? 'ABC' : (m.mode === 'all' ? TRACKS : m.tracks ?? []).join('') } },
               h('div', { class: 'move__main' },
                 h('button', { type: 'button', class: 'move__pick', disabled: support, onclick: () => { ui.moveId = m.id; render(); } },
                   h('strong', { text: m.skill ? `${m.name} Lv${skillLevel(state, m.skill)}` : m.name }),
@@ -383,7 +390,7 @@ export function createBattleView({ root, getState, commit }) {
     const multi = r.hits.length > 1;
     const lines = [];
     r.hits.forEach((h2) => {
-      if (multi) lines.push(`— ${h2.target.id}（傷害 ${fmt(h2.result.total)}）—`);
+      if (multi) lines.push(targetLine(h2.target.id, h2.result.total));
       lines.push(...trackLines(h2.result));
       if (h2.ignoreAbs) lines.push('終焉武裝：無視絕對防禦'); else if (h2.abs) lines.push(`敵人絕對防禦 ${h2.abs}`);
       lines.push(`${h2.target.id} 生命 ${fmt(befores.get(h2.target.id))} → ${fmt(h2.target.hp)} / ${fmt(h2.target.maxHp)}${h2.target.hp <= 0 ? '　倒下了！' : ''}`);
@@ -437,7 +444,10 @@ export function createBattleView({ root, getState, commit }) {
       hpBar(m.hp, m.maxHp, downed),
       h('dl', { class: 'monster__stats' },
         h('div', {}, h('dt', { text: '攻擊' }), h('dd', { text: m.kind === 'boss' ? `${BOSS_ATK_MODES[modes.atk]}：${formatAbc(monsterAtk(m, modes.atk))}` : formatAbc(m.atk) })),
-        h('div', {}, h('dt', { text: '防禦' }), h('dd', { text: (m.kind === 'boss' ? `${BOSS_DEF_MODES[modes.def]}：${formatAbc(monsterDef(m, modes.def))}` : formatAbc(m.def)) + (monsterAbs(m) ? `　絕防 ${monsterAbs(m)}` : '') }))),
+        h('div', {}, h('dt', { text: m.kind === 'boss' ? `防禦（${BOSS_DEF_MODES[modes.def]}）` : '防禦' }),
+          h('dd', { class: 'abc' },
+            TRACKS.map((t) => h('span', { class: 'abc__cell', dataset: { track: t } }, h('b', { text: t }), h('span', { class: 'num', text: fmt(monsterDef(m, modes.def)[t]) }))),
+            monsterAbs(m) ? h('span', { class: 'abc__abs', text: `絕防 ${fmt(monsterAbs(m))}` }) : null))),
       m.kind === 'boss'
         ? h('div', { class: 'row modes' },
             modeSelect('它的攻擊', BOSS_ATK_MODES, modes.atk, (v) => { modes.atk = v; render(); }),
@@ -481,16 +491,22 @@ export function createBattleView({ root, getState, commit }) {
         h('small', { class: 'stat__detail', text: d.parts[t].map((p) => `${p.label} ${fmt(p.value)}`).join(' + ') })))));
   }
 
+  const slot = (name, el) => { el.dataset.slot = name; return el; };
+
   function render() {
     const state = getState();
     feed?.destroy();
     const feedBox = h('div', { class: 'battle-feed' });
     const scrollY = root.scrollTop;
     root.replaceChildren(
+      // 電腦三欄：左角色、中戰鬥區、右擲骰紀錄；手機單欄時依 data-slot 排順序（見 blackgold.css）
       h('div', { class: 'page-wrap battle-layout' },
-        h('div', { class: 'battle-col' }, statusCard(state), resourceCard(state), potionCard(state), moveCard(state), skillCard(state), defenseCard(state)),
-        h('div', { class: 'battle-col' }, encounterCard(state),
-          h('section', { class: 'card' }, h('h2', { class: 'section-title', text: '戰鬥紀錄' }), feedBox))));
+        h('div', { class: 'battle-col battle-col--side' },
+          slot('status', statusCard(state)), slot('res', resourceCard(state)), slot('potion', potionCard(state)),
+          slot('defense', defenseCard(state)), slot('skill', skillCard(state))),
+        h('div', { class: 'battle-col battle-col--main' }, slot('enemy', encounterCard(state)), slot('move', moveCard(state))),
+        h('div', { class: 'battle-col battle-col--log' },
+          slot('log', h('section', { class: 'card' }, h('h2', { class: 'section-title', text: '戰鬥紀錄' }), feedBox)))));
     feed = mountFeed(feedBox, { limit: 8, empty: '出招或喝藥水後，結果會出現在這裡，也會出現在骰盤。' });
     root.scrollTop = scrollY;
   }

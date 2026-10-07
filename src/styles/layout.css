@@ -19,7 +19,7 @@ body {
 }
 
 body {
-  background: var(--ink);
+  background: var(--paper);
   color: var(--mist);
   font-family: var(--font-ui);
   display: flex;
@@ -42,7 +42,7 @@ body {
   gap: 1.5rem;
   padding: 0 1rem;
   border-bottom: 1px solid var(--ink-line);
-  background: var(--ink);
+  background: var(--paper);
   position: relative;
   z-index: 30;
 }
@@ -181,7 +181,7 @@ body {
 }
 
 .index-item:hover {
-  background: var(--ink);
+  background: var(--paper);
   color: var(--bronze);
 }
 

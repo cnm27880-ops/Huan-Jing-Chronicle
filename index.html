@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#14282c" />
+    <meta name="theme-color" content="#15120E" />
     <title>幻境編年史</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&family=Noto+Serif+TC:wght@400;600&family=Noto+Sans+TC:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Serif+TC:wght@400;600;900&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -21,7 +21,14 @@
         <a class="tab" href="#bag" data-view-link="bag">背包</a>
         <a class="tab" href="#gear" data-view-link="gear">裝備</a>
         <a class="tab" href="#battle" data-view-link="battle">戰鬥</a>
+        <!-- 手機底部導覽列的「更多」：修整日、骰盤、地點索引收在這裡（電腦版不顯示） -->
+        <button id="more-toggle" class="tab tab--more" type="button" aria-expanded="false" aria-controls="more-menu">更多</button>
       </nav>
+      <div id="more-menu" class="more-menu" hidden>
+        <a class="more-menu__item" href="#rest" data-view-link="rest">修整日</a>
+        <button class="more-menu__item" type="button" data-more-click="tray-toggle">骰盤</button>
+        <button class="more-menu__item" type="button" data-more-click="index-toggle">地點索引</button>
+      </div>
       <button id="tray-toggle" class="btn btn--ghost" type="button" aria-expanded="false" aria-controls="dice-tray" aria-label="骰盤">
         <span aria-hidden="true">🎲</span><span class="btn__label">骰盤</span>
       </button>

@@ -4,8 +4,8 @@
 // ============================================================
 import { h, fmt } from './dom.js';
 import { openSheet, closeSheet } from './sheet.js';
-import { itemTile, amountPicker, toast } from './controls.js';
-import { KNOWN_ITEMS, TIERS, tierOf, iconOf, plainName } from './items.js';
+import { itemTile, amountPicker, toast, rarityTag } from './controls.js';
+import { KNOWN_ITEMS, rarityOf, iconOf, plainName } from './items.js';
 import { FOODS, STOMACH_SLOTS } from '../game/rules.js';
 import { addItem, removeItem, countOf, eat } from '../game/engine.js';
 
@@ -13,7 +13,7 @@ export function openItemSheet(state, name, commit) {
   let amount = 1;
   const sheet = openSheet(plainName(name), (close) => {
     const have = countOf(state, name);
-    const tier = tierOf(name);
+    const tier = rarityOf(name);
     const def = state.keepsakes[name];
     const food = FOODS[name];
     const doEat = (ctx) => {
@@ -24,10 +24,10 @@ export function openItemSheet(state, name, commit) {
       sheet.refresh();
     };
     return h('div', { class: 'item-sheet' },
-      h('div', { class: 'item-sheet__hero', dataset: { tier: tier ?? 'none' } },
+      h('div', { class: `item-sheet__hero${tier !== null ? ' rarity' : ''}`, dataset: { tier: tier ?? 'none', rarity: tier ?? 'none' } },
         h('span', { class: 'item-sheet__icon', text: iconOf(name) }),
         h('div', {},
-          tier !== null ? h('p', { class: 'item-sheet__tier', text: `${TIERS[tier]}級` }) : null,
+          rarityTag(tier),
           h('p', { class: 'item-sheet__have' }, '持有 ', h('strong', { text: fmt(have) })))),
       def ? h('p', { class: 'item-sheet__desc', text: def.desc }) : null,
       food ? h('p', { class: 'item-sheet__desc', text: `效果：${food.effect}` }) : null,

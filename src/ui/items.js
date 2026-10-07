@@ -34,6 +34,20 @@ export function tierOf(name) {
   return null;
 }
 
+/**
+ * 畫面上的稀有度（0~4 → 初階／進階／大師／傳說／神話，和製作難度 簡單～神級 一一對應）。
+ * 和 tierOf 一樣，只有一處不同：技能書照名稱分級（使用者 2026-10-07 確認）。
+ * tierOf 是「原料優先」，初階技能書是普通配方的原料，會被算成進階，和名稱不符。
+ * 只影響顏色與標籤，不影響規則。
+ */
+export const RARITY_NAMES = ['初階', '進階', '大師', '傳說', '神話'];
+const BOOK_RARITY = { 殘缺: 0, 初階: 0, 進階: 1, 大師: 2, 傳說: 3, 神級: 4 };
+export function rarityOf(name) {
+  const book = String(name).match(/^(殘缺|初階|進階|大師|傳說|神級)技能書$/);
+  if (book) return BOOK_RARITY[book[1]];
+  return tierOf(name);
+}
+
 export function iconOf(name) {
   if (ICON[name]) return ICON[name];
   if (/武器$/.test(name)) return '⚔️';
