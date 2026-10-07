@@ -66,6 +66,10 @@ function newDayButton(state, commit) {
   return box;
 }
 
+/**
+ * 修整日頂部的角色狀態（和戰鬥頁一樣是固定在上方的 HUD）：
+ * 名字、天數、經驗、金幣；修整時顯示時間；熟練與胃袋（點空格吃東西）
+ */
 export function statusBar(state, commit, ctx = 'rest') {
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
   const prof = proficiency(state, ctx);
@@ -80,23 +84,25 @@ export function statusBar(state, commit, ctx = 'rest') {
           onclick: () => openFoodSheet(state, ctx, commit),
         }, '＋');
   });
-  return h('div', { class: 'status' },
-    h('div', { class: 'status__who' },
-      h('strong', { class: 'status__name', text: state.name }),
-      h('span', { class: 'status__meta', text: `第 ${state.loginDays} 天` })),
-    ctx === 'rest'
-      ? h('div', { class: 'status__time' },
-          h('span', { class: 'status__label', text: '時間' }),
-          h('span', { class: 'pips', role: 'img', 'aria-label': `剩餘時間 ${state.time} 點` },
-            Array.from({ length: MAX_TIME }, (_, i) => h('span', { class: `pip${i < state.time ? ' is-on' : ''}` }))),
-          h('strong', { text: `${state.time}` }),
-          newDayButton(state, commit))
-      : null,
-    h('div', { class: 'status__prof', title: prof.parts.map((p) => `${p.label} +${p.value}`).join('、') },
-      h('span', { class: 'status__label', text: ctx === 'rest' ? '修整熟練' : '跑團熟練' }),
-      h('strong', { text: prof.total }),
-      h('span', { class: 'mini-slots' }, slots)),
-    h('div', { class: 'status__num' }, h('span', { class: 'status__label', text: '經驗' }), h('strong', { text: fmt(state.exp) })),
-    h('div', { class: 'status__num' }, h('span', { class: 'status__label', text: '金幣' }), h('strong', { text: fmt(state.gold) }))
-  );
+  return h('div', { class: 'rest-hud' },
+    h('div', { class: 'rest-hud__top' },
+      h('h2', { class: 'rest-hud__name', text: state.name }),
+      h('span', { class: 'rest-hud__day', text: `第 ${state.loginDays} 天` }),
+      h('span', { class: 'rest-hud__num' }, h('small', { text: '經驗' }), h('strong', { class: 'num', text: fmt(state.exp) })),
+      h('span', { class: 'rest-hud__num' }, h('small', { text: '金幣' }), h('strong', { class: 'num', text: fmt(state.gold) }))),
+    h('div', { class: 'rest-hud__grid' },
+      ctx === 'rest'
+        ? h('div', { class: 'hud-box hud-box--time' },
+            h('div', { class: 'hud-box__head' },
+              h('span', { class: 'hud-box__label', text: '時間' }),
+              h('strong', { class: 'hud-box__value num', text: `${state.time} / ${MAX_TIME}` }),
+              newDayButton(state, commit)),
+            h('span', { class: 'pips', role: 'img', 'aria-label': `剩餘時間 ${state.time} 點` },
+              Array.from({ length: MAX_TIME }, (_, i) => h('span', { class: `pip${i < state.time ? ' is-on' : ''}` }))))
+        : null,
+      h('div', { class: 'hud-box hud-box--prof', title: prof.parts.map((p) => `${p.label} +${p.value}`).join('、') },
+        h('div', { class: 'hud-box__head' },
+          h('span', { class: 'hud-box__label', text: ctx === 'rest' ? '修整熟練' : '跑團熟練' }),
+          h('strong', { class: 'hud-box__value num', text: `+${prof.total}` })),
+        h('span', { class: 'mini-slots' }, slots))));
 }

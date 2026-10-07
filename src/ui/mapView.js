@@ -180,10 +180,6 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
     );
   }
 
-  function highlightRegion(regionId) {
-    hotspotLayer.dataset.highlight = regionId ?? '';
-  }
-
   function setActive(id) {
     hotspotLayer.querySelectorAll('.hotspot').forEach((el) => {
       el.classList.toggle('is-active', el.dataset.id === id);
@@ -194,7 +190,6 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
     reset,
     focusOn,
     renderHotspots,
-    highlightRegion,
     setActive,
     zoomIn: () => zoomAt(state.scale * 1.4, viewport.clientWidth / 2, viewport.clientHeight / 2, true),
     zoomOut: () => zoomAt(state.scale / 1.4, viewport.clientWidth / 2, viewport.clientHeight / 2, true),

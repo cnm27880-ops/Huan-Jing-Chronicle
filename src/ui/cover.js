@@ -7,7 +7,7 @@ import { h } from './dom.js';
 import { loginUrl, logout } from '../api/auth.js';
 
 export function showCover({ onEnter, notice, onUserChange } = {}) {
-  const background = [...document.querySelectorAll('.topbar, main, #index-panel, #dice-tray')];
+  const background = [...document.querySelectorAll('.topbar, main, #dice-tray')];
   const setInert = (v) => background.forEach((el) => { el.inert = v; });
 
   const enter = h('button', { type: 'button', class: 'btn btn--primary cover__btn', onclick: close }, '以訪客進入');

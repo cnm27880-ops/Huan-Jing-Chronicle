@@ -21,19 +21,15 @@
         <a class="tab" href="#bag" data-view-link="bag">背包</a>
         <a class="tab" href="#gear" data-view-link="gear">裝備</a>
         <a class="tab" href="#battle" data-view-link="battle">戰鬥</a>
-        <!-- 手機底部導覽列的「更多」：裝備、骰盤、地點索引收在這裡（電腦版不顯示） -->
+        <!-- 手機底部導覽列的「更多」：裝備、骰盤收在這裡（電腦版不顯示） -->
         <button id="more-toggle" class="tab tab--more" type="button" aria-expanded="false" aria-controls="more-menu">更多</button>
       </nav>
       <div id="more-menu" class="more-menu" hidden>
         <a class="more-menu__item" href="#gear" data-view-link="gear">裝備</a>
         <button class="more-menu__item" type="button" data-more-click="tray-toggle">骰盤</button>
-        <button class="more-menu__item" type="button" data-more-click="index-toggle">地點索引</button>
       </div>
       <button id="tray-toggle" class="btn btn--ghost" type="button" aria-expanded="false" aria-controls="dice-tray" aria-label="骰盤">
         <span aria-hidden="true">🎲</span><span class="btn__label">骰盤</span>
-      </button>
-      <button id="index-toggle" class="btn btn--ghost" type="button" aria-expanded="false" aria-controls="index-panel" aria-label="地點索引">
-        <span aria-hidden="true">☷</span><span class="btn__label">地點索引</span>
       </button>
     </header>
 
@@ -54,9 +50,6 @@
       <p class="map-hint">點地名查看情報，拖曳移動，滾輪或雙指縮放</p>
 
 
-      <aside id="index-panel" class="index-panel" data-open="false" aria-label="地點索引">
-        <div id="index-list" class="index-list"></div>
-      </aside>
 
       <aside id="dossier" class="dossier" data-open="false" data-theme="sea" aria-hidden="true" aria-label="地點情報">
         <button class="dossier__close" type="button" data-dossier-close>關閉</button>

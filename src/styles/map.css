@@ -74,15 +74,6 @@
   box-shadow: 0 0 0 3px var(--bronze), 0 0 18px 4px rgba(var(--gold-rgb), 0.7);
 }
 
-/* 索引滑過某區域時，地圖上同區域的地點一起亮起 */
-.map-hotspots[data-highlight='west'] .hotspot[data-region='west'],
-.map-hotspots[data-highlight='north'] .hotspot[data-region='north'],
-.map-hotspots[data-highlight='east'] .hotspot[data-region='east'],
-.map-hotspots[data-highlight='south'] .hotspot[data-region='south'],
-.map-hotspots[data-highlight='sea'] .hotspot[data-region='sea'] {
-  box-shadow: 0 0 0 2px var(--bronze);
-}
-
 /* ---------- 縮放按鈕 ---------- */
 .zoom-controls {
   position: absolute;

@@ -38,16 +38,7 @@ button:active { transform: scale(.97); }
 .zoom-btn:hover { color: var(--gold); background: var(--input); }
 .map-hint { left: 50%; bottom: 16px; padding: 5px 10px; color: var(--dim); background: rgba(var(--paper-rgb), .88); border: 1px solid var(--line); border-radius: 999px; font-size: .72rem; }
 
-/* ---------- 地點索引與資訊卡 ---------- */
-.index-panel { width: min(300px, 86vw); padding: 10px 0 20px; background: rgba(var(--paper-rgb), .98); border-right: 1px solid var(--line); box-shadow: 10px 0 25px rgba(var(--shadow-rgb), .35); }
-.index-group { padding: 10px 12px 2px; }
-.index-group__title { padding-left: 9px; color: var(--text); font-size: 1rem; border-left: 3px solid var(--gold); letter-spacing: .04em; }
-.index-group[data-region='west'] .index-group__title { border-color: var(--region-west); }
-.index-group[data-region='north'] .index-group__title { border-color: var(--blue); }
-.index-group[data-region='east'] .index-group__title { border-color: var(--gold); }
-.index-group[data-region='south'] .index-group__title { border-color: var(--lilac); }
-.index-item { padding: 7px 8px; color: var(--muted); border: 1px solid transparent; border-radius: 6px; }
-.index-item:hover { color: var(--text); background: var(--card); border-color: var(--line-focus); transform: none; }
+/* ---------- 資訊卡 ---------- */
 .dossier { width: min(460px, 100%); background: rgba(var(--paper-rgb), .98); border-left: 1px solid var(--line-focus); box-shadow: -15px 0 35px rgba(var(--shadow-rgb), .48); }
 .dossier__close { margin: 12px 12px 0; color: var(--muted); background: var(--card); border-color: var(--line); border-radius: 6px; }
 .dossier__close:hover { color: var(--gold); border-color: var(--gold-deep); }
@@ -93,7 +84,7 @@ button:active { transform: scale(.97); }
 
 @media (max-width: 700px) {
   .topbar { height: 58px; padding: 0 8px; gap: 8px; } .brand { font-size: 1rem; letter-spacing: .08em; padding-left: 16px; } .brand::after { font-size: .35rem; letter-spacing: .1em; }
-  .tab { padding: 7px 8px; font-size: .76rem; } #index-toggle { padding: 7px 8px; font-size: .75rem; }
+  .tab { padding: 7px 8px; font-size: .76rem; }
   .atlas { padding: 5px; } .map-viewport { inset: 5px; } .map-hint { left: 8px; transform: none; max-width: calc(100% - 80px); white-space: normal; }
   .zoom-controls { right: 8px; bottom: 8px; }
   .dossier__body { padding-inline: 16px; } .dossier__title { font-size: 1.9rem; }

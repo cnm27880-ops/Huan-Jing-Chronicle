@@ -14,7 +14,7 @@
   .brand { padding: 0 4px 0 16px; font-size: 1.05rem; letter-spacing: .08em; }
   .brand::after { display: none; }
   .tab { padding: 8px 9px; font-size: .8rem; }
-  #index-toggle, #tray-toggle { padding: 8px 9px; font-size: .78rem; }
+  #tray-toggle { padding: 8px 9px; font-size: .78rem; }
 }
 
 /* ---------- 頁面共用 ---------- */

@@ -606,7 +606,6 @@ button.tile:hover { border-color: var(--bronze); border-left-color: var(--t); }
 
 /* 頂部選單在手機上縮小 */
 @media (max-width: 640px) {
-  #index-toggle { padding: 0.4rem 0.6rem; font-size: 0.85rem; }
   .tabs { gap: 0; }
   .tab { padding: 0.4rem 0.5rem; }
 }

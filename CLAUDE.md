@@ -42,9 +42,11 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/state/rollLog.js` | 擲骰紀錄，**畫面與房間之間唯一的接線點**：房間模式走 WebSocket、伺服器擲骰；本機模式（沒登入／連不上）照舊存 localStorage |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |
-| `src/ui/restView.js` | 修整日頁面 |
+| `src/ui/restView.js` | 修整日頁面：上方 HUD、採集／製作／跑團檢定分頁、設定步驟＋大按鈕、結果卡 |
+| `src/ui/statusBar.js` | 修整日的 HUD（時間、熟練、胃袋）與「吃東西」面板 |
 | `src/ui/bagView.js` | 背包頁面 |
 | `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、整理 |
+| `src/ui/reveal.js` | 鑑定開獎動畫（翻牌、數值跳動；只是畫面，數值鑑定時就已存好） |
 | `src/ui/battleView.js` | 戰鬥頁：頂部固定列（生命／資源）、行動／紀錄／狀態三分頁、招式、藥水、遭遇戰 |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
 | `src/ui/diceTray.js` | 骰盤抽屜：一鍵技能檢定、自訂骰、紀錄 |
@@ -55,11 +57,10 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/data/locations.js` | 地點內容與揭露狀態。格式見 `src/data/CLAUDE.md` |
 | `public/map-data/markers.json` | 地圖標記位置（百分比座標、類型、簡介、設定集 id） |
 | `src/ui/mapView.js` | 地圖拖曳、縮放、熱點 |
-| `src/ui/dossier.js` | 地點情報面板（點地圖標記或索引直接打開） |
-| `src/ui/indexList.js` | 地點索引清單 |
+| `src/ui/dossier.js` | 地點情報面板（點地圖標記打開） |
 | `src/styles/theme.css` | **主題檔**：全站色碼、字體、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
 | `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線） |
-| `src/styles/layout.css` | 頂部列、索引面板 |
+| `src/styles/layout.css` | 頂部列、按鈕 |
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |
 | `src/styles/pages.css` | 修整日、背包頁面 |

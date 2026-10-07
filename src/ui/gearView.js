@@ -15,6 +15,7 @@ import {
 import { derivedStats } from '../game/stats.js';
 import { SKILL_CATALOG, RULE_SKILLS, moveFromCatalog } from '../game/skills.js';
 import { publish, rollWith } from '../state/rollLog.js';
+import { openReveal } from './reveal.js';
 
 const tierIndex = (g) => GEAR_TIERS.indexOf(g.tier);
 const SLOT_ORDER = { weapon: 0, armor: 1, accessory: 2 };
@@ -96,18 +97,25 @@ export function createGearView({ root, getState, commit }) {
   }
 
   // ---------- 裝備欄 ----------
+  /** 裝備屬性：每條屬性一個小格（屬性名＋數值），特殊飾品沒有數值時顯示文字 */
+  const effectChips = (g) => h('div', { class: 'fx-chips' },
+    g.effects.length
+      ? [
+          g.special ? h('span', { class: 'fx-chip fx-chip--special', text: '特殊' }) : null,
+          ...g.effects.map((e) => h('span', { class: 'fx-chip' }, h('span', { text: e.stat }), h('strong', { class: 'num', dataset: { final: e.value }, text: `+${fmt(e.value)}` }))),
+        ]
+      : h('span', { class: 'fx-chip fx-chip--special', text: effectText(g) }));
+
   function slotCard(state, key) {
     const g = state.equipment[key];
     return h('div', { class: `gear-slot${g ? ' rarity' : ' is-empty'}`, dataset: { tier: g ? tierIndex(g) : 'none', rarity: g ? tierIndex(g) : 'none' } },
-      h('span', { class: 'gear-slot__label', text: EQUIP_SLOT_LABEL[key] }),
-      g
-        ? [
-            h('strong', { class: 'gear-slot__name rarity__name', text: `${iconOf(gearName(g))} ${gearName(g)}` }),
-            rarityTag(tierIndex(g)),
-            h('span', { class: 'gear-slot__effect', text: effectText(g) }),
-            h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { unequip(state, key); commit(); } }, '卸下'),
-          ]
-        : h('span', { class: 'gear-slot__effect', text: '空著' }));
+      h('span', { class: 'gear-slot__icon', 'aria-hidden': 'true', text: g ? iconOf(gearName(g)) : '＋' }),
+      h('div', { class: 'gear-slot__head' },
+        h('span', { class: 'gear-slot__label', text: EQUIP_SLOT_LABEL[key] }),
+        g ? h('strong', { class: 'gear-slot__name rarity__name', text: gearName(g) }) : h('span', { class: 'gear-slot__name', text: '空著' }),
+        g ? rarityTag(tierIndex(g)) : null),
+      g ? h('button', { type: 'button', class: 'btn btn--ghost btn--small gear-slot__off', onclick: () => { unequip(state, key); commit(); } }, '卸下') : null,
+      g ? effectChips(g) : h('p', { class: 'gear-slot__empty', text: '從下方「背包裝備」選一件裝上' }));
   }
 
   function slotsCard(state) {
@@ -135,6 +143,22 @@ export function createGearView({ root, getState, commit }) {
       ].filter(Boolean),
     }, { draw });
     commit();
+    // 開獎動畫（只是畫面；數值上面已經擲好存好）
+    // 超過 12 件時只翻數值最高的 12 件（保持鑑定順序，最好的一定在裡面）
+    const top = new Set([...rows].sort((a, b) => gearValue(b.g) - gearValue(a.g)).slice(0, 12).map((r) => r.g.id));
+    const picked = rows.filter((r) => top.has(r.g.id));
+    const order = picked.map((r) => r.g.id);
+    openReveal({
+      title: `${name} ×${fmt(made.length)}`,
+      cards: picked.map(({ g, cmp }) => ({
+        tier: tierIndex(g), icon: iconOf(gearName(g)), name: gearName(g), body: effectChips(g), badge: BADGE[cmp],
+        note: g.roll?.d4 === 4 && g.slot !== 'accessory' ? '1D4 擲出 4' : null,
+      })),
+      best: order.indexOf(best.id),
+      summary: made.length > 12
+        ? `只翻開數值最高的 12 件；共 ${fmt(made.length)} 件，其中 ${fmt(upgrades)} 件比身上好，全部在下方「背包裝備」。`
+        : `共 ${fmt(made.length)} 件，其中 ${fmt(upgrades)} 件比身上好。`,
+    });
   }
 
   function identifyCard(state) {
