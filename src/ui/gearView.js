@@ -13,6 +13,7 @@ import {
   identifiable, identify, equip, unequip, discard, compareGear, findJunk, gearName, effectText, gearDiceText,
 } from '../game/equipment.js';
 import { derivedStats } from '../game/stats.js';
+import { SKILL_CATALOG, RULE_SKILLS, moveFromCatalog } from '../game/skills.js';
 import { publish, rollWith } from '../state/rollLog.js';
 
 const tierIndex = (g) => GEAR_TIERS.indexOf(g.tier);
@@ -24,10 +25,11 @@ const BADGE = {
   same: ['和身上一樣', 'bad'],
   different: ['不同屬性', 'neutral'],
 };
+const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const FILTERS = [['all', '全部'], ['weapon', '武器'], ['armor', '防具'], ['accessory', '飾品']];
 
 export function createGearView({ root, getState, commit }) {
-  const ui = { filter: 'all', batch: null };
+  const ui = { filter: 'all', batch: null, newSkill: '', newSkillLv: 1, skillBoxOpen: false };
 
   const gearValue = (g) => g.effects.reduce((a, e) => a + e.value, 0);
 
@@ -54,6 +56,43 @@ export function createGearView({ root, getState, commit }) {
       group('防禦', DEF_STATS),
       group('資源', RESOURCE_STATS),
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => openFoodSheet(state, 'session', commit) }, '🍽️ 跑團胃袋吃東西'));
+  }
+
+  // ---------- 技能等級（原本在戰鬥頁，功能不變） ----------
+  function skillCard(state) {
+    const entries = Object.entries(state.skills ?? {});
+    return h('section', { class: 'card' },
+      h('h2', { class: 'section-title', text: '技能等級（會影響戰鬥規則的）' }),
+      h('p', { class: 'hint', text: '暴徒、魔女、終焉武裝、域外魔祖、不可名狀是被動規則；納米醫療蜂、生生造化印、吞天噬血陣、萬物歸一的等級決定威力。其他技能的「每級加數值」已包含在基礎數值裡。' }),
+      entries.length
+        ? h('ul', { class: 'skill-list' }, entries.map(([name, lv]) => h('li', { class: 'skill-row' },
+            h('strong', { text: name }),
+            h('label', { class: 'extra' }, h('span', { text: '等級' }),
+              h('input', { class: 'field', type: 'number', min: 1, max: 10, value: lv, onchange: (e) => { state.skills[name] = Math.max(1, Math.min(10, num(e.target.value, 1))); commit(); } })),
+            h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { delete state.skills[name]; commit(); } }, '移除'))))
+        : h('p', { class: 'notice', text: '還沒有登錄技能。' }),
+      h('details', {
+        class: 'add-box', open: ui.skillBoxOpen,
+        ontoggle: (e) => { ui.skillBoxOpen = e.target.open; },
+      },
+      h('summary', { text: '＋ 登錄技能 / 從技能庫加入招式' }),
+      h('div', { class: 'row' },
+        h('select', { class: 'field', 'aria-label': '技能', onchange: (e) => { ui.newSkill = e.target.value; } },
+          h('option', { value: '', text: '選擇技能…' }),
+          RULE_SKILLS.filter((n) => !(n in (state.skills ?? {}))).map((n) => h('option', { value: n, selected: ui.newSkill === n ? true : null, text: n }))),
+        h('input', { class: 'field', type: 'number', min: 1, max: 10, value: ui.newSkillLv, 'aria-label': '等級', onchange: (e) => { ui.newSkillLv = Math.max(1, Math.min(10, num(e.target.value, 1))); } }),
+        h('button', {
+          type: 'button', class: 'btn btn--primary btn--small',
+          onclick: () => {
+            const n = ui.newSkill;
+            if (!n) return toast('先選一個技能。');
+            state.skills = { ...state.skills, [n]: ui.newSkillLv };
+            // 有招式的技能（技能庫）自動加進招式清單
+            if (SKILL_CATALOG[n] && !state.moves.some((m) => m.skill === n)) state.moves.push(moveFromCatalog(n));
+            ui.newSkill = '';
+            commit();
+          },
+        }, '加入'))));
   }
 
   // ---------- 裝備欄 ----------
@@ -193,7 +232,7 @@ export function createGearView({ root, getState, commit }) {
     root.replaceChildren(
       h('div', { class: 'page-wrap gear-layout' },
         h('div', { class: 'gear-col' }, slotsCard(state), identifyCard(state)),
-        h('div', { class: 'gear-col' }, panelCard(state), ownedCard(state))));
+        h('div', { class: 'gear-col' }, panelCard(state), skillCard(state), ownedCard(state))));
     root.scrollTop = scrollY;
   }
 

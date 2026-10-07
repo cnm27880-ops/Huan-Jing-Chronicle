@@ -45,7 +45,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/restView.js` | 修整日頁面 |
 | `src/ui/bagView.js` | 背包頁面 |
 | `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、整理 |
-| `src/ui/battleView.js` | 戰鬥頁：血量、藥水、招式、遭遇戰 |
+| `src/ui/battleView.js` | 戰鬥頁：頂部固定列（生命／資源）、行動／紀錄／狀態三分頁、招式、藥水、遭遇戰 |
+| `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
 | `src/ui/diceTray.js` | 骰盤抽屜：一鍵技能檢定、自訂骰、紀錄 |
 | `src/ui/rollFeed.js` | 擲骰紀錄的畫面（骰盤與戰鬥頁共用）：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要 |
 | `src/ui/dom.js` | 建立元素的小工具 |

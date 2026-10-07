@@ -371,16 +371,9 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .abc__cell { display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 2px 4px; background: var(--paper); border-radius: 6px; }
 .abc__cell b { color: var(--gold); font-size: 0.8rem; }
 .abc__abs { grid-column: 1 / -1; color: var(--soft); font-size: 0.78rem; }
-.move-tabs { display: none; }
 
-@media (min-width: 1100px) {
-  .battle-layout { grid-template-columns: 280px minmax(0, 1fr) 360px; max-width: none; }
-  .battle-col--log { position: sticky; top: 12px; max-height: calc(100vh - var(--topbar-h) - 24px); overflow-y: auto; }
-}
 @media (min-width: 760px) and (max-width: 1099px) {
   .page-wrap { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 12px; }
-  .battle-layout { grid-template-columns: 280px minmax(0, 1fr); }
-  .battle-col--log { grid-column: 2; }
 }
 
 /* ============================================================
@@ -394,32 +387,6 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
   /* 頁首：分頁移到底部後，品牌字放左邊、骰盤與索引靠右 */
   .brand { display: block; margin-right: auto; padding: 0; font-size: 1.15rem; letter-spacing: 0.2em; }
   .brand::after { display: none; }
-
-  /* 戰鬥頁：三欄拆開，依實戰順序排 */
-  .battle-layout { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
-  .battle-col { display: contents; }
-  [data-slot='status'] { order: 1; }
-  [data-slot='res'] { order: 2; }
-  [data-slot='enemy'] { order: 3; }
-  [data-slot='move'] { order: 4; }
-  [data-slot='log'] { order: 5; }
-  [data-slot='potion'] { order: 6; }
-  [data-slot='defense'] { order: 7; }
-  [data-slot='skill'] { order: 8; }
-
-  /* 資源條兩欄並排 */
-  [data-slot='res'] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 10px; }
-  [data-slot='res'] > :not(.res-row) { grid-column: 1 / -1; }
-  .res-row { grid-template-columns: minmax(0, 1fr) 5.2rem; grid-template-areas: 'name input' 'bar bar'; gap: 4px; }
-  .res-row__name { grid-area: name; }
-  .res-row__bar { grid-area: bar; }
-  .res-row__input { grid-area: input; }
-
-  /* 招式：A／B／C 軌分頁 */
-  .move-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 8px; }
-  .move-list[data-filter='A'] .move:not([data-tracks*='A']),
-  .move-list[data-filter='B'] .move:not([data-tracks*='B']),
-  .move-list[data-filter='C'] .move:not([data-tracks*='C']) { display: none; }
 
   /* 敵人：攻擊、防禦上下排，防禦三軌並排 */
   .monster__stats { grid-template-columns: minmax(0, 1fr); }
@@ -498,6 +465,130 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
   .btn, .seg, .toggle, .chip, .field, .amount__chip, .amount__input, .move__pick, .sheet__close, .dossier__close,
   .status__day, .potion, .diff, .skill-btn, .bag-group__head, .index-item, #tray-toggle, #index-toggle { min-height: 44px; }
   .zoom-btn, .amount__step, .info-chip__btn { min-width: 44px; min-height: 44px; }
+}
+
+/* ============================================================
+   戰鬥頁新版：頂部固定列、三個分頁、招式清單、數值調整面板
+   ============================================================ */
+.bt-root { max-width: 1480px; margin: 0 auto; padding: 0 12px 12px; }
+
+/* 頂部固定列：在 #view-battle 的捲動區裡黏在最上面 */
+.bt-hud {
+  position: sticky; top: 0; z-index: 5;
+  display: grid; gap: 6px;
+  margin: 0 -12px 10px; padding: 8px 12px 10px;
+  background: var(--paper2); border-bottom: 1px solid var(--line3); box-shadow: 0 6px 14px var(--shadow);
+}
+.bt-hud__top { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.bt-hud__name { margin: 0; font-size: 1rem; color: var(--gold); letter-spacing: 0.08em; }
+.bt-hud__res { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+
+.hud-meter {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 6px;
+  min-height: var(--touch); padding: 6px 8px; text-align: left; font: inherit; color: var(--ink);
+  background: var(--card); border: 1px solid var(--line3); border-radius: 10px; cursor: pointer;
+}
+.hud-meter:hover { border-color: var(--gold); }
+.hud-meter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.hud-meter__name { font-size: 0.78rem; color: var(--soft); }
+.hud-meter__val { font-size: 0.82rem; text-align: right; white-space: nowrap; }
+.hud-meter__bar { grid-column: 1 / -1; height: 6px; background: var(--paper); border-radius: var(--r-pill); overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
+.hud-meter__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--gold2), var(--gold)); transition: width 0.25s ease; }
+.hud-meter--hp { padding: 8px 10px; }
+.hud-meter--hp .hud-meter__name { font-size: 0.9rem; color: var(--ink2); }
+.hud-meter--hp .hud-meter__val { font-size: 1rem; }
+.hud-meter--hp .hud-meter__bar { height: 10px; }
+.hud-meter--hp .hud-meter__fill { background: linear-gradient(90deg, var(--rose2), var(--rose)); }
+.hud-meter--tox .hud-meter__fill { background: linear-gradient(90deg, var(--lilac), var(--lilac)); }
+.hud-meter.is-bad { border-color: var(--rose2); }
+.hud-meter--tox.is-bad .hud-meter__fill { background: var(--rose); }
+
+/* 三個分頁（手機）：頂部膠囊 */
+.bt-tabs {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-bottom: 10px; padding: 4px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-pill);
+}
+.bt-tab {
+  min-height: var(--touch); font: inherit; font-weight: 700; color: var(--soft);
+  background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer;
+}
+.bt-tab:hover { color: var(--gold); }
+.bt-tab[aria-selected='true'] { color: var(--on-gold); background: var(--gold); }
+.bt-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.bt-pane { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.bt-layout[data-pane='action'] > .bt-pane:not([data-id='action']),
+.bt-layout[data-pane='log'] > .bt-pane:not([data-id='log']),
+.bt-layout[data-pane='state'] > .bt-pane:not([data-id='state']) { display: none; }
+
+/* 平板（760–1100）兩欄、電腦（≥1100）三欄：不用分頁，全部並排 */
+@media (min-width: 760px) {
+  .bt-root { padding: 0 12px 12px; }
+  .bt-tabs { display: none; }
+  .bt-hud__res { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+  .bt-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); grid-template-areas: 'state action' 'log action'; gap: 12px; align-items: start; }
+  .bt-layout > .bt-pane { display: flex !important; }
+  .bt-pane[data-id='state'] { grid-area: state; }
+  .bt-pane[data-id='action'] { grid-area: action; }
+  .bt-pane[data-id='log'] { grid-area: log; }
+}
+@media (min-width: 1100px) {
+  .bt-layout { grid-template-columns: 300px minmax(0, 1fr) 360px; grid-template-areas: 'state action log'; }
+  .bt-pane[data-id='log'] {
+    position: sticky; top: calc(var(--bt-hud-h, 0px) + 10px);
+    max-height: calc(100vh - var(--topbar-h) - var(--bt-hud-h, 0px) - 20px); overflow-y: auto;
+  }
+}
+
+/* 招式清單：平面、軌道用小標籤 */
+.move__pick { grid-template-columns: minmax(0, 1fr) auto; text-align: left; }
+.move__tags { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px; }
+.move__dice { grid-column: 2; grid-row: 1; }
+.move__name {
+  grid-column: 1 / -1; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.move[data-open='true'] .move__name { display: block; overflow: visible; -webkit-line-clamp: unset; line-clamp: unset; }
+.move__detail { white-space: pre-wrap; }
+.move__lack { color: var(--rose); }
+.move.is-short .move__pick { cursor: not-allowed; }
+.move.is-short .move__pick > :not(.move__lack) { opacity: 0.5; filter: grayscale(0.6); }
+.trk {
+  display: inline-block; min-width: 1.6em; padding: 0 6px; text-align: center; font-size: 0.72rem; font-weight: 700; line-height: 1.5;
+  color: var(--ink2); background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill);
+}
+.trk[data-track='A'] { color: var(--gold); background: var(--goldbg); border-color: var(--gold2); }
+.trk[data-track='B'] { color: var(--sky); background: var(--skybg); border-color: var(--sky2); }
+.trk[data-track='C'] { color: var(--lilac); background: rgba(var(--lilac-rgb), 0.14); border-color: rgba(var(--lilac-rgb), 0.5); }
+.witch-rest { width: 100%; min-height: 48px; margin-bottom: 10px; font-weight: 700; box-shadow: var(--hover-ring); }
+
+/* 數值調整面板：手機從底部彈出，電腦版是小彈出框 */
+.vsheet { position: fixed; inset: 0; z-index: 90; }
+.vsheet__backdrop { position: absolute; inset: 0; background: rgba(var(--shadow-rgb), 0.55); opacity: 0; transition: opacity 0.2s ease; }
+.vsheet[data-open='true'] .vsheet__backdrop { opacity: 1; }
+.vsheet__panel {
+  position: fixed; left: 0; right: 0; bottom: 0; display: grid; gap: 10px; max-height: 88vh; overflow-y: auto; outline: none;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--paper2); border: 1px solid var(--line3); border-bottom: 0; border-radius: var(--r-panel) var(--r-panel) 0 0;
+  box-shadow: 0 -10px 30px var(--shadow); transform: translateY(100%); transition: transform 0.22s ease;
+}
+.vsheet[data-open='true'] .vsheet__panel { transform: none; }
+.vsheet__title { margin: 0; font-size: 1.1rem; color: var(--gold); }
+.vsheet__read { display: flex; align-items: center; gap: 8px; font-size: 1.2rem; }
+.vsheet__input { width: 7rem; min-height: var(--touch); font-size: 1.2rem; text-align: right; }
+.vsheet__was { margin: 0; color: var(--soft); font-size: 0.82rem; }
+.vsheet__steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.vsheet__step, .vsheet__full, .vsheet__actions .btn { min-height: var(--touch); }
+.vsheet__step { padding-inline: 0; }
+.vsheet__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.vsheet__actions .btn { min-height: 48px; }
+@media (min-width: 760px) {
+  .vsheet__backdrop { background: transparent; }
+  .vsheet__panel { right: auto; bottom: auto; width: min(320px, calc(100vw - 16px)); border: 1px solid var(--line3); border-radius: var(--r-panel); box-shadow: 0 12px 32px var(--shadow); transform: translateY(-6px); opacity: 0; transition: transform 0.15s ease, opacity 0.15s ease; }
+  .vsheet[data-open='true'] .vsheet__panel { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vsheet__backdrop, .vsheet__panel, .hud-meter__fill { transition: none; }
 }
 
 /* ---------- 地圖、地點索引、設定集 ---------- */
