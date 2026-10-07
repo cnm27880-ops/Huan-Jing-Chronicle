@@ -144,6 +144,9 @@ function request(msg) {
   });
 }
 
+/** 給 charSync 用：送一則要等回覆的房間訊息（沒連上房間會丟 RollError） */
+export const roomRequest = request;
+
 function addRoomEvent(ev) {
   if (roomLog.some((e) => e.id === ev.id)) return;
   roomLog.unshift(ev);
@@ -170,7 +173,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': {
+    case 'rolled': case 'drawn': case 'posted': case 'char': case 'charSaved': case 'charList': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;

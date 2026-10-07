@@ -302,3 +302,81 @@ test('登出（stopRoom）：關閉連線並回到本機模式', async () => {
   assert.equal(a.getRoomStatus().phase, 'local');
   assert.equal(hub.sockets.size, 0);
 });
+
+// ---------- 角色存檔同步（階段 2）----------
+test('角色同步：全新裝置登入，伺服器有存檔就直接採用，不問', async () => {
+  resetHub(); store.clear();
+  hub.core.onCharPut(P1, { base: 0, data: { name: '雲端角色', hp: 7 } });
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t1');
+  let adopted = null; let asked = 0;
+  createCharSync({ getState: () => ({ name: '示範' }), adopt: (d) => { adopted = d; }, hasLocalSave: () => false, confirmFn: () => { asked++; return true; }, room: m });
+  await flush();
+  assert.equal(adopted?.name, '雲端角色');
+  assert.equal(asked, 0);
+  assert.equal(JSON.parse(store.get('huanjing:character:sync:v1')).version, 1);
+  stopAll(m);
+});
+
+test('角色同步：伺服器沒有存檔就上傳本機的；之後修改會在 1.5 秒後上傳新版本', async () => {
+  resetHub(); store.clear();
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t2');
+  const state = { name: '本機角色', hp: 3 };
+  const sync = createCharSync({ getState: () => state, adopt: () => assert.fail('不該採用伺服器'), hasLocalSave: () => true, room: m });
+  await flush();
+  assert.equal(hub.core.charRow('300').version, 1);
+  state.hp = 2; sync.markDirty(); sync.markDirty();
+  mock.timers.tick(1000); await flush();
+  assert.equal(hub.core.charRow('300').version, 1); // 防抖：還沒到 1.5 秒
+  mock.timers.tick(600); await flush();
+  assert.equal(hub.core.charRow('300').version, 2);
+  assert.equal(JSON.parse(hub.core.charRow('300').json).hp, 2);
+  assert.equal(JSON.parse(store.get('huanjing:character:sync:v1')).dirty, false);
+  stopAll(m);
+});
+
+test('角色同步：兩邊都有不同存檔時問玩家；選伺服器就採用，選本機就覆蓋伺服器', async () => {
+  for (const [choice, expectAdopt, expectHp] of [[true, true, 7], [false, false, 3]]) {
+    resetHub(); store.clear();
+    hub.core.onCharPut(P1, { base: 0, data: { name: '雲端角色', hp: 7 } });
+    const m = await browser(P1);
+    const { createCharSync } = await import(`../src/state/charSync.js?t3${choice}`);
+    let adopted = null; let question = '';
+    createCharSync({ getState: () => ({ name: '本機角色', hp: 3 }), adopt: (d) => { adopted = d; }, hasLocalSave: () => true, confirmFn: (q) => { question = q; return choice; }, room: m });
+    await flush();
+    assert.match(question, /第 1 版/);
+    assert.equal(Boolean(adopted), expectAdopt);
+    assert.equal(JSON.parse(hub.core.charRow('300').json).hp, expectHp);
+    stopAll(m);
+  }
+});
+
+test('角色同步：另一台裝置先存了（本機版本過舊且有修改）→ 不會悄悄覆蓋，會詢問', async () => {
+  resetHub(); store.clear();
+  hub.core.onCharPut(P1, { base: 0, data: { name: '角色', hp: 1 } });
+  hub.core.onCharPut(P1, { base: 1, data: { name: '角色', hp: 2 } }); // 手機存到第 2 版
+  store.set('huanjing:character:sync:v1', JSON.stringify({ uid: '300', version: 1, dirty: true })); // 電腦停在第 1 版且有改動
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t4');
+  let asked = 0;
+  createCharSync({ getState: () => ({ name: '角色', hp: 99 }), adopt: () => {}, hasLocalSave: () => true, confirmFn: () => { asked++; return true; }, room: m });
+  await flush();
+  assert.equal(asked, 1);
+  assert.equal(JSON.parse(hub.core.charRow('300').json).hp, 2); // 伺服器的沒被蓋掉
+  stopAll(m);
+});
+
+test('角色同步：GM 可以列出並讀取玩家角色，玩家不行', async () => {
+  resetHub(); store.clear();
+  hub.core.onCharPut(P1, { base: 0, data: { name: '玩家角色', hp: 5 } });
+  const gm = await browser(GM);
+  const p = await browser(P1);
+  const sync = await import('../src/state/charSync.js?t5');
+  assert.equal(typeof sync.listCharacters, 'function'); // 預設綁 rollLog.js，這裡改直接用房間請求驗證權限
+  const list = await gm.roomRequest({ t: 'charList' });
+  assert.equal(list.list[0].charName, '玩家角色');
+  assert.equal((await gm.roomRequest({ t: 'charGet', uid: '300' })).data.hp, 5);
+  await assert.rejects(p.roomRequest({ t: 'charList' }), /GM/);
+  stopAll(gm, p);
+});

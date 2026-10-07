@@ -14,7 +14,7 @@ import { avatarUrl } from './avatar.js';
 import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
-  MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER,
+  MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -22,6 +22,8 @@ const POST_KINDS = new Set(['note', 'skill', 'attack', 'defend', 'potion', 'iden
 const TONES = new Set(['ok', 'fail', 'crit', 'warn']);
 const SKILLS = new Set([...LIFE_SKILLS, ...ART_SKILLS]);
 const RID = /^[A-Za-z0-9_-]{1,40}$/;
+const UID = /^\d{1,25}$/;
+const CHAR_PREFIX = '{"t":"charPut"'; // 前端組訊息時 t 一定排第一；只有這種訊息可以放寬大小上限
 
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const cleanStr = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
@@ -44,6 +46,7 @@ export class RoomCore {
     db.exec('CREATE TABLE IF NOT EXISTS members (uid TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, id TEXT NOT NULL, t INTEGER NOT NULL, json TEXT NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+    db.exec('CREATE TABLE IF NOT EXISTS characters (uid TEXT PRIMARY KEY, json TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
   }
 
   // ---------- 成員與權限 ----------
@@ -159,7 +162,7 @@ export class RoomCore {
     if (typeof user?.exp === 'number' && this.now() >= user.exp) return closing(4401, 'session expired');
     if (this.accessState(user.uid) !== 'ok') return closing(4403, 'not allowed');
     if (typeof raw !== 'string') return closing(1003, 'text only');
-    if (raw.length > MAX_MESSAGE_CHARS) return closing(1009, 'message too big');
+    if (raw.length > (raw.startsWith(CHAR_PREFIX) ? MAX_CHAR_MESSAGE_CHARS : MAX_MESSAGE_CHARS)) return closing(1009, 'message too big');
     const rate = this.rate(user.uid);
     if (rate === 'abuse') return closing(4429, 'rate limit');
     if (rate === 'limited') return err(undefined, 'rate_limited', '操作太快了，請稍等一下。');
@@ -167,6 +170,7 @@ export class RoomCore {
     let msg;
     try { msg = JSON.parse(raw); } catch { return err(undefined, 'bad_json', '訊息格式錯誤。'); }
     if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.t !== 'string') return err(undefined, 'bad_message', '訊息格式錯誤。');
+    if (raw.length > MAX_MESSAGE_CHARS && msg.t !== 'charPut') return closing(1009, 'message too big');
     const rid = typeof msg.rid === 'string' && RID.test(msg.rid) ? msg.rid : undefined;
 
     switch (msg.t) {
@@ -176,6 +180,9 @@ export class RoomCore {
       case 'post': return this.onPost(user, msg, rid);
       case 'newBattle': return this.onNewBattle(user, rid);
       case 'gm': return this.onGm(user, msg, rid);
+      case 'charGet': return this.onCharGet(user, msg, rid);
+      case 'charPut': return this.onCharPut(user, msg, rid);
+      case 'charList': return this.onCharList(user, rid);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
     }
   }
@@ -280,5 +287,54 @@ export class RoomCore {
       lines: action === 'take' ? ['測試用：原 GM 暫時沒有 GM 權限，之後會還回去。'] : [],
     }, user);
     return this.broadcastEvent(ev, [{ to: 'all', msg: { t: 'gm', gm: this.gmInfo() } }]);
+  }
+
+  // ---------- 角色存檔（階段 2） ----------
+  // 角色資料仍由前端算、前端寫入（和骰子加值一樣的信任邊界）；伺服器只負責「保存」與「GM 可讀」。
+  // version 是樂觀鎖：寫入時要帶上自己看到的版本，版本不一致就拒絕，避免手機與電腦互相悄悄覆蓋。
+  charRow(uid) {
+    const rows = this.db.exec('SELECT json, version, updated_at FROM characters WHERE uid = ?', uid);
+    return rows[0] ?? null;
+  }
+
+  /** 讀角色：自己的永遠可以讀；讀別人的只有 GM */
+  onCharGet(user, msg, rid) {
+    const uid = msg.uid === undefined ? user.uid : String(msg.uid);
+    if (!UID.test(uid)) return err(rid, 'bad_char', '玩家編號格式錯誤。');
+    if (uid !== user.uid && !this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以讀取其他玩家的角色。');
+    const row = this.charRow(uid);
+    return { out: [{ to: 'self', msg: { t: 'char', rid, uid, version: row?.version ?? 0, updatedAt: row?.updated_at ?? null, data: row ? JSON.parse(row.json) : null } }], close: null };
+  }
+
+  /** 存自己的角色。base = 前端上次確認的版本（從沒存過 = 0） */
+  onCharPut(user, msg, rid) {
+    const { base, data } = msg;
+    if (!isInt(base, 0, 1_000_000_000)) return err(rid, 'bad_char', '版本格式錯誤。');
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return err(rid, 'bad_char', '角色資料格式錯誤。');
+    if (typeof data.name !== 'string' || !data.name.trim() || data.name.length > 80) return err(rid, 'bad_char', '角色缺少名稱。');
+    const json = JSON.stringify(data);
+    if (json.length > MAX_CHAR_JSON_CHARS) return err(rid, 'char_too_big', '角色資料太大，無法儲存。');
+    let result;
+    this.db.tx(() => {
+      const cur = this.charRow(user.uid)?.version ?? 0;
+      if (cur !== base) { result = { ok: false, version: cur }; return; }
+      const t = this.now();
+      this.db.exec(
+        'INSERT INTO characters(uid, json, version, updated_at) VALUES (?, ?, ?, ?) '
+        + 'ON CONFLICT(uid) DO UPDATE SET json = excluded.json, version = excluded.version, updated_at = excluded.updated_at',
+        user.uid, json, cur + 1, t);
+      result = { ok: true, version: cur + 1, updatedAt: t };
+    });
+    return { out: [{ to: 'self', msg: { t: 'charSaved', rid, ...result } }], close: null };
+  }
+
+  /** GM：所有已存檔玩家的清單（不含角色內容），模擬戰挑人用 */
+  onCharList(user, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以查看玩家角色清單。');
+    const list = this.db.exec(
+      'SELECT c.uid AS uid, COALESCE(m.name, c.uid) AS name, c.version AS version, c.updated_at AS updatedAt, '
+      + "COALESCE(json_extract(c.json, '$.name'), '') AS charName "
+      + 'FROM characters c LEFT JOIN members m ON m.uid = c.uid ORDER BY m.first_seen, c.uid');
+    return { out: [{ to: 'self', msg: { t: 'charList', rid, list } }], close: null };
   }
 }

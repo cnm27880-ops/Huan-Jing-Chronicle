@@ -61,6 +61,18 @@ export function loadCharacter() {
   return clone(SAMPLE_CHARACTER);
 }
 
+/** 這台裝置有沒有存過角色（沒有的話 loadCharacter 給的是示範角色） */
+export function hasSavedCharacter() {
+  try { return localStorage.getItem(KEY) !== null; } catch { return false; }
+}
+
+/** 把從伺服器拿到的角色套用到這台裝置：走同一套舊存檔升級，並存進本機 */
+export function importCharacter(data) {
+  const state = upgrade(clone(data));
+  saveCharacter(state);
+  return state;
+}
+
 export function saveCharacter(state) {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
