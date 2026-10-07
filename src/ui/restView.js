@@ -1,22 +1,20 @@
 // ============================================================
 // 修整日頁面（黑金版，見 DESIGN.md）
 // 設計原則：全程用點的，不用打字；狀態列常駐在上方。
-// 版面：上方 HUD → 三個行動分頁 → 左邊一步步設定（行動、難度、次數與加值）＋大按鈕，右邊結果。
+// 版面：上方 HUD → 兩個行動分頁 → 左邊一步步設定（行動、難度、次數與加值）＋大按鈕，右邊結果。
 // 只改畫面：採集、製作、檢定都還是呼叫 engine.js 的同一批函式。
 // ============================================================
 import { h, fmt } from './dom.js';
-import { statusBar, openFoodSheet } from './statusBar.js';
+import { statusBar } from './statusBar.js';
 import { itemTile, amountPicker } from './controls.js';
 import { iconOf, TIERS } from './items.js';
 import {
-  LIFE_SKILLS, ART_SKILLS, GATHER_ACTIONS, CRAFT_ACTIONS, DIFFICULTIES, RECIPES,
-  FOODS, STOMACH_SLOTS, CRAFT_COST_AMOUNT,
+  GATHER_ACTIONS, CRAFT_ACTIONS, DIFFICULTIES, RECIPES,
+  CRAFT_COST_AMOUNT,
 } from '../game/rules.js';
 import {
-  modifier, endSession, gather, craft, craftableTimes, keepsakeApplies, countOf,
+  modifier, gather, craft, craftableTimes, keepsakeApplies, countOf,
 } from '../game/engine.js';
-import { rollCheck } from '../state/rollLog.js';
-import { rollFailed } from './controls.js';
 
 const ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -143,41 +141,6 @@ export function createRestView({ root, getState, commit }) {
     ];
   }
 
-  // ---------- 跑團 ----------
-  function sessionPanel(state) {
-    const skillBtn = (s, value) => {
-      const mod = modifier(state, s, 'session');
-      return h('button', {
-        type: 'button', class: 'skill-btn',
-        onclick: async () => {
-          let r;
-          try { r = await rollCheck(state.name, state, s); } catch (e) { return rollFailed(e); } // 同步到骰盤紀錄，大家都看得到
-          pushResult({ kind: 'session', ...r });
-        },
-      },
-      h('span', { class: 'skill-btn__name', text: s }),
-      h('span', { class: 'skill-btn__mod num', text: `+${mod.total}` }),
-      h('small', { text: mod.isLife ? `${value} + 熟練` : `技能 ${value}` }));
-    };
-    const st = state.sessionStomach;
-    return [
-      section('跑團胃袋（到本次跑團結束）',
-        h('div', { class: 'session-stomach__slots' },
-          Array.from({ length: STOMACH_SLOTS }, (_, i) => st[i]
-            ? itemTile(st[i].food, null, { size: 'sm', extra: h('span', { class: 'tile__note', text: FOODS[st[i].food]?.effect }) })
-            : h('button', { type: 'button', class: 'slot-add', onclick: () => openFoodSheet(state, 'session', commit) }, '＋ 吃東西'))),
-        h('button', {
-          type: 'button', class: 'btn btn--ghost btn--small', disabled: !st.length,
-          onclick: () => { endSession(state); pushResult({ kind: 'note', text: '本次跑團結束，跑團胃袋已清空。' }); },
-        }, '結束本次跑團')),
-      section('生活技能（加熟練）',
-        h('p', { class: 'hint', text: '點技能就直接擲 1D20，結果也會出現在骰盤紀錄。GM 准許用生活技能時點這裡，否則點下面的非生活技能。' }),
-        h('div', { class: 'skill-grid' }, LIFE_SKILLS.map((s) => skillBtn(s, state.lifeSkills[s] ?? 0)))),
-      section('非生活技能',
-        h('div', { class: 'skill-grid' }, ART_SKILLS.map((s) => skillBtn(s, state.arts[s] ?? 0)))),
-    ];
-  }
-
   // ---------- 結果 ----------
   const lootTiles = (loot) =>
     h('div', { class: 'loot' }, Object.entries(loot).sort((x, y) => y[1] - x[1]).map(([n, q]) => itemTile(n, q, { size: 'sm' })));
@@ -185,14 +148,6 @@ export function createRestView({ root, getState, commit }) {
   /** 結果卡：和擲骰紀錄同一種樣式（左側色條、右上膠囊徽章、六角骰面） */
   function resultCard(r, latest) {
     if (r.kind === 'note') return h('li', { class: 'rres rres--note', text: r.text });
-    if (r.kind === 'session') {
-      return h('li', { class: 'rres', dataset: { tone: 'gold' } },
-        h('div', { class: 'rres__head' },
-          h('strong', { class: 'rres__title', text: `🎲 ${r.skill}檢定` }),
-          h('span', { class: 'rres__badge num', dataset: { final: r.total, roll: latest ? '1' : '0' }, text: r.total })),
-        h('div', { class: 'dice-faces' }, h('span', { class: 'die', dataset: { max: r.roll === 20 ? '1' : '0', min: r.roll === 1 ? '1' : '0' }, text: r.roll })),
-        h('p', { class: 'roll__formula', text: `1D20 + ${r.mod}　${r.isLife ? '含熟練' : '不加熟練'}` }));
-    }
     const gatherKind = r.kind === 'gather';
     if (!r.rolls.length) return h('li', { class: 'rres rres--note', text: gatherKind ? '時間不足，沒有採集。' : '原料不足，沒有製作。' });
     const best = gatherKind ? Math.max(...r.rolls.map((x) => TIERS.indexOf(x.tier))) : -1;
@@ -233,18 +188,17 @@ export function createRestView({ root, getState, commit }) {
   const TABS = [
     ['gather', '採集', '🌿', '花時間'],
     ['craft', '製作', '🔨', '不花時間'],
-    ['session', '跑團檢定', '🎲', '1D20'],
   ];
 
   function render() {
     const state = getState();
-    const panel = ui.tab === 'gather' ? gatherPanel(state) : ui.tab === 'craft' ? craftPanel(state) : sessionPanel(state);
+    const panel = ui.tab === 'gather' ? gatherPanel(state) : craftPanel(state);
     const scrollY = root.scrollTop;
     const fresh = ui.fresh;
     ui.fresh = false;
     root.replaceChildren(
       h('div', { class: 'rest-root' },
-        statusBar(state, commit, ui.tab === 'session' ? 'session' : 'rest'),
+        statusBar(state, commit, 'rest'),
         h('div', { class: 'rest-tabs', role: 'tablist', 'aria-label': '修整日行動' },
           TABS.map(([id, label, icon, sub]) => h('button', {
             type: 'button', role: 'tab', class: 'rest-tab', 'aria-selected': String(ui.tab === id),

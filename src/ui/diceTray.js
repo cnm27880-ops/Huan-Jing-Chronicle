@@ -9,9 +9,10 @@ import { mountRoomPanel } from './roomPanel.js';
 import { mountFeed } from './rollFeed.js';
 import { openFoodSheet } from './statusBar.js';
 import { LIFE_SKILLS, ART_SKILLS, STOMACH_SLOTS } from '../game/rules.js';
-import { modifier, proficiency } from '../game/engine.js';
+import { modifier, proficiency, endSession } from '../game/engine.js';
 import { parseDiceExpr, MAX_DICE } from '../game/dice.js';
 import { rollDice, rollCheck, clearLog, getRoomStatus } from '../state/rollLog.js';
+import { iconOf } from './items.js';
 
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
 
@@ -102,19 +103,25 @@ export function createDiceTray({ getState, commit, toggleButton }) {
         h('span', { class: 'tray__who', text: state.name }),
         h('button', { type: 'button', class: 'sheet__close', onclick: () => setOpen(false) }, '關閉')),
       roomBox, // 房間狀態：只有登入後才會出現
-      latestBox, // 固定在上方：不管骰盤捲到哪裡，最新結果都看得到
       h('div', { class: 'tray__body' },
+        latestBox, // 最新結果放在內容最上面，跟著一起捲動（不再釘在畫面上佔空間）
         h('section', { class: 'tray__section' },
           h('div', { class: 'tray__stomach' },
             h('span', { class: 'field-label', text: '跑團熟練' }),
             h('strong', { text: String(prof.total) }),
             h('span', { class: 'mini-slots' }, Array.from({ length: STOMACH_SLOTS }, (_, i) =>
               stomach[i]
-                ? h('span', { class: 'mini-slot', title: stomach[i].food }, h('span', { 'aria-hidden': 'true', text: '🍽️' }))
+                ? h('span', { class: 'mini-slot', title: stomach[i].food }, h('span', { 'aria-hidden': 'true', text: iconOf(stomach[i].food) || '🍽️' }))
                 : h('button', {
                     type: 'button', class: 'mini-slot mini-slot--empty', 'aria-label': '空胃袋，點一下吃東西',
                     onclick: () => openFoodSheet(state, 'session', commit),
                   }, '＋')))),
+          stomach.length
+            ? h('button', {
+                type: 'button', class: 'btn btn--ghost btn--small',
+                onclick: () => { if (!confirm('結束本次跑團？跑團胃袋會清空。')) return; endSession(state); commit(); },
+              }, '結束本次跑團')
+            : null,
           h('p', { class: 'hint', text: '點技能直接擲 1D20。GM 准許用生活技能時點生活技能（會加熟練），否則點非生活技能。' }),
           h('p', { class: 'field-label', text: '生活技能（加熟練）' }),
           h('div', { class: 'skill-grid' }, LIFE_SKILLS.map((s) => skillButton(state, s, state.lifeSkills[s] ?? 0, true))),

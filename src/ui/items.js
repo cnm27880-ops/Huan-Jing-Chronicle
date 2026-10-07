@@ -58,7 +58,7 @@ export function iconOf(name) {
   // 名稱本身以 emoji 開頭（稱號、寶寶），沿用那個 emoji
   const lead = name.match(/^\p{Extended_Pictographic}\uFE0F?/u);
   if (lead) return lead[0];
-  return '🎁';
+  return ''; // 自行新增的紀念品等沒有專屬圖示：不放預設 emoji，畫面會自動隱藏空圖示
 }
 
 /** 去掉名稱開頭的 emoji，避免和圖示重複 */

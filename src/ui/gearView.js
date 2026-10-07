@@ -20,6 +20,9 @@ import { openReveal } from './reveal.js';
 import { openGearSellSheet } from './marketView.js';
 
 const tierIndex = (g) => GEAR_TIERS.indexOf(g.tier);
+const SLOT_ICON = { weapon: '⚔️', armor: '🛡️', accessory: '💍' };
+const gearIcon = (g) => SLOT_ICON[g.slot] ?? '';  // 取了自訂名字後不能再靠名稱判斷圖示，改看欄位
+const NAME_MAX = 20;
 const SLOT_ORDER = { weapon: 0, armor: 1, accessory: 2 };
 const BADGE = {
   empty: ['空欄位', 'good'],
@@ -99,6 +102,17 @@ export function createGearView({ root, getState, commit }) {
   }
 
   // ---------- 裝備欄 ----------
+  /** 取名欄：空白＝改回預設名稱（例如「傳說武器」）。身上的與背包的共用 */
+  const nameField = (g) => h('input', {
+    class: 'field gear-name', type: 'text', placeholder: `取個名字（預設：${gearName({ ...g, name: undefined })}）`, value: g.name ?? '',
+    maxlength: NAME_MAX, 'aria-label': '裝備名稱',
+    onchange: (e) => {
+      const v = e.target.value.trim().slice(0, NAME_MAX);
+      if (v) g.name = v; else delete g.name;
+      commit();
+    },
+  });
+
   /** 裝備屬性：每條屬性一個小格（屬性名＋數值），特殊飾品沒有數值時顯示文字 */
   const effectChips = (g) => h('div', { class: 'fx-chips' },
     g.effects.length
@@ -117,12 +131,13 @@ export function createGearView({ root, getState, commit }) {
   function slotCard(state, key) {
     const g = state.equipment[key];
     return h('div', { class: `gear-slot${g ? ' rarity' : ' is-empty'}`, dataset: { tier: g ? tierIndex(g) : 'none', rarity: g ? tierIndex(g) : 'none' } },
-      h('span', { class: 'gear-slot__icon', 'aria-hidden': 'true', text: g ? iconOf(gearName(g)) : '＋' }),
+      h('span', { class: 'gear-slot__icon', 'aria-hidden': 'true', text: g ? gearIcon(g) : '＋' }),
       h('div', { class: 'gear-slot__head' },
         h('span', { class: 'gear-slot__label', text: EQUIP_SLOT_LABEL[key] }),
         g ? h('strong', { class: 'gear-slot__name rarity__name', text: gearName(g) }) : h('span', { class: 'gear-slot__name', text: '空著' }),
         g ? rarityTag(tierIndex(g)) : null),
       g ? h('button', { type: 'button', class: 'btn btn--ghost btn--small gear-slot__off', onclick: () => { unequip(state, key); commit(); } }, '卸下') : null,
+      g ? nameField(g) : null,
       g ? effectChips(g) : h('p', { class: 'gear-slot__empty', text: '從下方「背包裝備」選一件裝上' }));
   }
 
@@ -159,7 +174,7 @@ export function createGearView({ root, getState, commit }) {
     openReveal({
       title: `${name} ×${fmt(made.length)}`,
       cards: picked.map(({ g, cmp }) => ({
-        tier: tierIndex(g), icon: iconOf(gearName(g)), name: gearName(g), body: effectChips(g), badge: BADGE[cmp],
+        tier: tierIndex(g), icon: gearIcon(g), name: gearName(g), body: effectChips(g), badge: BADGE[cmp],
         note: g.roll?.d4 === 4 && g.slot !== 'accessory' ? '1D4 擲出 4' : null,
       })),
       best: order.indexOf(best.id),
@@ -301,12 +316,13 @@ export function createGearView({ root, getState, commit }) {
     const putOn = (key) => { const err = equip(state, g.id, key); if (err) return toast(err); commit(); };
     return h('li', { class: 'owned rarity', dataset: { tier: tierIndex(g), rarity: tierIndex(g) } },
       h('div', { class: 'owned__main' },
-        h('strong', { class: 'owned__name rarity__name', text: `${iconOf(gearName(g))} ${gearName(g)}` }),
+        h('strong', { class: 'owned__name rarity__name', text: `${gearIcon(g)} ${gearName(g)}` }),
         rarityTag(tierIndex(g)),
         h('span', { class: 'owned__effect', text: effectText(g) }),
         g.gem ? gemChip(g.gem) : null,
         h('span', { class: 'badge', dataset: { tone: BADGE[cmp][1] }, text: BADGE[cmp][0] }),
         junk.has(g.id) ? h('span', { class: 'badge', title: '同欄位同屬性已經有更高的（身上穿的算在內），可以賣掉', text: '用不到' }) : null),
+      nameField(g),
       g.special
         ? h('input', {
             class: 'field owned__note', type: 'text', placeholder: '記下特殊效果（例如：怪力）', value: g.note ?? '', maxlength: 60,

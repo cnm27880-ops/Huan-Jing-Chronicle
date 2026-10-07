@@ -576,7 +576,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .vsheet[data-open='true'] .vsheet__panel { transform: none; }
 .vsheet__title { margin: 0; font-size: 1.1rem; color: var(--gold); }
 .vsheet__read { display: flex; align-items: center; gap: 8px; font-size: 1.2rem; }
-.vsheet__input { width: 7rem; min-height: var(--touch); font-size: 1.2rem; text-align: right; }
+.vsheet__input { width: 7rem; min-height: var(--touch); font-size: 1.2rem; text-align: center; }
 .vsheet__was { margin: 0; color: var(--soft); font-size: 0.82rem; }
 .vsheet__steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
 .vsheet__step, .vsheet__full, .vsheet__actions .btn { min-height: var(--touch); }
@@ -632,7 +632,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .gear-slot {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto;
-  grid-template-areas: 'icon head off' 'fx fx fx';
+  grid-template-areas: 'icon head off' 'name name name' 'fx fx fx';
   align-items: center;
   gap: 8px 10px;
   min-height: 0;
@@ -1061,7 +1061,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .trade-row__price { flex-basis: 100%; color: var(--ink2); font-size: 0.82rem; }
 .trade-row__sub { flex-basis: 100%; color: var(--gold); font-size: 0.78rem; }
 .trade-row__act { display: flex; align-items: center; gap: 6px; }
-.trade-row__qty { width: 4.6rem; text-align: right; }
+.trade-row__qty { width: 4.6rem; text-align: center; }
 .trade-row__act .btn { min-width: 5.5rem; white-space: nowrap; }
 @media (max-width: 759px) {
   #view-market .mk-session { margin-left: 0; }
@@ -1076,3 +1076,13 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .sell-opt__text { display: grid; gap: 2px; }
 .sell-opt__text small { color: var(--soft); }
 .sell-opt__note { color: var(--rose) !important; }
+
+/* ============================================================
+   手機測試後調整：數字框置中、沒有圖示的物品不留空格
+   ============================================================ */
+input[type='number'], .amount__input { text-align: center; }
+.tile__icon:empty, .keepsake__icon:empty, .item-sheet__icon:empty, .trade-row__icon:empty, .potion__icon:empty { display: none; }
+
+/* 裝備取名欄：身上（整列）與背包（整列） */
+.gear-slot .gear-name { grid-area: name; }
+.owned .gear-name { flex: 1 1 100%; padding: 6px 10px; font-size: 14px; }

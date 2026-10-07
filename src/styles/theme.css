@@ -7,11 +7,11 @@
   color-scheme: dark;
 
   /* ---------- 規格色 ---------- */
-  --paper: #15120e;   --paper2: #1e1913;              /* 背景 */
-  --card: #221c15;    --raise: #2a2319;               /* 面板 */
-  --line: #3a3122;    --line3: #5a4b33;               /* 線條 */
-  --ink: #ede3cc;     --ink2: #d9cdb2;  --soft: #b3a483;  --faint: #7f7055; /* 文字 */
-  --gold: #e3be72;    --gold2: #b8954f; --goldbg: #33291a;  /* 金（主色） */
+  --paper: #100d09;   --paper2: #17130e;              /* 背景 */
+  --card: #1d1812;    --raise: #272017;               /* 面板 */
+  --line: #4a3f2c;    --line3: #6e5d40;               /* 線條 */
+  --ink: #f6eedb;     --ink2: #ebe0c6;  --soft: #cfc1a0;  --faint: #a69776; /* 文字 */
+  --gold: #ecc77c;    --gold2: #b8954f; --goldbg: #33291a;  /* 金（主色） */
   --rose: #e0627a;    --rose2: #a8425c; --rosebg: #3a1d23;  /* 失敗／受傷 */
   --sky: #7fa6d6;     --sky2: #3f6290;  --skybg: #1c2634;   /* 成功／破防 */
   --lilac: #a897d4;                                     /* 靈魂條 */
@@ -20,22 +20,22 @@
   --shadow: rgba(0, 0, 0, 0.35);
 
   /* rgba 用的三元色（數值同上） */
-  --paper-rgb: 21, 18, 14;
-  --card-rgb: 34, 28, 21;
-  --ink-rgb: 237, 227, 204;
-  --gold-rgb: 227, 190, 114;
+  --paper-rgb: 16, 13, 9;
+  --card-rgb: 29, 24, 18;
+  --ink-rgb: 246, 238, 219;
+  --gold-rgb: 236, 199, 124;
   --rose-rgb: 224, 98, 122;
   --sky-rgb: 127, 166, 214;
   --lilac-rgb: 168, 151, 212;
   --shadow-rgb: 0, 0, 0;
-  --star: rgba(237, 227, 204, 0.6);
+  --star: rgba(246, 238, 219, 0.6);
 
   /* ---------- 物品稀有度（等級／製作難度） ---------- */
   --rarity-0: #7bcb7f; /* 初階／簡單：綠 */
   --rarity-1: #6aaef5; /* 進階／普通：藍 */
   --rarity-2: #c09bf0; /* 大師／困難：紫 */
   --rarity-3: #f6c14b; /* 傳說／史詩：金 */
-  --rarity-4: #ede3cc; /* 神話／神級：名稱為象牙白，外框用虹彩 */
+  --rarity-4: #f6eedb; /* 神話／神級：名稱為象牙白，外框用虹彩 */
   --rarity-2-rgb: 192, 155, 240;
   --rarity-3-rgb: 246, 193, 75;
   --rainbow: linear-gradient(135deg, #ff6b6b, #f6c14b, #7bcb7f, #6aaef5, #c09bf0);

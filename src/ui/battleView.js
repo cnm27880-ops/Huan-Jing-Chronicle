@@ -24,6 +24,11 @@ import { publish, rollWith } from '../state/rollLog.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
 
+// 戰鬥紀錄只放戰鬥相關事件；黑市、鑑定、鑲嵌、一般檢定與自訂骰只出現在骰盤
+const BATTLE_KINDS = new Set(['attack', 'defend', 'potion', 'skill', 'divider']);
+const BATTLE_NOTE = /^(調整|戰鬥結束|魔女|遭遇)/;
+const isBattleEvent = (ev) => BATTLE_KINDS.has(ev.kind) || (ev.kind === 'note' && BATTLE_NOTE.test(ev.label ?? ''));
+
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const potionText = (p) => [
   p.heal ? `回復 ${p.heal.n}D${p.heal.sides} 生命` : null,
@@ -522,7 +527,7 @@ export function createBattleView({ root, getState, commit }) {
     }, label)));
     const hudEl = hud(state);
     root.replaceChildren(h('div', { class: 'bt-root' }, hudEl, tabs, layout));
-    feed = mountFeed(feedBox, { limit: 8, empty: '出招或喝藥水後，結果會出現在這裡，也會出現在骰盤。' });
+    feed = mountFeed(feedBox, { limit: 8, filter: isBattleEvent, empty: '出招或喝藥水後，結果會出現在這裡，也會出現在骰盤。' });
     // 電腦版右欄紀錄要貼在固定列下面：把固定列的高度記成 CSS 變數
     if (typeof ResizeObserver !== 'undefined') {
       hudWatcher = new ResizeObserver(() => root.style.setProperty('--bt-hud-h', `${hudEl.offsetHeight}px`));
