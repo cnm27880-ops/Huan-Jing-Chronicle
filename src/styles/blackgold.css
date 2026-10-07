@@ -1166,3 +1166,5 @@ input[type='number'], .amount__input { text-align: center; }
 .badge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .badge-row { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .badge-row__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.badge-made { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; font-size: 0.8rem; color: var(--soft); }
+.badge-made__name { min-width: 0; overflow-wrap: anywhere; }

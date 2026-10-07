@@ -17,7 +17,7 @@ import {
 } from '../game/engine.js';
 import { SKILL_TABLE, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo } from '../game/skillTable.js';
 import { drawBooks, chooseDraw, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
-import { badgeStatus, craftBadge, BADGE_COUNT } from '../game/badges.js';
+import { badgeStatus, craftBadge, renameBadge, BADGE_COUNT, BADGE_NAME_MAX } from '../game/badges.js';
 import { openSheet } from './sheet.js';
 import { skillTile, skillInfoBlock, skillTag } from './skillTile.js';
 import { SKILL_CATALOG, moveFromCatalog } from '../game/skills.js';
@@ -323,13 +323,28 @@ export function createRestView({ root, getState, commit }) {
         h('strong', { text: `${ICONS[skill]} ${skill}　技能 ${state.lifeSkills[skill] ?? 0}` }),
         h('div', { class: 'badge-row__btns' }, badgeStatus(state, skill).map((b) => {
           const label = b.kind === '神級' ? '神級徽章' : `${BADGE_COUNT}次徽章（${fmt(Math.min(b.progress.have, BADGE_COUNT))}/${BADGE_COUNT}）`;
-          if (b.made) return h('button', { type: 'button', class: 'btn btn--small', disabled: true }, `${label} ✓ 已製作`);
+          if (b.made) {
+            return h('div', { class: 'badge-made' },
+              h('span', { class: 'badge-made__name', text: `✓ ${b.item}` }),
+              h('button', {
+                type: 'button', class: 'btn btn--ghost btn--small',
+                onclick: () => {
+                  const name = prompt(`幫「${b.item}」取新名字（最多 ${BADGE_NAME_MAX} 字）`, b.item);
+                  if (name === null) return;
+                  const r = renameBadge(getState(), skill, b.kind, name);
+                  if (!r.ok) return toast(r.error);
+                  toast(`改名為 ${r.item}`);
+                  commit();
+                },
+              }, '改名'));
+          }
           if (!b.reached) return h('button', { type: 'button', class: 'btn btn--small', disabled: true }, `${label} 未達成`);
           return h('button', {
             type: 'button', class: 'btn btn--primary btn--small',
             onclick: () => {
-              if (!confirm(`製作「${b.item}」？${skill}技能等級 +1，每種只能做一次。`)) return;
-              const r = craftBadge(getState(), skill, b.kind);
+              const name = prompt(`製作徽章：${skill}技能等級 +1，每種只能做一次。\n名稱可以自己取（最多 ${BADGE_NAME_MAX} 字，之後也能改）：`, b.item);
+              if (name === null) return;
+              const r = craftBadge(getState(), skill, b.kind, name);
               if (!r.ok) return toast(r.error);
               toast(`做出 ${r.item}，${skill}技能升到 ${r.level}`);
               commit();

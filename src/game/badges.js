@@ -19,30 +19,73 @@ const KNOWN = {
   '鑄造:500次': '【萬劫鍛靈度厄師】500次鑄造',
   '書寫:500次': '【妙筆生花奪造化】500次書寫',
 };
+/** 預設名稱（機器人的原名；沒資料的用通用名稱） */
 export const badgeName = (skill, kind) => KNOWN[`${skill}:${kind}`] ?? `${kind === '神級' ? '神級' : '500次'}${skill}徽章`;
+export const BADGE_NAME_MAX = 20;
+const keyOf = (skill, kind) => `${skill}:${kind}`;
+/** 玩家目前用的名稱：自己改過的優先，否則預設 */
+export const badgeItemName = (state, skill, kind) => state.badgeNames?.[keyOf(skill, kind)] ?? badgeName(skill, kind);
 
 /** 某個生活技能的兩個徽章狀態：[{ kind, item, reached, made, progress }] */
 export function badgeStatus(state, skill) {
   return BADGE_KINDS.map((kind) => {
-    const item = badgeName(skill, kind);
+    const item = badgeItemName(state, skill, kind);
     const count = Number(state.counters?.[skill]) || 0;
     return {
       kind, item,
       reached: kind === '神級' ? Boolean(state.godReached?.[skill]) : count >= BADGE_COUNT,
-      made: Boolean(state.badgeMade?.[`${skill}:${kind}`]) || countOf(state, item) > 0,
+      made: Boolean(state.badgeMade?.[keyOf(skill, kind)]) || countOf(state, item) > 0 || countOf(state, badgeName(skill, kind)) > 0,
       progress: kind === '神級' ? null : { have: count, need: BADGE_COUNT },
     };
   });
 }
 
-/** 製作徽章：達標且沒做過才行。回傳 { ok, error?, item?, level? } */
-export function craftBadge(state, skill, kind) {
+/** 名稱檢查：1～20 字、不能和背包裡別的東西或別的徽章同名（同名會合併成同一種物品）。回傳錯誤文字或 null */
+function nameError(state, skill, kind, name) {
+  if (!name || name.length > BADGE_NAME_MAX) return `名稱要 1～${BADGE_NAME_MAX} 字。`;
+  const mine = badgeItemName(state, skill, kind);
+  if (name === mine) return null;
+  const others = LIFE_SKILLS.flatMap((s) => BADGE_KINDS.map((k) => [s, k])).filter(([s, k]) => s !== skill || k !== kind);
+  if (name in state.inventory || others.some(([s, k]) => badgeItemName(state, s, k) === name || badgeName(s, k) === name)) return '已經有同名的東西，換一個名字。';
+  return null;
+}
+
+/** 製作徽章：達標且沒做過才行；name 不給就用預設名稱。回傳 { ok, error?, item?, level? } */
+export function craftBadge(state, skill, kind, name) {
   if (!LIFE_SKILLS.includes(skill) || !BADGE_KINDS.includes(kind)) return { ok: false, error: '沒有這種徽章。' };
   const b = badgeStatus(state, skill).find((x) => x.kind === kind);
   if (b.made) return { ok: false, error: '這個徽章已經做過了。' };
   if (!b.reached) return { ok: false, error: '還沒達成條件。' };
-  addItem(state, b.item);
-  state.badgeMade = { ...state.badgeMade, [`${skill}:${kind}`]: true };
+  const item = name === undefined ? b.item : String(name).trim();
+  const err = nameError(state, skill, kind, item);
+  if (err) return { ok: false, error: err };
+  addItem(state, item);
+  state.badgeNames = { ...state.badgeNames, [keyOf(skill, kind)]: item };
+  state.badgeMade = { ...state.badgeMade, [keyOf(skill, kind)]: true };
   state.lifeSkills[skill] = (Number(state.lifeSkills[skill]) || 0) + 1;
-  return { ok: true, item: b.item, level: state.lifeSkills[skill] };
+  return { ok: true, item, level: state.lifeSkills[skill] };
+}
+
+/** 幫做過的徽章改名：背包裡的徽章一起改名（沒有徽章在身上也能改，之後用新名字） */
+export function renameBadge(state, skill, kind, newName) {
+  const b = LIFE_SKILLS.includes(skill) && badgeStatus(state, skill).find((x) => x.kind === kind);
+  if (!b || !b.made) return { ok: false, error: '還沒有這個徽章。' };
+  const name = String(newName ?? '').trim();
+  const err = nameError(state, skill, kind, name);
+  if (err) return { ok: false, error: err };
+  const old = badgeItemName(state, skill, kind);
+  if (name !== old) {
+    // 舊名稱可能是預設名（機器人匯入的）或上次改的名字：把背包裡所有舊名稱的數量搬到新名稱
+    for (const from of new Set([old, badgeName(skill, kind)])) {
+      const n = countOf(state, from);
+      if (n > 0 && from !== name) {
+        delete state.inventory[from];
+        state.sortOrder = (state.sortOrder ?? []).filter((x) => x !== from);
+        addItem(state, name, n);
+      }
+    }
+  }
+  state.badgeNames = { ...state.badgeNames, [keyOf(skill, kind)]: name };
+  state.badgeMade = { ...state.badgeMade, [keyOf(skill, kind)]: true };
+  return { ok: true, item: name };
 }
