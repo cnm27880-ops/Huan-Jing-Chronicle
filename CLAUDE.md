@@ -1,6 +1,6 @@
 # 幻境編年史（網遊網站）
 
-GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包、裝備、戰鬥、交易、跑團（骰盤、遭遇戰）分頁，資料存在瀏覽器（localStorage）。
+GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包、裝備、交易、跑團（骰盤、遭遇戰、戰鬥面板）分頁，資料存在瀏覽器（localStorage）。
 **改到遊戲規則、擲骰、加值、胃袋、紀念品、裝備、戰鬥、藥水時，先讀 `GAME_RULES.md`，並在改完後執行 `npm test`。**
 開發者是程式新手：回覆用繁體中文，步驟要具體，指令要能直接複製貼上。
 **所有 UI 樣式依 `DESIGN.md`（黑金主題）。** 色碼只能寫在 `src/styles/theme.css`，其他檔案用變數。
@@ -20,7 +20,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | 檔案 | 用途 |
 |---|---|
 | `index.html` | 頁面骨架（頂部列、地圖、面板容器） |
-| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #battle / #session / #market）、角色存檔串接 |
+| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #session / #market（舊的 #battle 導到 #session））、角色存檔串接 |
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
 | `DESIGN.md` | 視覺設計規格（黑金主題） |
 | `RULES_OVERVIEW.md` | 規則原文整理（創角、每日養成、技能學習升級、資源、寶石、配方、特殊材料）；階段 2 的依據，含待確認清單 |
@@ -34,7 +34,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
-| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家回報傷害、先攻純隨機） |
+| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定） |
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |
@@ -59,10 +59,10 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、寶石、背包裝備（不能丟棄，只能賣出） |
 | `src/ui/reveal.js` | 鑑定開獎動畫（翻牌、數值跳動；只是畫面，數值鑑定時就已存好） |
 | `src/ui/marketView.js` | 交易頁（交易大廳／黑市／特殊黑市）＋裝備頁「賣出」面板 |
-| `src/ui/battleView.js` | 戰鬥頁：頂部固定列（生命／資源）、行動／紀錄／狀態三分頁、招式、藥水（遭遇戰在跑團頁） |
+| `src/ui/battleView.js` | 戰鬥面板（跑團頁的懸浮面板，原戰鬥頁）：頂部固定列（生命／資源）、行動／紀錄／狀態三分頁、招式、藥水；遭遇戰在 encounterCard.js |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
 | `src/ui/sessionView.js` | 跑團頁（原骰盤抽屜，階段 B）：房間資訊、一鍵技能檢定、跑團胃袋與結束跑團、自訂骰、遭遇戰、擲骰紀錄；離開頁面會停掉紀錄更新 |
-| `src/ui/encounterCard.js` | 遭遇戰卡片（跑團頁用）：怪物、新增敵人、選招式出招、承受攻擊、先攻順序。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
+| `src/ui/encounterCard.js` | 遭遇戰卡片（跑團頁用）：怪物、新增敵人、選招式出招、承受攻擊、先攻位置（隨機、玩家可交換、GM 開打後鎖定）。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
 | `src/ui/battleSelect.js` | 戰鬥頁與跑團頁共用的「目前選擇」（出招招式、怪物攻防模式），不存檔 |
 | `src/ui/rollFeed.js` | 擲骰紀錄的畫面（跑團頁與戰鬥頁共用）：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要 |
 | `src/ui/dom.js` | 建立元素的小工具 |

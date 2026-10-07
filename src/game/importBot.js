@@ -9,6 +9,7 @@
 // ============================================================
 import { SAMPLE_CHARACTER } from '../data/sample/fude.js';
 import { LIFE_SKILLS, ART_SKILLS, MAX_TIME } from './rules.js';
+import { basicMove } from './skills.js';
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const nonNeg = (v) => Math.max(0, Math.floor(Number(v)) || 0);
@@ -29,7 +30,7 @@ export function blankCharacter(name) {
     equipment: { weapon: null, armor: null, acc1: null, acc2: null },
     gear: [], nextGearId: 1, gems: [], nextGemId: 1, toxicity: 0, buffs: { atk: 0, def: 0 },
     skills: {}, resources: Object.fromEntries(RESOURCES.map((r) => [r, 0])), shield: { hp: 0, res: 0 },
-    moves: [], encounter: { monsters: [], next: { mob: 1, boss: 1 } }, migrated: {},
+    moves: [basicMove()], encounter: { monsters: [], next: { mob: 1, boss: 1 } }, migrated: {},
   };
 }
 

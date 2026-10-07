@@ -14,11 +14,12 @@ import { parseDiceExpr, MAX_DICE } from '../game/dice.js';
 import { rollDice, rollCheck, clearLog, getRoomStatus, subscribeRoom, getEncounter } from '../state/rollLog.js';
 import { iconOf } from './items.js';
 import { createEncounterCard } from './encounterCard.js';
+import { createBattleView, isBattleEvent } from './battleView.js';
 
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
 
 export function createSessionView({ root, getState, commit }) {
-  const ui = { sides: 20, count: 1, mod: 0, text: '' };
+  const ui = { sides: 20, count: 1, mod: 0, text: '', battleOpen: false };
   const node = root;
   let feeds = [];
   let roomPanel = null;
@@ -26,6 +27,24 @@ export function createSessionView({ root, getState, commit }) {
   let unsubRoom = null;
   let encSig = '';
   const encounter = createEncounterCard({ getState, commit, rerender: () => render() });
+
+  // 戰鬥面板：原本的戰鬥頁（生命與資源、招式、藥水、狀態）改成跑團頁裡的懸浮面板，隨時可以打開
+  const panelBody = h('div', { class: 'battle-float__body' });
+  const battle = createBattleView({ root: panelBody, getState, commit });
+  const panel = h('aside', { class: 'battle-float', 'aria-label': '戰鬥面板', 'aria-hidden': 'true', dataset: { open: 'false' } },
+    h('header', { class: 'battle-float__head' },
+      h('h2', { class: 'tray__heading', text: '戰鬥面板' }),
+      h('button', { type: 'button', class: 'sheet__close', onclick: () => setBattleOpen(false) }, '關閉')),
+    panelBody);
+  const toggle = h('button', { type: 'button', class: 'btn btn--primary battle-float__toggle', 'aria-expanded': 'false', onclick: () => setBattleOpen(!ui.battleOpen) }, '⚔️ 戰鬥面板');
+
+  function setBattleOpen(open) {
+    ui.battleOpen = open;
+    panel.dataset.open = String(open);
+    panel.setAttribute('aria-hidden', String(!open));
+    toggle.setAttribute('aria-expanded', String(open));
+    if (open) battle.render(); else battle.leave();
+  }
 
   // ---------- 一鍵技能檢定 ----------
   async function checkSkill(skill) {
@@ -107,11 +126,12 @@ export function createSessionView({ root, getState, commit }) {
     });
     const latestBox = h('div', { class: 'tray__latest', 'aria-live': 'polite' });
     const historyBox = h('div', { class: 'tray__history' });
+    const battleLogBox = h('div', { class: 'tray__history' });
     const prof = proficiency(state, 'session');
     const stomach = state.sessionStomach;
     const scrollY = root.scrollTop;
 
-    node.replaceChildren(h('div', { class: 'session-root' },
+    node.replaceChildren(panel, toggle, h('div', { class: 'session-root' },
       h('header', { class: 'tray__head' },
         h('h2', { class: 'tray__heading', text: '跑團' }),
         h('span', { class: 'tray__who', text: state.name })),
@@ -143,6 +163,9 @@ export function createSessionView({ root, getState, commit }) {
         customPanel(),
         encBox,
         h('section', { class: 'tray__section' },
+          h('h3', { class: 'tray__title', text: '戰鬥紀錄' }),
+          battleLogBox),
+        h('section', { class: 'tray__section' },
           h('div', { class: 'tray__title-row' },
             h('h3', { class: 'tray__title', text: '紀錄' }),
             getRoomStatus().phase === 'online'
@@ -150,14 +173,16 @@ export function createSessionView({ root, getState, commit }) {
               : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')),
           historyBox))));
     roomPanel = mountRoomPanel(roomBox);
-    feeds = [mountFeed(latestBox, { limit: 1, empty: '按下任何一顆骰子，結果會出現在這裡。' }), mountFeed(historyBox, { limit: 30, skip: 1, empty: '' })];
+    feeds = [mountFeed(battleLogBox, { limit: 10, filter: isBattleEvent, empty: '出招、承受攻擊或喝藥水後，戰鬥紀錄會出現在這裡。' }), mountFeed(latestBox, { limit: 1, empty: '按下任何一顆骰子，結果會出現在這裡。' }), mountFeed(historyBox, { limit: 30, skip: 1, empty: '' })];
     root.scrollTop = scrollY;
+    if (ui.battleOpen) battle.render(); // 戰鬥面板開著：資料有變就一起更新
   }
 
   /** 離開跑團頁：停掉紀錄的自動更新，背景擲骰時不用重畫看不到的清單 */
   function leave() {
     unsubRoom?.();
     unsubRoom = null;
+    battle.leave();
     feeds.forEach((f) => f.destroy());
     feeds = [];
     roomPanel?.destroy();

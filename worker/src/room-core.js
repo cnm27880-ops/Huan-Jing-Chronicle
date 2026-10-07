@@ -188,7 +188,7 @@ export class RoomCore {
       case 'charPut': return this.onCharPut(user, msg, rid);
       case 'charList': return this.onCharList(user, rid);
       case 'charImport': return this.onCharImport(user, msg, rid);
-      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encNext': return this.onEncounter(user, msg, rid, online);
+      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': return this.onEncounter(user, msg, rid, online);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
     }
   }
@@ -298,10 +298,11 @@ export class RoomCore {
   // ---------- 遭遇戰（階段 C） ----------
   // 怪物由 GM 建立，存在房間裡，所有人即時看到。怪物生命只有伺服器會改：
   // 玩家端算出傷害後回報「打了誰、扣多少」（和階段 1-B 一樣，傷害由前端算、伺服器負責保存與廣播）。
-  // 先攻：純隨機洗牌（GM 的決定），目前只顯示順序與輪到誰，不強制玩家只能在自己的回合行動。
+  // 先攻：GM 抽先攻 = 把在線玩家與怪物隨機洗成一排「位置」；GM 按開打之前，玩家可以討論並和別人交換自己的位置。
+  // 目前只顯示順序與輪到誰，不強制玩家只能在自己的回合行動。
   encounter() {
     const v = this.getMeta('encounter');
-    return v ? JSON.parse(v) : { ...newEncounter(), round: 0, order: [], turn: 0 };
+    return v ? JSON.parse(v) : { ...newEncounter(), round: 0, order: [], turn: 0, locked: false };
   }
 
   saveEncounter(enc) { this.setMeta('encounter', JSON.stringify(enc)); }
@@ -333,6 +334,18 @@ export class RoomCore {
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user);
     }
+    if (msg.t === 'encSwap') { // 換位置：GM 隨時可以；玩家只能在 GM 開打之前、而且其中一格是自己的
+      const { a, b } = msg;
+      if (!isInt(a, 0, enc.order.length - 1) || !isInt(b, 0, enc.order.length - 1) || a === b) return err(rid, 'bad_enc', '位置錯誤。');
+      if (!this.isGm(user.uid)) {
+        if (enc.locked) return err(rid, 'forbidden', 'GM 已經開打，不能再換位置。');
+        const mine = (i) => enc.order[i].kind === 'player' && enc.order[i].uid === user.uid;
+        if (!mine(a) && !mine(b)) return err(rid, 'forbidden', '只能換自己的位置。');
+      }
+      [enc.order[a], enc.order[b]] = [enc.order[b], enc.order[a]];
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user);
+    }
     if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以操作遭遇戰。');
 
     if (msg.t === 'encAdd') {
@@ -356,7 +369,7 @@ export class RoomCore {
       return this.encOk(enc, rid, user);
     }
     if (msg.t === 'encClear') {
-      this.saveEncounter({ ...newEncounter(), round: 0, order: [], turn: 0 });
+      this.saveEncounter({ ...newEncounter(), round: 0, order: [], turn: 0, locked: false });
       return this.encOk(this.encounter(), rid, user, { label: '遭遇：戰鬥結束，清空敵人' });
     }
     if (msg.t === 'encInit') { // 先攻：在線玩家（不含 GM）與還活著的怪物，純隨機洗牌
@@ -369,13 +382,21 @@ export class RoomCore {
         const j = this.rng.int(i + 1) - 1;
         [order[i], order[j]] = [order[j], order[i]];
       }
-      Object.assign(enc, { order, turn: 0, round: order.length ? 1 : 0 });
+      Object.assign(enc, { order, turn: 0, round: 0, locked: false });
       this.saveEncounter(enc);
       const names = order.map((o, i) => `${i + 1}. ${o.kind === 'player' ? o.name : o.id}`);
-      return this.encOk(enc, rid, user, { label: '遭遇：先攻順序（隨機）', lines: names });
+      return this.encOk(enc, rid, user, { label: '遭遇：先攻位置（隨機）', lines: [...names, '玩家可以討論並交換自己的位置，GM 按「開打」後鎖定。'] });
+    }
+    if (msg.t === 'encStart') {
+      if (!enc.order.length) return err(rid, 'bad_enc', '還沒有先攻順序，請先抽先攻。');
+      Object.assign(enc, { locked: true, turn: 0, round: 1 });
+      this.saveEncounter(enc);
+      const names = enc.order.map((o, i) => `${i + 1}. ${o.kind === 'player' ? o.name : o.id}`);
+      return this.encOk(enc, rid, user, { label: '遭遇：開打，先攻順序鎖定', lines: names });
     }
     // encNext：換下一位；已倒下的怪物自動跳過；繞完一圈回合數 +1
     if (!enc.order.length) return err(rid, 'bad_enc', '還沒有先攻順序，請先抽先攻。');
+    if (!enc.locked) return err(rid, 'bad_enc', '請先按「開打」鎖定先攻順序。');
     for (let step = 0; step < enc.order.length; step++) {
       enc.turn += 1;
       if (enc.turn >= enc.order.length) { enc.turn = 0; enc.round += 1; }

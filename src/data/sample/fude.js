@@ -4,7 +4,7 @@
 // 背包、金幣、經驗、天數取自機器人存檔（已轉成「物品：數量」格式，不含 Discord ID）
 // 原型展示用，時間設為 10 點方便測試（存檔裡是 0）
 // ============================================================
-import { moveFromCatalog } from '../../game/skills.js';
+import { moveFromCatalog, basicMove } from '../../game/skills.js';
 
 // ---------- 裝備實例（取自試算表「背包」分頁；試算表的「傳奇」在網頁叫「傳說」）----------
 let gearId = 1;
@@ -97,6 +97,7 @@ export const SAMPLE_CHARACTER = {
     moveFromCatalog('吞天噬血陣'),
     moveFromCatalog('暴徒'),
     moveFromCatalog('萬物歸一'),
+    basicMove(),
   ],
   encounter: { monsters: [], next: { mob: 1, boss: 1 } },
 };

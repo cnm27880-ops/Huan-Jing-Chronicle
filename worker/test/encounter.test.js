@@ -79,10 +79,12 @@ test('先攻：在線玩家（不含 GM）加還活著的怪物一起洗牌；�
   send(core, P1, { t: 'encHit', hits: [{ id: '小怪2', dmg: 100 }] }); // 小怪2 倒下，不參與先攻
   const res = send(core, GM, { t: 'encInit' }, { online: ['100', '300', '400'] });
   const enc = encOf(res);
-  assert.equal(enc.round, 1);
+  assert.equal(enc.locked, false);
+  assert.equal(errorOf(send(core, GM, { t: 'encNext' }))?.code, 'bad_enc'); // 還沒開打不能換人
+  assert.equal(encOf(send(core, GM, { t: 'encStart' })).round, 1);
   assert.equal(enc.order.length, 3); // 玩家一、玩家二、小怪1
   assert.ok(!enc.order.some((o) => o.uid === '100' || o.id === '小怪2'));
-  assert.ok(res.out.find((o) => o.msg.t === 'event').msg.event.lines.length === 3);
+  assert.ok(res.out.find((o) => o.msg.t === 'event').msg.event.lines.length === 4); // 3 個位置 + 一行提示
   // 輪一圈：turn 0→1→2→0（回合 +1）
   assert.equal(encOf(send(core, GM, { t: 'encNext' })).turn, 1);
   assert.equal(encOf(send(core, GM, { t: 'encNext' })).turn, 2);
@@ -95,6 +97,24 @@ test('先攻：在線玩家（不含 GM）加還活著的怪物一起洗牌；�
   while (cur.turn !== (target + cur.order.length - 1) % cur.order.length) cur = encOf(send(core, GM, { t: 'encNext' }));
   const after = encOf(send(core, GM, { t: 'encNext' }));
   assert.notEqual(after.turn, target);
+});
+
+test('換位置：玩家開打前只能換自己的格子；開打後只有 GM 能換', () => {
+  const core = room((n) => n);
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 1 } });
+  const { order } = encOf(send(core, GM, { t: 'encInit' }, { online: ['300', '400'] }));
+  const slot = (uid) => order.findIndex((o) => o.uid === uid);
+  const other = [0, 1, 2].find((i) => i !== slot('300') && i !== slot('400'));
+  assert.equal(errorOf(send(core, P1, { t: 'encSwap', a: slot('400'), b: other }))?.code, 'forbidden'); // 不是自己的格子
+  assert.equal(errorOf(send(core, P1, { t: 'encSwap', a: 0, b: 0 }))?.code, 'bad_enc');
+  assert.equal(errorOf(send(core, P1, { t: 'encSwap', a: 0, b: 9 }))?.code, 'bad_enc');
+  const mine = slot('300');
+  const swapped = encOf(send(core, P1, { t: 'encSwap', a: mine, b: slot('400') }));
+  assert.equal(swapped.order[slot('400')].uid, '300');
+  assert.equal(swapped.order[mine].uid, '400');
+  send(core, GM, { t: 'encStart' });
+  assert.equal(errorOf(send(core, P1, { t: 'encSwap', a: slot('400'), b: mine }))?.code, 'forbidden');
+  assert.ok(encOf(send(core, GM, { t: 'encSwap', a: 0, b: 1 })));
 });
 
 test('還沒抽先攻就換人會被拒絕；移除怪物會一併從先攻順序拿掉；清空後回到空的遭遇', () => {

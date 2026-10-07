@@ -27,7 +27,7 @@ import { battleSel as sel } from './battleSelect.js';
 // 戰鬥紀錄只放戰鬥相關事件；黑市、鑑定、鑲嵌、一般檢定與自訂骰只出現在跑團頁
 const BATTLE_KINDS = new Set(['attack', 'defend', 'potion', 'skill', 'divider']);
 const BATTLE_NOTE = /^(調整|戰鬥結束|魔女|遭遇)/;
-const isBattleEvent = (ev) => BATTLE_KINDS.has(ev.kind) || (ev.kind === 'note' && BATTLE_NOTE.test(ev.label ?? ''));
+export const isBattleEvent = (ev) => BATTLE_KINDS.has(ev.kind) || (ev.kind === 'note' && BATTLE_NOTE.test(ev.label ?? ''));
 
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const potionText = (p) => [
@@ -378,5 +378,11 @@ export function createBattleView({ root, getState, commit }) {
     root.scrollTop = scrollY;
   }
 
-  return { render };
+  /** 面板關起來或離開頁面：停掉紀錄與固定列的監聽 */
+  function leave() {
+    feed?.destroy(); feed = null;
+    hudWatcher?.disconnect(); hudWatcher = null;
+  }
+
+  return { render, leave };
 }

@@ -30,6 +30,7 @@ const trackLines = (result) => result.tracks.filter((t) => t.atkDice > 0).map(tr
 
 export function createEncounterCard({ getState, commit, rerender }) {
   const ui = {
+    swapFrom: null, // 先攻換位置：已選的第一個位置
     form: { kind: 'mob', count: 1, atk: 10, def: 10, hp: 100, atkMod: '', defMod: '', absDef: 0 },
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
   };
@@ -213,23 +214,41 @@ export function createEncounterCard({ getState, commit, rerender }) {
         h('button', { type: 'button', class: 'btn btn--small', disabled: downed, onclick: () => doDefend(state, m) }, '🛡️ 承受它的攻擊')));
   }
 
-  /** 先攻順序與回合（只有房間模式、GM 抽過先攻才有） */
+  /** 先攻位置：抽完後玩家可以點自己的位置，再點想換的位置（GM 按「開打」後鎖定）；GM 隨時可以換 */
   function initiativeBar(enc) {
     if (!enc.order?.length) return null;
+    const me = getRoomStatus().me;
+    const gm = isGm();
     const label = (o) => (o.kind === 'player' ? `🧑 ${o.name}` : `${enc.monsters.find((m) => m.id === o.id)?.kind === 'boss' ? '👹' : '👾'} ${o.id}`);
+    const canSwap = !enc.locked || gm;
+    const mine = (o) => o.kind === 'player' && o.uid === me?.uid;
+    const pick = (i) => {
+      if (ui.swapFrom == null) {
+        if (!gm && !mine(enc.order[i])) return toast('先點自己的位置，再點想換過去的位置。');
+        ui.swapFrom = i;
+        return rerender();
+      }
+      const from = ui.swapFrom;
+      ui.swapFrom = null;
+      if (from === i) return rerender();
+      return act({ t: 'encSwap', a: from, b: i });
+    };
     return h('div', { class: 'initiative' },
-      h('p', { class: 'field-label', text: `第 ${enc.round} 回合・輪到 ${label(enc.order[enc.turn])}` }),
-      h('ol', { class: 'initiative__list' }, enc.order.map((o, i) => h('li', {
-        class: `info-chip${i === enc.turn ? ' is-good' : ''}`, 'aria-current': i === enc.turn ? 'step' : null,
-        text: `${i + 1}. ${label(o)}`,
-      }))));
+      h('p', { class: 'field-label', text: enc.locked ? `第 ${enc.round} 回合・輪到 ${label(enc.order[enc.turn])}` : '先攻位置（隨機）：玩家可以討論並點選交換，GM 按「開打」後鎖定' }),
+      h('ol', { class: 'initiative__list' }, enc.order.map((o, i) => h('li', { class: 'initiative__item' },
+        h('button', {
+          type: 'button', class: `info-chip${enc.locked && i === enc.turn ? ' is-good' : ''}${ui.swapFrom === i ? ' is-warn' : ''}`,
+          'aria-current': enc.locked && i === enc.turn ? 'step' : null, 'aria-pressed': String(ui.swapFrom === i),
+          disabled: !online() || !canSwap, onclick: () => pick(i),
+        }, `${i + 1}. ${label(o)}`)))));
   }
 
   function gmBar(enc) {
     if (!online() || !isGm()) return null;
     return h('div', { class: 'row room__btns' },
-      h('button', { type: 'button', class: 'btn btn--small', onclick: () => act({ t: 'encInit' }) }, '🎲 抽先攻（隨機）'),
-      h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.order?.length, onclick: () => act({ t: 'encNext' }) }, '下一位 ▶'));
+      h('button', { type: 'button', class: 'btn btn--small', onclick: () => { ui.swapFrom = null; act({ t: 'encInit' }); } }, '🎲 抽先攻位置'),
+      h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.order?.length || enc.locked, onclick: () => act({ t: 'encStart' }) }, '⚔️ 開打（鎖定）'),
+      h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, onclick: () => act({ t: 'encNext' }) }, '下一位 ▶'));
   }
 
   function encounterCard() {

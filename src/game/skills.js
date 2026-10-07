@@ -69,6 +69,9 @@ export function addCost(a, b) {
 }
 
 /** 用目錄技能建立一個招式（等級由 state.skills 決定，不寫死在招式裡） */
+/** 普攻：每人固定有一個不花資源的招式（資源用光還能出手）：A/B/C 三軌都用面板攻擊，沒有招式加成 */
+export const basicMove = () => ({ id: 'basic', name: '普攻', tracks: ['A', 'B', 'C'], extra: { A: 0, B: 0, C: 0 }, cost: {} });
+
 export function moveFromCatalog(name) {
   const c = SKILL_CATALOG[name];
   if (!c) return null;

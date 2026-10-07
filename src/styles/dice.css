@@ -226,3 +226,38 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 /* 跑團頁（原骰盤抽屜改成獨立分頁） */
 .session-root { max-width: 760px; margin: 0 auto; padding: 0 .9rem calc(2rem + env(safe-area-inset-bottom, 0px)); }
 .session-root .skill-grid { margin-bottom: .6rem; }
+
+/* 戰鬥面板（跑團頁的懸浮面板；原本的戰鬥頁）。裡面沿用 .bt-* 的版面，一律用「分頁」排法，不受視窗寬度影響 */
+.battle-float {
+  position: fixed; top: var(--topbar-h); right: 0; bottom: 0; z-index: 55;
+  width: min(440px, 100vw); display: flex; flex-direction: column;
+  background: var(--paper2); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(var(--shadow-rgb), .45);
+  transform: translateX(104%); visibility: hidden;
+  transition: transform .22s var(--ease, ease), visibility 0s linear .22s;
+}
+.battle-float[data-open='true'] { transform: none; visibility: visible; transition: transform .22s var(--ease, ease); }
+.battle-float__head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .7rem .9rem; border-bottom: 1px solid var(--line); }
+.battle-float__body { flex: 1; overflow-y: auto; }
+.btn.battle-float__toggle { position: fixed; right: 14px; bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 50; box-shadow: 0 6px 18px var(--shadow); }
+.battle-float[data-open='true'] ~ .btn.battle-float__toggle { visibility: hidden; }
+.battle-float .bt-root { padding: 0 12px 12px; }
+.battle-float .bt-tabs { display: grid; }
+.battle-float .bt-hud__res { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.battle-float .bt-layout { display: block; }
+.battle-float .bt-layout > .bt-pane { display: flex !important; }
+.battle-float .bt-layout[data-pane='action'] > .bt-pane:not([data-id='action']),
+.battle-float .bt-layout[data-pane='log'] > .bt-pane:not([data-id='log']),
+.battle-float .bt-layout[data-pane='state'] > .bt-pane:not([data-id='state']) { display: none !important; }
+.battle-float .bt-pane[data-id='log'] { position: static; max-height: none; overflow: visible; }
+@media (max-width: 700px) {
+  .battle-float { top: auto; left: 0; width: 100%; height: min(88vh, 720px); border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; transform: translateY(104%); }
+  .battle-float[data-open='true'] { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .battle-float { transition: none; } }
+
+/* 先攻位置 */
+.initiative { margin: .4rem 0 .6rem; }
+.initiative__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; }
+.initiative__item button { cursor: pointer; font: inherit; min-height: 36px; }
+.initiative__item button:disabled { cursor: default; opacity: .85; }
+.info-chip.is-warn { color: var(--gold); border-color: var(--gold); }
