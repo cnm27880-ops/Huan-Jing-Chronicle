@@ -51,8 +51,17 @@ export function createBattleView({ root, getState, commit }) {
     moveForm: { name: '', mode: 'normal', school: '', tracks: ['C'], extra: { A: 0, B: 0, C: 0 }, cost: {}, global: true },
     yuwai: false, newSkill: '', newSkillLv: 1,
     hpAdjust: 10,
+    openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
   };
   let feed = null;
+
+  /** 可收合的「＋新增」區塊。記住展開狀態，按裡面的按鈕重畫後不會自己收起來 */
+  function addBox(key, summary, ...children) {
+    return h('details', {
+      class: 'add-box', open: ui.openBoxes.has(key),
+      ontoggle: (e) => { if (e.target.open) ui.openBoxes.add(key); else ui.openBoxes.delete(key); },
+    }, h('summary', { text: summary }), ...children);
+  }
 
   // ---------- 狀態、藥水 ----------
   function statusCard(state) {
@@ -178,8 +187,7 @@ export function createBattleView({ root, getState, commit }) {
               h('input', { class: 'field', type: 'number', min: 1, max: 10, value: lv, onchange: (e) => { state.skills[name] = Math.max(1, Math.min(10, num(e.target.value, 1))); commit(); } })),
             h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { delete state.skills[name]; commit(); } }, '移除'))))
         : h('p', { class: 'notice', text: '還沒有登錄技能。' }),
-      h('details', { class: 'add-box' },
-        h('summary', { text: '＋ 登錄技能 / 從技能庫加入招式' }),
+      addBox('skill', '＋ 登錄技能 / 從技能庫加入招式',
         h('div', { class: 'row' },
           h('select', { class: 'field', 'aria-label': '技能', onchange: (e) => { ui.newSkill = e.target.value; } },
             h('option', { value: '', text: '選擇技能…' }),
@@ -276,8 +284,7 @@ export function createBattleView({ root, getState, commit }) {
               }, '刪除'));
           }))
         : h('p', { class: 'notice', text: '還沒有招式。下面新增一個。' }),
-      h('details', { class: 'add-box' },
-        h('summary', { text: '＋ 新增自訂招式' }),
+      addBox('move', '＋ 新增自訂招式',
         h('div', { class: 'row' },
           h('input', {
             class: 'field', type: 'text', placeholder: '招式名稱', value: f.name, maxlength: 20, 'aria-label': '招式名稱',
@@ -329,8 +336,7 @@ export function createBattleView({ root, getState, commit }) {
 
   function enemyForm(state) {
     const f = ui.form;
-    return h('details', { class: 'add-box' },
-      h('summary', { text: '＋ 新增敵人' }),
+    return addBox('enemy', '＋ 新增敵人',
       h('div', { class: 'toggle-row' },
         [['mob', '小怪'], ['boss', 'BOSS']].map(([id, label]) => h('button', {
           type: 'button', class: 'toggle', 'aria-pressed': String(f.kind === id), onclick: () => { f.kind = id; render(); },

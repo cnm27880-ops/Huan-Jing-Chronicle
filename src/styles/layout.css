@@ -7,6 +7,11 @@
   box-sizing: border-box;
 }
 
+/* 有 hidden 屬性就一定隱藏（避免被 display: grid / flex 蓋掉） */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;

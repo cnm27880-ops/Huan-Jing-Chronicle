@@ -43,17 +43,17 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/data/regions.js` | 四大區域＋中央海域 |
 | `src/data/locations.js` | 地點內容與揭露狀態。格式見 `src/data/CLAUDE.md` |
 | `public/map-data/markers.json` | 地圖標記位置（百分比座標、類型、簡介、設定集 id） |
-| `src/ui/markerCard.js` | 點標記的小卡片 |
 | `src/ui/mapView.js` | 地圖拖曳、縮放、熱點 |
-| `src/ui/dossier.js` | 地點情報面板 |
+| `src/ui/dossier.js` | 地點情報面板（點地圖標記或索引直接打開） |
 | `src/ui/indexList.js` | 地點索引清單 |
 | `src/styles/tokens.css` | 顏色、字體變數（改配色只改這裡） |
 | `src/styles/layout.css` | 頂部列、索引面板 |
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |
 | `src/styles/pages.css` | 修整日、背包頁面 |
-| `src/styles/dice.css` | 骰盤、紀錄、裝備頁、戰鬥頁（最後載入） |
-| `src/styles/redesign.css` | 全站新版樣式（最後載入，覆蓋前面幾個檔案） |
+| `src/styles/dice.css` | 骰盤、紀錄、裝備頁、戰鬥頁 |
+| `src/styles/redesign.css` | 全站新版樣式（覆蓋前面幾個檔案） |
+| `src/styles/polish.css` | 質感層：玻璃面板、按鈕光暈、hover 效果（最後載入） |
 | `public/lore-data/*.json` | 設定集文字（Discord 匯出），點「查看設定集」時由 `lore.js` 讀取 |
 
 ## 不可違反的規則
