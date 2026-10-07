@@ -22,7 +22,7 @@ const P1 = { uid: '300', name: '玩家一', avatar: null };
 const baseEnv = { DISCORD_ALLOWED_IDS: '100,200,300', GM_DISCORD_IDS: '100', ADMIN_DISCORD_IDS: '200' };
 
 // ---------- 假的伺服器：WebSocket 一端接到 RoomCore ----------
-const hub = { core: null, sockets: new Set(), access: 'ok', failNextDraw: false };
+const hub = { core: null, sockets: new Set(), access: 'ok', failNextDraw: false, noPong: false };
 
 function resetHub(env = baseEnv) {
   hub.core = new RoomCore({ db: makeDb(), env, rng: seqRng([5]) });
@@ -30,6 +30,7 @@ function resetHub(env = baseEnv) {
   hub.sockets.clear();
   hub.access = 'ok';
   hub.failNextDraw = false;
+  hub.noPong = false;
 }
 const online = () => [...new Set([...hub.sockets].map((w) => w.user.uid))];
 const deliver = (ws, obj) => queueMicrotask(() => { if (ws.readyState === 1) ws.onmessage({ data: typeof obj === 'string' ? obj : JSON.stringify(obj) }); });
@@ -50,7 +51,7 @@ class FakeWS {
     });
   }
   send(data) {
-    if (data === 'ping') return deliver(this, 'pong');
+    if (data === 'ping') return hub.noPong ? undefined : deliver(this, 'pong');
     if (hub.failNextDraw && JSON.parse(data).t === 'draw') {
       hub.failNextDraw = false;
       return deliver(this, { t: 'error', rid: JSON.parse(data).rid, code: 'boom', message: '伺服器壞掉了' });
@@ -230,6 +231,22 @@ test('連線中斷：暫時用本機骰盤，自動重連後回到房間且歷�
   assert.equal(a.getRoomStatus().phase, 'online');
   assert.deepEqual(a.getLog().map((e) => e.label), ['1D6']);
   assert.ok(local.id);
+  stopAll(a);
+});
+
+test('心跳沒回應（網路已死、瀏覽器遲遲不觸發 onclose）：不等關閉握手，直接轉為重連', async () => {
+  resetHub();
+  const a = await browser(P1);
+  assert.equal(a.getRoomStatus().phase, 'online');
+  hub.noPong = true;
+  mock.timers.tick(45_000); // 送出心跳
+  mock.timers.tick(10_000); // 等不到 pong
+  await flush();
+  assert.equal(a.getRoomStatus().phase, 'reconnecting');
+  hub.noPong = false;
+  mock.timers.tick(31_000);
+  await flush();
+  assert.equal(a.getRoomStatus().phase, 'online');
   stopAll(a);
 });
 
