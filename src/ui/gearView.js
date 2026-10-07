@@ -3,7 +3,7 @@
 // 設計原則：玩家會一次鍛造很多件再挑最好的，所以鑑定可以一次多件，並自動標出「比身上好」的
 // ============================================================
 import { h, fmt } from './dom.js';
-import { toast } from './controls.js';
+import { toast, rollFailed } from './controls.js';
 import { iconOf } from './items.js';
 import { openFoodSheet } from './statusBar.js';
 import {
@@ -13,7 +13,7 @@ import {
   identifiable, identify, equip, unequip, discard, compareGear, findJunk, gearName, effectText, gearDiceText,
 } from '../game/equipment.js';
 import { derivedStats } from '../game/stats.js';
-import { publish } from '../state/rollLog.js';
+import { publish, rollWith } from '../state/rollLog.js';
 
 const tierIndex = (g) => GEAR_TIERS.indexOf(g.tier);
 const SLOT_ORDER = { weapon: 0, armor: 1, accessory: 2 };
@@ -77,8 +77,10 @@ export function createGearView({ root, getState, commit }) {
   }
 
   // ---------- 鑑定 ----------
-  function runIdentify(state, name, times) {
-    const made = identify(state, name, times);
+  async function runIdentify(state, name, times) {
+    let made;
+    let draw;
+    try { ({ r: made, draw } = await rollWith(state, (st, rng) => identify(st, name, times, rng))); } catch (e) { return rollFailed(e); }
     if (!made.length) return toast('沒有可以鑑定的裝備。');
     const rows = made.map((g) => ({ g, cmp: compareGear(state, g) }));
     ui.batch = { name, ids: made.map((g) => g.id) };
@@ -91,7 +93,7 @@ export function createGearView({ root, getState, commit }) {
         ...made.slice(0, 5).map((g) => `${gearName(g)}：${effectText(g)}${g.roll?.d4 === 4 && g.slot !== 'accessory' ? '（1D4 擲出 4）' : ''}`),
         made.length > 5 ? `…共 ${made.length} 件，其中 ${upgrades} 件比身上好` : null,
       ].filter(Boolean),
-    });
+    }, { draw });
     commit();
   }
 

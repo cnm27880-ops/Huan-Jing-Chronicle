@@ -7,8 +7,9 @@ import {
   LIFE_SKILLS, GATHER_POOLS, gatherTier, RECIPES, CRAFT_COST_AMOUNT,
   FOODS, STOMACH_SLOTS, REST_FOOD_CHECKS, BASE_PROFICIENCY, MAX_TIME,
 } from './rules.js';
+import { rollDie } from './dice.js';
 
-export const d20 = (rng = Math.random) => Math.floor(rng() * 20) + 1;
+export const d20 = (rng = Math.random) => rollDie(20, rng);
 const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
 
 // ---------- 背包 ----------

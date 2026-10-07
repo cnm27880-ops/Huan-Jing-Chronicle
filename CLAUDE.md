@@ -29,10 +29,15 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js） |
 | `tests/*.test.js` | 規則測試：engine（採集製作）、combat、equipment、dice |
-| `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（階段 1-A）。設定在 `wrangler.jsonc`，測試在 `worker/test/`，Secrets 放後台 |
+| `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
+| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證 |
+| `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
+| `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
+| `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |
+| `src/ui/roomPanel.js` | 骰盤裡的房間區塊：狀態、GM、成員、新戰鬥、暫代 GM |
 | `src/api/auth.js` | 前端登入 API：查詢登入者、登出；任何失敗都當未登入（維持單機試玩） |
 | `src/ui/userChip.js` | 頂部列的登入者頭像與登出 |
-| `src/state/rollLog.js` | 擲骰紀錄。**之後接 Cloudflare 時只改這個檔案**（publish 送伺服器、subscribe 收廣播） |
+| `src/state/rollLog.js` | 擲骰紀錄，**畫面與房間之間唯一的接線點**：房間模式走 WebSocket、伺服器擲骰；本機模式（沒登入／連不上）照舊存 localStorage |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |
 | `src/ui/restView.js` | 修整日頁面 |
@@ -68,4 +73,4 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 6. 圖片路徑用相對路徑（`img/...`，不要開頭的 `/`），GitHub Pages 子路徑才不會壞。
 
 ## 未來規劃（現在不要做，除非我明確要求）
-Cloudflare Workers + Durable Objects（共享骰盤、伺服器端擲骰與鑑定、角色資料放伺服器）、Discord OAuth2 登入、GM 控制遭遇戰與先攻、GM 後台（地圖點選放標記、表單編輯、圖片上傳到 R2、揭露開關）、依技能自動計算戰鬥面板、從試算表匯入角色。網站日後會掛到自己的網域（同站）。
+角色資料放伺服器（階段 2；目前骰子的數量與加值仍由前端送出，伺服器只負責擲與記錄）、GM 控制遭遇戰與先攻、GM 後台（地圖點選放標記、表單編輯、圖片上傳到 R2、揭露開關）、依技能自動計算戰鬥面板、從試算表匯入角色。網站日後會掛到自己的網域（同站）。

@@ -4,14 +4,14 @@
 // 之後接上 Cloudflare：紀錄會變成「房間內所有玩家」共用（見 src/state/rollLog.js）。
 // ============================================================
 import { h } from './dom.js';
-import { amountPicker } from './controls.js';
+import { amountPicker, rollFailed } from './controls.js';
+import { mountRoomPanel } from './roomPanel.js';
 import { mountFeed } from './rollFeed.js';
 import { openFoodSheet } from './statusBar.js';
 import { LIFE_SKILLS, ART_SKILLS, STOMACH_SLOTS } from '../game/rules.js';
-import { modifier, proficiency, sessionCheck } from '../game/engine.js';
-import { rollExpr, parseDiceExpr, MAX_DICE } from '../game/dice.js';
-import { checkEvent } from '../game/events.js';
-import { publish, clearLog } from '../state/rollLog.js';
+import { modifier, proficiency } from '../game/engine.js';
+import { parseDiceExpr, MAX_DICE } from '../game/dice.js';
+import { rollDice, rollCheck, clearLog, getRoomStatus } from '../state/rollLog.js';
 
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
 
@@ -20,11 +20,12 @@ export function createDiceTray({ getState, commit, toggleButton }) {
   const node = h('aside', { class: 'tray', id: 'dice-tray', 'aria-label': '骰盤', 'aria-hidden': 'true', dataset: { open: 'false' } });
   document.body.append(node);
   let feeds = [];
+  let roomPanel = null;
 
   // ---------- 一鍵技能檢定 ----------
-  function checkSkill(skill) {
+  async function checkSkill(skill) {
     const state = getState();
-    publish(checkEvent(state.name, sessionCheck(state, skill)));
+    try { await rollCheck(state.name, state, skill); } catch (e) { rollFailed(e); }
   }
 
   function skillButton(state, skill, value, isLife) {
@@ -41,17 +42,11 @@ export function createDiceTray({ getState, commit, toggleButton }) {
     return parseDiceExpr(`${ui.count}D${ui.sides}${ui.mod ? (ui.mod > 0 ? '+' : '') + ui.mod : ''}`);
   }
 
-  function rollCustom() {
+  async function rollCustom() {
     const state = getState();
     const expr = expression();
     if (expr.error) return;
-    const r = rollExpr(expr);
-    publish({
-      who: state.name, kind: 'dice', label: r.text, big: r.total,
-      lines: [
-        r.count > 1 ? `明細 ${r.rolls.join(' + ')}${r.mod ? ` ${r.mod > 0 ? '+' : '−'} ${Math.abs(r.mod)}` : ''}` : r.mod ? `骰面 ${r.base} ${r.mod > 0 ? '+' : '−'} ${Math.abs(r.mod)}` : null,
-      ].filter(Boolean),
-    });
+    try { await rollDice(state.name, expr); } catch (e) { rollFailed(e); }
   }
 
   function customPanel() {
@@ -93,6 +88,8 @@ export function createDiceTray({ getState, commit, toggleButton }) {
   function render() {
     const state = getState();
     feeds.forEach((f) => f.destroy());
+    roomPanel?.destroy();
+    const roomBox = h('div', { class: 'tray__room' });
     const latestBox = h('div', { class: 'tray__latest', 'aria-live': 'polite' });
     const historyBox = h('div', { class: 'tray__history' });
     const prof = proficiency(state, 'session');
@@ -104,6 +101,7 @@ export function createDiceTray({ getState, commit, toggleButton }) {
         h('h2', { class: 'tray__heading', text: '骰盤' }),
         h('span', { class: 'tray__who', text: state.name }),
         h('button', { type: 'button', class: 'sheet__close', onclick: () => setOpen(false) }, '關閉')),
+      roomBox, // 房間狀態：只有登入後才會出現
       latestBox, // 固定在上方：不管骰盤捲到哪裡，最新結果都看得到
       h('div', { class: 'tray__body' },
         h('section', { class: 'tray__section' },
@@ -126,8 +124,11 @@ export function createDiceTray({ getState, commit, toggleButton }) {
         h('section', { class: 'tray__section' },
           h('div', { class: 'tray__title-row' },
             h('h3', { class: 'tray__title', text: '紀錄' }),
-            h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')),
+            getRoomStatus().phase === 'online'
+              ? h('span', { class: 'hint', text: '房間共用，保存最近 200 筆' })
+              : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')),
           historyBox)));
+    roomPanel = mountRoomPanel(roomBox);
     feeds = [mountFeed(latestBox, { limit: 1, empty: '按下任何一顆骰子，結果會出現在這裡。' }), mountFeed(historyBox, { limit: 30, skip: 1, empty: '' })];
     const body = node.querySelector('.tray__body');
     if (body) body.scrollTop = scrollY;

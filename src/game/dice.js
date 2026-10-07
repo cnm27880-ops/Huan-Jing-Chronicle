@@ -2,8 +2,13 @@
 // 骰子基礎：所有隨機都經過這裡，rng 可替換（測試用固定值、伺服器用 crypto）
 // ============================================================
 
-/** 擲一顆 sides 面骰（1..sides） */
-export const rollDie = (sides, rng = Math.random) => Math.floor(rng() * sides) + 1;
+/**
+ * 擲一顆 sides 面骰（1..sides）。
+ * 若 rng 帶有 .int(sides)（伺服器的安全亂數：用拒絕取樣、沒有偏差），就用它；
+ * 否則照舊 Math.floor(rng() * sides) + 1（Math.random 與測試用的固定值都走這條，行為不變）。
+ */
+export const rollDie = (sides, rng = Math.random) =>
+  typeof rng.int === 'function' ? rng.int(sides) : Math.floor(rng() * sides) + 1;
 
 /** 擲 count 顆 sides 面骰，回傳總和（count <= 0 回傳 0） */
 export function rollSum(count, sides, rng = Math.random) {

@@ -3,6 +3,7 @@
 // ============================================================
 import { h, fmt } from './dom.js';
 import { iconOf, tierOf, plainName, TIERS } from './items.js';
+import { RollError } from '../state/rollLog.js';
 
 /** 物品格：圖示 + 名稱 + 數量，左側色條代表稀有度 */
 export function itemTile(name, qty, { onClick, size = 'md', extra } = {}) {
@@ -55,4 +56,10 @@ export function toast(msg) {
   t.dataset.show = 'true';
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (t.dataset.show = 'false'), 2200);
+}
+
+/** 擲骰失敗（房間連線問題）時用：顯示原因；不是擲骰錯誤就原樣丟出去，不吞掉真正的 bug */
+export function rollFailed(e) {
+  if (e instanceof RollError) return toast(e.message);
+  throw e;
 }

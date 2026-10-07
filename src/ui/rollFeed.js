@@ -5,13 +5,20 @@ import { h } from './dom.js';
 import { getLog, subscribe } from '../state/rollLog.js';
 
 const ICON = {
-  check: '🎲', dice: '🎲', identify: '🔍', attack: '⚔️', defend: '🛡️', potion: '🧪', note: '📝',
+  check: '🎲', dice: '🎲', identify: '🔍', attack: '⚔️', defend: '🛡️', potion: '🧪', skill: '✨', note: '📝', divider: '⚔️',
 };
 
 const clock = (t) => new Date(t).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
 
 /** 單一事件的卡片 */
 export function renderRoll(ev, { fresh = false } = {}) {
+  if (ev.kind === 'divider') { // GM 開新戰鬥：紀錄裡的分隔線，只是分段，不影響任何規則
+    return h('li', { class: 'roll roll--divider', dataset: { tone: '', fresh: fresh ? '1' : '0' } },
+      h('span', { class: 'roll__icon', 'aria-hidden': 'true', text: ICON.divider }),
+      h('strong', { class: 'roll__label', text: ev.label }),
+      h('time', { class: 'roll__time', text: clock(ev.t) }),
+      ev.lines?.length ? h('span', { class: 'roll__sub', text: ev.lines.join('　') }) : null);
+  }
   return h('li', { class: `roll roll--${ev.kind}`, dataset: { tone: ev.tone ?? '', fresh: fresh ? '1' : '0' } },
     h('div', { class: 'roll__head' },
       h('span', { class: 'roll__icon', 'aria-hidden': 'true', text: ICON[ev.kind] ?? '🎲' }),

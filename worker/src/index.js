@@ -3,6 +3,11 @@
 // 設計重點：登入完成後「不保存」Discord access token，只把 id/名稱/頭像簽進 session cookie。
 import { signToken, verifyToken, randomToken } from './crypto.js';
 import { parseCookies, setCookie, clearCookie } from './cookies.js';
+import { parseAllowlist, isAllowed, roomAccessState } from './allowlist.js';
+import { avatarUrl } from './avatar.js';
+import { ROOM_IDS } from './config.js';
+
+export { parseAllowlist, isAllowed }; // 階段 1-A 起就從這裡匯出（測試在用）
 
 const SESSION_COOKIE = 'hj_session';
 const STATE_COOKIE = 'hj_state';
@@ -43,28 +48,12 @@ const withCors = (res, request, env) => {
 const configured = (env) =>
   env.SESSION_SECRET && env.DISCORD_CLIENT_SECRET && env.DISCORD_CLIENT_ID && env.DISCORD_REDIRECT_URI && env.SITE_ORIGIN;
 
-export function parseAllowlist(raw) {
-  return String(raw || '').split(',').map((s) => s.trim()).filter(Boolean);
-}
-
-/** 白名單為空 = 不限制 */
-export function isAllowed(env, userId) {
-  const list = parseAllowlist(env.DISCORD_ALLOWED_IDS);
-  return list.length === 0 || list.includes(String(userId));
-}
-
 function backToSite(env, result, extraCookies = []) {
   const url = new URL(env.SITE_ORIGIN);
   url.searchParams.set('login', result);
   const headers = new Headers({ Location: url.toString(), 'Cache-Control': 'no-store' });
   for (const c of extraCookies) headers.append('Set-Cookie', c);
   return new Response(null, { status: 302, headers });
-}
-
-function avatarUrl(user) {
-  if (user.avatar) return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128`;
-  const idx = Number((BigInt(user.id) >> 22n) % 6n);
-  return `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
 }
 
 const publicUser = (s) => ({ id: s.uid, name: s.name, avatarUrl: avatarUrl({ id: s.uid, avatar: s.avatar }) });
@@ -177,6 +166,44 @@ function logout(request, env) {
   return json({ ok: true }, 200, { 'Set-Cookie': clearCookie(SESSION_COOKIE) });
 }
 
+// ---------- 固定團房間（階段 1-B） ----------
+const ROOM_PATH = /^\/rooms\/([a-z0-9_-]{1,32})\/(access|ws)$/;
+
+/** 前端用來決定「進房間還是維持本機模式」，並能顯示明確原因。不會碰到 Durable Object。 */
+async function roomAccess(request, env, roomId) {
+  if (request.method !== 'GET') return json({ error: 'method_not_allowed' }, 405);
+  if (!ROOM_IDS.includes(roomId)) return json({ error: 'not_found' }, 404);
+  const s = await readSession(request, env);
+  if (!s) return json({ state: 'unauthenticated' });
+  return json({ state: roomAccessState(env, s.uid), user: publicUser(s) });
+}
+
+/**
+ * WebSocket 不受 CORS 保護（任何網站都能對我們開連線，而且會自動帶 cookie），
+ * 所以升級連線前一定要：檢查 Origin、驗證 session cookie、確認在白名單內。
+ */
+async function roomSocket(request, env, roomId) {
+  const fail = (status, error) => json({ error }, status);
+  if (request.method !== 'GET') return fail(405, 'method_not_allowed');
+  if (!ROOM_IDS.includes(roomId)) return fail(404, 'not_found');
+  if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return fail(426, 'upgrade_required');
+  if (request.headers.get('Origin') !== env.SITE_ORIGIN) return fail(403, 'bad_origin');
+  const s = await readSession(request, env);
+  if (!s) return fail(401, 'unauthenticated');
+  const state = roomAccessState(env, s.uid);
+  if (state !== 'ok') return fail(403, state);
+  if (!env.ROOM) return fail(500, 'server_misconfigured');
+
+  const headers = new Headers(request.headers);
+  for (const k of [...headers.keys()]) if (k.startsWith('x-hj-')) headers.delete(k); // 不信任瀏覽器自己帶的身分標頭
+  headers.set('X-HJ-Uid', s.uid);
+  headers.set('X-HJ-Name', encodeURIComponent(s.name));
+  headers.set('X-HJ-Avatar', s.avatar ?? '');
+  headers.set('X-HJ-Exp', String(s.exp));
+  headers.set('X-HJ-Room', roomId);
+  return env.ROOM.get(env.ROOM.idFromName(roomId)).fetch(new Request(request, { headers }));
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -186,6 +213,12 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(request, env) });
     }
     if (path === '/health' && request.method === 'GET') return withCors(json({ status: 'ok' }), request, env);
+
+    const room = ROOM_PATH.exec(path);
+    if (room) {
+      if (!configured(env)) return withCors(json({ error: 'server_misconfigured' }, 500), request, env);
+      return room[2] === 'ws' ? roomSocket(request, env, room[1]) : withCors(await roomAccess(request, env, room[1]), request, env);
+    }
 
     const routes = {
       'GET /auth/login': login,

@@ -1,17 +1,26 @@
 {
   // Worker 名稱必須與 Cloudflare 後台（Workers Builds）上的名稱一致
   "name": "huan-jing-api",
-  "main": "src/index.js",
+  "main": "src/entry.js",
   "compatibility_date": "2026-01-01",
   "workers_dev": false,
   "routes": [{ "pattern": "huan-jing-api.yuci8660.uk", "custom_domain": true }],
   "observability": { "enabled": true },
+  // 固定團房間（Durable Object，SQLite 儲存）。migrations 會在部署時自動建立，不用手動操作。
+  "durable_objects": { "bindings": [{ "name": "ROOM", "class_name": "Room" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
   // 非機密設定。Client Secret 與 Session Secret 絕對不要寫在這裡（放後台 Secrets）。
   "vars": {
     "SITE_ORIGIN": "https://huan-jing.yuci8660.uk",
     "DISCORD_CLIENT_ID": "1482663721271820368",
     "DISCORD_REDIRECT_URI": "https://huan-jing-api.yuci8660.uk/auth/callback",
-    // Discord ID 白名單，逗號分隔。空字串 = 不限制（任何 Discord 帳號都能登入）
-    "DISCORD_ALLOWED_IDS": ""
+    // Discord ID 白名單，逗號分隔（同時管登入與房間）。
+    // 登入：空字串 = 不限制。房間：空字串 = 一律拒絕加入（安全預設）。
+    // 目前先放 GM 與開發者；其他玩家請把他們的 Discord ID 加在後面，用逗號隔開。
+    "DISCORD_ALLOWED_IDS": "342173216078561291,693348255706251284",
+    // GM：可以按「新戰鬥」。逗號分隔。
+    "GM_DISCORD_IDS": "342173216078561291",
+    // 開發者：可以按「暫代 GM」，測試完再「還給原 GM」。必須也在白名單內。留空 = 沒有人能暫代。
+    "ADMIN_DISCORD_IDS": "693348255706251284"
   }
 }

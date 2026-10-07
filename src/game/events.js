@@ -10,3 +10,13 @@ export function checkEvent(who, r) {
     lines: [`1D20（${r.roll}）+ ${r.mod}`, partsText(r.parts) || '無加值', r.isLife ? '生活技能：已加跑團熟練' : '非生活技能：不加熟練'],
   };
 }
+
+/** 自訂骰：rollExpr() 的結果 → 事件（骰盤的自訂骰；伺服器擲骰也用同一份格式） */
+export function diceEvent(who, r) {
+  return {
+    who, kind: 'dice', label: r.text, big: r.total,
+    lines: [
+      r.count > 1 ? `明細 ${r.rolls.join(' + ')}${r.mod ? ` ${r.mod > 0 ? '+' : '−'} ${Math.abs(r.mod)}` : ''}` : r.mod ? `骰面 ${r.base} ${r.mod > 0 ? '+' : '−'} ${Math.abs(r.mod)}` : null,
+    ].filter(Boolean),
+  };
+}

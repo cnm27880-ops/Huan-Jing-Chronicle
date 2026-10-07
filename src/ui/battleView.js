@@ -4,7 +4,7 @@
 // 目前遭遇戰由自己建立（等於單人試玩）；之後交給 GM 控制、全員共享。
 // ============================================================
 import { h, fmt } from './dom.js';
-import { toast } from './controls.js';
+import { toast, rollFailed } from './controls.js';
 import { mountFeed } from './rollFeed.js';
 import { TRACKS, TRACK_ATK_STAT, POTIONS, TOXICITY_MAX } from '../game/rules.js';
 import {
@@ -20,7 +20,7 @@ import {
 } from '../game/resources.js';
 import { countOf } from '../game/engine.js';
 import { iconOf } from './items.js';
-import { publish } from '../state/rollLog.js';
+import { publish, rollWith } from '../state/rollLog.js';
 
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const potionText = (p) => [
@@ -111,10 +111,12 @@ export function createBattleView({ root, getState, commit }) {
       have.length
         ? h('div', { class: 'potion-grid' }, have.map((n) => h('button', {
             type: 'button', class: 'potion', title: potionText(POTIONS[n]), disabled: state.toxicity + POTIONS[n].toxicity > TOXICITY_MAX, 'aria-disabled': String(state.toxicity + POTIONS[n].toxicity > TOXICITY_MAX),
-            onclick: () => {
+            onclick: async () => {
               const pd = POTIONS[n];
               if (pd.heal && !pd.atk && !pd.def && state.hp >= maxHp(state) && !confirm('血量已經是滿的，喝了回血會浪費。還是要喝嗎？')) return;
-              const r = drinkPotion(state, n);
+              let r;
+              let draw;
+              try { ({ r, draw } = await rollWith(state, (st, rng) => drinkPotion(st, n, rng))); } catch (e) { return rollFailed(e); }
               if (r.error) return toast(r.error);
               publish({
                 who: state.name, kind: 'potion', label: `喝下${n}`,
@@ -126,7 +128,7 @@ export function createBattleView({ root, getState, commit }) {
                   r.def ? '下次防禦：絕對防禦骰增加（三軌都加）' : null,
                   `毒性 ${r.toxicity} / ${TOXICITY_MAX}${r.atLimit ? '　⚠ 已達上限，不能再喝' : ''}`,
                 ].filter(Boolean),
-              });
+              }, { draw });
               commit();
             },
           },
@@ -367,12 +369,16 @@ export function createBattleView({ root, getState, commit }) {
         names.map((n, i) => h('option', { value: String(i), selected: i === value ? true : null, text: n }))));
   }
 
-  function doAttack(state, m) {
+  async function doAttack(state, m) {
     const modes = ui.modes[m.id] ?? { atk: 0, def: 0 };
     const move = state.moves.find((x) => x.id === ui.moveId);
     const hpBefore = state.hp;
     const befores = new Map(state.encounter.monsters.map((x) => [x.id, x.hp]));
-    const r = playerAttack(state, state.encounter, ui.moveId, m.id, modes.def, Math.random, { yuwai: ui.yuwai });
+    let r;
+    let draw;
+    try {
+      ({ r, draw } = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, ui.moveId, m.id, modes.def, rng, { yuwai: ui.yuwai })));
+    } catch (e) { return rollFailed(e); }
     if (r.error) return toast(r.error);
     const multi = r.hits.length > 1;
     const lines = [];
@@ -392,14 +398,18 @@ export function createBattleView({ root, getState, commit }) {
       big: r.hits.reduce((a, x) => a + x.result.total + (x.bonus ?? 0) + (x.yuwai ?? 0), 0),
       tone: r.hits.some((x) => x.result.total > 0) ? 'ok' : 'fail',
       lines,
-    });
+    }, { draw });
     commit();
   }
 
-  function doDefend(state, m) {
+  async function doDefend(state, m) {
     const modes = ui.modes[m.id] ?? { atk: 0, def: 0 };
     const before = state.hp;
-    const r = monsterAttack(state, state.encounter, m.id, modes.atk);
+    let r;
+    let draw;
+    try {
+      ({ r, draw } = await rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng)));
+    } catch (e) { return rollFailed(e); }
     if (r.error) return toast(r.error);
     publish({
       who: state.name, kind: 'defend', label: `${m.id} 攻擊${m.kind === 'boss' ? `（${BOSS_ATK_MODES[modes.atk]}）` : ''}`,
@@ -411,7 +421,7 @@ export function createBattleView({ root, getState, commit }) {
         `${state.name} 生命 ${fmt(before)} → ${fmt(state.hp)} / ${fmt(maxHp(state))}`,
         r.newlyDowned ? `${state.name} 倒地！（不會死亡）` : null,
       ].filter(Boolean),
-    });
+    }, { draw });
     commit();
   }
 

@@ -62,3 +62,21 @@ export function consumeLoginResult() {
     return null;
   }
 }
+
+export const DEFAULT_ROOM_ID = 'main';
+export const roomWsUrl = (roomId = DEFAULT_ROOM_ID) => `${API_BASE.replace(/^http/, 'ws')}/rooms/${roomId}/ws`;
+
+/**
+ * 問 Worker：我能不能進房間？回傳 { state, user? }
+ * state：ok｜unauthenticated｜not_allowed｜whitelist_empty｜offline（API 連不上）
+ */
+export async function getRoomAccess(roomId = DEFAULT_ROOM_ID) {
+  try {
+    const res = await request(`/rooms/${roomId}/access`);
+    if (!res.ok) return { state: 'offline' };
+    const { state, user } = await res.json();
+    return { state: typeof state === 'string' ? state : 'offline', user };
+  } catch {
+    return { state: 'offline' };
+  }
+}
