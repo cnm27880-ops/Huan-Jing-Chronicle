@@ -43,6 +43,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/userChip.js` | 頂部列的登入者頭像與登出 |
 | `src/state/rollLog.js` | 擲骰紀錄，**畫面與房間之間唯一的接線點**：房間模式走 WebSocket、伺服器擲骰；本機模式（沒登入／連不上）照舊存 localStorage |
 | `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔 |
+| `src/game/importBot.js` | 機器人存檔（players_data.json 的一位玩家）→ 網站角色（純函式）：只填機器人有的欄位，技能與基礎數值空白；可合併進既有角色 |
+| `src/ui/botImport.js` | GM 專用的「匯入機器人存檔」面板（在骰盤的房間區塊）：檔案只在瀏覽器讀取轉換，轉好才送伺服器（`charImport`）；`players_data.json` 永遠不能進 git |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |
 | `src/ui/restView.js` | 修整日頁面：上方 HUD、採集／製作／跑團檢定分頁、設定步驟＋大按鈕、結果卡 |

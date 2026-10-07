@@ -23,7 +23,8 @@ const TONES = new Set(['ok', 'fail', 'crit', 'warn']);
 const SKILLS = new Set([...LIFE_SKILLS, ...ART_SKILLS]);
 const RID = /^[A-Za-z0-9_-]{1,40}$/;
 const UID = /^\d{1,25}$/;
-const CHAR_PREFIX = '{"t":"charPut"'; // 前端組訊息時 t 一定排第一；只有這種訊息可以放寬大小上限
+const CHAR_PREFIXES = ['{"t":"charPut"', '{"t":"charImport"']; // 前端組訊息時 t 一定排第一；只有這兩種訊息可以放寬大小上限
+const isCharType = (t) => t === 'charPut' || t === 'charImport';
 
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const cleanStr = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
@@ -162,7 +163,7 @@ export class RoomCore {
     if (typeof user?.exp === 'number' && this.now() >= user.exp) return closing(4401, 'session expired');
     if (this.accessState(user.uid) !== 'ok') return closing(4403, 'not allowed');
     if (typeof raw !== 'string') return closing(1003, 'text only');
-    if (raw.length > (raw.startsWith(CHAR_PREFIX) ? MAX_CHAR_MESSAGE_CHARS : MAX_MESSAGE_CHARS)) return closing(1009, 'message too big');
+    if (raw.length > (CHAR_PREFIXES.some((x) => raw.startsWith(x)) ? MAX_CHAR_MESSAGE_CHARS : MAX_MESSAGE_CHARS)) return closing(1009, 'message too big');
     const rate = this.rate(user.uid);
     if (rate === 'abuse') return closing(4429, 'rate limit');
     if (rate === 'limited') return err(undefined, 'rate_limited', '操作太快了，請稍等一下。');
@@ -170,7 +171,7 @@ export class RoomCore {
     let msg;
     try { msg = JSON.parse(raw); } catch { return err(undefined, 'bad_json', '訊息格式錯誤。'); }
     if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.t !== 'string') return err(undefined, 'bad_message', '訊息格式錯誤。');
-    if (raw.length > MAX_MESSAGE_CHARS && msg.t !== 'charPut') return closing(1009, 'message too big');
+    if (raw.length > MAX_MESSAGE_CHARS && !isCharType(msg.t)) return closing(1009, 'message too big');
     const rid = typeof msg.rid === 'string' && RID.test(msg.rid) ? msg.rid : undefined;
 
     switch (msg.t) {
@@ -183,6 +184,7 @@ export class RoomCore {
       case 'charGet': return this.onCharGet(user, msg, rid);
       case 'charPut': return this.onCharPut(user, msg, rid);
       case 'charList': return this.onCharList(user, rid);
+      case 'charImport': return this.onCharImport(user, msg, rid);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
     }
   }
@@ -306,9 +308,8 @@ export class RoomCore {
     return { out: [{ to: 'self', msg: { t: 'char', rid, uid, version: row?.version ?? 0, updatedAt: row?.updated_at ?? null, data: row ? JSON.parse(row.json) : null } }], close: null };
   }
 
-  /** 存自己的角色。base = 前端上次確認的版本（從沒存過 = 0） */
-  onCharPut(user, msg, rid) {
-    const { base, data } = msg;
+  /** 驗證並寫入某人的角色（版本號對不上就不寫）。回傳要送給對方的訊息 */
+  storeChar(uid, base, data, rid) {
     if (!isInt(base, 0, 1_000_000_000)) return err(rid, 'bad_char', '版本格式錯誤。');
     if (!data || typeof data !== 'object' || Array.isArray(data)) return err(rid, 'bad_char', '角色資料格式錯誤。');
     if (typeof data.name !== 'string' || !data.name.trim() || data.name.length > 80) return err(rid, 'bad_char', '角色缺少名稱。');
@@ -316,16 +317,33 @@ export class RoomCore {
     if (json.length > MAX_CHAR_JSON_CHARS) return err(rid, 'char_too_big', '角色資料太大，無法儲存。');
     let result;
     this.db.tx(() => {
-      const cur = this.charRow(user.uid)?.version ?? 0;
+      const cur = this.charRow(uid)?.version ?? 0;
       if (cur !== base) { result = { ok: false, version: cur }; return; }
       const t = this.now();
       this.db.exec(
         'INSERT INTO characters(uid, json, version, updated_at) VALUES (?, ?, ?, ?) '
         + 'ON CONFLICT(uid) DO UPDATE SET json = excluded.json, version = excluded.version, updated_at = excluded.updated_at',
-        user.uid, json, cur + 1, t);
+        uid, json, cur + 1, t);
       result = { ok: true, version: cur + 1, updatedAt: t };
     });
-    return { out: [{ to: 'self', msg: { t: 'charSaved', rid, ...result } }], close: null };
+    return result;
+  }
+
+  /** 存自己的角色。base = 前端上次確認的版本（從沒存過 = 0） */
+  onCharPut(user, msg, rid) {
+    const r = this.storeChar(user.uid, msg.base, msg.data, rid);
+    if (r.out) return r;
+    return { out: [{ to: 'self', msg: { t: 'charSaved', rid, ...r } }], close: null };
+  }
+
+  /** GM：替某位成員寫入角色（匯入舊機器人存檔用）。同樣要帶版本號，免得蓋掉對方剛存的 */
+  onCharImport(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以匯入玩家角色。');
+    const uid = String(msg.uid);
+    if (!UID.test(uid) || this.accessState(uid) !== 'ok') return err(rid, 'bad_char', '這個玩家不在白名單內。');
+    const r = this.storeChar(uid, msg.base, msg.data, rid);
+    if (r.out) return r;
+    return { out: [{ to: 'self', msg: { t: 'charSaved', rid, uid, ...r } }], close: null };
   }
 
   /** GM：所有已存檔玩家的清單（不含角色內容），模擬戰挑人用 */

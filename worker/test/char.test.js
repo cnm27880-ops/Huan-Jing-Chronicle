@@ -93,3 +93,19 @@ test('非成員（不在白名單）不能存取', () => {
   const stranger = { uid: '999', name: '路人', avatar: null };
   assert.equal(send(core, stranger, { t: 'charPut', base: 0, data: { name: 'x' } }).close?.code, 4403);
 });
+
+test('GM 匯入：只有 GM、只能寫白名單內的成員、要帶版本號、不動別人的資料', () => {
+  const core = room();
+  const imp = (user, uid, base, data) => reply(send(core, user, { t: 'charImport', rid: 'i', uid, base, data }));
+  assert.equal(imp(P1, '400', 0, { name: 'x' }).code, 'forbidden'); // 玩家不能替別人寫
+  assert.equal(imp(GM, '999', 0, { name: 'x' }).code, 'bad_char'); // 不在白名單
+  const a = imp(GM, '400', 0, { name: '匯入的角色', hp: 9 });
+  assert.equal(a.ok, true); assert.equal(a.uid, '400'); assert.equal(a.version, 1);
+  assert.equal(get(core, P2).data.name, '匯入的角色'); // 玩家二登入後讀得到
+  assert.equal(get(core, GM, '300').version, 0); // 沒有動到玩家一
+  put(core, P2, 1, { name: '玩家二自己改的', hp: 1 }); // 玩家二之後自己存了第 2 版
+  const stale = imp(GM, '400', 1, { name: '舊的匯入', hp: 9 }); // GM 還以為是第 1 版
+  assert.equal(stale.ok, false); assert.equal(stale.version, 2);
+  assert.equal(get(core, P2).data.name, '玩家二自己改的');
+  assert.equal(imp(GM, '400', 2, { name: 'x'.repeat(81) }).code, 'bad_char');
+});
