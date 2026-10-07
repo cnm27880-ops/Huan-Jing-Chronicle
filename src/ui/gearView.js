@@ -15,6 +15,7 @@ import {
 } from '../game/equipment.js';
 import { derivedStats } from '../game/stats.js';
 import { SKILL_CATALOG, RULE_SKILLS, moveFromCatalog } from '../game/skills.js';
+import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL } from '../game/skillTable.js';
 import { publish, rollWith } from '../state/rollLog.js';
 import { openReveal } from './reveal.js';
 import { openGearSellSheet } from './marketView.js';
@@ -57,7 +58,7 @@ export function createGearView({ root, getState, commit }) {
       h('div', { class: 'stat-grid' }, list.map((s) => statCell(p, s, s === '生命' ? h('small', { class: 'stat__detail', text: `目前 ${fmt(state.hp)}` }) : null))));
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '數值面板' }),
-      h('p', { class: 'hint', text: '基礎 + 裝備 + 跑團胃袋的食物。滑過數字可看明細。' }),
+      h('p', { class: 'hint', text: usesSkillTable(state) ? '基礎 + 技能 + 手動調整 + 裝備 + 跑團胃袋的食物。滑過數字可看明細。' : '基礎 + 裝備 + 跑團胃袋的食物。滑過數字可看明細。' }),
       group('攻擊', ATK_STATS),
       group('防禦', DEF_STATS),
       group('資源', RESOURCE_STATS),
@@ -65,7 +66,64 @@ export function createGearView({ root, getState, commit }) {
   }
 
   // ---------- 技能等級（原本在戰鬥頁，功能不變） ----------
+  // ---------- 技能（新匯入的角色：技能目錄 + 自動加總） ----------
+  const TIER_RANK = { 初階: 0, 進階: 1, 大師: 2, 傳說: 3, 神級: 4 };
+  const addMoveIfAny = (state, name) => {
+    if ((state.skills[name] ?? 0) > 0 && SKILL_CATALOG[name] && !state.moves.some((m) => m.skill === name)) state.moves.push(moveFromCatalog(name));
+  };
+
+  function catalogSkillCard(state) {
+    const rank = (n) => TIER_RANK[SKILL_TABLE[n]?.tier] ?? 9;
+    const learned = Object.entries(state.skills ?? {}).filter(([n]) => inCatalog(n))
+      .sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0], 'zh-TW'));
+    const unlearned = Object.keys(SKILL_TABLE).filter((n) => !(n in (state.skills ?? {})))
+      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'zh-TW'));
+    return h('section', { class: 'card' },
+      h('h2', { class: 'section-title', text: `技能（已學會 ${fmt(learned.length)} 個）` }),
+      h('p', { class: 'hint', text: '數值面板依技能等級自動加總。「手動調整」（自由分配、愚者對調、還沒搬到網站的裝備）由 GM 設定。武裝類技能要打開「啟動」才有數值，同時扣算力上限。' }),
+      learned.length
+        ? h('ul', { class: 'skill-list' }, learned.map(([name, lv]) => {
+            const t = SKILL_TABLE[name];
+            return h('li', { class: 'skill-row skill-row--cat' },
+              h('div', { class: 'skill-row__main' },
+                h('strong', { text: name }),
+                h('small', { class: 'skill-row__tag', text: `${t.tier}・${t.kind}${t.school ? `・${t.school}` : ''}${t.manual ? '・數值手動' : ''}` }),
+                h('label', { class: 'extra' }, h('span', { text: '等級' }),
+                  h('input', {
+                    class: 'field', type: 'number', min: 0, max: MAX_SKILL_LEVEL, value: lv, inputmode: 'numeric',
+                    onchange: (e) => { state.skills[name] = Math.max(0, Math.min(MAX_SKILL_LEVEL, num(e.target.value, 0))); addMoveIfAny(state, name); commit(); },
+                  })),
+                needsActivation(name)
+                  ? h('label', { class: 'check' },
+                      h('input', { type: 'checkbox', checked: state.skillOn?.[name] ? true : null, onchange: (e) => { state.skillOn = { ...state.skillOn, [name]: e.target.checked }; commit(); } }),
+                      h('span', { text: `啟動（算力上限 −${t.activate.算力}）` }))
+                  : null,
+                h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (!confirm(`移除技能「${name}」？`)) return; delete state.skills[name]; if (state.skillOn) delete state.skillOn[name]; commit(); } }, '移除')),
+              h('details', { class: 'skill-row__text' }, h('summary', { text: '效果' }), h('p', { text: t.text })));
+          }))
+        : h('p', { class: 'notice', text: '還沒有學會技能。' }),
+      h('details', { class: 'add-box', open: ui.skillBoxOpen, ontoggle: (e) => { ui.skillBoxOpen = e.target.open; } },
+        h('summary', { text: '＋ 加入技能' }),
+        h('div', { class: 'row' },
+          h('select', { class: 'field', 'aria-label': '技能', onchange: (e) => { ui.newSkill = e.target.value; } },
+            h('option', { value: '', text: '選擇技能…' }),
+            unlearned.map((n) => h('option', { value: n, selected: ui.newSkill === n ? true : null, text: `${SKILL_TABLE[n].tier}｜${n}` }))),
+          h('input', { class: 'field', type: 'number', min: 0, max: MAX_SKILL_LEVEL, value: ui.newSkillLv, 'aria-label': '等級', inputmode: 'numeric', onchange: (e) => { ui.newSkillLv = Math.max(0, Math.min(MAX_SKILL_LEVEL, num(e.target.value, 0))); } }),
+          h('button', {
+            type: 'button', class: 'btn btn--primary btn--small',
+            onclick: () => {
+              const n = ui.newSkill;
+              if (!n) return toast('先選一個技能。');
+              state.skills = { ...state.skills, [n]: ui.newSkillLv };
+              addMoveIfAny(state, n);
+              ui.newSkill = '';
+              commit();
+            },
+          }, '加入'))));
+  }
+
   function skillCard(state) {
+    if (usesSkillTable(state)) return catalogSkillCard(state);
     const entries = Object.entries(state.skills ?? {});
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '技能等級（會影響戰鬥規則的）' }),

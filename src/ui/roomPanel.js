@@ -2,6 +2,8 @@
 // 本機模式（沒登入）時整塊不顯示。文字一律走 textContent。
 import { h } from './dom.js';
 import { openBotImportSheet } from './botImport.js';
+import { openSheetImportSheet } from './sheetImport.js';
+import { openGmCharEditor } from './gmCharEdit.js';
 import { getRoomStatus, subscribeRoom, startNewBattle, setGmOverride } from '../state/rollLog.js';
 
 export function mountRoomPanel(container) {
@@ -35,6 +37,8 @@ export function mountRoomPanel(container) {
           onclick: () => { if (confirm('開始新的一場戰鬥？紀錄裡會插入一條分隔線（不會改動任何角色資料）。')) startNewBattle(); },
         }, '🆕 新戰鬥'));
         btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openBotImportSheet }, '匯入機器人存檔'));
+        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openSheetImportSheet }, '匯入角色卡'));
+        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openGmCharEditor }, '玩家角色'));
       }
       if (r.me?.isAdmin) {
         btns.push(r.gm.override
