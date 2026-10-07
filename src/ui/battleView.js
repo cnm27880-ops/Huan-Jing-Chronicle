@@ -23,6 +23,9 @@ import { publish, rollWith } from '../state/rollLog.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
 import { battleSel as sel } from './battleSelect.js';
+import { teammates } from './giftSheet.js';
+import { sendMail } from '../state/rollLog.js';
+import { takeItems, refundItems } from '../game/mail.js';
 
 // 戰鬥紀錄只放戰鬥相關事件；黑市、鑑定、鑲嵌、一般檢定與自訂骰只出現在跑團頁
 const BATTLE_KINDS = new Set(['attack', 'defend', 'potion', 'skill', 'divider']);
@@ -41,6 +44,7 @@ export function createBattleView({ root, getState, commit }) {
   const ui = {
     moveForm: { name: '', mode: 'normal', school: '', tracks: ['C'], extra: { A: 0, B: 0, C: 0 }, cost: {}, global: true },
     pane: 'action', // 手機版目前的分頁：action（行動）／log（紀錄）／state（狀態）
+    feedTo: '', // 餵藥給誰（uid）
     openMoves: new Set(), // 展開完整內容的招式 id
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
   };
@@ -140,6 +144,36 @@ export function createBattleView({ root, getState, commit }) {
         }, '🏁 結束戰鬥')));
   }
 
+  /** 餵回復藥水給隊友（倒地的也可以，等於拉起來）：藥水先從自己的背包扣，寄失敗會還回來；毒性算被救的人 */
+  async function feedPotion(state, name) {
+    if (!ui.feedTo) return toast('先選要餵誰。');
+    if (!takeItems(state, { [name]: 1 })) return toast(`背包裡沒有${name}。`);
+    commit();
+    try {
+      const res = await sendMail({ to: ui.feedTo, kind: 'potion', potion: name });
+      toast(`已餵出${name}（回復 ${res.heal}），紀錄會顯示在戰鬥紀錄裡。`);
+    } catch (e) {
+      refundItems(state, { [name]: 1 });
+      commit();
+      toast(`沒有餵出去：${e.message}`);
+    }
+  }
+
+  function feedBox(state) {
+    const mates = teammates();
+    const heals = Object.keys(POTIONS).filter((n) => POTIONS[n].heal && countOf(state, n) > 0);
+    if (!mates.length || !heals.length) return null;
+    return h('div', { class: 'feedbox' },
+      h('p', { class: 'field-label', text: '餵給隊友（對方不用同意；倒地的也能拉起來，毒性算對方的）' }),
+      h('div', { class: 'row' },
+        h('select', { class: 'field', 'aria-label': '餵給誰', onchange: (e) => { ui.feedTo = e.target.value; render(); } },
+          h('option', { value: '', text: '選擇隊友…' }),
+          mates.map((m) => h('option', { value: m.uid, selected: ui.feedTo === m.uid ? true : null, text: `${m.name}${m.online ? '' : '（離線）'}` }))),
+        heals.map((n) => h('button', {
+          type: 'button', class: 'btn btn--small', disabled: ui.feedTo ? null : true, onclick: () => feedPotion(state, n),
+        }, `餵 ${n}（×${fmt(countOf(state, n))}）`))));
+  }
+
   function potionCard(state) {
     const have = Object.keys(POTIONS).filter((n) => countOf(state, n) > 0);
     return h('section', { class: 'card' },
@@ -172,7 +206,8 @@ export function createBattleView({ root, getState, commit }) {
           h('span', { class: 'potion__name', text: n }),
           h('span', { class: 'potion__qty', text: `×${fmt(countOf(state, n))}` }),
           h('small', { class: 'potion__fx', text: potionText(POTIONS[n]) }))))
-        : h('p', { class: 'notice', text: '背包裡沒有藥水。到修整日調劑就會得到。' }));
+        : h('p', { class: 'notice', text: '背包裡沒有藥水。到修整日調劑就會得到。' }),
+      feedBox(state));
   }
 
   // ---------- 招式 ----------

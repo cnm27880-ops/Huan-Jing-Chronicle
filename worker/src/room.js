@@ -66,7 +66,9 @@ export class Room extends DurableObject {
     const res = this.core.handle(user, message, { online: this.online() });
     for (const o of res.out) {
       const text = JSON.stringify(o.msg);
-      if (o.to === 'self') safeSend(ws, text); else this.broadcast(text);
+      if (o.to === 'self') safeSend(ws, text);
+      else if (o.to === 'user') for (const w of this.ctx.getWebSockets(o.uid)) safeSend(w, text); // 只送給某位玩家的所有分頁
+      else this.broadcast(text);
     }
     if (res.close) { try { ws.close(res.close.code, res.close.reason); } catch { /* ignore */ } }
   }

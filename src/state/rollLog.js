@@ -156,14 +156,35 @@ function addRoomEvent(ev) {
   subs.forEach((fn) => fn(ev));
 }
 
+// ---------- 信箱（送東西、餵藥）：信件由 mailbox.js 領取並套用 ----------
+let mailListener = null;
+let mailQueue = []; // 畫面還沒準備好接信時先放著
+function deliverMail(list) {
+  if (!Array.isArray(list) || !list.length) return;
+  if (mailListener) mailListener(list); else mailQueue.push(...list);
+}
+/** mailbox.js 註冊：有新信（或重新連線後還沒領的信）就呼叫 fn(信件陣列) */
+export function setMailListener(fn) {
+  mailListener = fn;
+  if (mailQueue.length) { const q = mailQueue; mailQueue = []; fn(q); }
+}
+/** 寄東西或餵藥：msg = { to, kind: 'gift', items } 或 { to, kind: 'potion', potion }。失敗丟 RollError */
+export const sendMail = (msg) => request({ t: 'mailSend', ...msg });
+/** 領信：回傳 { mail }（已經被別的分頁領走就是 null） */
+export const claimMail = (id) => request({ t: 'mailClaim', id });
+
 function onRoomMessage(msg) {
   switch (msg.t) {
     case 'hello':
       roomLog = Array.isArray(msg.history) ? msg.history.slice(0, MAX_ROOM_LOG) : [];
       setPhase('online', { me: msg.me, gm: msg.gm, members: msg.members ?? [], battleNo: msg.battleNo ?? 0, encounter: msg.encounter ?? null, roomId: msg.room ?? room.roomId, notice: '' });
+      deliverMail(msg.mail); // 要等狀態變成「已加入」才能領信（領信要走房間連線）
       break;
     case 'event':
       if (msg.event) addRoomEvent(msg.event);
+      break;
+    case 'mail':
+      deliverMail(msg.mails);
       break;
     case 'enc':
       room.encounter = msg.encounter ?? null;
@@ -178,7 +199,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'char': case 'charSaved': case 'charList': {
+    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'char': case 'charSaved': case 'charList': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;

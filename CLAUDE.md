@@ -31,12 +31,16 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/equipment.js` | 裝備：鑑定骰式、裝備欄、比較、整理；寶石鑑定與鑲嵌（純函式） |
 | `src/game/market.js` | 交易：交易大廳（每日原價 5 個）、黑市（擲骰溢價／壓價、勞動抵債、代金券換金幣）、特殊黑市（黑市團、50 個）（純函式） |
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
+| `src/game/mail.js` | 送東西與餵藥（純函式）：打包扣背包、收到時套用（禮物進背包、藥水回復＋毒性算收件人、毒性滿了退回） |
+| `src/state/mailbox.js` | 信箱：收到伺服器的信 → 領取（只有第一個分頁拿得到）→ 套用到自己的角色 → 存檔 → 跳通知；不在線寄來的上線才收到 |
+| `src/ui/mailNotice.js` | 「收到的東西」通知面板（右下角浮動，不需同意） |
+| `src/ui/giftSheet.js` | 「送給別人」面板（背包頁按鈕）：選玩家、複選東西與數量；戰鬥面板的「餵給隊友」用同一個信箱機制 |
 | `src/game/simulate.js` | 模擬戰（階段 D，純函式）：續航最長招式、怪物隨機打人、自動喝藥與隊友救人、勝率／回合數／傷害／剩餘生命統計；不碰真實存檔 |
 | `src/ui/simPanel.js` | GM 專用「模擬戰」面板（跑團頁房間區塊）：選玩家＋敵人＋場數，畫回合分布與剩餘生命條狀圖 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
-| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定） |
+| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏） |
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |

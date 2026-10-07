@@ -26,6 +26,7 @@ import { getCurrentUser, consumeLoginResult } from './api/auth.js';
 import { startRoom, stopRoom } from './state/rollLog.js';
 import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
+import { createMailbox } from './state/mailbox.js';
 import { toast } from './ui/controls.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -103,6 +104,8 @@ async function init() {
       views[currentView]?.render();
     },
   });
+
+  createMailbox({ getState, commit }); // 別人送的東西、餵的藥：領取後直接放進自己的角色
 
   let currentView = 'map';
   function showView() {

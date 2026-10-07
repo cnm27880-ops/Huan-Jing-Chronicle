@@ -5,10 +5,10 @@
 //
 // 資料庫介面（db）：exec(sql, ...參數) → 資料列陣列；tx(fn) → 在交易中執行 fn
 // ============================================================
-import { parseDiceExpr, rollExpr, rollDie, MAX_SIDES } from '../../src/game/dice.js';
+import { parseDiceExpr, rollExpr, rollDie, rollSum, MAX_SIDES } from '../../src/game/dice.js';
 import { d20 } from '../../src/game/engine.js';
 import { diceEvent, checkEvent } from '../../src/game/events.js';
-import { LIFE_SKILLS, ART_SKILLS } from '../../src/game/rules.js';
+import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/rules.js';
 import { newEncounter, addMobs, addBosses, isDowned } from '../../src/game/combat.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
@@ -16,6 +16,7 @@ import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
+  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -49,6 +50,7 @@ export class RoomCore {
     db.exec('CREATE TABLE IF NOT EXISTS members (uid TEXT PRIMARY KEY, name TEXT NOT NULL, avatar TEXT, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, id TEXT NOT NULL, t INTEGER NOT NULL, json TEXT NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+    db.exec('CREATE TABLE IF NOT EXISTS mail (id TEXT PRIMARY KEY, to_uid TEXT NOT NULL, t INTEGER NOT NULL, json TEXT NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS characters (uid TEXT PRIMARY KEY, json TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
   }
 
@@ -124,6 +126,7 @@ export class RoomCore {
       gm: this.gmInfo(),
       battleNo: this.battleNo(),
       encounter: this.encounter(),
+      mail: this.pendingMail(user.uid),
       members: this.membersView(online),
       history: this.history(),
     };
@@ -188,6 +191,8 @@ export class RoomCore {
       case 'charPut': return this.onCharPut(user, msg, rid);
       case 'charList': return this.onCharList(user, rid);
       case 'charImport': return this.onCharImport(user, msg, rid);
+      case 'mailSend': return this.onMailSend(user, msg, rid);
+      case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': return this.onEncounter(user, msg, rid, online);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
     }
@@ -293,6 +298,60 @@ export class RoomCore {
       lines: action === 'take' ? ['測試用：原 GM 暫時沒有 GM 權限，之後會還回去。'] : [],
     }, user);
     return this.broadcastEvent(ev, [{ to: 'all', msg: { t: 'gm', gm: this.gmInfo() } }]);
+  }
+
+  // ---------- 信箱：送東西、餵藥（對方不用同意） ----------
+  // 東西與藥水的「增減」都在各自的瀏覽器裡做（和整個階段 2 一樣：角色在前端）。伺服器只負責轉交與暫存：
+  //   寄的人先扣東西 → mailSend → 伺服器存進信箱並即時推給對方 → 對方 mailClaim（只有第一個領的人拿得到，不會重複）→ 對方加進自己的背包
+  // 餵藥的回復點數由伺服器擲（和戰鬥的骰子一樣），並寫進公開的戰鬥紀錄。
+  pendingMail(uid) {
+    return this.db.exec('SELECT json FROM mail WHERE to_uid = ? ORDER BY t, id', uid).map((r) => JSON.parse(r.json));
+  }
+
+  onMailSend(user, msg, rid) {
+    const to = String(msg.to ?? '');
+    if (!UID.test(to) || this.accessState(to) !== 'ok') return err(rid, 'bad_mail', '找不到這位玩家。');
+    if (to === user.uid) return err(rid, 'bad_mail', '不能寄給自己。');
+    if (this.pendingMail(to).length >= MAX_PENDING_MAIL) return err(rid, 'mail_full', '對方還有太多東西沒領，請稍後再寄。');
+    const toName = this.memberName(to) ?? to;
+    const mail = { id: this.uuid(), from: user.uid, fromName: user.name, t: this.now() };
+    const out = [];
+
+    if (msg.kind === 'gift') {
+      const items = {};
+      const entries = msg.items && typeof msg.items === 'object' && !Array.isArray(msg.items) ? Object.entries(msg.items) : [];
+      if (!entries.length || entries.length > MAX_MAIL_ITEM_KINDS) return err(rid, 'bad_mail', '請至少選一樣東西（最多 30 種）。');
+      for (const [name, qty] of entries) {
+        const n = cleanStr(name, 40);
+        if (!n || !isInt(qty, 1, MAX_MAIL_ITEM_QTY)) return err(rid, 'bad_mail', '東西的名稱或數量錯誤。');
+        items[n] = (items[n] ?? 0) + qty;
+      }
+      Object.assign(mail, { kind: 'gift', items });
+      if (msg.bounced === true) mail.bounced = true; // 對方拒收的藥水退回
+    } else if (msg.kind === 'potion') {
+      const def = POTIONS[msg.potion];
+      if (!def?.heal) return err(rid, 'bad_mail', '只有回復藥水可以餵給別人。');
+      const stored = this.charRow(to);
+      const tox = stored ? Number(JSON.parse(stored.json).toxicity) : NaN; // 對方存在伺服器的毒性（約略值；對方領取時還會再檢查一次）
+      if (Number.isFinite(tox) && tox + def.toxicity > TOXICITY_MAX) return err(rid, 'toxic', `${toName} 的毒性是 ${tox}，喝${msg.potion}（毒性 +${def.toxicity}）會超過 ${TOXICITY_MAX}，不能餵。`);
+      const heal = rollSum(def.heal.n, def.heal.sides, this.rng);
+      Object.assign(mail, { kind: 'potion', potion: msg.potion, heal });
+      const ev = this.record({
+        who: user.name, kind: 'potion', label: `${user.name} 餵 ${toName}：${msg.potion}`, big: heal, srv: true,
+        lines: [`回復 ${def.heal.n}D${def.heal.sides} = ${heal} 生命`, `毒性算在 ${toName} 身上（+${def.toxicity}）`],
+      }, user);
+      out.push({ to: 'all', msg: { t: 'event', event: ev } });
+    } else return err(rid, 'bad_mail', '不認得這種寄送方式。');
+
+    this.db.exec('INSERT INTO mail(id, to_uid, t, json) VALUES (?, ?, ?, ?)', mail.id, to, mail.t, JSON.stringify(mail));
+    out.push({ to: 'self', msg: { t: 'mailSent', rid, heal: mail.heal } }, { to: 'user', uid: to, msg: { t: 'mail', mails: [mail] } });
+    return { out, close: null };
+  }
+
+  /** 領取：先刪先贏（兩個分頁同時收到，只有一個拿得到） */
+  onMailClaim(user, msg, rid) {
+    const rows = typeof msg.id === 'string' ? this.db.exec('DELETE FROM mail WHERE id = ? AND to_uid = ? RETURNING json', msg.id, user.uid) : [];
+    return { out: [{ to: 'self', msg: { t: 'mailClaimed', rid, mail: rows.length ? JSON.parse(rows[0].json) : null } }], close: null };
   }
 
   // ---------- 遭遇戰（階段 C） ----------
