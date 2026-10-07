@@ -86,7 +86,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .tab--more, .more-menu { display: none; }
 
 /* ---------- 面板（不透明） ---------- */
-.card, .results, .showcase, .sheet__panel, .tray, .dossier, .zoom-controls, .map-hint, .status, .bag-bar {
+.card, .results, .showcase, .sheet__panel, .tray, .dossier, .map-hint, .status, .bag-bar {
   background: var(--card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -128,7 +128,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .battle-head { margin-bottom: 12px; }
 
 /* ---------- 按鈕：hover 金色 1.5px 外框 ---------- */
-.btn, .btn--ghost, .sheet__close, .dossier__close, .zoom-btn {
+.btn, .btn--ghost, .sheet__close, .dossier__close {
   color: var(--ink);
   background: var(--raise);
   border: 1px solid var(--line3);
@@ -136,7 +136,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
   box-shadow: none;
   text-shadow: none;
 }
-.btn:hover:not(:disabled), .btn--ghost:hover, .sheet__close:hover, .dossier__close:hover, .zoom-btn:hover,
+.btn:hover:not(:disabled), .btn--ghost:hover, .sheet__close:hover, .dossier__close:hover,
 .btn--ghost[aria-expanded='true'] {
   color: var(--gold);
   background: var(--raise);
@@ -455,7 +455,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
   /* 底部導覽列佔的空間 */
   .view--page { padding-bottom: calc(var(--nav-h) + 1.5rem + env(safe-area-inset-bottom, 0px)); }
   .map-viewport { bottom: calc(var(--nav-h) + 5px + env(safe-area-inset-bottom, 0px)); }
-  .zoom-controls, .map-hint { bottom: calc(var(--nav-h) + 1rem + env(safe-area-inset-bottom, 0px)); }
+  .map-hint { bottom: calc(var(--nav-h) + 1rem + env(safe-area-inset-bottom, 0px)); }
   .dossier { bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px)); max-height: calc(100% - var(--nav-h) - 1rem); }
   .toast { bottom: calc(var(--nav-h) + 1rem + env(safe-area-inset-bottom, 0px)); }
 }
@@ -464,7 +464,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 @media (max-width: 759px), (pointer: coarse) {
   .btn, .seg, .toggle, .chip, .field, .amount__chip, .amount__input, .move__pick, .sheet__close, .dossier__close,
   .status__day, .potion, .diff, .skill-btn, .bag-group__head, #tray-toggle { min-height: 44px; }
-  .zoom-btn, .amount__step, .info-chip__btn { min-width: 44px; min-height: 44px; }
+  .amount__step, .info-chip__btn { min-width: 44px; min-height: 44px; }
 }
 
 /* ============================================================

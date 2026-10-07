@@ -33,9 +33,6 @@ button:active { transform: scale(.97); }
 .hotspot { transition: box-shadow .15s ease, background-color .15s ease; }
 .hotspot:hover, .hotspot:focus-visible { background: rgba(var(--gold-rgb), .13); box-shadow: 0 0 0 2px var(--gold), 0 0 14px 3px rgba(var(--gold-rgb), .38); }
 .hotspot.is-active { box-shadow: 0 0 0 3px var(--gold), 0 0 18px 4px rgba(var(--gold-rgb), .55); }
-.zoom-controls { right: 18px; bottom: 18px; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 5px 18px rgba(var(--shadow-rgb), .42); }
-.zoom-btn { background: var(--card); color: var(--muted); }
-.zoom-btn:hover { color: var(--gold); background: var(--input); }
 .map-hint { left: 50%; bottom: 16px; padding: 5px 10px; color: var(--dim); background: rgba(var(--paper-rgb), .88); border: 1px solid var(--line); border-radius: 999px; font-size: .72rem; }
 
 /* ---------- 資訊卡 ---------- */
@@ -86,7 +83,6 @@ button:active { transform: scale(.97); }
   .topbar { height: 58px; padding: 0 8px; gap: 8px; } .brand { font-size: 1rem; letter-spacing: .08em; padding-left: 16px; } .brand::after { font-size: .35rem; letter-spacing: .1em; }
   .tab { padding: 7px 8px; font-size: .76rem; }
   .atlas { padding: 5px; } .map-viewport { inset: 5px; } .map-hint { left: 8px; transform: none; max-width: calc(100% - 80px); white-space: normal; }
-  .zoom-controls { right: 8px; bottom: 8px; }
   .dossier__body { padding-inline: 16px; } .dossier__title { font-size: 1.9rem; }
 }
 @media (max-width: 440px) { .brand { display: none; } .tabs { margin-left: 0; } .tab { padding-inline: 7px; } }

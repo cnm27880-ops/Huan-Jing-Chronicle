@@ -1,14 +1,18 @@
 // ============================================================
-// 世界地圖檢視：拖曳平移、滾輪／雙指縮放、可點擊的地點熱點
+// 世界地圖檢視（操作比照 Google 地圖）：
+//   手機：單指拖曳、雙指捏合縮放＋同時移動、點兩下放大；電腦：拖曳、滾輪／觸控板縮放、點兩下放大
+//   最小可以縮到看見整張地圖，最大放大到原圖解析度附近
 // ============================================================
 
 const MAP_W = 1280;
 const MAP_H = 714;
-const MAX_ZOOM = 2; // 相對於「剛好塞滿畫面」的倍數（原圖僅 1884 像素，再放大只會變糊）
+const MAX_SCALE = 2.2; // 原圖寬 1884 像素（= 1.47 倍），再大一點還看得清楚，更大只會糊
 const DRAG_THRESHOLD = 6; // 移動超過幾像素就算拖曳，不算點擊
+const DOUBLE_TAP_MS = 300;
 
 export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
-  const state = { scale: 1, x: 0, y: 0, fit: 1 };
+  // fit：剛進地圖的倍率（手機塞滿高度、電腦塞滿畫面）；min：最小倍率（看得見整張地圖）
+  const state = { scale: 1, x: 0, y: 0, fit: 1, min: 1 };
   const pointers = new Map();
   let dragged = false;
   let pinchStart = null;
@@ -41,10 +45,14 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
     const contain = Math.min(vw / MAP_W, vh / MAP_H);
     const cover = Math.max(vw / MAP_W, vh / MAP_H);
     state.fit = vw < 640 ? Math.min(cover, contain * 2.6) : contain;
+    state.min = contain; // 可以一直縮到整張地圖都看得到
   }
 
+  const maxScale = () => Math.max(MAX_SCALE, state.fit * 2);
+  const clampScale = (s) => Math.min(maxScale(), Math.max(state.min, s));
+
   function zoomAt(newScale, cx, cy, animate = false) {
-    const s = Math.min(state.fit * MAX_ZOOM, Math.max(state.fit, newScale));
+    const s = clampScale(newScale);
     // 讓游標（或雙指中心）下的那個點保持不動
     state.x = cx - ((cx - state.x) * s) / state.scale;
     state.y = cy - ((cy - state.y) * s) / state.scale;
@@ -62,8 +70,7 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
 
   /** 把地圖移到某個地點（百分比座標）並適度放大 */
   function focusOn(xPct, yPct) {
-    const target = Math.max(state.scale, state.fit * 2);
-    state.scale = Math.min(target, state.fit * MAX_ZOOM);
+    state.scale = clampScale(Math.max(state.scale, state.fit * 2));
     // 情報面板會蓋住一部分地圖：桌機在右側、手機在下方，所以把地點移到沒被蓋住的區域中央
     const vw = viewport.clientWidth;
     const vh = viewport.clientHeight;
@@ -87,35 +94,50 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
     { passive: false }
   );
 
-  // ---------- 拖曳與雙指縮放 ----------
+  // ---------- 拖曳、雙指縮放、點兩下放大 ----------
   // 注意：不使用 setPointerCapture，否則熱點按鈕會收不到 click
+  const localPoint = (x, y) => { const r = viewport.getBoundingClientRect(); return { x: x - r.left, y: y - r.top }; };
+
+  /** 依目前手指重新設定起點：手指數改變（例如雙指放開一指）時不會跳動 */
+  function restartGesture() {
+    const pts = [...pointers.values()];
+    if (pts.length === 1) {
+      panStart = { px: pts[0].x, py: pts[0].y, x: state.x, y: state.y };
+      pinchStart = null;
+    } else if (pts.length >= 2) {
+      const [a, b] = pts;
+      const mid = localPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+      pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, scale: state.scale, mid, x: state.x, y: state.y };
+      panStart = null;
+    } else {
+      panStart = null;
+      pinchStart = null;
+    }
+  }
+
+  let lastTap = { t: 0, x: 0, y: 0 };
   viewport.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    dragged = false;
-    if (pointers.size === 1) {
-      panStart = { px: e.clientX, py: e.clientY, x: state.x, y: state.y };
-    } else if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()];
-      pinchStart = { dist: Math.hypot(a.x - b.x, a.y - b.y), scale: state.scale };
-      panStart = null;
-    }
+    if (pointers.size === 1) dragged = false;
+    restartGesture();
   });
 
   window.addEventListener('pointermove', (e) => {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    if (pointers.size === 2 && pinchStart) {
+    if (pointers.size >= 2 && pinchStart) {
+      // 捏合：倍率跟著兩指距離，地圖上「起始兩指中心」那一點跟著目前兩指中心走（縮放＋移動一起）
       const [a, b] = [...pointers.values()];
-      const rect = viewport.getBoundingClientRect();
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const mid = localPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
+      const s = clampScale(pinchStart.scale * (Math.hypot(a.x - b.x, a.y - b.y) / pinchStart.dist));
+      state.x = mid.x - ((pinchStart.mid.x - pinchStart.x) * s) / pinchStart.scale;
+      state.y = mid.y - ((pinchStart.mid.y - pinchStart.y) * s) / pinchStart.scale;
+      state.scale = s;
       dragged = true;
-      zoomAt(
-        pinchStart.scale * (dist / pinchStart.dist),
-        (a.x + b.x) / 2 - rect.left,
-        (a.y + b.y) / 2 - rect.top
-      );
+      viewport.classList.add('is-dragging');
+      apply();
     } else if (pointers.size === 1 && panStart) {
       const dx = e.clientX - panStart.px;
       const dy = e.clientY - panStart.py;
@@ -131,10 +153,19 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
   function endPointer(e) {
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
-    if (pointers.size < 2) pinchStart = null;
-    if (pointers.size === 0) {
-      panStart = null;
-      viewport.classList.remove('is-dragging');
+    restartGesture();
+    if (pointers.size === 0) viewport.classList.remove('is-dragging');
+    // 點兩下（沒有拖曳、不是點在地名上）：以該點為中心放大；已經很大就縮回剛進來的大小
+    if (e.type === 'pointerup' && pointers.size === 0 && !dragged && !e.target.closest?.('.hotspot')) {
+      const now = performance.now();
+      if (now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+        const p = localPoint(e.clientX, e.clientY);
+        if (state.scale >= maxScale() * 0.95) reset(true);
+        else zoomAt(state.scale * 2, p.x, p.y, true);
+        lastTap = { t: 0, x: 0, y: 0 };
+      } else {
+        lastTap = { t: now, x: e.clientX, y: e.clientY };
+      }
     }
   }
   window.addEventListener('pointerup', endPointer);
@@ -199,7 +230,5 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
     focusOn,
     renderHotspots,
     setActive,
-    zoomIn: () => zoomAt(state.scale * 1.4, viewport.clientWidth / 2, viewport.clientHeight / 2, true),
-    zoomOut: () => zoomAt(state.scale / 1.4, viewport.clientWidth / 2, viewport.clientHeight / 2, true),
   };
 }

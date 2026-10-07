@@ -61,9 +61,6 @@ async function init() {
     dossier.open(detail, regionsById[detail.region]);
   }
 
-  $('#zoom-in').addEventListener('click', () => map.zoomIn());
-  $('#zoom-out').addEventListener('click', () => map.zoomOut());
-  $('#zoom-reset').addEventListener('click', () => map.reset());
 
   map.renderHotspots(locations, regionsById);
 

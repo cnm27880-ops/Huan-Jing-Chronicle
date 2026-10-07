@@ -74,41 +74,6 @@
   box-shadow: 0 0 0 3px var(--bronze), 0 0 18px 4px rgba(var(--gold-rgb), 0.7);
 }
 
-/* ---------- 縮放按鈕 ---------- */
-.zoom-controls {
-  position: absolute;
-  right: 1rem;
-  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  background: var(--ink-line);
-  border: 1px solid var(--ink-line);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  z-index: 10;
-}
-
-.zoom-btn {
-  width: 44px;
-  height: 40px;
-  font: inherit;
-  font-size: 1.1rem;
-  color: var(--mist);
-  background: var(--paper);
-  border: 0;
-  cursor: pointer;
-}
-
-.zoom-btn--text {
-  font-size: 0.8rem;
-}
-
-.zoom-btn:hover {
-  color: var(--bronze);
-  background: var(--ink-raised);
-}
-
 .map-hint {
   position: absolute;
   left: 50%;
