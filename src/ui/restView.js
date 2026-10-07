@@ -116,8 +116,7 @@ export function createRestView({ root, getState, commit }) {
     const max = state.time;
     ui.times = Math.max(1, Math.min(ui.times, Math.max(max, 1)));
     return [
-      section('選擇採集', actionCards(state, GATHER_ACTIONS, a, (x) => { ui.gatherAction = x; render(); }),
-        h('p', { class: 'hint', text: '每次擲 1D20 + 加值，總分決定評級（簡單～神級），評級越高抽到的東西越好。' })),
+      section('選擇採集', actionCards(state, GATHER_ACTIONS, a, (x) => { ui.gatherAction = x; render(); })),
       ...(max <= 0
         ? [h('p', { class: 'notice notice--bad', text: '今天的時間用完了。點上方的「新的一天」恢復 10 點。' })]
         : runBlock(state, a, {
@@ -258,7 +257,6 @@ export function createRestView({ root, getState, commit }) {
           plan.gate && plan.gate.need > 0 ? costRow('累計花費經驗（門檻）', plan.gate.need, plan.gate.have) : null,
           costRow('經驗', plan.exp, plan.haveExp),
           Object.entries(plan.books).map(([n, q]) => costRow(`${iconOf(n)} ${n}`, q, getState().inventory[n] ?? 0))),
-        h('p', { class: 'hint', text: `學新技能要 3 本抽取後的「${name}」技能書（${SKILL_TABLE[name].tier}技能要累計花費過一定經驗才能學）；之後每升到第 N 級要 N 本還沒抽取的「${SKILL_TABLE[name].tier}技能書」。` }),
         swapAt.length ? h('p', { class: 'hint', text: `會在 ${swapAt.join('、')} 級自動對調「${FOOL_SWAPS[name][0]}」與「${FOOL_SWAPS[name][1]}」。` }) : null,
         h('button', {
           type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: () => doUpgrade(plan),
@@ -275,7 +273,6 @@ export function createRestView({ root, getState, commit }) {
       const pending = getState().pendingDraws ?? [];
       if (!pending.length) return h('p', { class: 'notice', text: '都選完了。到背包可以看到新的技能書。' });
       return h('div', { class: 'learn' },
-        h('p', { class: 'hint', text: '每一組選一個技能，選到的技能會變成該技能的技能書。選完才能做其他事。' }),
         pending.map((d, i) => h('section', { class: 'draw-set' },
           h('h3', { class: 'field-label', text: `${d.tier}技能書　第 ${i + 1} / ${pending.length} 組` }),
           h('div', { class: 'draw-options' }, d.options.map((n) => h('div', { class: 'draw-option' },
@@ -307,7 +304,6 @@ export function createRestView({ root, getState, commit }) {
   function drawSection(state) {
     const pending = state.pendingDraws ?? [];
     return section('抽取技能書',
-      h('p', { class: 'hint', text: '用掉初階～傳說技能書，每本出現 3 個技能選 1，選到的技能會變成該技能的技能書（學新技能要 3 本同名）。可以先開多本再一一選；選完之前不能採集、製作或學習。' }),
       pending.length
         ? h('button', { type: 'button', class: 'btn btn--primary btn--go', onclick: openDrawSheet }, `選擇技能（還有 ${pending.length} 組沒選）`)
         : h('div', { class: 'draw-cards' }, DRAW_TIERS.map((tier) => {
@@ -324,7 +320,6 @@ export function createRestView({ root, getState, commit }) {
 
   function badgeSection(state) {
     return section('生活徽章',
-      h('p', { class: 'hint', text: `每個生活技能「初次達到神級」和「累計 ${BADGE_COUNT} 次」（採集與製作都算）各可以做一個徽章，做的當下該技能等級 +1，每種只能做一次。` }),
       h('ul', { class: 'badge-list' }, LIFE_SKILLS.map((skill) => h('li', { class: 'badge-row' },
         h('strong', { text: `${ICONS[skill]} ${skill}　技能 ${state.lifeSkills[skill] ?? 0}` }),
         h('div', { class: 'badge-row__btns' }, badgeStatus(state, skill).map((b) => {
@@ -372,7 +367,7 @@ export function createRestView({ root, getState, commit }) {
     const learned = Object.keys(state.skills ?? {}).filter(inCatalog).sort(byTier);
     const unlearned = Object.keys(SKILL_TABLE).filter((n) => !(n in (state.skills ?? {}))).sort(byTier);
     return [drawSection(state), badgeSection(state), section('學習技能',
-      h('p', { class: 'hint', text: `點技能看效果並學習／升級，可以一次升到想要的等級，不花時間。目前經驗 ${fmt(state.exp)}。愚者技能升到 1、5、10 級時會自動對調兩項數值（不含裝備與食物）。` }),
+      h('p', { class: 'hint', text: `目前經驗 ${fmt(state.exp)}` }),
       h('h3', { class: 'field-label', text: `已學會（${fmt(learned.length)}）` }),
       learned.length ? h('div', { class: 'skill-tiles' }, learned.map((n) => learnTile(state, n))) : h('p', { class: 'notice', text: '還沒有學會技能。' }),
       h('details', { class: 'add-box', open: ui.learnOpen, ontoggle: (e) => { ui.learnOpen = e.target.open; } },
@@ -383,7 +378,6 @@ export function createRestView({ root, getState, commit }) {
   // ---------- 特殊（特殊配方、特殊材料、餵肉球） ----------
   function materialsSection(state) {
     return section('特殊材料',
-      h('p', { class: 'hint', text: '每個修整日每種材料可以取 1 次：擲 1D20 + 所選技能加值，總分多少就得到多少個。不花時間。' }),
       h('div', { class: 'special-list' }, Object.entries(DAILY_MATERIALS).map(([name, m]) => {
         const skill = m.skills.includes(ui.matSkill[name]) ? ui.matSkill[name] : m.skills[0];
         const done = dailyDone(state, name);
@@ -419,7 +413,6 @@ export function createRestView({ root, getState, commit }) {
       pushResult({ kind: 'note', text: `餵肉球 ${item} ×${n}，獲得 ${MEAT} ×${fmt(r.meat)}` });
     };
     return section('餵肉球',
-      h('p', { class: 'hint', text: `拿材料餵「徐曉迪的肉球」換${MEAT}：初階材料 ×1、進階 ×3、大師 ×15、傳說 ×75。${MEAT_PER_HARVEST} 個${MEAT}可以收割成 1 個${MONSTER_MEAT}。` }),
       h('div', { class: 'special-card' },
         h('div', { class: 'special-card__head' },
           h('strong', { text: `${MEAT}　有 ${fmt(meat)}` }),
@@ -430,13 +423,23 @@ export function createRestView({ root, getState, commit }) {
           harvestMax > 1 ? h('button', { type: 'button', class: 'btn btn--small',
             onclick: () => { const r = harvestMeat(getState(), harvestMax); if (!r.ok) return toast(r.error); pushResult({ kind: 'note', text: `收割 ${harvestMax} 次：${MEAT} ×${MEAT_PER_HARVEST * harvestMax} → ${MONSTER_MEAT} ×${harvestMax}` }); } }, `全部收割（${harvestMax} 次）`) : null)),
       foods.length
-        ? h('div', { class: 'special-list' }, foods.map((n) => h('div', { class: 'special-card' },
-            h('div', { class: 'special-card__head' },
-              h('strong', { text: `${iconOf(n)} ${n}　有 ${fmt(countOf(state, n))}` }),
-              h('span', { class: 'hint', text: `每個 → ${MEAT} ×${MEAT_FEED[n]}` })),
-            h('div', { class: 'row' },
-              h('button', { type: 'button', class: 'btn btn--small', onclick: () => doFeed(n, 1) }, '餵 1 個'),
-              countOf(state, n) > 1 ? h('button', { type: 'button', class: 'btn btn--small', onclick: () => doFeed(n, countOf(state, n)) }, `全部（${fmt(countOf(state, n))}）`) : null))))
+        ? h('div', { class: 'feed-list' }, foods.map((n) => {
+            const have = countOf(state, n);
+            const input = h('input', {
+              class: 'field feed-row__qty', type: 'number', inputmode: 'numeric', min: 1, max: have, placeholder: '數量', 'aria-label': `${n}要餵幾個`,
+            });
+            const go = () => {
+              const q = Math.floor(Number(input.value));
+              if (!(q >= 1)) return toast('先輸入要餵的數量。');
+              doFeed(n, Math.min(q, have));
+            };
+            input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+            return h('div', { class: 'feed-row' },
+              h('span', { class: 'feed-row__name', text: `${iconOf(n)} ${n}` }),
+              h('span', { class: 'feed-row__have num', text: `有 ${fmt(have)}　×${MEAT_FEED[n]}` }),
+              input,
+              h('button', { type: 'button', class: 'btn btn--small', onclick: go }, '餵'));
+          }))
         : h('p', { class: 'notice', text: '背包裡沒有可以餵的材料。' }));
   }
 

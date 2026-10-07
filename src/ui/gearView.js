@@ -58,7 +58,6 @@ export function createGearView({ root, getState, commit }) {
       h('div', { class: 'stat-grid' }, list.map((s) => statCell(p, s, s === '生命' ? h('small', { class: 'stat__detail', text: `目前 ${fmt(state.hp)}` }) : null))));
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '數值面板' }),
-      h('p', { class: 'hint', text: usesSkillTable(state) ? '基礎 + 技能 + 手動調整 + 裝備 + 跑團胃袋的食物。' : '基礎 + 裝備 + 跑團胃袋的食物。' }),
       group('攻擊', ATK_STATS),
       group('防禦', DEF_STATS),
       group('資源', RESOURCE_STATS),
@@ -80,7 +79,6 @@ export function createGearView({ root, getState, commit }) {
       .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'zh-TW'));
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: `技能（已學會 ${fmt(learned.length)} 個）` }),
-      h('p', { class: 'hint', text: '數值面板依技能等級自動加總（等級只能在修整日「學習」用經驗與技能書升級）。「手動調整」（自由分配、愚者對調、還沒搬到網站的裝備）由 GM 設定。武裝類技能要打開「啟動」才有數值，同時扣算力上限。' }),
       learned.length
         ? h('div', { class: 'skill-tiles' }, learned.map(([name, lv]) => {
             const t = SKILL_TABLE[name];
@@ -94,8 +92,7 @@ export function createGearView({ root, getState, commit }) {
               onOpen: () => openSheet(name, () => h('div', { class: 'learn' }, skillInfoBlock(name), h('p', { class: 'hint', text: `目前 ${lv} 級` }))),
             });
           }))
-        : h('p', { class: 'notice', text: '還沒有學會技能。' }),
-      h('p', { class: 'hint', text: '學新技能與升級請到「修整日」的「學習」分頁。' }));
+        : h('p', { class: 'notice', text: '還沒有學會技能。' }));
   }
 
   function skillCard(state) {
@@ -103,7 +100,6 @@ export function createGearView({ root, getState, commit }) {
     const entries = Object.entries(state.skills ?? {});
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '技能等級（會影響戰鬥規則的）' }),
-      h('p', { class: 'hint', text: '暴徒、魔女、終焉武裝、域外魔祖、不可名狀是被動規則；納米醫療蜂、生生造化印、吞天噬血陣、萬物歸一的等級決定威力。其他技能的「每級加數值」已包含在基礎數值裡。' }),
       entries.length
         ? h('ul', { class: 'skill-list' }, entries.map(([name, lv]) => h('li', { class: 'skill-row' },
             h('strong', { text: name }),
@@ -222,7 +218,6 @@ export function createGearView({ root, getState, commit }) {
     const list = identifiable(state);
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '鑑定' }),
-      h('p', { class: 'hint', text: '鍛造得到的是通用裝備。鑑定時才會骰出數值，每件固定下來。可以一次鑑定很多件，結果會出現在骰盤紀錄，所有人都看得到。' }),
       list.length
         ? h('div', { class: 'identify-list' }, list.map((x) =>
             h('div', { class: 'identify rarity', dataset: { tier: GEAR_TIERS.indexOf(x.tier), rarity: GEAR_TIERS.indexOf(x.tier) } },
@@ -296,7 +291,6 @@ export function createGearView({ root, getState, commit }) {
     const label = (g) => `${wornIds.has(g.id) ? '【身上】' : ''}${gearName(g)}：${effectText(g)}`;
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: `寶石（${fmt(gems.length)} 顆未鑲嵌）` }),
-      h('p', { class: 'hint', text: '只能鑲進傳說裝備，每件 1 顆。鑲上後目前無法取出（需要「特殊剝離道具」，網站還沒有）。鑲在身上的裝備才會計入數值面板。' }),
       targets.length ? null : h('p', { class: 'notice', text: '沒有可以鑲的傳說裝備（全部都已經鑲了，或還沒有傳說裝備）。' }),
       h('ul', { class: 'gem-list' }, gems.map((gem) => {
         const sel = targets.some((g) => g.id === ui.gemTarget[gem.id]) ? ui.gemTarget[gem.id] : targets[0]?.id;
@@ -390,7 +384,6 @@ export function createGearView({ root, getState, commit }) {
             type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.filter === id),
             onclick: () => { ui.filter = id; render(); },
           }, label)))),
-      h('p', { class: 'hint', text: '裝備不能丟棄；用不到的可以按「賣出」到交易大廳或黑市換錢（鑲了寶石的不能賣）。' }),
       list.length ? h('ul', { class: 'owned-list' }, list.map((g) => ownedRow(state, g, junk))) : h('p', { class: 'empty', text: '這個分類沒有裝備。' }));
   }
 

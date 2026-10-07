@@ -134,7 +134,7 @@ export function createMarketView({ root, getState, commit }) {
 
   const list = (rows) => (rows.length ? h('ul', { class: 'trade-list' }, rows) : h('p', { class: 'empty', text: '背包裡沒有可以賣的東西。' }));
   const section = (title, hint, ...children) => h('section', { class: 'card' },
-    h('h2', { class: 'section-title', text: title }), hint ? h('p', { class: 'hint', text: hint }) : null, ...children);
+    h('h2', { class: 'section-title', text: title }), ...children);
 
   /** 已鑑定裝備：數量提示（到裝備頁一件件賣） */
   function gearHint(state, table) {
@@ -242,7 +242,6 @@ export function createMarketView({ root, getState, commit }) {
             type: 'button', role: 'tab', class: 'rest-tab', 'aria-selected': String(ui.tab === id),
             onclick: () => { ui.tab = id; render(); },
           }, h('span', { class: 'rest-tab__name', text: label })))),
-        h('p', { class: 'hint mk-note', text: '交易的目的是消耗多餘金幣與材料、讓裝備差的人多刷幾次數值，不是賺錢的管道（GM 說明）。' }),
         h('div', { class: 'mk-grid' }, pane)));
     root.scrollTop = scrollY;
   }

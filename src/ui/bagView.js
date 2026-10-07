@@ -75,7 +75,6 @@ export function createBagView({ root, getState, commit, onReset }) {
         }),
         visible.length ? null : h('p', { class: 'empty', text: `背包裡沒有「${q}」。` }),
         h('div', { class: 'bag-foot' },
-          h('p', { class: 'hint', text: '原型階段的資料只存在這台裝置的瀏覽器。' }),
           h('button', {
             type: 'button', class: 'btn btn--ghost btn--small',
             onclick: () => confirm('還原成示範資料？目前的變更會消失。') && onReset(),
