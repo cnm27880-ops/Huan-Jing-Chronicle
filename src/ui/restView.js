@@ -6,7 +6,7 @@
 // ============================================================
 import { h, fmt } from './dom.js';
 import { statusBar } from './statusBar.js';
-import { itemTile, amountPicker } from './controls.js';
+import { itemTile, amountPicker, toast } from './controls.js';
 import { iconOf, TIERS } from './items.js';
 import {
   GATHER_ACTIONS, CRAFT_ACTIONS, DIFFICULTIES, RECIPES,
@@ -15,6 +15,8 @@ import {
 import {
   modifier, gather, craft, craftableTimes, keepsakeApplies, countOf,
 } from '../game/engine.js';
+import { SKILL_TABLE, MAX_SKILL_LEVEL, usesSkillTable, inCatalog, upgradeCost, upgradeSkill } from '../game/skillTable.js';
+import { SKILL_CATALOG, moveFromCatalog } from '../game/skills.js';
 
 const ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -184,15 +186,62 @@ export function createRestView({ root, getState, commit }) {
     requestAnimationFrame(tick);
   }
 
+  // ---------- 學習（花經驗學新技能、升級；不花時間） ----------
+  const TIER_RANK = { 初階: 0, 進階: 1, 大師: 2, 傳說: 3, 神級: 4 };
+  const byTier = (a, b) => (TIER_RANK[SKILL_TABLE[a]?.tier] ?? 9) - (TIER_RANK[SKILL_TABLE[b]?.tier] ?? 9) || a.localeCompare(b, 'zh-TW');
+
+  function doUpgrade(name) {
+    const state = getState();
+    const r = upgradeSkill(state, name);
+    if (!r.ok) return toast(r.error);
+    if (SKILL_CATALOG[name] && !state.moves.some((m) => m.skill === name)) state.moves.push(moveFromCatalog(name));
+    const swapText = r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`).join('；');
+    toast(`${name} 升到 ${r.level} 級（−${fmt(r.cost)} 經驗）${swapText ? `。${swapText}` : ''}`);
+    commit();
+  }
+
+  function learnRow(state, name) {
+    const t = SKILL_TABLE[name];
+    const lv = Number(state.skills?.[name]) || 0;
+    const cost = upgradeCost(state, name);
+    const can = cost != null && (Number(state.exp) || 0) >= cost;
+    return h('li', { class: 'skill-row skill-row--cat' },
+      h('div', { class: 'skill-row__main' },
+        h('strong', { text: name }),
+        h('small', { class: 'skill-row__tag', text: `${t.tier}・${t.kind}${t.school ? `・${t.school}` : ''}` }),
+        h('span', { class: 'num', text: lv ? `${lv} / ${MAX_SKILL_LEVEL} 級` : '未學會' }),
+        cost == null
+          ? h('small', { class: 'skill-row__tag', text: '已滿級' })
+          : h('button', { type: 'button', class: 'btn btn--primary btn--small', disabled: can ? null : true, onclick: () => doUpgrade(name) },
+              `${lv ? `升到 ${lv + 1} 級` : '學習'}（${fmt(cost)} 經驗）`)),
+      h('details', { class: 'skill-row__text' }, h('summary', { text: '效果' }), h('p', { text: t.text })));
+  }
+
+  function learnPanel(state) {
+    if (!usesSkillTable(state)) {
+      return section('學習技能', h('p', { class: 'notice', text: '這是舊式存檔，還不能在這裡升級技能。請請 GM 用「匯入角色卡」更新。' }));
+    }
+    const learned = Object.keys(state.skills ?? {}).filter(inCatalog).sort(byTier);
+    const unlearned = Object.keys(SKILL_TABLE).filter((n) => !(n in (state.skills ?? {}))).sort(byTier);
+    return section('學習技能',
+      h('p', { class: 'hint', text: `花經驗學新技能或升級，不花時間。目前經驗 ${fmt(state.exp)}。愚者技能升到 1、5、10 級時會自動對調兩項數值（不含裝備與食物）。` }),
+      h('h3', { class: 'field-label', text: `已學會（${fmt(learned.length)}）` }),
+      learned.length ? h('ul', { class: 'skill-list' }, learned.map((n) => learnRow(state, n))) : h('p', { class: 'notice', text: '還沒有學會技能。' }),
+      h('details', { class: 'add-box', open: ui.learnOpen, ontoggle: (e) => { ui.learnOpen = e.target.open; } },
+        h('summary', { text: `＋ 學新技能（${fmt(unlearned.length)}）` }),
+        h('ul', { class: 'skill-list' }, unlearned.map((n) => learnRow(state, n)))));
+  }
+
   // ---------- 組合 ----------
   const TABS = [
     ['gather', '採集', '🌿', '花時間'],
     ['craft', '製作', '🔨', '不花時間'],
+    ['learn', '學習', '📖', '花經驗'],
   ];
 
   function render() {
     const state = getState();
-    const panel = ui.tab === 'gather' ? gatherPanel(state) : craftPanel(state);
+    const panel = ui.tab === 'gather' ? gatherPanel(state) : ui.tab === 'learn' ? learnPanel(state) : craftPanel(state);
     const scrollY = root.scrollTop;
     const fresh = ui.fresh;
     ui.fresh = false;
