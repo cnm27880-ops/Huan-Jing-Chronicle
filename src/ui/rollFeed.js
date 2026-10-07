@@ -150,11 +150,12 @@ export function renderRoll(ev, { fresh = false } = {}) {
 
 /**
  * 把紀錄清單掛進 container，之後有新事件會自動更新。
- * 回傳 { destroy }；limit 是最多顯示幾筆，skip 是略過最新的幾筆。
+ * 回傳 { destroy }；limit 是最多顯示幾筆，skip 是略過最新的幾筆，filter 是只留下哪些事件（沒給就全留）。
  */
-export function mountFeed(container, { limit = 30, skip = 0, empty = '還沒有人擲骰。' } = {}) {
+export function mountFeed(container, { limit = 30, skip = 0, empty = '還沒有人擲骰。', filter = null } = {}) {
   const draw = (latest) => {
-    const list = getLog().slice(skip, skip + limit);
+    const all = filter ? getLog().filter(filter) : getLog();
+    const list = all.slice(skip, skip + limit);
     container.replaceChildren(
       list.length
         ? h('ol', { class: 'roll-list' }, list.map((e) => renderRoll(e, { fresh: Boolean(latest) && latest.id === e.id })))
