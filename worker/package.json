@@ -1,0 +1,14 @@
+{
+  "name": "huan-jing-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "幻境編年史 API（Cloudflare Worker）：階段 1-A 只有 Discord 登入",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

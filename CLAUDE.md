@@ -29,6 +29,9 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js） |
 | `tests/*.test.js` | 規則測試：engine（採集製作）、combat、equipment、dice |
+| `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（階段 1-A）。設定在 `wrangler.jsonc`，測試在 `worker/test/`，Secrets 放後台 |
+| `src/api/auth.js` | 前端登入 API：查詢登入者、登出；任何失敗都當未登入（維持單機試玩） |
+| `src/ui/userChip.js` | 頂部列的登入者頭像與登出 |
 | `src/state/rollLog.js` | 擲骰紀錄。**之後接 Cloudflare 時只改這個檔案**（publish 送伺服器、subscribe 收廣播） |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |

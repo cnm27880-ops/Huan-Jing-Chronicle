@@ -210,3 +210,14 @@
 .cover__btn--discord { color: var(--mist); border-color: var(--ink-line); cursor: not-allowed; }
 .cover__note { margin: 0.5rem 0 0; color: var(--mist-dim); font-size: 0.8rem; font-family: var(--font-ui); line-height: 1.6; }
 @media (prefers-reduced-motion: reduce) { .cover { transition: none; } }
+
+/* ---------- Discord 登入（封面與頂部列） ---------- */
+a.cover__btn--discord { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+.cover__user { display: flex; align-items: center; gap: 0.7rem; color: var(--mist); font-family: var(--font-ui); }
+.cover__avatar { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--bronze); }
+.cover__username { font-size: 1.05rem; }
+.user-chip { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; color: var(--mist); font-family: var(--font-ui); font-size: 0.85rem; min-width: 0; }
+.user-chip[hidden] { display: none; }
+.user-chip__avatar { width: 24px; height: 24px; border-radius: 50%; flex: none; }
+.user-chip__name { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 700px) { .user-chip__name { display: none; } }

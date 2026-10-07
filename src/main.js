@@ -20,6 +20,8 @@ import { createGearView } from './ui/gearView.js';
 import { createBattleView } from './ui/battleView.js';
 import { createDiceTray } from './ui/diceTray.js';
 import { showCover } from './ui/cover.js';
+import { createUserChip } from './ui/userChip.js';
+import { getCurrentUser, consumeLoginResult } from './api/auth.js';
 import { loadCharacter, saveCharacter, resetCharacter } from './state/store.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -135,7 +137,10 @@ async function init() {
   }
   window.addEventListener('hashchange', showView);
   showView();
-  showCover();
+  // 登入：封面先出現，不等網路；查到已登入才更新畫面。任何失敗都維持單機試玩。
+  const chip = createUserChip();
+  const cover = showCover({ notice: consumeLoginResult(), onUserChange: () => chip.set(null) });
+  getCurrentUser().then((user) => { if (user) { cover.setUser(user); chip.set(user); } });
 }
 
 init();

@@ -1,0 +1,17 @@
+{
+  // Worker 名稱必須與 Cloudflare 後台（Workers Builds）上的名稱一致
+  "name": "huan-jing-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-01-01",
+  "workers_dev": false,
+  "routes": [{ "pattern": "huan-jing-api.yuci8660.uk", "custom_domain": true }],
+  "observability": { "enabled": true },
+  // 非機密設定。Client Secret 與 Session Secret 絕對不要寫在這裡（放後台 Secrets）。
+  "vars": {
+    "SITE_ORIGIN": "https://huan-jing.yuci8660.uk",
+    "DISCORD_CLIENT_ID": "1482663721271820368",
+    "DISCORD_REDIRECT_URI": "https://huan-jing-api.yuci8660.uk/auth/callback",
+    // Discord ID 白名單，逗號分隔。空字串 = 不限制（任何 Discord 帳號都能登入）
+    "DISCORD_ALLOWED_IDS": ""
+  }
+}
