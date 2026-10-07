@@ -13,8 +13,10 @@ const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matche
  * cards：[{ tier, icon, name, body: 元素, badge: [文字, 'good'|'bad'|'neutral'], note }]
  * best：最好的那張在 cards 裡的位置；summary：最下面的一句話
  */
+let closeCurrent = null;
+
 export function openReveal({ title, cards, best = -1, summary = '' }) {
-  document.querySelector('.reveal')?.remove();
+  closeCurrent?.();
   const shown = cards.slice(0, MAX_CARDS);
   const timers = [];
 
@@ -82,7 +84,9 @@ export function openReveal({ title, cards, best = -1, summary = '' }) {
     timers.forEach(clearTimeout);
     document.removeEventListener('keydown', onKey);
     root.remove();
+    if (closeCurrent === close) closeCurrent = null;
   }
+  closeCurrent = close;
   const onKey = (e) => { if (e.key === 'Escape') close(); };
 
   // 開獎的數字先顯示 0，翻開時才跳到真正的數值

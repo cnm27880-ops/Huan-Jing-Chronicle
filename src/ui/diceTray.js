@@ -140,6 +140,10 @@ export function createDiceTray({ getState, commit, toggleButton }) {
     node.setAttribute('aria-hidden', String(!open));
     toggleButton?.setAttribute('aria-expanded', String(open));
     if (open) render();
+    else { // 關起來就停掉紀錄的自動更新，背景擲骰時不用重畫看不到的清單
+      feeds.forEach((f) => f.destroy());
+      feeds = [];
+    }
   }
 
   toggleButton?.addEventListener('click', () => setOpen(!ui.open));

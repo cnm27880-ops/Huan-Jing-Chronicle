@@ -34,7 +34,7 @@ export function createRestView({ root, getState, commit }) {
   };
 
   const partsText = (list) => list.map((p) => `${p.label} +${p.value}`).join('　');
-  const pushResult = (r) => { ui.results.unshift(r); ui.fresh = true; commit(); };
+  const pushResult = (r) => { ui.results.unshift(r); ui.results.length = Math.min(ui.results.length, 20); ui.fresh = true; commit(); };
 
   // ---------- 共用 ----------
   const section = (title, ...children) => h('section', { class: 'card rest-step' }, h('h2', { class: 'section-title', text: title }), ...children);

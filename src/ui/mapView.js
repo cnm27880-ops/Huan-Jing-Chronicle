@@ -153,7 +153,15 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
     true
   );
 
-  window.addEventListener('resize', () => reset(false));
+  // 只有寬度改變（轉向、拉視窗）才重新置中。手機捲動時網址列伸縮只改高度，不能把玩家放大的地圖重設；
+  // 地圖頁沒顯示時寬度是 0，也不處理（切回地圖時 main.js 會重設）
+  let lastWidth = viewport.clientWidth;
+  window.addEventListener('resize', () => {
+    const w = viewport.clientWidth;
+    if (!w || w === lastWidth) return;
+    lastWidth = w;
+    reset(false);
+  });
 
   // ---------- 熱點 ----------
   function renderHotspots(locations, regionsById) {
