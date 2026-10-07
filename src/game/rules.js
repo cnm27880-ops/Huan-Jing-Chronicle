@@ -113,3 +113,73 @@ export const STOMACH_SLOTS = 3;
 export const REST_FOOD_CHECKS = 10;
 export const BASE_PROFICIENCY = 1;
 export const MAX_TIME = 10;
+
+// ============================================================
+// 戰鬥與裝備規則（來源：GM 試算表「角色永久狀態」「生產表」）
+// 機器人沒有這些內容。標「待確認」者尚未經 GM 驗證，見 GAME_RULES.md
+// ============================================================
+
+/** 傷害軌道：A 物理、B 能量、C 靈魂（試算表「物能魂真」順序；與機器人 A/B/C 對應） */
+export const TRACKS = ['A', 'B', 'C'];
+export const TRACK_ATK_STAT = { A: '物理傷害', B: '能量傷害', C: '靈魂傷害' };
+export const TRACK_DEF_STAT = { A: '體魄強韌', B: '抗性免疫', C: '精神意志' };
+export const TRUE_ATK = '真實傷害';
+export const TRUE_DEF = '絕對防禦';
+export const RESOURCE_STATS = ['生命', '靈氣', '魔力', '能量', '鬥氣', '算力'];
+export const ATK_STATS = [TRUE_ATK, ...TRACKS.map((t) => TRACK_ATK_STAT[t])];
+export const DEF_STATS = [TRUE_DEF, ...TRACKS.map((t) => TRACK_DEF_STAT[t])];
+export const ALL_STATS = [...ATK_STATS, ...DEF_STATS, ...RESOURCE_STATS];
+
+/** 食物的戰鬥數值（試算表「生產表」）；熟練食物的熟練見 FOODS */
+export const FOOD_STATS = {
+  炒飯: { [TRUE_ATK]: 1, [TRUE_DEF]: 1 },
+  什錦飯: { 生命: 10 },
+  豪華蓋飯: { 生命: 20, [TRUE_ATK]: 2, [TRUE_DEF]: 2 },
+  滿漢全席: { 生命: 40, [TRUE_ATK]: 4, [TRUE_DEF]: 4 },
+};
+
+/**
+ * 藥水（試算表「生產表」）。toxicity = 累積毒性；
+ * heal = 回復 NdM 生命；atk / def = 下次攻擊（防禦）骰加成
+ * 神級滴露（神怒/神皮/神愛）試算表沒有效果，尚未收錄。
+ */
+export const POTIONS = {
+  紅藥水: { toxicity: 2, heal: { n: 2, sides: 10 } },
+  黃藥水: { toxicity: 1, atk: 1 },
+  綠藥水: { toxicity: 1, def: 1 },
+  活血藥: { toxicity: 2, heal: { n: 4, sides: 10 } },
+  強擊藥: { toxicity: 1, atk: 3 },
+  堅盾藥: { toxicity: 1, def: 3 },
+  回春湯: { toxicity: 2, heal: { n: 8, sides: 10 } },
+  狂暴湯: { toxicity: 1, atk: 5 },
+  玄武湯: { toxicity: 1, def: 5 },
+  生命泉: { toxicity: 2, heal: { n: 10, sides: 16 } },
+  力量泉: { toxicity: 1, atk: 7 },
+  抗性泉: { toxicity: 1, def: 7 },
+};
+export const TOXICITY_MAX = 15;
+
+/** 裝備：鍛造得到通用物品，「鑑定」時才骰數值（試算表「生產表」第 99–123 列） */
+export const GEAR_TIERS = ['初階', '進階', '大師', '傳說'];
+export const GEAR_TIER_ALIAS = { 低階: '初階' }; // 機器人的鍛造獎勵叫「低階」，試算表叫「初階」
+export const GEAR_SLOT_NAME = { weapon: '武器', armor: '防具', accessory: '飾品' };
+/** 武器/防具：加值 = n D sides + add，另擲 1D4 決定屬性 */
+export const GEAR_BONUS = {
+  初階: { n: 1, sides: 3, add: 0 },
+  進階: { n: 1, sides: 6, add: 3 },
+  大師: { n: 1, sides: 12, add: 6 },
+  傳說: { n: 1, sides: 24, add: 12 },
+};
+export const WEAPON_STATS = [...TRACKS.map((t) => TRACK_ATK_STAT[t]), TRUE_ATK]; // 1D4：1物 2能 3魂 4真
+export const ARMOR_STATS = [...TRACKS.map((t) => TRACK_DEF_STAT[t]), TRUE_DEF]; // 1D4：1體 2抗 3精 4絕
+/** 飾品：1D15 決定屬性，數值固定（不另擲）。15 = 特殊（由 GM 設定） */
+export const ACC_STATS = [...WEAPON_STATS, ...ARMOR_STATS, '生命', '能量', '魔力', '鬥氣', '算力', '靈氣'];
+export const ACC_VALUES = {
+  初階: { attr: 1, 生命: 5, 能量: 1, 魔力: 5, 鬥氣: 1, 算力: 2, 靈氣: 3 },
+  進階: { attr: 3, 生命: 10, 能量: 2, 魔力: 10, 鬥氣: 2, 算力: 4, 靈氣: 6 },
+  大師: { attr: 6, 生命: 20, 能量: 4, 魔力: 20, 鬥氣: 4, 算力: 8, 靈氣: 12 },
+  傳說: { attr: 12, 生命: 40, 能量: 8, 魔力: 40, 鬥氣: 8, 算力: 16, 靈氣: 24 },
+};
+export const ACC_SPECIAL_ROLL = 15;
+export const EQUIP_SLOTS = ['weapon', 'armor', 'acc1', 'acc2'];
+export const EQUIP_SLOT_LABEL = { weapon: '武器', armor: '防具', acc1: '飾品 1', acc2: '飾品 2' };

@@ -1,7 +1,7 @@
 # 幻境編年史（網遊網站）
 
-GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包三個分頁，資料存在瀏覽器（localStorage）。
-**改到遊戲規則、擲骰、加值、胃袋、紀念品時，先讀 `GAME_RULES.md`，並在改完後執行 `npm test`。**
+GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包、裝備、戰鬥五個分頁，加上隨時可開的「骰盤」，資料存在瀏覽器（localStorage）。
+**改到遊戲規則、擲骰、加值、胃袋、紀念品、裝備、戰鬥、藥水時，先讀 `GAME_RULES.md`，並在改完後執行 `npm test`。**
 開發者是程式新手：回覆用繁體中文，步驟要具體，指令要能直接複製貼上。
 
 ## 省 token 規則（最重要）
@@ -19,15 +19,25 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | 檔案 | 用途 |
 |---|---|
 | `index.html` | 頁面骨架（頂部列、地圖、面板容器） |
-| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag）、角色存檔串接 |
+| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #battle）、角色存檔串接、骰盤 |
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
 | `src/game/rules.js` | 規則數值：採集池、配方、DC、食物（照搬機器人） |
 | `src/game/engine.js` | 規則邏輯：加值、熟練、胃袋、採集、製作、跑團檢定（純函式） |
-| `tests/engine.test.js` | 規則測試，確認與機器人一致 |
+| `src/game/dice.js` | 骰子基礎：擲骰、自訂骰式解析（rng 可替換） |
+| `src/game/stats.js` | 數值面板：基礎 + 裝備 + 食物，附明細 |
+| `src/game/equipment.js` | 裝備：鑑定骰式、裝備欄、比較、整理（純函式） |
+| `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
+| `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js） |
+| `tests/*.test.js` | 規則測試：engine（採集製作）、combat、equipment、dice |
+| `src/state/rollLog.js` | 擲骰紀錄。**之後接 Cloudflare 時只改這個檔案**（publish 送伺服器、subscribe 收廣播） |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |
 | `src/ui/restView.js` | 修整日頁面 |
 | `src/ui/bagView.js` | 背包頁面 |
+| `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、整理 |
+| `src/ui/battleView.js` | 戰鬥頁：血量、藥水、招式、遭遇戰 |
+| `src/ui/diceTray.js` | 骰盤抽屜：一鍵技能檢定、自訂骰、紀錄 |
+| `src/ui/rollFeed.js` | 擲骰紀錄的畫面（骰盤與戰鬥頁共用） |
 | `src/ui/dom.js` | 建立元素的小工具 |
 | `src/api/lore.js` | **資料存取層**。UI 只能透過這裡拿資料 |
 | `src/data/regions.js` | 四大區域＋中央海域 |
@@ -42,6 +52,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |
 | `src/styles/pages.css` | 修整日、背包頁面 |
+| `src/styles/dice.css` | 骰盤、紀錄、裝備頁、戰鬥頁（最後載入） |
 | `src/styles/redesign.css` | 全站新版樣式（最後載入，覆蓋前面幾個檔案） |
 | `public/lore-data/*.json` | 設定集文字（Discord 匯出），點「查看設定集」時由 `lore.js` 讀取 |
 
@@ -50,7 +61,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 2. 內容文字一律用 `textContent` 放進頁面，**禁止用 `innerHTML` 放資料內容**（之後內容由 GM 輸入，要防 XSS）。
 3. `src/api/lore.js` 的函式名稱與回傳格式要保持穩定，之後會換成向 Cloudflare Worker 要資料。
 4. 機密（Token、金鑰）和 `players_data.json` 永遠不能進 git。
-5. 圖片路徑用相對路徑（`img/...`，不要開頭的 `/`），GitHub Pages 子路徑才不會壞。
+5. 擲骰結果一律用 `rollLog.publish()` 發布，UI 不要自己維護另一份「大家看得到的紀錄」。
+6. 圖片路徑用相對路徑（`img/...`，不要開頭的 `/`），GitHub Pages 子路徑才不會壞。
 
 ## 未來規劃（現在不要做，除非我明確要求）
-Cloudflare Workers + Durable Objects、Discord OAuth2 登入、GM 後台（地圖點選放標記、表單編輯、圖片上傳到 R2、揭露開關）、依技能自動計算戰鬥面板、從試算表匯入角色。
+Cloudflare Workers + Durable Objects（共享骰盤、伺服器端擲骰與鑑定、角色資料放伺服器）、Discord OAuth2 登入、GM 控制遭遇戰與先攻、GM 後台（地圖點選放標記、表單編輯、圖片上傳到 R2、揭露開關）、依技能自動計算戰鬥面板、從試算表匯入角色。網站日後會掛到自己的網域（同站）。

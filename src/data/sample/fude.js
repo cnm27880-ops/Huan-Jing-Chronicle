@@ -4,11 +4,38 @@
 // 背包、金幣、經驗、天數取自機器人存檔（已轉成「物品：數量」格式，不含 Discord ID）
 // 原型展示用，時間設為 10 點方便測試（存檔裡是 0）
 // ============================================================
+import { moveFromCatalog } from '../../game/skills.js';
+
+// ---------- 裝備實例（取自試算表「背包」分頁；試算表的「傳奇」在網頁叫「傳說」）----------
+let gearId = 1;
+const gear = (tier, slot, effects, extra = {}) => ({ id: gearId++, tier, slot, effects, roll: {}, ...extra });
+const equipped = {
+  weapon: gear('傳說', 'weapon', [{ stat: '真實傷害', value: 36 }]),
+  armor: gear('傳說', 'armor', [{ stat: '絕對防禦', value: 36 }]),
+  acc1: gear('傳說', 'accessory', [{ stat: '靈魂傷害', value: 12 }, { stat: '鬥氣', value: 8 }]),
+  acc2: gear('大師', 'accessory', [{ stat: '真實傷害', value: 6 }]),
+};
+const spare = [
+  gear('傳說', 'weapon', [{ stat: '真實傷害', value: 28 }]),
+  gear('傳說', 'weapon', [{ stat: '真實傷害', value: 27 }]),
+  gear('傳說', 'weapon', [{ stat: '靈魂傷害', value: 32 }]),
+  gear('傳說', 'armor', [{ stat: '體魄強韌', value: 36 }]),
+  gear('傳說', 'armor', [{ stat: '絕對防禦', value: 28 }]),
+  gear('傳說', 'armor', [{ stat: '絕對防禦', value: 25 }]),
+  gear('傳說', 'accessory', [{ stat: '魔力', value: 40 }]),
+  gear('傳說', 'accessory', [{ stat: '魔力', value: 40 }]),
+  gear('傳說', 'accessory', [{ stat: '靈氣', value: 24 }]),
+  gear('傳說', 'accessory', [{ stat: '靈氣', value: 24 }]),
+  gear('傳說', 'accessory', [{ stat: '靈魂傷害', value: 12 }]),
+  gear('傳說', 'accessory', [{ stat: '物理傷害', value: 12 }]),
+  gear('傳說', 'accessory', [{ stat: '生命', value: 40 }]),
+  gear('進階', 'accessory', [{ stat: '靈魂傷害', value: 9 }], { name: '魚王飾品' }),
+];
+
 export const SAMPLE_CHARACTER = {
   name: '新世紀福德正神',
   player: '邵予安',
-  hp: 694,
-  maxHp: 804,
+  hp: 684, // 最大生命由面板計算；吃 3 份滿漢全席為 804（與試算表相同）
   time: 10,
   loginDays: 57,
   gold: 73644,
@@ -34,10 +61,40 @@ export const SAMPLE_CHARACTER = {
     鐵礦石: 5, 兔子俠的狩獵指南: 5, 佳餚肉: 4, 大師技能書: 3, 惜未央: 2, '🐣 寶寶-紫淵': 1,
     '🎣【垂釣諸天太虛客】神級釣魚': 1, '⚒️【萬劫鍛靈度厄師】500次鑄造': 1, 乾癟肉: 1,
     '🍲【五味造化鼎中仙】500次烹飪': 1, '❄️【寒江問道一蓑翁】500次釣魚': 1,
-    '🪪 A級特別調查員證': 1, 傳說武器: 1, 被咬一口的大肉棒: 1, '🪶【妙筆生花奪造化】500次書寫': 1,
+    '🪪 A級特別調查員證': 1, 傳說武器: 1, 傳說飾品: 6, 大師武器: 4, 被咬一口的大肉棒: 1, '🪶【妙筆生花奪造化】500次書寫': 1,
   },
   sortOrder: [
     '🎣【垂釣諸天太虛客】神級釣魚', '❄️【寒江問道一蓑翁】500次釣魚', '🍲【五味造化鼎中仙】500次烹飪',
     '⚒️【萬劫鍛靈度厄師】500次鑄造', '🪶【妙筆生花奪造化】500次書寫', '🐣 寶寶-紫淵',
   ],
+  // ---------- 戰鬥與裝備（網頁新增）----------
+  // 基礎數值 = 試算表面板 − 身上裝備 − 食物（試算表的面板已含裝備與滿漢全席 ×3，這裡拆開）
+  // 物理/能量/魂/防禦含試算表中手動加的常數，無法再拆，照面板值放入；
+  // 能量 110、靈魂 145 = 面板 190、225 − 暴徒的 ROUNDUP(物理 160 ÷ 2) = 80（暴徒由程式計算，見 stats.js）
+  baseStats: {
+    真實傷害: 87, 物理傷害: 160, 能量傷害: 110, 靈魂傷害: 145,
+    絕對防禦: 87, 體魄強韌: 110, 抗性免疫: 64, 精神意志: 90,
+    生命: 684, 靈氣: 104, 魔力: 221, 能量: 24, 鬥氣: 48, 算力: 34,
+  },
+  equipment: equipped,
+  gear: spare,
+  nextGearId: gearId,
+  toxicity: 0,
+  buffs: { atk: 0, def: 0 },
+  // 已學會、會影響戰鬥規則的技能等級（試算表「已學會的技能」）：暴徒/魔女/終焉武裝 是被動規則，其餘是招式或響應
+  skills: { 暴徒: 1, 魔女: 10, 終焉武裝: 5, 域外魔祖: 3, 萬物歸一: 5, 吞天噬血陣: 5 },
+  // 目前資源（生命用 hp）；最大值由面板計算。數值取自試算表
+  resources: { 靈氣: 104, 魔力: 221, 能量: 24, 鬥氣: 56, 算力: 34 },
+  shield: { hp: 0, res: 0 },
+  // 招式：攻擊骰 = 軌道傷害 + 真實傷害 + 招式加成（試算表「招式」：六手 382C、點化 332B381C、歸墟 390C）
+  // 消耗取自試算表「消耗資源」欄
+  moves: [
+    { id: 'm1', name: '六手', tracks: ['C'], extra: { C: 4 }, cost: { 生命: 2, 靈氣: 3, 算力: 3 } },
+    { id: 'm2', name: '點化', tracks: ['B', 'C'], extra: { B: 1, C: 3 }, cost: { 生命: 2, 靈氣: 2, 算力: 3 } },
+    { id: 'm3', name: '歸墟', tracks: ['C'], extra: { C: 12 }, cost: { 生命: 2, 靈氣: 30, 算力: 3 } },
+    moveFromCatalog('吞天噬血陣'),
+    moveFromCatalog('暴徒'),
+    moveFromCatalog('萬物歸一'),
+  ],
+  encounter: { monsters: [], next: { mob: 1, boss: 1 } },
 };

@@ -13,6 +13,8 @@ import {
 import {
   modifier, endSession, gather, craft, craftableTimes, sessionCheck, keepsakeApplies, countOf,
 } from '../game/engine.js';
+import { checkEvent } from '../game/events.js';
+import { publish } from '../state/rollLog.js';
 
 const ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -136,7 +138,11 @@ export function createRestView({ root, getState, commit }) {
       const mod = modifier(state, s, 'session');
       return h('button', {
         type: 'button', class: 'skill-btn',
-        onclick: () => pushResult({ kind: 'session', ...sessionCheck(state, s) }),
+        onclick: () => {
+          const r = sessionCheck(state, s);
+          publish(checkEvent(state.name, r)); // 同步到骰盤紀錄，大家都看得到
+          pushResult({ kind: 'session', ...r });
+        },
       },
       h('span', { class: 'skill-btn__name', text: s }),
       h('span', { class: 'skill-btn__mod', text: `+${mod.total}` }),

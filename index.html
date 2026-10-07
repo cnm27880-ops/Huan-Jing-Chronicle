@@ -19,7 +19,12 @@
         <a class="tab" href="#map" data-view-link="map">世界地圖</a>
         <a class="tab" href="#rest" data-view-link="rest">修整日</a>
         <a class="tab" href="#bag" data-view-link="bag">背包</a>
+        <a class="tab" href="#gear" data-view-link="gear">裝備</a>
+        <a class="tab" href="#battle" data-view-link="battle">戰鬥</a>
       </nav>
+      <button id="tray-toggle" class="btn btn--ghost" type="button" aria-expanded="false" aria-controls="dice-tray">
+        <span aria-hidden="true">🎲</span> 骰盤
+      </button>
       <button id="index-toggle" class="btn btn--ghost" type="button" aria-expanded="false" aria-controls="index-panel">
         <span aria-hidden="true">☷</span> 地點索引
       </button>
@@ -56,6 +61,8 @@
 
     <main class="view view--page" id="view-rest" data-view="rest" hidden></main>
     <main class="view view--page" id="view-bag" data-view="bag" hidden></main>
+    <main class="view view--page" id="view-gear" data-view="gear" hidden></main>
+    <main class="view view--page" id="view-battle" data-view="battle" hidden></main>
 
     <script type="module" src="/src/main.js"></script>
   </body>

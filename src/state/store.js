@@ -3,14 +3,58 @@
 // 之後接上 Cloudflare 時，只要改這個檔案，其他程式不用動
 // ============================================================
 import { SAMPLE_CHARACTER } from '../data/sample/fude.js';
+import { moveFromCatalog } from '../game/skills.js';
+import { maxHp, derivedStats } from '../game/stats.js';
 
 const KEY = 'huanjing:character:v1';
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
+/**
+ * 舊存檔升級：新增的欄位（戰鬥、裝備）舊存檔沒有，缺的就用示範角色的補上，
+ * 已有的欄位一律保留，不會蓋掉玩家的資料。
+ */
+const NEW_FIELDS = ['baseStats', 'equipment', 'gear', 'nextGearId', 'toxicity', 'buffs', 'moves', 'encounter', 'shield'];
+function upgrade(state) {
+  // v2：暴徒加成改由程式計算。舊存檔（階段 0 第一版）的能量/靈魂基礎值含 80 點暴徒加成，要扣掉避免重複計算
+  const firstTime = state.skills === undefined;
+  if (firstTime && state.baseStats?.能量傷害 === 190 && state.baseStats?.靈魂傷害 === 225) {
+    state.baseStats.能量傷害 = 110;
+    state.baseStats.靈魂傷害 = 145;
+  }
+  if (firstTime) state.skills = clone(SAMPLE_CHARACTER.skills);
+  if (state.resources === undefined) state.resources = clone(SAMPLE_CHARACTER.resources);
+  delete state.passives;
+  for (const k of NEW_FIELDS) {
+    if (state[k] === undefined) state[k] = clone(SAMPLE_CHARACTER[k]);
+  }
+  delete state.maxHp; // 最大生命改由數值面板計算
+  // 招式沒有消耗資源欄的舊存檔：依招式名稱從示範角色補上；第一次升級時補上技能庫招式
+  for (const m of state.moves) {
+    if (!m.cost) m.cost = clone(SAMPLE_CHARACTER.moves.find((x) => x.name === m.name)?.cost ?? {});
+  }
+  state.migrated = state.migrated ?? {};
+  if (firstTime) {
+    for (const m of SAMPLE_CHARACTER.moves.filter((x) => x.skill)) {
+      if (!state.moves.some((x) => x.id === m.id)) state.moves.push(clone(m));
+    }
+    state.migrated.brute = true;
+  }
+  // 暴徒的主動招式（技能庫）後來才加：已學暴徒的舊存檔補一次
+  if (!state.migrated.brute) {
+    state.migrated.brute = true;
+    if (state.skills.暴徒 && !state.moves.some((x) => x.skill === '暴徒')) state.moves.push(moveFromCatalog('暴徒'));
+  }
+  for (const r of Object.keys(state.resources)) {
+    state.resources[r] = Math.max(0, Math.min(state.resources[r], derivedStats(state)[r]?.total ?? Infinity));
+  }
+  state.hp = Math.max(0, Math.min(state.hp, maxHp(state)));
+  return state;
+}
+
 export function loadCharacter() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return upgrade(JSON.parse(raw));
   } catch {
     /* 讀不到就用示範資料 */
   }

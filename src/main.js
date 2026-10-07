@@ -7,6 +7,7 @@ import './styles/map.css';
 import './styles/dossier.css';
 import './styles/pages.css';
 import './styles/redesign.css';
+import './styles/dice.css';
 
 import { getRegions, getMapLocations, getLocationDetail } from './api/lore.js';
 import { createMapView } from './ui/mapView.js';
@@ -15,6 +16,10 @@ import { createMarkerCard } from './ui/markerCard.js';
 import { createIndexList } from './ui/indexList.js';
 import { createRestView } from './ui/restView.js';
 import { createBagView } from './ui/bagView.js';
+import { createGearView } from './ui/gearView.js';
+import { createBattleView } from './ui/battleView.js';
+import { createDiceTray } from './ui/diceTray.js';
+import { showCover } from './ui/cover.js';
 import { loadCharacter, saveCharacter, resetCharacter } from './state/store.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -98,9 +103,11 @@ async function init() {
   let character = loadCharacter();
   const getState = () => character;
   let views;
+  let tray;
   const commit = () => {
     saveCharacter(character);
     views[currentView]?.render();
+    tray?.refresh();
   };
   views = {
     rest: createRestView({ root: $('#view-rest'), getState, commit }),
@@ -113,12 +120,15 @@ async function init() {
         commit();
       },
     }),
+    gear: createGearView({ root: $('#view-gear'), getState, commit }),
+    battle: createBattleView({ root: $('#view-battle'), getState, commit }),
   };
+  tray = createDiceTray({ getState, commit, toggleButton: $('#tray-toggle') });
 
   let currentView = 'map';
   function showView() {
     const id = (location.hash || '#map').slice(1);
-    currentView = ['map', 'rest', 'bag'].includes(id) ? id : 'map';
+    currentView = ['map', 'rest', 'bag', 'gear', 'battle'].includes(id) ? id : 'map';
     document.querySelectorAll('[data-view]').forEach((el) => {
       el.hidden = el.dataset.view !== currentView;
     });
@@ -132,6 +142,7 @@ async function init() {
   }
   window.addEventListener('hashchange', showView);
   showView();
+  showCover();
 }
 
 init();
