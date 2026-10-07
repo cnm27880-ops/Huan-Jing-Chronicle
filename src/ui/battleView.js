@@ -35,6 +35,7 @@ export const isBattleEvent = (ev) => BATTLE_KINDS.has(ev.kind) || (ev.kind === '
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const potionText = (p) => [
   p.heal ? `回復 ${p.heal.n}D${p.heal.sides} 生命` : null,
+  ...Object.entries(p.restore ?? {}).map(([res, pct]) => `回復 ${pct}% ${res}`),
   p.atk ? `下次攻擊 真傷 +${p.atk} 骰` : null,
   p.def ? `下次防禦 絕防 +${p.def} 骰` : null,
   `毒性 +${p.toxicity}`,
@@ -190,10 +191,11 @@ export function createBattleView({ root, getState, commit }) {
               if (r.error) return toast(r.error);
               publish({
                 who: state.name, kind: 'potion', label: `喝下${n}`,
-                big: r.rolled != null ? `+${r.healed}` : r.atk ? `攻 +${r.atk}` : `防 +${r.def}`,
+                big: r.rolled != null ? `+${r.healed}` : r.restored ? Object.entries(r.restored).map(([k, v]) => `${k} +${v}`).join('　') : r.atk ? `攻 +${r.atk}` : `防 +${r.def}`,
                 tone: r.atLimit ? 'warn' : undefined,
                 lines: [
                   r.rolled != null ? `${r.dice} = ${r.rolled}，生命 ${state.hp} / ${maxHp(state)}` : null,
+                  r.restored ? `回復 ${Object.entries(r.restored).map(([k, v]) => `${k} +${v}`).join('、')}` : null,
                   r.atk ? '下次攻擊：真實傷害骰增加' : null,
                   r.def ? '下次防禦：絕對防禦骰增加（三軌都加）' : null,
                   `毒性 ${r.toxicity} / ${TOXICITY_MAX}${r.atLimit ? '　⚠ 已達上限，不能再喝' : ''}`,

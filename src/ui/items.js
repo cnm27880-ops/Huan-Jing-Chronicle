@@ -1,7 +1,7 @@
 // ============================================================
 // 物品外觀：圖示、稀有度、分類（只影響畫面，不影響規則）
 // ============================================================
-import { GATHER_POOLS, RECIPES, FOODS, CRAFT_ACTIONS } from '../game/rules.js';
+import { GATHER_POOLS, RECIPES, FOODS, CRAFT_ACTIONS, POTIONS as POTION_RULES } from '../game/rules.js';
 
 export const TIERS = ['簡單', '普通', '困難', '史詩', '神級'];
 
@@ -67,7 +67,7 @@ export const plainName = (name) => name.replace(/^\p{Extended_Pictographic}\uFE0
 const flat = (o) => Object.values(o).flatMap((x) => (Array.isArray(x) ? x : flat(x)));
 const RECIPE_LIST = Object.values(RECIPES).flatMap((d) => Object.values(d));
 const MATERIALS = new Set([...flat(GATHER_POOLS), ...RECIPE_LIST.map((r) => r.cost)].filter((x) => !x.includes('技能書')));
-const POTIONS = new Set(Object.values(RECIPES.調劑).flatMap((r) => r.rewards));
+const POTIONS = new Set([...Object.values(RECIPES.調劑).flatMap((r) => r.rewards), ...Object.keys(POTION_RULES)]);
 const MEALS = new Set([...Object.keys(FOODS), ...Object.values(RECIPES.烹飪).flatMap((r) => r.rewards)]);
 const GEAR = new Set(Object.values(RECIPES.鑄造).flatMap((r) => r.rewards));
 

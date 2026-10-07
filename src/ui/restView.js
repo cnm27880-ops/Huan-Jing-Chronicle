@@ -18,6 +18,10 @@ import {
 import { SKILL_TABLE, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo } from '../game/skillTable.js';
 import { drawBooks, chooseDraw, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
 import { badgeStatus, craftBadge, renameBadge, BADGE_COUNT, BADGE_NAME_MAX } from '../game/badges.js';
+import {
+  SPECIAL_RECIPES, USABLE_ITEMS, DAILY_MATERIALS, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
+  specialMaxTimes, craftSpecial, useSpecialItem, gatherDaily, dailyDone, feedMeatball, harvestMeat,
+} from '../game/special.js';
 import { openSheet } from './sheet.js';
 import { skillTile, skillInfoBlock, skillTag } from './skillTile.js';
 import { SKILL_CATALOG, moveFromCatalog } from '../game/skills.js';
@@ -31,6 +35,8 @@ export function createRestView({ root, getState, commit }) {
     gatherAction: '採藥',
     craftAction: '烹飪',
     craftDiff: '普通',
+    specialRecipe: '祕製桃花酒',
+    matSkill: {}, // 每種特殊材料選的檢定技能
     times: 1,
     keepsakes: new Set(),
     results: [], // 最新的在最前面
@@ -374,16 +380,117 @@ export function createRestView({ root, getState, commit }) {
         h('div', { class: 'skill-tiles' }, unlearned.map((n) => learnTile(state, n)))))];
   }
 
+  // ---------- 特殊（特殊配方、特殊材料、餵肉球） ----------
+  function materialsSection(state) {
+    return section('特殊材料',
+      h('p', { class: 'hint', text: '每個修整日每種材料可以取 1 次：擲 1D20 + 所選技能加值，總分多少就得到多少個。不花時間。' }),
+      h('div', { class: 'special-list' }, Object.entries(DAILY_MATERIALS).map(([name, m]) => {
+        const skill = m.skills.includes(ui.matSkill[name]) ? ui.matSkill[name] : m.skills[0];
+        const done = dailyDone(state, name);
+        return h('div', { class: 'special-card' },
+          h('div', { class: 'special-card__head' },
+            h('strong', { text: `${iconOf(name)} ${name}` }),
+            h('span', { class: 'num', text: `有 ${fmt(countOf(state, name))}` })),
+          h('small', { class: 'hint', text: m.hint }),
+          done
+            ? h('p', { class: 'notice', text: '今天已經取過了，下個修整日再來。' })
+            : h('div', { class: 'row' },
+                h('select', { class: 'field', 'aria-label': `${name}用的技能`, onchange: (e) => { ui.matSkill[name] = e.target.value; render(); } },
+                  m.skills.map((s) => h('option', { value: s, selected: s === skill ? true : null, text: `${s}（+${modifier(state, s, 'rest').total}）` }))),
+                h('button', {
+                  type: 'button', class: 'btn btn--primary btn--small',
+                  onclick: () => {
+                    if (blockedByDraw()) return;
+                    const r = gatherDaily(state, name, skill);
+                    if (!r.ok) return toast(r.error);
+                    pushResult({ kind: 'note', text: `${iconOf(name)} ${name}：1D20（${r.roll}）+ ${r.mod} = ${r.total}，獲得 ${r.total} 個` });
+                  },
+                }, '擲骰取得')));
+      })));
+  }
+
+  function meatballSection(state) {
+    const foods = Object.keys(MEAT_FEED).filter((n) => countOf(state, n) > 0);
+    const meat = countOf(state, MEAT);
+    const harvestMax = Math.floor(meat / MEAT_PER_HARVEST);
+    const doFeed = (item, n) => {
+      const r = feedMeatball(getState(), item, n);
+      if (!r.ok) return toast(r.error);
+      pushResult({ kind: 'note', text: `餵肉球 ${item} ×${n}，獲得 ${MEAT} ×${fmt(r.meat)}` });
+    };
+    return section('餵肉球',
+      h('p', { class: 'hint', text: `拿材料餵「徐曉迪的肉球」換${MEAT}：初階材料 ×1、進階 ×3、大師 ×15、傳說 ×75。${MEAT_PER_HARVEST} 個${MEAT}可以收割成 1 個${MONSTER_MEAT}。` }),
+      h('div', { class: 'special-card' },
+        h('div', { class: 'special-card__head' },
+          h('strong', { text: `${MEAT}　有 ${fmt(meat)}` }),
+          h('span', { class: 'num', text: `${MONSTER_MEAT}　有 ${fmt(countOf(state, MONSTER_MEAT))}` })),
+        h('div', { class: 'row' },
+          h('button', { type: 'button', class: 'btn btn--primary btn--small', disabled: harvestMax ? null : true,
+            onclick: () => { const r = harvestMeat(getState(), 1); if (!r.ok) return toast(r.error); pushResult({ kind: 'note', text: `收割：${MEAT} ×${MEAT_PER_HARVEST} → ${MONSTER_MEAT} ×1` }); } }, '收割 1 次'),
+          harvestMax > 1 ? h('button', { type: 'button', class: 'btn btn--small',
+            onclick: () => { const r = harvestMeat(getState(), harvestMax); if (!r.ok) return toast(r.error); pushResult({ kind: 'note', text: `收割 ${harvestMax} 次：${MEAT} ×${MEAT_PER_HARVEST * harvestMax} → ${MONSTER_MEAT} ×${harvestMax}` }); } }, `全部收割（${harvestMax} 次）`) : null)),
+      foods.length
+        ? h('div', { class: 'special-list' }, foods.map((n) => h('div', { class: 'special-card' },
+            h('div', { class: 'special-card__head' },
+              h('strong', { text: `${iconOf(n)} ${n}　有 ${fmt(countOf(state, n))}` }),
+              h('span', { class: 'hint', text: `每個 → ${MEAT} ×${MEAT_FEED[n]}` })),
+            h('div', { class: 'row' },
+              h('button', { type: 'button', class: 'btn btn--small', onclick: () => doFeed(n, 1) }, '餵 1 個'),
+              countOf(state, n) > 1 ? h('button', { type: 'button', class: 'btn btn--small', onclick: () => doFeed(n, countOf(state, n)) }, `全部（${fmt(countOf(state, n))}）`) : null))))
+        : h('p', { class: 'notice', text: '背包裡沒有可以餵的材料。' }));
+  }
+
+  function specialRecipeSection(state) {
+    const name = SPECIAL_RECIPES[ui.specialRecipe] ? ui.specialRecipe : Object.keys(SPECIAL_RECIPES)[0];
+    const r = SPECIAL_RECIPES[name];
+    const max = specialMaxTimes(state, name);
+    ui.times = Math.max(1, Math.min(ui.times, Math.max(max, 1)));
+    const usable = Object.keys(USABLE_ITEMS).filter((n) => countOf(state, n) > 0);
+    return [
+      section('特殊配方',
+        h('div', { class: 'diff-grid', role: 'radiogroup' }, Object.entries(SPECIAL_RECIPES).map(([n, x]) => h('button', {
+          type: 'button', class: `diff${specialMaxTimes(state, n) ? '' : ' is-none'}`, role: 'radio', 'aria-checked': String(n === name),
+          onclick: () => { ui.specialRecipe = n; ui.times = 1; render(); },
+        },
+        h('span', { class: 'diff__head' }, h('strong', { text: n }), h('span', { class: 'diff__dc num', text: `DC ${x.dc}` })),
+        h('span', { class: 'diff__cost', text: `${x.type}・${x.skill}` }),
+        h('span', { class: 'diff__can', text: specialMaxTimes(state, n) ? `可做 ${fmt(specialMaxTimes(state, n))} 次` : '材料不足' })))),
+        h('div', { class: 'reward-line' },
+          h('p', { class: 'field-label', text: `${name}　${r.type}（${r.skill} DC ${r.dc}）` }),
+          h('p', { class: 'hint', text: `效果：${r.effect}` }),
+          h('ul', { class: 'learn-cost' }, Object.entries(r.materials).map(([item, n]) => h('li', { class: 'learn-cost__row', dataset: { ok: countOf(state, item) >= n ? '1' : '0' } },
+            h('span', { text: `${iconOf(item)} ${item}` }),
+            h('span', { class: 'num', text: `${n}（有 ${fmt(countOf(state, item))}）` }),
+            h('b', { 'aria-hidden': 'true', text: countOf(state, item) >= n ? '✓' : `缺 ${fmt(n - countOf(state, item))}` })))))),
+      ...(max <= 0
+        ? [h('p', { class: 'notice notice--bad', text: `${name}的材料不足，先去取材料或採集。` })]
+        : runBlock(state, r.skill, {
+            label: `${ICONS[r.skill]} ${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 3, 5],
+            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSpecial(state, name, ui.times, [...ui.keepsakes]) }),
+          })),
+      usable.length ? section('使用特殊物品', usable.map((n) => h('div', { class: 'special-card' },
+        h('div', { class: 'special-card__head' }, h('strong', { text: `${iconOf(n)} ${n}　有 ${fmt(countOf(state, n))}` }),
+          h('span', { class: 'hint', text: `使用 → ${Object.entries(USABLE_ITEMS[n].gives).map(([k, q]) => `${k} ×${q}`).join('、')}` })),
+        h('button', {
+          type: 'button', class: 'btn btn--primary btn--small',
+          onclick: () => { const x = useSpecialItem(getState(), n); if (!x.ok) return toast(x.error); pushResult({ kind: 'note', text: `使用 ${n}：${Object.entries(x.gives).map(([k, q]) => `${k} ×${q}`).join('、')}` }); },
+        }, '使用 1 個')))) : null,
+    ];
+  }
+
+  const specialPanel = (state) => [materialsSection(state), meatballSection(state), ...specialRecipeSection(state)];
+
   // ---------- 組合 ----------
   const TABS = [
     ['gather', '採集', '🌿', '花時間'],
     ['craft', '製作', '🔨', '不花時間'],
     ['learn', '學習', '📖', '花經驗'],
+    ['special', '特殊', '🧪', '配方與材料'],
   ];
 
   function render() {
     const state = getState();
-    const panel = ui.tab === 'gather' ? gatherPanel(state) : ui.tab === 'learn' ? learnPanel(state) : craftPanel(state);
+    const panel = ui.tab === 'gather' ? gatherPanel(state) : ui.tab === 'learn' ? learnPanel(state) : ui.tab === 'special' ? specialPanel(state) : craftPanel(state);
     const scrollY = root.scrollTop;
     const fresh = ui.fresh;
     ui.fresh = false;

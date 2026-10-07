@@ -108,6 +108,8 @@ export const FOODS = {
   碳烤肉排: { effect: '熟練 +3', proficiency: 3 },
   滿漢全席: { effect: '生命上限 +40，真實傷害與絕對防禦 +4' },
   傳奇盛宴: { effect: '熟練 +4', proficiency: 4 },
+  祕製桃花酒: { effect: '熟練 +2', proficiency: 2 },
+  惜未央: { effect: '熟練 +2，吃下時獲得 1 時間（每次刷新最多 2 次）', proficiency: 2 },
 };
 export const STOMACH_SLOTS = 3;
 export const REST_FOOD_CHECKS = 10;
@@ -156,6 +158,7 @@ export const POTIONS = {
   生命泉: { toxicity: 2, heal: { n: 10, sides: 16 } },
   力量泉: { toxicity: 1, atk: 7 },
   抗性泉: { toxicity: 1, def: 7 },
+  動物春藥: { toxicity: 2, restore: { 魔力: 40 } }, // 回復最大魔力的 40%（特殊配方，無條件捨去，需驗證）
 };
 export const TOXICITY_MAX = 15;
 
