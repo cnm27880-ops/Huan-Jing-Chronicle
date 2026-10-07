@@ -155,7 +155,6 @@ export function createSessionView({ root, getState, commit }) {
                 onclick: () => { if (!confirm('結束本次跑團？跑團胃袋會清空。')) return; endSession(state); commit(); },
               }, '結束本次跑團')
             : null,
-          h('p', { class: 'hint', text: '點技能直接擲 1D20。GM 准許用生活技能時點生活技能（會加熟練），否則點非生活技能。' }),
           h('p', { class: 'field-label', text: '生活技能（加熟練）' }),
           h('div', { class: 'skill-grid' }, LIFE_SKILLS.map((s) => skillButton(state, s, state.lifeSkills[s] ?? 0, true))),
           h('p', { class: 'field-label', text: '非生活技能' }),

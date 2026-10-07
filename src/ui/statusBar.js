@@ -14,9 +14,6 @@ export function openFoodSheet(state, ctx, commit) {
     const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
     const foods = Object.keys(FOODS).filter((f) => countOf(state, f) > 0);
     return h('div', {},
-      h('p', { class: 'hint', text: ctx === 'rest'
-        ? '每份維持 10 次修整檢定，最多 3 份，熟練加值相加。'
-        : '維持到本次跑團結束，最多 3 份，熟練加值相加。' }),
       h('p', { class: 'field-label', text: `胃袋 ${stomach.length} / ${STOMACH_SLOTS}` }),
       foods.length
         ? h('div', { class: 'tile-grid' }, foods.map((f) =>
