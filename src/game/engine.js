@@ -8,6 +8,7 @@ import {
   FOODS, STOMACH_SLOTS, REST_FOOD_CHECKS, BASE_PROFICIENCY, MAX_TIME,
 } from './rules.js';
 import { rollDie } from './dice.js';
+import { skillParts } from './skillTable.js';
 
 export const d20 = (rng = Math.random) => rollDie(20, rng);
 const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
@@ -33,6 +34,8 @@ export function removeItem(state, item, n = 1) {
 export function proficiency(state, ctx) {
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
   const parts = [{ label: '基礎', value: BASE_PROFICIENCY }];
+  const fromSkills = skillParts(state).熟練 ?? []; // 新匯入的角色：技能提供的熟練
+  parts.push(...fromSkills);
   stomach.forEach((s) => {
     const p = FOODS[s.food]?.proficiency;
     if (p) parts.push({ label: s.food, value: p });

@@ -5,6 +5,7 @@
 import { ALL_STATS, FOOD_STATS } from './rules.js';
 import { equipmentEffects } from './equipment.js';
 import { passivesOf } from './skills.js';
+import { usesSkillTable, skillParts, activeActivations } from './skillTable.js';
 
 /** 跑團胃袋提供的數值 */
 export function foodEffects(stomach) {
@@ -17,19 +18,29 @@ export function foodEffects(stomach) {
 
 /**
  * 回傳每個屬性：{ total, parts:[{label,value}] }
+
  * 基礎值 state.baseStats 不含裝備與食物（GM 試算表的面板已含，匯入時要先扣掉）
+ * statMode === 'skills' 的角色另外有「技能」（查技能目錄）與「手動調整」，見 skillTable.js
  */
 export function derivedStats(state) {
   const eq = equipmentEffects(state);
   const food = foodEffects(state.sessionStomach);
   const out = {};
+  const fromSkills = usesSkillTable(state) ? skillParts(state) : {};
   for (const stat of ALL_STATS) {
     const parts = [
       { label: '基礎', value: state.baseStats[stat] ?? 0 },
+      ...(fromSkills[stat] ?? []),
+      { label: '手動調整', value: usesSkillTable(state) ? Number(state.adjust?.[stat]) || 0 : 0 },
       { label: '裝備', value: eq[stat] ?? 0 },
       { label: '食物', value: food[stat] ?? 0 },
     ].filter((p, i) => i === 0 || p.value !== 0);
     out[stat] = { total: parts.reduce((a, p) => a + p.value, 0), parts };
+  }
+  // 啟動類技能（武裝）：啟動時扣算力上限，扣到 0 為止（「不能為負數」）。要等其他加成都算完才扣
+  for (const { name, cost } of activeActivations(state)) {
+    const cut = Math.min(cost.算力 ?? 0, Math.max(0, out.算力.total));
+    if (cut > 0) { out.算力.parts.push({ label: `${name}（啟動）`, value: -cut }); out.算力.total -= cut; }
   }
   // 暴徒（試算表手改公式）：物理傷害面板照留，但能量與靈魂各加 ROUNDUP(物理 ÷ 2)；攻擊時不能用物理（見 combat.js）
   if (passivesOf(state).brute) {

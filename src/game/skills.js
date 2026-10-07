@@ -10,7 +10,8 @@ export const skillLevel = (state, name) => Number(state.skills?.[name]) || 0;
 /** 會改變戰鬥規則的被動（來自已學會的技能） */
 export function passivesOf(state) {
   return {
-    ignoreAbs: skillLevel(state, '終焉武裝') > 0, // 攻擊無視敵人絕對防禦
+    // 攻擊無視敵人絕對防禦；新匯入的角色（statMode 'skills'）要「啟動」終焉武裝才有
+    ignoreAbs: skillLevel(state, '終焉武裝') > 0 && (state.statMode !== 'skills' || Boolean(state.skillOn?.終焉武裝)),
     brute: skillLevel(state, '暴徒') > 0,           // 無法造成物理傷害，一半的物理加到能量與靈魂
     witch: skillLevel(state, '魔女') > 0,           // 負向被動：每個主動動作額外 30 魔力
   };
