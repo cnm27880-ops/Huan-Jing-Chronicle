@@ -233,3 +233,79 @@ test('缺少 Secrets：回 500 server_misconfigured，不洩漏內容', async ()
 test('未知路徑 404', async () => {
   assert.equal((await call('/nope')).status, 404);
 });
+
+// ---------- 滑動續期（30 天有效、剩 15 天內換發、90 天上限） ----------
+const DAY = 24 * 3600 * 1000;
+const sessionToken = (iatAgoDays, expInDays) => signToken({
+  uid: '42', name: 'x', avatar: null, iat: Date.now() - iatAgoDays * DAY, exp: Date.now() + expInDays * DAY,
+}, env.SESSION_SECRET);
+const meWith = (token, e = env) => call('/auth/me', { headers: { Cookie: `hj_session=${token}` } }, e);
+const maxAgeDays = (res) => Number(/Max-Age=(\d+)/.exec(res.headers.getSetCookie()[0])[1]) / 86400;
+
+test('登入簽發的 session 有效期 30 天，並記錄原始登入時間', async () => {
+  const { res } = await fullLogin({ id: '42', username: 'a' });
+  assert.match(res.headers.getSetCookie().find((c) => c.startsWith('hj_session=')), /Max-Age=2592000/);
+  const payload = await verifyToken(cookieOf(res, 'hj_session'), env.SESSION_SECRET);
+  assert.ok(Math.abs(payload.iat - Date.now()) < 5000);
+  assert.ok(Math.abs(payload.exp - payload.iat - 30 * DAY) < 1000);
+});
+
+test('續期門檻：剩 16 天不換發；剩 14 天換發新 30 天 token 且保留原始登入時間', async () => {
+  const before = await meWith(await sessionToken(14, 16));
+  assert.equal((await before.json()).user.id, '42');
+  assert.equal(before.headers.getSetCookie().length, 0);
+
+  const old = await sessionToken(16, 14);
+  const res = await meWith(old);
+  assert.equal((await res.json()).user.id, '42');
+  const line = res.headers.getSetCookie()[0];
+  assert.match(line, /^hj_session=/);
+  assert.match(line, /HttpOnly/); assert.match(line, /Secure/); assert.match(line, /SameSite=Lax/);
+  assert.doesNotMatch(line, /Domain=/i);
+  assert.ok(Math.abs(maxAgeDays(res) - 30) < 0.01);
+
+  const renewed = await verifyToken(cookieOf(res, 'hj_session'), env.SESSION_SECRET);
+  const original = await verifyToken(old, env.SESSION_SECRET);
+  assert.equal(renewed.iat, original.iat);
+  assert.ok(renewed.exp - Date.now() > 29.9 * DAY);
+  // 新 token 本身可以繼續使用
+  assert.equal((await (await meWith(cookieOf(res, 'hj_session'))).json()).user.id, '42');
+});
+
+test('90 天上限：到期日不超過原始登入 + 90 天；已達上限就不再續期', async () => {
+  // 原始登入 80 天前，剩 10 天 → 只能續到第 90 天（剩 10 天），沒有可延長的空間 → 不換發
+  const edge = await meWith(await sessionToken(80, 10));
+  assert.equal((await edge.json()).user.id, '42');
+  assert.equal(edge.headers.getSetCookie().length, 0);
+
+  // 原始登入 70 天前，剩 5 天 → 換發，但新到期日封頂在第 90 天（約再 20 天）
+  const capped = await meWith(await sessionToken(70, 5));
+  assert.ok(Math.abs(maxAgeDays(capped) - 20) < 0.01);
+  const payload = await verifyToken(cookieOf(capped, 'hj_session'), env.SESSION_SECRET);
+  assert.ok(payload.exp - payload.iat <= 90 * DAY);
+
+  // 原始登入超過 90 天（token 已過期）→ 未登入，必須重新登入
+  const expired = await meWith(await sessionToken(91, -1));
+  assert.equal((await expired.json()).user, null);
+  assert.equal(expired.headers.getSetCookie().length, 0);
+});
+
+test('沒有原始登入時間的舊 token 不續期', async () => {
+  const token = await signToken({ uid: '42', name: 'x', avatar: null, exp: Date.now() + 2 * DAY }, env.SESSION_SECRET);
+  const res = await meWith(token);
+  assert.equal((await res.json()).user.id, '42');
+  assert.equal(res.headers.getSetCookie().length, 0);
+});
+
+test('每次 /auth/me 都重查白名單：未到期的 session 被移出名單即失效，且不續期', async () => {
+  const e = { ...env, DISCORD_ALLOWED_IDS: '42' };
+  const token = await sessionToken(16, 14); // 需要續期的 session
+  assert.equal((await (await meWith(token, e)).json()).user.id, '42');
+
+  const removed = await meWith(token, { ...env, DISCORD_ALLOWED_IDS: '7,8' });
+  assert.equal((await removed.json()).user, null);
+  assert.equal(removed.headers.getSetCookie().length, 0);
+
+  // 名單清空 = 不限制，又恢復可用
+  assert.equal((await (await meWith(token, { ...env, DISCORD_ALLOWED_IDS: '' })).json()).user.id, '42');
+});

@@ -6,7 +6,10 @@ import { parseCookies, setCookie, clearCookie } from './cookies.js';
 
 const SESSION_COOKIE = 'hj_session';
 const STATE_COOKIE = 'hj_state';
-const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
+const DAY_MS = 24 * 3600 * 1000;
+const SESSION_TTL_MS = 30 * DAY_MS; // 每次簽發的有效期
+const RENEW_BELOW_MS = 15 * DAY_MS; // 剩餘有效期低於這個值，/auth/me 就換發新 token
+const SESSION_MAX_AGE_MS = 90 * DAY_MS; // 從原始登入起算的上限，滿了必須重新登入
 const STATE_TTL_MS = 10 * 60 * 1000;
 const DISCORD_API = 'https://discord.com/api';
 
@@ -133,11 +136,13 @@ async function callback(request, env) {
     // access token 只活在這個函式裡，不寫入 cookie、不存任何地方
     if (!isAllowed(env, me.id)) return fail('denied');
 
+    const now = Date.now();
     const session = await signToken({
       uid: me.id,
+      iat: now, // 原始登入時間；續期時保留不變，用來計算 90 天上限
       name: String(me.global_name || me.username || me.id).slice(0, 80),
       avatar: typeof me.avatar === 'string' ? me.avatar : null,
-      exp: Date.now() + SESSION_TTL_MS,
+      exp: now + SESSION_TTL_MS,
     }, env.SESSION_SECRET);
     return backToSite(env, 'ok', [
       clearState,
@@ -150,9 +155,20 @@ async function callback(request, env) {
 
 async function me(request, env) {
   const s = await readSession(request, env);
-  // 白名單之後若收緊，已登入但不在名單內的人也視為未登入
+  // 每次都重新檢查白名單：就算 session 還沒到期，被移出名單的人也視為未登入
   if (!s || !isAllowed(env, s.uid)) return json({ user: null });
-  return json({ user: publicUser(s) });
+
+  // 滑動續期：剩餘不到 15 天就換發；新的到期時間不會超過「原始登入 + 90 天」
+  const now = Date.now();
+  const headers = {};
+  if (typeof s.iat === 'number' && s.exp - now < RENEW_BELOW_MS) {
+    const exp = Math.min(now + SESSION_TTL_MS, s.iat + SESSION_MAX_AGE_MS);
+    if (exp > s.exp) {
+      const token = await signToken({ uid: s.uid, iat: s.iat, name: s.name, avatar: s.avatar, exp }, env.SESSION_SECRET);
+      headers['Set-Cookie'] = setCookie(SESSION_COOKIE, token, { path: '/', maxAge: Math.floor((exp - now) / 1000) });
+    }
+  }
+  return json({ user: publicUser(s) }, 200, headers);
 }
 
 function logout(request, env) {
