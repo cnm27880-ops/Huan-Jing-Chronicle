@@ -135,7 +135,7 @@ async function init() {
       if (a.dataset.viewLink === currentView) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
-    moreBtn.toggleAttribute('data-active', currentView === 'rest'); // 修整日收在「更多」裡，手機版讓「更多」亮起
+    moreBtn.toggleAttribute('data-active', currentView === 'gear'); // 裝備收在「更多」裡，手機版讓「更多」亮起
     if (currentView === 'map') map.reset(false);
     else views[currentView].render();
   }
