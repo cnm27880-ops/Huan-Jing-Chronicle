@@ -240,7 +240,7 @@ export function createRestView({ root, getState, commit }) {
         h('ul', { class: 'learn-cost' },
           costRow('經驗', plan.exp, plan.haveExp),
           Object.entries(plan.books).map(([n, q]) => costRow(`${iconOf(n)} ${n}`, q, getState().inventory[n] ?? 0))),
-        h('p', { class: 'hint', text: `學新技能要 3 本「${name}」技能書；之後每升到第 N 級要 N 本「${SKILL_TABLE[name].tier}技能書」。` }),
+        h('p', { class: 'hint', text: `學新技能要 3 本抽取後的「${name}」技能書；之後每升到第 N 級要 N 本還沒抽取的「${SKILL_TABLE[name].tier}技能書」。` }),
         swapAt.length ? h('p', { class: 'hint', text: `會在 ${swapAt.join('、')} 級自動對調「${FOOL_SWAPS[name][0]}」與「${FOOL_SWAPS[name][1]}」。` }) : null,
         h('button', {
           type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: () => doUpgrade(plan),
