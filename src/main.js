@@ -25,7 +25,9 @@ import { showCover } from './ui/cover.js';
 import { createUserChip } from './ui/userChip.js';
 import { getCurrentUser, consumeLoginResult } from './api/auth.js';
 import { startRoom, stopRoom } from './state/rollLog.js';
-import { loadCharacter, saveCharacter, resetCharacter } from './state/store.js';
+import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter } from './state/store.js';
+import { createCharSync } from './state/charSync.js';
+import { toast } from './ui/controls.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -73,8 +75,10 @@ async function init() {
   const getState = () => character;
   let views;
   let tray;
+  let sync = null;
   const commit = () => {
     saveCharacter(character);
+    sync?.markDirty(); // 已連上房間時，稍後同步到伺服器
     views[currentView]?.render();
     tray?.refresh();
   };
@@ -93,6 +97,16 @@ async function init() {
     battle: createBattleView({ root: $('#view-battle'), getState, commit }),
     market: createMarketView({ root: $('#view-market'), getState, commit }),
   };
+  sync = createCharSync({
+    getState,
+    hasLocalSave: hasSavedCharacter,
+    notify: toast,
+    adopt: (data) => { // 伺服器的存檔套用到畫面（不經過 commit，免得又上傳一次）
+      character = importCharacter(data);
+      views[currentView]?.render();
+      tray?.refresh();
+    },
+  });
   tray = createDiceTray({ getState, commit, toggleButton: $('#tray-toggle') });
 
   let currentView = 'map';

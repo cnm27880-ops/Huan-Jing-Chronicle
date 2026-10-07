@@ -11,3 +11,7 @@ export const MAX_DRAW_DICE = 5000; // 戰鬥／鑑定單次最多擲幾顆（一
 export const MAX_DRAW_POOLS = 32;
 export const DRAW_TTL_MS = 60_000;
 export const MAX_PENDING_DRAWS_PER_USER = 20;
+
+// 角色存檔（階段 2）：整份角色資料存在房間的 SQLite，每人一份
+export const MAX_CHAR_MESSAGE_CHARS = 262_144; // 只有 charPut 可以超過 MAX_MESSAGE_CHARS，上限 256K 字
+export const MAX_CHAR_JSON_CHARS = 200_000; // 角色 JSON 本身的上限
