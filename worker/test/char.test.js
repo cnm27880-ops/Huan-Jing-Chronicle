@@ -109,3 +109,36 @@ test('GM 匯入：只有 GM、只能寫白名單內的成員、要帶版本號�
   assert.equal(get(core, P2).data.name, '玩家二自己改的');
   assert.equal(imp(GM, '400', 2, { name: 'x'.repeat(81) }).code, 'bad_char');
 });
+
+test('異動紀錄：GM 替玩家寫入角色 → 紀錄裡多一條 audit 事件（誰、改了什麼），全員看得到；玩家自己存檔、版本衝突都不記', () => {
+  const core = room();
+  const imp = (base, data) => send(core, GM, { t: 'charImport', rid: 'i', uid: '400', base, data });
+  const events = (res) => res.out.filter((o) => o.msg.t === 'event').map((o) => o.msg.event);
+  const first = imp(0, { name: '二號', gold: 10, skills: { 引氣訣: 1 }, adjust: { 物理傷害: 5 }, inventory: { 鐵礦石: 3 } });
+  assert.equal(first.out[0].msg.t, 'charSaved'); // 先回覆 GM 自己的儲存結果
+  const [ev] = events(first);
+  assert.equal(ev.kind, 'audit'); assert.equal(ev.by, '100'); assert.equal(ev.byName, 'GM');
+  assert.match(ev.label, /GM 修改了「二號」（.+）的角色/); // 括號裡是成員名稱（沒連線過的成員用 uid 代替）
+  assert.ok(ev.lines[0].startsWith('新建角色'));
+  assert.ok(ev.lines.includes('技能 引氣訣　0 → 1') && ev.lines.includes('手動調整 物理傷害　0 → 5') && ev.lines.includes('背包 鐵礦石　0 → 3') && ev.lines.includes('金幣　0 → 10'));
+  assert.equal(first.out.find((o) => o.msg.t === 'event').to, 'all');
+  const hist = core.hello(P1).history.filter((e) => e.kind === 'audit'); // 之後連線的人也看得到
+  assert.equal(hist.length, 1);
+  const second = imp(1, { name: '二號', gold: 10, skills: { 引氣訣: 3 }, adjust: { 物理傷害: 5 }, skillOn: { 終焉武裝: true }, inventory: { 鐵礦石: 3 } });
+  assert.deepEqual(events(second)[0].lines, ['技能 引氣訣　1 → 3', '啟動 終焉武裝　關 → 開']);
+  assert.deepEqual(events(imp(2, { name: '二號', gold: 10 })).length, 1); // 技能被清掉也記得到
+  assert.equal(events(imp(0, { name: 'x' })).length, 0); // 版本衝突沒寫入，不記
+  put(core, P2, 3, { name: '玩家自己存', gold: 999 });
+  assert.equal(core.hello(P1).history.filter((e) => e.kind === 'audit').length, 3); // 玩家自己存檔不新增
+});
+
+test('異動紀錄：太多項時只列前 12 項並說明還有幾項；沒變更也有一行說明', () => {
+  const core = room();
+  const inv = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`物品${i}`, 1]));
+  const res = send(core, GM, { t: 'charImport', rid: 'i', uid: '400', base: 0, data: { name: 'A', inventory: inv } });
+  const ev = res.out.find((o) => o.msg.t === 'event').msg.event;
+  assert.equal(ev.lines.length, 13);
+  assert.equal(ev.lines[12], '…另外還有 9 項變更'); // 新建 1 + 背包 20 = 21 項，列 12，剩 9
+  const same = send(core, GM, { t: 'charImport', rid: 'i', uid: '400', base: 1, data: { name: 'A', inventory: inv } });
+  assert.deepEqual(same.out.find((o) => o.msg.t === 'event').msg.event.lines, ['沒有數值變更']);
+});
