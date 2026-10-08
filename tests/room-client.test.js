@@ -397,6 +397,22 @@ test('角色同步：等 GM 匯入的玩家，GM 一匯入就自動採用（不�
   stopAll(m, gm);
 });
 
+test('特殊配方：GM 新增後，在線的玩家立刻收到；之後才進來的玩家連線時就拿到；離開房間後不再使用', async () => {
+  resetHub(); store.clear();
+  const p = await browser(P1);
+  const gm = await browser(GM);
+  const def = { type: '進階藥水', skill: '調劑', dc: 12, materials: { 福瑞毛: 2 }, effect: '測試' };
+  const res = await gm.roomRequest({ t: 'specialSet', kind: 'recipe', name: '毛茸茸藥水', def });
+  assert.equal(res.t, 'specialOk');
+  await flush();
+  assert.deepEqual(p.getRoomStatus().special.recipes.毛茸茸藥水, def); // 在線的玩家立刻收到
+  assert.ok(p.getLog().some((e) => e.kind === 'audit' && /新增了特殊配方/.test(e.label))); // 異動紀錄大家都看得到
+  await assert.rejects(p.roomRequest({ t: 'specialSet', kind: 'recipe', name: '偷改', def }), /只有 GM/); // 玩家被拒絕
+  const late = await browser({ uid: '200', name: '開發者', avatar: null });
+  assert.deepEqual(late.getRoomStatus().special.recipes.毛茸茸藥水, def); // 之後才連線的人
+  stopAll(p, gm, late);
+});
+
 test('角色同步：兩邊都有不同存檔時問玩家；選伺服器就採用，選本機就覆蓋伺服器', async () => {
   for (const [choice, expectAdopt, expectHp] of [[true, true, 7], [false, false, 3]]) {
     resetHub(); store.clear();

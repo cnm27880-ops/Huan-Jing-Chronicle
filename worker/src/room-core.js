@@ -13,6 +13,7 @@ import { newEncounter, addMobs, addBosses, isDowned } from '../../src/game/comba
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
 import { describeCharChange } from './audit.js';
+import { validateCustomRecipe, validateCustomMaterial, MAX_CUSTOM_RECIPES, MAX_CUSTOM_MATERIALS } from '../../src/game/special.js';
 import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
@@ -128,6 +129,7 @@ export class RoomCore {
       battleNo: this.battleNo(),
       encounter: this.encounter(),
       mail: this.pendingMail(user.uid),
+      special: this.special(),
       members: this.membersView(online),
       history: this.history(),
     };
@@ -193,6 +195,7 @@ export class RoomCore {
       case 'charPut': return this.onCharPut(user, msg, rid);
       case 'charList': return this.onCharList(user, rid);
       case 'charImport': return this.onCharImport(user, msg, rid);
+      case 'specialSet': case 'specialDel': return this.onSpecial(user, msg, rid);
       case 'mailSend': return this.onMailSend(user, msg, rid);
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': return this.onEncounter(user, msg, rid, online);
@@ -467,6 +470,45 @@ export class RoomCore {
     }
     this.saveEncounter(enc);
     return this.encOk(enc, rid, user);
+  }
+
+  // ---------- 特殊配方與特殊材料（GM 新增的；內建的寫在 src/game/special.js，不能改） ----------
+  /** GM 新增的資料：{ recipes: { 名稱: 定義 }, materials: { 名稱: 定義 } }，所有人都讀得到 */
+  special() {
+    try {
+      const v = JSON.parse(this.getMeta('special') ?? '{}');
+      return { recipes: v.recipes ?? {}, materials: v.materials ?? {} };
+    } catch { return { recipes: {}, materials: {} }; }
+  }
+
+  /** GM 新增／修改（specialSet）或刪除（specialDel）一個配方或材料；每次改動記一條異動紀錄並通知所有人 */
+  onSpecial(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以編輯特殊配方與材料。');
+    const kind = msg.kind === 'recipe' ? 'recipe' : msg.kind === 'material' ? 'material' : null;
+    if (!kind) return err(rid, 'bad_special', '不認得這種資料。');
+    const sp = this.special();
+    const bag = kind === 'recipe' ? sp.recipes : sp.materials;
+    const noun = kind === 'recipe' ? '特殊配方' : '特殊材料';
+    let label; let lines = [];
+    if (msg.t === 'specialDel') {
+      const name = cleanStr(msg.name, 40);
+      if (!(name in bag)) return err(rid, 'bad_special', `沒有「${name}」可以刪除（內建的不能刪）。`);
+      delete bag[name];
+      label = `${user.name} 刪除了${noun}「${name}」`;
+    } else {
+      const v = kind === 'recipe' ? validateCustomRecipe(msg.name, msg.def) : validateCustomMaterial(msg.name, msg.def);
+      if (!v.ok) return err(rid, 'bad_special', v.error);
+      const isNew = !(v.name in bag);
+      if (isNew && Object.keys(bag).length >= (kind === 'recipe' ? MAX_CUSTOM_RECIPES : MAX_CUSTOM_MATERIALS)) return err(rid, 'bad_special', `${noun}已經太多了，請先刪掉不用的。`);
+      bag[v.name] = v.def;
+      label = `${user.name} ${isNew ? '新增' : '修改'}了${noun}「${v.name}」`;
+      lines = kind === 'recipe'
+        ? [`${v.def.type}・${v.def.skill} DC ${v.def.dc}`, `材料：${Object.entries(v.def.materials).map(([k, q]) => `${k}×${q}`).join('、')}`, v.def.effect ? `效果：${v.def.effect}` : '']
+        : [`可用技能：${v.def.skills.join('、')}`, v.def.hint ? `說明：${v.def.hint}` : ''];
+    }
+    this.setMeta('special', JSON.stringify(sp));
+    const ev = this.record({ who: '系統', kind: 'audit', label, lines: lines.filter(Boolean) }, user);
+    return { out: [{ to: 'self', msg: { t: 'specialOk', rid } }, ...this.broadcastEvent(ev).out, { to: 'all', msg: { t: 'special', special: sp } }], close: null };
   }
 
   // ---------- 角色存檔（階段 2） ----------

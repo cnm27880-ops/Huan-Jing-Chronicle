@@ -26,6 +26,7 @@ import { getCurrentUser, consumeLoginResult } from './api/auth.js';
 import { startRoom, stopRoom, getRoomStatus, subscribeRoom } from './state/rollLog.js';
 import { mountWaitNotice } from './ui/waitNotice.js';
 import { blankCharacter } from './game/importBot.js';
+import { setCustomSpecial } from './game/special.js';
 import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
 import { createMailbox } from './state/mailbox.js';
@@ -147,7 +148,17 @@ async function init() {
     if (el && !wait) el.hidden = false;
   }
   sync.onWaitingChange(() => showView());
-  subscribeRoom(applyWait);
+  let lastSpecial;
+  subscribeRoom(() => {
+    applyWait();
+    const status = getRoomStatus();
+    const special = status.phase === 'online' ? status.special : null;
+    if (special !== lastSpecial) { // GM 新增／修改了特殊配方或材料（或離開房間）：換成最新的資料並重畫修整日
+      lastSpecial = special;
+      setCustomSpecial(special);
+      if (currentView === 'rest') views.rest.render();
+    }
+  });
   // 手機底部導覽列的「更多」選單
   const moreBtn = $('#more-toggle');
   const moreMenu = $('#more-menu');

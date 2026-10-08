@@ -96,6 +96,7 @@ const room = {
   members: [],
   battleNo: 0,
   encounter: null, // GM 建立、全員共享的遭遇戰（階段 C）；本機模式是 null
+  special: null, // GM 新增的特殊配方與材料 { recipes, materials }；本機模式是 null（只有內建的）
   notice: '', // 伺服器回的錯誤（例如不是 GM 還按新戰鬥）
 };
 let roomLog = [];
@@ -177,7 +178,7 @@ function onRoomMessage(msg) {
   switch (msg.t) {
     case 'hello':
       roomLog = Array.isArray(msg.history) ? msg.history.slice(0, MAX_ROOM_LOG) : [];
-      setPhase('online', { me: msg.me, gm: msg.gm, members: msg.members ?? [], battleNo: msg.battleNo ?? 0, encounter: msg.encounter ?? null, roomId: msg.room ?? room.roomId, notice: '' });
+      setPhase('online', { me: msg.me, gm: msg.gm, members: msg.members ?? [], battleNo: msg.battleNo ?? 0, encounter: msg.encounter ?? null, special: msg.special ?? null, roomId: msg.room ?? room.roomId, notice: '' });
       deliverMail(msg.mail); // 要等狀態變成「已加入」才能領信（領信要走房間連線）
       break;
     case 'event':
@@ -190,6 +191,10 @@ function onRoomMessage(msg) {
       room.encounter = msg.encounter ?? null;
       notifyRoom();
       break;
+    case 'special':
+      room.special = msg.special ?? null;
+      notifyRoom();
+      break;
     case 'presence':
       room.members = msg.members ?? room.members;
       notifyRoom();
@@ -199,7 +204,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'char': case 'charSaved': case 'charList': {
+    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'specialOk': case 'char': case 'charSaved': case 'charList': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;
@@ -263,7 +268,7 @@ export function stopRoom() {
   client?.close(); client = null;
   failPending('已離開房間。');
   roomLog = [];
-  if (room.phase !== 'local') setPhase('local', { me: null, members: [], gm: { uids: [], override: null, names: {} }, battleNo: 0, encounter: null, notice: '' });
+  if (room.phase !== 'local') setPhase('local', { me: null, members: [], gm: { uids: [], override: null, names: {} }, battleNo: 0, encounter: null, special: null, notice: '' });
 }
 
 /**

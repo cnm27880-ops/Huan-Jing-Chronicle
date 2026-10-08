@@ -1222,3 +1222,13 @@ input[type='number'], .amount__input { text-align: center; }
 .wait-notice__form .field { flex: 1 1 12em; max-width: 16em; min-width: 0; }
 .wait-notice__msg { margin: 6px 0 0; min-height: 1.2em; color: var(--rose); font-size: 0.85rem; }
 .wait-notice__sub { margin: 8px 0 0; color: var(--soft); font-size: 0.9rem; }
+
+/* GM 編輯特殊配方與材料（specialEdit.js） */
+.special-edit { display: grid; gap: 8px; margin-bottom: 18px; }
+.special-edit__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.special-edit__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.special-edit__name { min-width: 0; overflow-wrap: anywhere; font-size: 0.9rem; }
+.special-edit__btns { display: flex; gap: 6px; flex: none; }
+.special-edit__form { display: grid; gap: 6px; }
+.special-edit__pair { display: grid; grid-template-columns: minmax(0, 1fr) 6.5em; gap: 6px; }
+.special-edit__skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(6em, 1fr)); gap: 6px 10px; }
