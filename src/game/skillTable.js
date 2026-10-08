@@ -34,7 +34,18 @@ export function skillFx(name, level) {
  */
 const MYSTIC_STEP = 5;
 const MYSTIC_LEVEL = 5;
+// 老狗識途：每個擁有的技能（含自己）達到 5 級、10 級各觸發一次（同一個技能 10 級觸發兩次），
+// 第 n 次依序加 物理傷害、能量傷害、靈魂傷害、體魄強韌、抗性免疫、精神意志 各 +1，循環。「擁有」= 已學會，不看有沒有啟動。
+const DOG_ORDER = ['物理傷害', '能量傷害', '靈魂傷害', '體魄強韌', '抗性免疫', '精神意志'];
+const DOG_LEVELS = [5, 10];
 const DYNAMIC_FX = {
+  老狗識途: (state) => {
+    const n = Object.entries(state.skills ?? {}).filter(([name]) => inCatalog(name))
+      .reduce((sum, [, lv]) => sum + DOG_LEVELS.filter((t) => Number(lv) >= t).length, 0);
+    const out = {};
+    DOG_ORDER.forEach((stat, i) => { const v = Math.floor((n - i + DOG_ORDER.length - 1) / DOG_ORDER.length); if (v > 0) out[stat] = v; });
+    return out;
+  },
   浮腫之軀: (state) => {
     const n = Object.entries(state.skills ?? {}).filter(([name, lv]) => inCatalog(name) && SKILL_TABLE[name].school === '神秘' && skillActive(state, name) && Number(lv) >= MYSTIC_LEVEL).length;
     return n ? { 生命: n * MYSTIC_STEP } : {};

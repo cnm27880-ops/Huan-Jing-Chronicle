@@ -23,7 +23,8 @@ import { createSessionView } from './ui/sessionView.js';
 import { showCover } from './ui/cover.js';
 import { createUserChip } from './ui/userChip.js';
 import { getCurrentUser, consumeLoginResult } from './api/auth.js';
-import { startRoom, stopRoom } from './state/rollLog.js';
+import { startRoom, stopRoom, getRoomStatus, subscribeRoom } from './state/rollLog.js';
+import { mountWaitNotice } from './ui/waitNotice.js';
 import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
 import { createMailbox } from './state/mailbox.js';
@@ -124,7 +125,21 @@ async function init() {
     moreBtn.toggleAttribute('data-active', currentView === 'gear' || currentView === 'market'); // 裝備、交易收在「更多」裡，手機版讓「更多」亮起
     if (currentView === 'map') map.reset(false);
     else views[currentView].render();
+    applyWait();
   }
+  // 登入後伺服器沒有角色、這台裝置也只有示範角色：非地圖頁改顯示「等 GM 匯入」（GM 自己不擋，要用 GM 工具）
+  const waitView = $('#view-wait');
+  mountWaitNotice(waitView);
+  function applyWait() {
+    const status = getRoomStatus();
+    const wait = currentView !== 'map' && Boolean(sync?.isWaiting()) && status.phase === 'online' && !status.me?.isGm;
+    waitView.hidden = !wait;
+    const el = document.querySelector(`[data-view="${currentView}"]`);
+    if (el && wait) el.hidden = true;
+    if (el && !wait) el.hidden = false;
+  }
+  sync.onWaitingChange(() => showView());
+  subscribeRoom(applyWait);
   // 手機底部導覽列的「更多」選單
   const moreBtn = $('#more-toggle');
   const moreMenu = $('#more-menu');

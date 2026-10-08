@@ -1214,3 +1214,8 @@ input[type='number'], .amount__input { text-align: center; }
 .feed-row__qty { grid-column: 2; grid-row: 1 / 3; min-width: 0; padding: 6px 8px; text-align: center; }
 .feed-row .btn { grid-column: 3; grid-row: 1 / 3; margin: 0; }
 @media (max-width: 420px) { #view-rest .rest-tab { gap: 3px; padding: 0 4px; font-size: 0.9rem; } #view-rest .rest-tab__icon { display: none; } }
+
+/* 「等 GM 匯入角色」畫面（waitNotice.js） */
+.wait-notice { margin: 16px; text-align: center; padding-block: 28px; }
+.wait-notice__text { margin: 10px auto 0; max-width: 28em; line-height: 1.7; }
+.wait-notice__sub { margin: 8px 0 0; color: var(--soft); font-size: 0.9rem; }

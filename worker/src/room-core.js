@@ -141,6 +141,7 @@ export class RoomCore {
       big: fields.big ?? null, tone: fields.tone, lines: fields.lines ?? [],
     };
     if (fields.srv) ev.srv = true; // 骰點由伺服器擲出
+    if (fields.target) ev.target = fields.target; // 異動紀錄：被修改的玩家 uid
     if (fields.battleNo != null) ev.battleNo = fields.battleNo;
     this.db.tx(() => {
       const [{ seq }] = this.db.exec('INSERT INTO events(id, t, json) VALUES (?, ?, ?) RETURNING seq', ev.id, ev.t, JSON.stringify(ev));
@@ -526,7 +527,7 @@ export class RoomCore {
     // 異動紀錄：誰、何時、改了什麼（GM 替玩家改角色），所有人都看得到，和擲骰紀錄放在同一條時間軸
     const member = this.db.exec('SELECT name FROM members WHERE uid = ?', uid)[0]?.name ?? uid;
     const { lines } = describeCharChange(before ? JSON.parse(before.json) : null, msg.data);
-    const ev = this.record({ who: '系統', kind: 'audit', label: `${user.name} 修改了「${cleanStr(msg.data.name, 80)}」（${member}）的角色`, lines }, user);
+    const ev = this.record({ who: '系統', kind: 'audit', target: uid, label: `${user.name} 修改了「${cleanStr(msg.data.name, 80)}」（${member}）的角色`, lines }, user);
     return { out: [...saved, ...this.broadcastEvent(ev).out], close: null };
   }
 

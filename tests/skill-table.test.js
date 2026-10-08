@@ -180,3 +180,18 @@ test('暗影斗篷（我要把朋友賣掉）：只有文字、不影響任何�
   const after = derivedStats(mk({ 暗影斗篷: 10 }));
   for (const k of Object.keys(before)) assert.equal(after[k].total, before[k].total);
 });
+
+test('老狗識途：每個擁有的技能（含自己）達 5、10 級各觸發一次，依序加 物理→能量→靈魂→體魄→抗性→精神，循環', () => {
+  const STATS = ['物理傷害', '能量傷害', '靈魂傷害', '體魄強韌', '抗性免疫', '精神意志'];
+  // 只看「老狗識途」這個來源在面板明細裡加了多少（其他技能自己的數值不算）
+  const dog = (skills) => { const d = derivedStats(mk(skills)); return STATS.map((k) => d[k].parts.filter((p) => p.label === '老狗識途').reduce((a, p) => a + p.value, 0)); };
+  assert.deepEqual(skillFx('老狗識途', 3), { 生命: 3 }); // 目錄只剩每級 +1 生命，屬性由程式算
+  assert.deepEqual(skillFx('老狗識途', 10), { 生命: 10, 真實傷害: 1, 絕對防禦: 1 });
+  assert.deepEqual(dog({ 老狗識途: 4 }), [0, 0, 0, 0, 0, 0]); // 沒有任何技能到 5 級
+  assert.deepEqual(dog({ 老狗識途: 5 }), [1, 0, 0, 0, 0, 0]); // 自己 5 級也算：第 1 次 → 物理
+  assert.deepEqual(dog({ 老狗識途: 5, 八卦掌: 10 }), [1, 1, 1, 0, 0, 0]); // 老狗 5（1 次）＋八卦掌 10（2 次）＝ 3 次
+  assert.deepEqual(dog({ 老狗識途: 10, 八卦掌: 10, 呢喃低語: 5 }), [1, 1, 1, 1, 1, 0]); // 2 + 2 + 1 = 5 次：前五項各 1
+  assert.deepEqual(dog({ 老狗識途: 10, 八卦掌: 5, 呢喃低語: 5, 引氣訣: 5, 周天吐納法: 5 }), [1, 1, 1, 1, 1, 1]); // 2 + 4 = 6 次：六項各 1
+  assert.deepEqual(dog({ 老狗識途: 10, 八卦掌: 10, 呢喃低語: 5, 引氣訣: 5, 周天吐納法: 5 }), [2, 1, 1, 1, 1, 1]); // 2 + 2 + 1 + 1 + 1 = 7 次：第 7 次回到物理
+  assert.deepEqual(dog({ 呢喃低語: 10 }), [0, 0, 0, 0, 0, 0]); // 沒學老狗識途就沒有這個被動
+});

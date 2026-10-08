@@ -377,6 +377,26 @@ test('角色同步：全新裝置、伺服器也沒有存檔 → 不上傳示範
   stopAll(m2);
 });
 
+test('角色同步：等 GM 匯入的玩家，GM 一匯入就自動採用（不用重新整理），等待狀態解除並通知畫面', async () => {
+  resetHub(); store.clear();
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t2x');
+  let adopted = null; const waits = [];
+  const sync = createCharSync({ getState: () => ({ name: '示範' }), adopt: (d) => { adopted = d; }, hasLocalSave: () => false, notify: () => {}, room: m });
+  sync.onWaitingChange((w) => waits.push(w));
+  await flush();
+  assert.equal(sync.isWaiting(), true);
+  assert.equal(adopted, null);
+  const gm = await browser(GM);
+  const res = await gm.roomRequest({ t: 'charImport', uid: '300', base: 0, data: { name: 'GM 匯入的角色', hp: 9 } });
+  assert.equal(res.ok, true);
+  await flush();
+  assert.equal(adopted?.name, 'GM 匯入的角色');
+  assert.equal(sync.isWaiting(), false);
+  assert.deepEqual(waits, [true, false]); // 先進入等待，GM 匯入後解除
+  stopAll(m, gm);
+});
+
 test('角色同步：兩邊都有不同存檔時問玩家；選伺服器就採用，選本機就覆蓋伺服器', async () => {
   for (const [choice, expectAdopt, expectHp] of [[true, true, 7], [false, false, 3]]) {
     resetHub(); store.clear();
