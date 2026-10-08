@@ -441,3 +441,24 @@ test('角色同步：GM 可以列出並讀取玩家角色，玩家不行', async
   await assert.rejects(p.roomRequest({ t: 'charList' }), /GM/);
   stopAll(gm, p);
 });
+
+test('角色同步：等待中的新玩家自己建立空白角色 → 解除等待並上傳（版本 1）；之後修改照常同步', async () => {
+  resetHub(); store.clear();
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t2y');
+  let state = { name: '示範', hp: 3 };
+  const sync = createCharSync({ getState: () => state, adopt: () => assert.fail('伺服器沒有存檔，不該採用'), hasLocalSave: () => false, notify: () => {}, room: m });
+  await flush();
+  assert.equal(sync.isWaiting(), true);
+  assert.equal(hub.core.charRow('300'), null);
+  state = { name: '我的新角色', hp: 0 }; // 玩家建立空白角色（main.js 會先存進本機）
+  sync.release();
+  await flush();
+  assert.equal(sync.isWaiting(), false);
+  assert.equal(hub.core.charRow('300').version, 1);
+  assert.equal(JSON.parse(hub.core.charRow('300').json).name, '我的新角色');
+  state.hp = 5; sync.markDirty(); // 不再等待：之後的修改會正常同步
+  mock.timers.tick(2000); await flush();
+  assert.equal(hub.core.charRow('300').version, 2);
+  stopAll(m);
+});

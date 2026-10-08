@@ -25,6 +25,7 @@ import { createUserChip } from './ui/userChip.js';
 import { getCurrentUser, consumeLoginResult } from './api/auth.js';
 import { startRoom, stopRoom, getRoomStatus, subscribeRoom } from './state/rollLog.js';
 import { mountWaitNotice } from './ui/waitNotice.js';
+import { blankCharacter } from './game/importBot.js';
 import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
 import { createMailbox } from './state/mailbox.js';
@@ -129,7 +130,14 @@ async function init() {
   }
   // 登入後伺服器沒有角色、這台裝置也只有示範角色：非地圖頁改顯示「等 GM 匯入」（GM 自己不擋，要用 GM 工具）
   const waitView = $('#view-wait');
-  mountWaitNotice(waitView);
+  mountWaitNotice(waitView, {
+    onCreate: (name) => { // 新玩家自己建立空白角色：存本機、解除等待、上傳伺服器
+      character = importCharacter({ ...blankCharacter(name), statMode: 'skills' });
+      sync.release();
+      toast(`已建立角色「${name}」。`);
+      showView();
+    },
+  });
   function applyWait() {
     const status = getRoomStatus();
     const wait = currentView !== 'map' && Boolean(sync?.isWaiting()) && status.phase === 'online' && !status.me?.isGm;

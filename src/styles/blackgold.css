@@ -1218,4 +1218,7 @@ input[type='number'], .amount__input { text-align: center; }
 /* 「等 GM 匯入角色」畫面（waitNotice.js） */
 .wait-notice { margin: 16px; text-align: center; padding-block: 28px; }
 .wait-notice__text { margin: 10px auto 0; max-width: 28em; line-height: 1.7; }
+.wait-notice__form { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.wait-notice__form .field { flex: 1 1 12em; max-width: 16em; min-width: 0; }
+.wait-notice__msg { margin: 6px 0 0; min-height: 1.2em; color: var(--rose); font-size: 0.85rem; }
 .wait-notice__sub { margin: 8px 0 0; color: var(--soft); font-size: 0.9rem; }

@@ -137,6 +137,17 @@ export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) 
     isWaiting: () => readMeta().waiting,
     /** 等待狀態改變時呼叫 fn(是否等待中)；回傳取消訂閱的函式 */
     onWaitingChange(fn) { waitSubs.add(fn); return () => waitSubs.delete(fn); },
+    /**
+     * 玩家選擇自己建立空白角色（不等 GM）：呼叫前要先把新角色存進本機並讓 getState() 回傳它。
+     * 解除等待並立刻上傳（版本 0）；伺服器剛好有 GM 匯入的角色時，照一般流程問玩家用哪一份。
+     */
+    release() {
+      if (!readMeta().waiting) return;
+      gen++;
+      writeMeta({ uid: myUid(), version: 0, dirty: true, waiting: false });
+      notifyWaiting();
+      if (online()) run(() => push(0));
+    },
     /** 角色有修改（每次存檔後呼叫） */
     markDirty() {
       if (readMeta().waiting) return; // 等 GM 匯入期間，示範角色的修改不上傳
