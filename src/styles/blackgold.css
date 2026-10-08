@@ -1133,8 +1133,8 @@ input[type='number'], .amount__input { text-align: center; }
 }
 .skill-tile:hover, .skill-tile:focus-visible { box-shadow: 0 0 0 1px var(--gold2); outline: 0; }
 .skill-tile[data-learned='0'] { opacity: 0.75; }
-/* 位階淡色（跟稀有度同一組顏色：初階綠、進階藍、大師紫、傳說金）：左側細色條＋很淡的底色，一眼分得出階級 */
-.skill-tile { --t: var(--faint); --t-rgb: var(--faint-rgb, 128, 128, 128); border-left: 3px solid var(--t); background: linear-gradient(100deg, rgba(var(--t-rgb), 0.11), transparent 75%), var(--raise); }
+/* 位階淡色（跟稀有度同一組顏色：初階綠、進階藍、大師紫、傳說金）：只有很淡的底色與位階小字，沒有色條 */
+.skill-tile { --t: var(--faint); --t-rgb: var(--faint-rgb, 128, 128, 128); background: linear-gradient(100deg, rgba(var(--t-rgb), 0.14), transparent 80%), var(--raise); }
 .skill-tile[data-tier='初階'] { --t: var(--rarity-0); --t-rgb: var(--rarity-0-rgb); }
 .skill-tile[data-tier='進階'] { --t: var(--rarity-1); --t-rgb: var(--rarity-1-rgb); }
 .skill-tile[data-tier='大師'] { --t: var(--rarity-2); --t-rgb: var(--rarity-2-rgb); }
