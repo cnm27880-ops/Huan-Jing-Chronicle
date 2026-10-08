@@ -9,13 +9,13 @@ import { listCharacters, fetchCharacter } from '../state/charSync.js';
 import { roomRequest } from '../state/rollLog.js';
 import { derivedStats } from '../game/stats.js';
 import { ALL_STATS } from '../game/rules.js';
-import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL } from '../game/skillTable.js';
+import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL, getCustomSkillNames } from '../game/skillTable.js';
 
 const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) : '不明');
 const int = (v) => Math.trunc(Number(v)) || 0;
 
 export function openGmCharEditor() {
-  const ui = { list: null, error: '', uid: null, version: 0, data: null, busy: false, message: '' };
+  const ui = { list: null, error: '', uid: null, version: 0, data: null, busy: false, message: '', addSkill: '', addLevel: 1 };
   let sheet;
 
   async function loadList() {
@@ -54,6 +54,23 @@ export function openGmCharEditor() {
       h('button', { type: 'button', class: 'btn btn--small', disabled: ui.busy ? true : null, onclick: () => open(c.uid) }, '開啟'))));
   }
 
+  /** 把技能指定給玩家（例如 GM 新增的專屬技能）：直接設定等級；GM 自己決定要不要補技能書與經驗 */
+  function addSkillRow(d) {
+    const owned = d.skills ?? {};
+    const custom = getCustomSkillNames().filter((n) => !(n in owned));
+    const others = Object.keys(SKILL_TABLE).filter((n) => !(n in owned) && !custom.includes(n));
+    if (!ui.addSkill || !(ui.addSkill in SKILL_TABLE) || ui.addSkill in owned) ui.addSkill = custom[0] ?? others[0] ?? '';
+    return h('div', { class: 'row', style: 'margin: 10px 0;' },
+      h('select', { class: 'field', 'aria-label': '要指定的技能', onchange: (e) => { ui.addSkill = e.target.value; } },
+        custom.length ? h('optgroup', { label: 'GM 新增的專屬技能' }, custom.map((n) => h('option', { value: n, selected: n === ui.addSkill ? true : null, text: n }))) : null,
+        h('optgroup', { label: '其他技能' }, others.map((n) => h('option', { value: n, selected: n === ui.addSkill ? true : null, text: `${n}（${SKILL_TABLE[n].tier}）` })))),
+      h('input', { class: 'field', type: 'number', min: 1, max: MAX_SKILL_LEVEL, value: ui.addLevel, inputmode: 'numeric', 'aria-label': '等級', style: 'max-width: 5em;', onchange: (e) => { ui.addLevel = Math.max(1, Math.min(MAX_SKILL_LEVEL, int(e.target.value) || 1)); } }),
+      h('button', {
+        type: 'button', class: 'btn btn--small', disabled: ui.addSkill ? null : true,
+        onclick: () => { d.skills = { ...d.skills, [ui.addSkill]: ui.addLevel }; ui.message = `已加上「${ui.addSkill}」${ui.addLevel} 級，記得按「儲存到伺服器」。`; ui.addSkill = ''; sheet.refresh(); },
+      }, '＋ 指定給玩家'));
+  }
+
   function editor() {
     const d = ui.data;
     if (!usesSkillTable(d)) {
@@ -83,6 +100,7 @@ export function openGmCharEditor() {
               h('input', { type: 'checkbox', checked: d.skillOn?.[n] ? true : null, onchange: (e) => { d.skillOn = { ...d.skillOn, [n]: e.target.checked }; sheet.refresh(); } }),
               h('span', { text: `啟動（算力上限 −${SKILL_TABLE[n].activate.算力}）` }))
           : null))),
+      addSkillRow(d),
       h('button', { type: 'button', class: 'btn btn--primary', disabled: ui.busy ? true : null, onclick: save }, ui.busy ? '儲存中…' : '儲存到伺服器'),
       ui.message ? h('p', { class: 'notice', text: ui.message }) : null);
   }

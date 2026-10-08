@@ -2,7 +2,11 @@
 // 技能目錄與技能數值（src/game/skillTable.js、stats.js 的 skills 模式）
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SKILL_TABLE, EXP_TABLE, skillFx, skillParts, needsActivation, inCatalog } from '../src/game/skillTable.js';
+import {
+  SKILL_TABLE, EXP_TABLE, skillFx, skillParts, needsActivation, inCatalog,
+  validateCustomSkill, setCustomSkills, parseFxLine, formatFxLine, getCustomSkillNames, isBuiltinSkill, MAX_CUSTOM_SKILLS,
+} from '../src/game/skillTable.js';
+import { drawPool } from '../src/game/skillDraw.js';
 import { derivedStats } from '../src/game/stats.js';
 import { passivesOf } from '../src/game/skills.js';
 import { proficiency } from '../src/game/engine.js';
@@ -179,4 +183,72 @@ test('暗影斗篷（我要把朋友賣掉）：只有文字、不影響任何�
   const before = derivedStats(mk({}));
   const after = derivedStats(mk({ 暗影斗篷: 10 }));
   for (const k of Object.keys(before)) assert.equal(after[k].total, before[k].total);
+});
+
+test('老狗識途：每個擁有的技能（含自己）達 5、10 級各觸發一次，依序加 物理→能量→靈魂→體魄→抗性→精神，循環', () => {
+  const STATS = ['物理傷害', '能量傷害', '靈魂傷害', '體魄強韌', '抗性免疫', '精神意志'];
+  // 只看「老狗識途」這個來源在面板明細裡加了多少（其他技能自己的數值不算）
+  const dog = (skills) => { const d = derivedStats(mk(skills)); return STATS.map((k) => d[k].parts.filter((p) => p.label === '老狗識途').reduce((a, p) => a + p.value, 0)); };
+  assert.deepEqual(skillFx('老狗識途', 3), { 生命: 3 }); // 目錄只剩每級 +1 生命，屬性由程式算
+  assert.deepEqual(skillFx('老狗識途', 10), { 生命: 10, 真實傷害: 1, 絕對防禦: 1 });
+  assert.deepEqual(dog({ 老狗識途: 4 }), [0, 0, 0, 0, 0, 0]); // 沒有任何技能到 5 級
+  assert.deepEqual(dog({ 老狗識途: 5 }), [1, 0, 0, 0, 0, 0]); // 自己 5 級也算：第 1 次 → 物理
+  assert.deepEqual(dog({ 老狗識途: 5, 八卦掌: 10 }), [1, 1, 1, 0, 0, 0]); // 老狗 5（1 次）＋八卦掌 10（2 次）＝ 3 次
+  assert.deepEqual(dog({ 老狗識途: 10, 八卦掌: 10, 呢喃低語: 5 }), [1, 1, 1, 1, 1, 0]); // 2 + 2 + 1 = 5 次：前五項各 1
+  assert.deepEqual(dog({ 老狗識途: 10, 八卦掌: 5, 呢喃低語: 5, 引氣訣: 5, 周天吐納法: 5 }), [1, 1, 1, 1, 1, 1]); // 2 + 4 = 6 次：六項各 1
+  assert.deepEqual(dog({ 老狗識途: 10, 八卦掌: 10, 呢喃低語: 5, 引氣訣: 5, 周天吐納法: 5 }), [2, 1, 1, 1, 1, 1]); // 2 + 2 + 1 + 1 + 1 = 7 次：第 7 次回到物理
+  assert.deepEqual(dog({ 呢喃低語: 10 }), [0, 0, 0, 0, 0, 0]); // 沒學老狗識途就沒有這個被動
+});
+
+// ---------- GM 新增的專屬技能 ----------
+const mySkill = { tier: '進階', kind: '被動', school: '獨特', text: '每級加生命', fx: [{ 生命: 5 }, { 生命: 10 }, { 生命: 10, 真實傷害: 1 }] };
+
+test('屬性加成文字：「生命+5 真實傷害+1」讀成數值、數值轉回文字；看不懂的會說哪一段', () => {
+  assert.deepEqual(parseFxLine('生命+5 真實傷害+1，物理傷害-2、魔力3'), { ok: true, fx: { 生命: 5, 真實傷害: 1, 物理傷害: -2, 魔力: 3 } });
+  assert.deepEqual(parseFxLine(''), { ok: true, fx: {} });
+  assert.deepEqual(parseFxLine('生命+0'), { ok: true, fx: {} });
+  assert.deepEqual(parseFxLine('生命+2 生命+3'), { ok: true, fx: { 生命: 5 } }); // 同一屬性寫兩次會相加
+  assert.equal(parseFxLine('生命').ok, false);
+  assert.match(parseFxLine('亂寫+1').error, /亂寫\+1/);
+  assert.equal(parseFxLine('能量傷害+1').fx.能量傷害, 1); // 能量傷害與能量是不同屬性
+  assert.equal(formatFxLine({ 生命: 5, 物理傷害: -2 }), '生命+5 物理傷害-2');
+  assert.deepEqual(parseFxLine(formatFxLine({ 生命: 5, 物理傷害: -2 })).fx, { 生命: 5, 物理傷害: -2 });
+});
+
+test('GM 新增專屬技能的檢查：名稱、位階、類型（沒有啟動類）、系別、文字長度、數值表', () => {
+  assert.equal(validateCustomSkill('我的技能', mySkill).ok, true);
+  const no = (name, def) => assert.equal(validateCustomSkill(name, def).ok, false);
+  no('', mySkill); no('x'.repeat(21), mySkill);
+  no('八卦掌', mySkill); no('老狗識途', mySkill); // 內建技能不能蓋掉
+  no('新', { ...mySkill, tier: '神級' }); no('新', { ...mySkill, kind: '啟動' }); no('新', { ...mySkill, school: '亂來' });
+  no('新', { ...mySkill, text: 'x'.repeat(601) });
+  no('新', { ...mySkill, fx: Array.from({ length: 11 }, () => ({})) });
+  no('新', { ...mySkill, fx: [{ 亂寫: 1 }] }); no('新', { ...mySkill, fx: [{ 生命: 1.5 }] }); no('新', { ...mySkill, fx: [{ 生命: 10000 }] }); no('新', { ...mySkill, fx: ['生命'] });
+  no('新', null);
+  const v = validateCustomSkill('  我的技能  ', { ...mySkill, fx: [{ 生命: 5, 物理傷害: 0 }] });
+  assert.equal(v.name, '我的技能'); // 前後空白去掉
+  assert.equal(v.def.fx.length, 10); // 不足 10 級的補成空的
+  assert.deepEqual(v.def.fx[0], { 生命: 5 }); // 0 的丟掉
+  assert.ok(v.def.personal && v.def.custom);
+  assert.ok(isBuiltinSkill('八卦掌') && !isBuiltinSkill('我的技能'));
+});
+
+test('GM 新增專屬技能：放進目錄後面板會算數值、不進抽書池；更新或清空時上一批會被拿掉；內建技能不受影響', () => {
+  const before = Object.keys(SKILL_TABLE).length;
+  setCustomSkills({ 我的技能: mySkill, 八卦掌: { ...mySkill, tier: '初階' }, 壞技能: { tier: '亂來' } });
+  assert.deepEqual(getCustomSkillNames(), ['我的技能']); // 蓋內建的、壞資料的都被丟掉
+  assert.equal(SKILL_TABLE.八卦掌.tier, '初階'); assert.equal(SKILL_TABLE.八卦掌.school, '修仙'); // 內建的沒被蓋掉
+  assert.ok(inCatalog('我的技能') && Object.keys(SKILL_TABLE).length === before + 1);
+  assert.deepEqual(skillFx('我的技能', 3), { 生命: 10, 真實傷害: 1 });
+  const hp = (skills) => derivedStats(mk(skills)).生命.total;
+  const base = hp({});
+  assert.equal(hp({ 我的技能: 2 }) - base, 10); // 2 級累積 +10 生命
+  assert.equal(hp({ 我的技能: 0 }) - base, 0);
+  assert.ok(!drawPool('進階').includes('我的技能')); // 專屬技能不進抽書池
+  setCustomSkills({ 另一個: { ...mySkill, fx: [] } });
+  assert.ok(!inCatalog('我的技能') && inCatalog('另一個')); // 換一批：上一批拿掉
+  assert.equal(hp({ 我的技能: 2 }) - base, 0); // 目錄沒有就不算（資料還在玩家身上，技能回來又會算）
+  setCustomSkills(null);
+  assert.equal(Object.keys(SKILL_TABLE).length, before);
+  assert.equal(MAX_CUSTOM_SKILLS, 60);
 });

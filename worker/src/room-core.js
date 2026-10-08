@@ -13,6 +13,8 @@ import { newEncounter, addMobs, addBosses, isDowned } from '../../src/game/comba
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
 import { describeCharChange } from './audit.js';
+import { validateCustomRecipe, validateCustomMaterial, MAX_CUSTOM_RECIPES, MAX_CUSTOM_MATERIALS } from '../../src/game/special.js';
+import { validateCustomSkill, formatFxLine, MAX_CUSTOM_SKILLS } from '../../src/game/skillTable.js';
 import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
@@ -128,6 +130,8 @@ export class RoomCore {
       battleNo: this.battleNo(),
       encounter: this.encounter(),
       mail: this.pendingMail(user.uid),
+      special: this.special(),
+      skills: this.customSkills(),
       members: this.membersView(online),
       history: this.history(),
     };
@@ -141,6 +145,7 @@ export class RoomCore {
       big: fields.big ?? null, tone: fields.tone, lines: fields.lines ?? [],
     };
     if (fields.srv) ev.srv = true; // 骰點由伺服器擲出
+    if (fields.target) ev.target = fields.target; // 異動紀錄：被修改的玩家 uid
     if (fields.battleNo != null) ev.battleNo = fields.battleNo;
     this.db.tx(() => {
       const [{ seq }] = this.db.exec('INSERT INTO events(id, t, json) VALUES (?, ?, ?) RETURNING seq', ev.id, ev.t, JSON.stringify(ev));
@@ -192,6 +197,8 @@ export class RoomCore {
       case 'charPut': return this.onCharPut(user, msg, rid);
       case 'charList': return this.onCharList(user, rid);
       case 'charImport': return this.onCharImport(user, msg, rid);
+      case 'specialSet': case 'specialDel': return this.onSpecial(user, msg, rid);
+      case 'skillSet': case 'skillDel': return this.onSkillEdit(user, msg, rid);
       case 'mailSend': return this.onMailSend(user, msg, rid);
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': return this.onEncounter(user, msg, rid, online);
@@ -468,6 +475,76 @@ export class RoomCore {
     return this.encOk(enc, rid, user);
   }
 
+  // ---------- 特殊配方與特殊材料（GM 新增的；內建的寫在 src/game/special.js，不能改） ----------
+  /** GM 新增的資料：{ recipes: { 名稱: 定義 }, materials: { 名稱: 定義 } }，所有人都讀得到 */
+  special() {
+    try {
+      const v = JSON.parse(this.getMeta('special') ?? '{}');
+      return { recipes: v.recipes ?? {}, materials: v.materials ?? {} };
+    } catch { return { recipes: {}, materials: {} }; }
+  }
+
+  /** GM 新增／修改（specialSet）或刪除（specialDel）一個配方或材料；每次改動記一條異動紀錄並通知所有人 */
+  onSpecial(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以編輯特殊配方與材料。');
+    const kind = msg.kind === 'recipe' ? 'recipe' : msg.kind === 'material' ? 'material' : null;
+    if (!kind) return err(rid, 'bad_special', '不認得這種資料。');
+    const sp = this.special();
+    const bag = kind === 'recipe' ? sp.recipes : sp.materials;
+    const noun = kind === 'recipe' ? '特殊配方' : '特殊材料';
+    let label; let lines = [];
+    if (msg.t === 'specialDel') {
+      const name = cleanStr(msg.name, 40);
+      if (!(name in bag)) return err(rid, 'bad_special', `沒有「${name}」可以刪除（內建的不能刪）。`);
+      delete bag[name];
+      label = `${user.name} 刪除了${noun}「${name}」`;
+    } else {
+      const v = kind === 'recipe' ? validateCustomRecipe(msg.name, msg.def) : validateCustomMaterial(msg.name, msg.def);
+      if (!v.ok) return err(rid, 'bad_special', v.error);
+      const isNew = !(v.name in bag);
+      if (isNew && Object.keys(bag).length >= (kind === 'recipe' ? MAX_CUSTOM_RECIPES : MAX_CUSTOM_MATERIALS)) return err(rid, 'bad_special', `${noun}已經太多了，請先刪掉不用的。`);
+      bag[v.name] = v.def;
+      label = `${user.name} ${isNew ? '新增' : '修改'}了${noun}「${v.name}」`;
+      lines = kind === 'recipe'
+        ? [`${v.def.type}・${v.def.skill} DC ${v.def.dc}`, `材料：${Object.entries(v.def.materials).map(([k, q]) => `${k}×${q}`).join('、')}`, v.def.effect ? `效果：${v.def.effect}` : '']
+        : [`可用技能：${v.def.skills.join('、')}`, v.def.hint ? `說明：${v.def.hint}` : ''];
+    }
+    this.setMeta('special', JSON.stringify(sp));
+    const ev = this.record({ who: '系統', kind: 'audit', label, lines: lines.filter(Boolean) }, user);
+    return { out: [{ to: 'self', msg: { t: 'specialOk', rid } }, ...this.broadcastEvent(ev).out, { to: 'all', msg: { t: 'special', special: sp } }], close: null };
+  }
+
+  // ---------- 專屬技能（GM 新增的；內建的技能目錄在 src/data/skills.js，不能改） ----------
+  /** GM 新增的技能：{ 名稱: 定義 }，所有人都讀得到 */
+  customSkills() {
+    try { return JSON.parse(this.getMeta('custom_skills') ?? '{}'); } catch { return {}; }
+  }
+
+  /** GM 新增／修改（skillSet）或刪除（skillDel）一個專屬技能；每次改動記一條異動紀錄並通知所有人 */
+  onSkillEdit(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以編輯專屬技能。');
+    const all = this.customSkills();
+    let label; let lines = [];
+    if (msg.t === 'skillDel') {
+      const name = cleanStr(msg.name, 40);
+      if (!(name in all)) return err(rid, 'bad_skill', `沒有「${name}」可以刪除（內建技能不能刪）。`);
+      delete all[name];
+      label = `${user.name} 刪除了專屬技能「${name}」`;
+    } else {
+      const v = validateCustomSkill(msg.name, msg.def);
+      if (!v.ok) return err(rid, 'bad_skill', v.error);
+      const isNew = !(v.name in all);
+      if (isNew && Object.keys(all).length >= MAX_CUSTOM_SKILLS) return err(rid, 'bad_skill', '專屬技能已經太多了，請先刪掉不用的。');
+      all[v.name] = v.def;
+      label = `${user.name} ${isNew ? '新增' : '修改'}了專屬技能「${v.name}」`;
+      const fxLines = v.def.fx.map((f, i) => (Object.keys(f).length ? `${i + 1} 級：${formatFxLine(f)}` : '')).filter(Boolean);
+      lines = [`${v.def.tier}・${v.def.kind}・${v.def.school}`, ...fxLines.slice(0, 12)];
+    }
+    this.setMeta('custom_skills', JSON.stringify(all));
+    const ev = this.record({ who: '系統', kind: 'audit', label, lines }, user);
+    return { out: [{ to: 'self', msg: { t: 'skillOk', rid } }, ...this.broadcastEvent(ev).out, { to: 'all', msg: { t: 'skills', skills: all } }], close: null };
+  }
+
   // ---------- 角色存檔（階段 2） ----------
   // 角色資料仍由前端算、前端寫入（和骰子加值一樣的信任邊界）；伺服器只負責「保存」與「GM 可讀」。
   // version 是樂觀鎖：寫入時要帶上自己看到的版本，版本不一致就拒絕，避免手機與電腦互相悄悄覆蓋。
@@ -526,7 +603,7 @@ export class RoomCore {
     // 異動紀錄：誰、何時、改了什麼（GM 替玩家改角色），所有人都看得到，和擲骰紀錄放在同一條時間軸
     const member = this.db.exec('SELECT name FROM members WHERE uid = ?', uid)[0]?.name ?? uid;
     const { lines } = describeCharChange(before ? JSON.parse(before.json) : null, msg.data);
-    const ev = this.record({ who: '系統', kind: 'audit', label: `${user.name} 修改了「${cleanStr(msg.data.name, 80)}」（${member}）的角色`, lines }, user);
+    const ev = this.record({ who: '系統', kind: 'audit', target: uid, label: `${user.name} 修改了「${cleanStr(msg.data.name, 80)}」（${member}）的角色`, lines }, user);
     return { out: [...saved, ...this.broadcastEvent(ev).out], close: null };
   }
 

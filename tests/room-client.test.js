@@ -377,6 +377,71 @@ test('角色同步：全新裝置、伺服器也沒有存檔 → 不上傳示範
   stopAll(m2);
 });
 
+test('角色同步：等 GM 匯入的玩家，GM 一匯入就自動採用（不用重新整理），等待狀態解除並通知畫面', async () => {
+  resetHub(); store.clear();
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t2x');
+  let adopted = null; const waits = [];
+  const sync = createCharSync({ getState: () => ({ name: '示範' }), adopt: (d) => { adopted = d; }, hasLocalSave: () => false, notify: () => {}, room: m });
+  sync.onWaitingChange((w) => waits.push(w));
+  await flush();
+  assert.equal(sync.isWaiting(), true);
+  assert.equal(adopted, null);
+  const gm = await browser(GM);
+  const res = await gm.roomRequest({ t: 'charImport', uid: '300', base: 0, data: { name: 'GM 匯入的角色', hp: 9 } });
+  assert.equal(res.ok, true);
+  await flush();
+  assert.equal(adopted?.name, 'GM 匯入的角色');
+  assert.equal(sync.isWaiting(), false);
+  assert.deepEqual(waits, [true, false]); // 先進入等待，GM 匯入後解除
+  stopAll(m, gm);
+});
+
+test('特殊配方：GM 新增後，在線的玩家立刻收到；之後才進來的玩家連線時就拿到；離開房間後不再使用', async () => {
+  resetHub(); store.clear();
+  const p = await browser(P1);
+  const gm = await browser(GM);
+  const def = { type: '進階藥水', skill: '調劑', dc: 12, materials: { 福瑞毛: 2 }, effect: '測試' };
+  const res = await gm.roomRequest({ t: 'specialSet', kind: 'recipe', name: '毛茸茸藥水', def });
+  assert.equal(res.t, 'specialOk');
+  await flush();
+  assert.deepEqual(p.getRoomStatus().special.recipes.毛茸茸藥水, def); // 在線的玩家立刻收到
+  assert.ok(p.getLog().some((e) => e.kind === 'audit' && /新增了特殊配方/.test(e.label))); // 異動紀錄大家都看得到
+  await assert.rejects(p.roomRequest({ t: 'specialSet', kind: 'recipe', name: '偷改', def }), /只有 GM/); // 玩家被拒絕
+  const late = await browser({ uid: '200', name: '開發者', avatar: null });
+  assert.deepEqual(late.getRoomStatus().special.recipes.毛茸茸藥水, def); // 之後才連線的人
+  stopAll(p, gm, late);
+});
+
+test('專屬技能：GM 新增後，在線的玩家立刻收到；之後才進來的玩家連線時就拿到；玩家不能改', async () => {
+  resetHub(); store.clear();
+  const p = await browser(P1);
+  const gm = await browser(GM);
+  const def = { tier: '進階', kind: '被動', school: '獨特', text: '測試', fx: [{ 生命: 5 }] };
+  const res = await gm.roomRequest({ t: 'skillSet', name: '我的技能', def });
+  assert.equal(res.t, 'skillOk');
+  await flush();
+  assert.equal(p.getRoomStatus().skills.我的技能.fx[0].生命, 5); // 在線的玩家立刻收到
+  assert.ok(p.getLog().some((e) => e.kind === 'audit' && /新增了專屬技能/.test(e.label)));
+  await assert.rejects(p.roomRequest({ t: 'skillSet', name: '偷改', def }), /只有 GM/);
+  const late = await browser({ uid: '200', name: '開發者', avatar: null });
+  assert.equal(late.getRoomStatus().skills.我的技能.tier, '進階'); // 之後才連線的人
+  stopAll(p, gm, late);
+});
+
+test('專屬技能本機快取：存了就讀得回來；壞資料當作沒有', async () => {
+  store.clear();
+  const { loadCachedCustomSkills, saveCachedCustomSkills } = await import('../src/state/customSkills.js');
+  assert.equal(loadCachedCustomSkills(), null);
+  saveCachedCustomSkills({ 我的技能: { tier: '進階' } });
+  assert.deepEqual(loadCachedCustomSkills(), { 我的技能: { tier: '進階' } });
+  store.set('huanjing:customSkills:v1', '不是 JSON');
+  assert.equal(loadCachedCustomSkills(), null);
+  store.set('huanjing:customSkills:v1', '[1,2]');
+  assert.equal(loadCachedCustomSkills(), null);
+  store.clear();
+});
+
 test('角色同步：兩邊都有不同存檔時問玩家；選伺服器就採用，選本機就覆蓋伺服器', async () => {
   for (const [choice, expectAdopt, expectHp] of [[true, true, 7], [false, false, 3]]) {
     resetHub(); store.clear();
@@ -420,4 +485,25 @@ test('角色同步：GM 可以列出並讀取玩家角色，玩家不行', async
   assert.equal((await gm.roomRequest({ t: 'charGet', uid: '300' })).data.hp, 5);
   await assert.rejects(p.roomRequest({ t: 'charList' }), /GM/);
   stopAll(gm, p);
+});
+
+test('角色同步：等待中的新玩家自己建立空白角色 → 解除等待並上傳（版本 1）；之後修改照常同步', async () => {
+  resetHub(); store.clear();
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t2y');
+  let state = { name: '示範', hp: 3 };
+  const sync = createCharSync({ getState: () => state, adopt: () => assert.fail('伺服器沒有存檔，不該採用'), hasLocalSave: () => false, notify: () => {}, room: m });
+  await flush();
+  assert.equal(sync.isWaiting(), true);
+  assert.equal(hub.core.charRow('300'), null);
+  state = { name: '我的新角色', hp: 0 }; // 玩家建立空白角色（main.js 會先存進本機）
+  sync.release();
+  await flush();
+  assert.equal(sync.isWaiting(), false);
+  assert.equal(hub.core.charRow('300').version, 1);
+  assert.equal(JSON.parse(hub.core.charRow('300').json).name, '我的新角色');
+  state.hp = 5; sync.markDirty(); // 不再等待：之後的修改會正常同步
+  mock.timers.tick(2000); await flush();
+  assert.equal(hub.core.charRow('300').version, 2);
+  stopAll(m);
 });

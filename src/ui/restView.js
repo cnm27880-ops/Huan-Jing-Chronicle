@@ -19,7 +19,7 @@ import { SKILL_TABLE, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, 
 import { drawBooks, chooseDraw, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
 import { badgeStatus, craftBadge, renameBadge, BADGE_COUNT, BADGE_NAME_MAX } from '../game/badges.js';
 import {
-  SPECIAL_RECIPES, USABLE_ITEMS, DAILY_MATERIALS, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
+  allRecipes, allMaterials, USABLE_ITEMS, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
   specialMaxTimes, craftSpecial, useSpecialItem, gatherDaily, dailyDone, feedMeatball, harvestMeat,
 } from '../game/special.js';
 import { openSheet } from './sheet.js';
@@ -378,14 +378,14 @@ export function createRestView({ root, getState, commit }) {
   // ---------- 特殊（特殊配方、特殊材料、餵肉球） ----------
   function materialsSection(state) {
     return section('特殊材料',
-      h('div', { class: 'special-list' }, Object.entries(DAILY_MATERIALS).map(([name, m]) => {
+      h('div', { class: 'special-list' }, Object.entries(allMaterials()).map(([name, m]) => {
         const skill = m.skills.includes(ui.matSkill[name]) ? ui.matSkill[name] : m.skills[0];
         const done = dailyDone(state, name);
         return h('div', { class: 'special-card' },
           h('div', { class: 'special-card__head' },
             h('strong', { text: `${iconOf(name)} ${name}` }),
             h('span', { class: 'num', text: `有 ${fmt(countOf(state, name))}` })),
-          h('small', { class: 'hint', text: m.hint }),
+          m.hint ? h('small', { class: 'hint', text: m.hint }) : null,
           done
             ? h('p', { class: 'notice', text: '今天已經取過了，下個修整日再來。' })
             : h('div', { class: 'row' },
@@ -444,14 +444,15 @@ export function createRestView({ root, getState, commit }) {
   }
 
   function specialRecipeSection(state) {
-    const name = SPECIAL_RECIPES[ui.specialRecipe] ? ui.specialRecipe : Object.keys(SPECIAL_RECIPES)[0];
-    const r = SPECIAL_RECIPES[name];
+    const recipes = allRecipes();
+    const name = recipes[ui.specialRecipe] ? ui.specialRecipe : Object.keys(recipes)[0];
+    const r = recipes[name];
     const max = specialMaxTimes(state, name);
     ui.times = Math.max(1, Math.min(ui.times, Math.max(max, 1)));
     const usable = Object.keys(USABLE_ITEMS).filter((n) => countOf(state, n) > 0);
     return [
       section('特殊配方',
-        h('div', { class: 'diff-grid', role: 'radiogroup' }, Object.entries(SPECIAL_RECIPES).map(([n, x]) => h('button', {
+        h('div', { class: 'diff-grid', role: 'radiogroup' }, Object.entries(recipes).map(([n, x]) => h('button', {
           type: 'button', class: `diff${specialMaxTimes(state, n) ? '' : ' is-none'}`, role: 'radio', 'aria-checked': String(n === name),
           onclick: () => { ui.specialRecipe = n; ui.times = 1; render(); },
         },
@@ -460,7 +461,7 @@ export function createRestView({ root, getState, commit }) {
         h('span', { class: 'diff__can', text: specialMaxTimes(state, n) ? `可做 ${fmt(specialMaxTimes(state, n))} 次` : '材料不足' })))),
         h('div', { class: 'reward-line' },
           h('p', { class: 'field-label', text: `${name}　${r.type}（${r.skill} DC ${r.dc}）` }),
-          h('p', { class: 'hint', text: `效果：${r.effect}` }),
+          r.effect ? h('p', { class: 'hint', text: `效果：${r.effect}` }) : null,
           h('ul', { class: 'learn-cost' }, Object.entries(r.materials).map(([item, n]) => h('li', { class: 'learn-cost__row', dataset: { ok: countOf(state, item) >= n ? '1' : '0' } },
             h('span', { text: `${iconOf(item)} ${item}` }),
             h('span', { class: 'num', text: `${n}（有 ${fmt(countOf(state, item))}）` }),

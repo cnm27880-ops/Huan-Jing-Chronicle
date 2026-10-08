@@ -19,6 +19,7 @@ from openpyxl.utils import column_index_from_string as CI
 
 STAT_RENAME = {'體魄防禦': '體魄強韌', '抗性防禦': '抗性免疫'}  # 試算表與網站的名稱差異
 TIERS = ['初階', '進階', '大師', '傳說']
+DYNAMIC_ONLY = {'老狗識途': ['物理傷害', '能量傷害', '靈魂傷害', '體魄強韌', '抗性免疫', '精神意志']}  # 試算表裡是照某位玩家當下技能數算死的
 ACTIVATE = re.compile(r'減少(\d+)點算力上限[^。]*。?[^。]*永久獲得啟動能力')  # 只有「永久獲得啟動能力」的一次性被動才算啟動類
 
 
@@ -83,6 +84,9 @@ def main(paths):
             if name not in table:
                 table[name] = dict(spec, fx=[{} for _ in range(10)], personal=True)
                 print('補入手動維護的個人專屬技能', name)
+    for name, stats in DYNAMIC_ONLY.items():  # 這些技能的屬性由程式依玩家的技能數量即時算（skillTable.js 的 DYNAMIC_FX），試算表的固定值要拿掉
+        if name in table:
+            table[name]['fx'] = [{k: v for k, v in f.items() if k not in stats} for f in table[name]['fx']]
     for name, t in table.items():
         m = ACTIVATE.search(t['text'])
         if m:  # 一次性被動：扣算力上限，之後才有「啟動」的數值（見 src/game/skillTable.js）

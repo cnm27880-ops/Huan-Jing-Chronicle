@@ -35,6 +35,9 @@ const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) 
 export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) => window.confirm(t), notify = () => {}, room = defaultRoom }) {
   const { roomRequest: request, getRoomStatus, subscribeRoom } = room;
   let timer = null;
+  const waitSubs = new Set();
+  let lastWaiting = readMeta().waiting;
+  const notifyWaiting = () => { const w = readMeta().waiting; if (w === lastWaiting) return; lastWaiting = w; waitSubs.forEach((fn) => fn(w)); };
   let gen = 0; // 每次修改 +1，用來判斷上傳期間又有新修改
   let chain = Promise.resolve();
 
@@ -83,6 +86,7 @@ export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) 
       if (meta.waiting || !hasLocalSave()) { // 本機只有示範角色：不上傳，等 GM 匯入
         if (!meta.waiting) notify('伺服器還沒有你的角色，請 GM 匯入；匯入後會自動套用。這台裝置的示範角色不會上傳。');
         writeMeta({ uid: myUid(), version: 0, dirty: false, waiting: true });
+        notifyWaiting();
         return;
       }
       await push(0); // 伺服器還沒有：把本機的上傳
@@ -91,6 +95,7 @@ export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) 
     if (meta.waiting) { // 之前在等 GM 匯入：現在有了，直接用（本機的只是示範角色）
       adopt(res.data);
       writeMeta({ uid: myUid(), version: res.version, dirty: false, waiting: false });
+      notifyWaiting();
       return;
     }
     if (res.version === meta.version) { // 同一版：有待上傳的修改就上傳
@@ -120,12 +125,29 @@ export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) 
     if (now && !wasOnline) run(reconcile);
     wasOnline = now;
   });
+  // 等 GM 匯入的玩家：GM 一匯入，紀錄裡會出現指向自己的異動事件 → 立刻重新比對並採用，不用重新整理
+  room.subscribe?.((ev) => { if (ev?.kind === 'audit' && ev.target && ev.target === myUid() && readMeta().waiting && online()) run(reconcile); });
   if (wasOnline) run(reconcile); // 建立時已經在房間裡（通常是測試或重新建立）
   document.addEventListener('visibilitychange', () => { // 切到背景前盡快上傳，避免關掉分頁漏存
     if (document.visibilityState === 'hidden' && online() && readMeta().dirty && !readMeta().waiting) { clearTimeout(timer); run(() => push(readMeta().version)); }
   });
 
   return {
+    /** 這台裝置正在等 GM 匯入角色（伺服器沒有存檔、本機只有示範角色） */
+    isWaiting: () => readMeta().waiting,
+    /** 等待狀態改變時呼叫 fn(是否等待中)；回傳取消訂閱的函式 */
+    onWaitingChange(fn) { waitSubs.add(fn); return () => waitSubs.delete(fn); },
+    /**
+     * 玩家選擇自己建立空白角色（不等 GM）：呼叫前要先把新角色存進本機並讓 getState() 回傳它。
+     * 解除等待並立刻上傳（版本 0）；伺服器剛好有 GM 匯入的角色時，照一般流程問玩家用哪一份。
+     */
+    release() {
+      if (!readMeta().waiting) return;
+      gen++;
+      writeMeta({ uid: myUid(), version: 0, dirty: true, waiting: false });
+      notifyWaiting();
+      if (online()) run(() => push(0));
+    },
     /** 角色有修改（每次存檔後呼叫） */
     markDirty() {
       if (readMeta().waiting) return; // 等 GM 匯入期間，示範角色的修改不上傳

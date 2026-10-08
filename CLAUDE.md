@@ -40,7 +40,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
-| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏）、GM 寫入玩家角色時記「異動」事件（`worker/src/audit.js` 比對前後差異） |
+| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏）、GM 寫入玩家角色時記「異動」事件（`worker/src/audit.js` 比對前後差異）、GM 新增的特殊配方與材料（`specialSet`／`specialDel`）與專屬技能（`skillSet`／`skillDel`），存在 meta、全員同步、每次改動記異動 |
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |
@@ -48,14 +48,16 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/api/auth.js` | 前端登入 API：查詢登入者、登出；任何失敗都當未登入（維持單機試玩） |
 | `src/ui/userChip.js` | 頂部列的登入者頭像與登出 |
 | `src/state/rollLog.js` | 擲骰紀錄，**畫面與房間之間唯一的接線點**：房間模式走 WebSocket、伺服器擲骰；本機模式（沒登入／連不上）照舊存 localStorage |
-| `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；全新裝置且伺服器沒有存檔時不上傳示範角色（標記等待，GM 匯入後自動採用）；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔 |
+| `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；全新裝置且伺服器沒有存檔時不上傳示範角色（標記等待，GM 匯入後自動採用，畫面在 `src/ui/waitNotice.js`，新玩家也可以在那裡自己建立空白角色）；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔 |
 | `src/game/importBot.js` | 機器人存檔（players_data.json 的一位玩家）→ 網站角色（純函式）：只填機器人有的欄位，技能與基礎數值空白；可合併進既有角色 |
 | `src/ui/botImport.js` | GM 專用的「匯入機器人存檔」面板（在跑團頁的房間區塊）：檔案只在瀏覽器讀取轉換，轉好才送伺服器（`charImport`）；`players_data.json` 永遠不能進 git |
 | `src/data/skills.js` | 技能目錄（**自動產生，不要手改**；試算表沒有的個人專屬技能放 `tools/extra-skills.json`）：119 個技能、每級累積數值、位階／類型／系別／效果文字、升級經驗表。由 `tools/extract-skills.py` 從 GM 的自動角色卡產生 |
 | `tools/extract-skills.py` | 更新技能目錄用（需要 openpyxl，只在技能資料改版時才跑）：`python3 tools/extract-skills.py 標準卡.xlsx [補充卡.xlsx …]` |
-| `src/game/skillTable.js` | 技能數值：查表、啟動類技能（武裝）、skills 模式（`statMode: 'skills'`）的規則（純函式） |
+| `src/game/skillTable.js` | 技能數值：查表、啟動類技能（武裝）、skills 模式（`statMode: 'skills'`）的規則、老狗識途與浮腫之軀的動態被動、GM 新增專屬技能的檢查與放進目錄（`validateCustomSkill`／`setCustomSkills`）（純函式） |
 | `src/game/skillDraw.js` | 抽取技能書（3 選 1，結果存 `pendingDraws`，選完前不能做其他事）（純函式） |
-| `src/game/special.js` | 特殊配方（10 個）、特殊材料（每日 1 次）、餵肉球與收割（純函式）；畫面在修整日「特殊」分頁 |
+| `src/game/special.js` | 特殊配方（內建 10 個）、特殊材料（每日 1 次）、餵肉球與收割（純函式）；GM 新增的配方與材料也在這裡檢查與合併（`allRecipes`／`allMaterials`，畫面一律用這兩個）；畫面在修整日「特殊」分頁 |
+| `src/ui/skillEdit.js`、`src/state/customSkills.js` | GM 專用的「專屬技能」面板（新增、修改、刪除；每級填累積屬性加成＋效果文字；內建技能不能改）；`customSkills.js` 是 GM 專屬技能的本機快取（載入角色前先放進目錄，免得生命上限算低、生命被砍）。指定給玩家在「玩家角色」面板 |
+| `src/ui/specialEdit.js` | GM 專用的「特殊配方與材料」面板（跑團頁房間區塊）：新增、修改、刪除 GM 自己加的配方與每日材料（只產生物品、效果寫文字）；內建的不能改 |
 | `src/game/badges.js` | 生活技能徽章（神級、500 次）：判斷達標、製作後技能 +1（純函式） |
 | `src/game/importSheet.js` | 試算表角色卡（貼上的文字）→ 網站角色：用標題文字找位置，不看固定格子；算出「手動調整」（純函式） |
 | `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |
@@ -104,4 +106,6 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 6. 圖片路徑用相對路徑（`img/...`，不要開頭的 `/`），GitHub Pages 子路徑才不會壞。
 
 ## 未來規劃（現在不要做，除非我明確要求）
-角色資料放伺服器（階段 2：**已開始**——伺服器保存角色並讓 GM 可讀，但資料仍由前端算、前端寫入，骰子的數量與加值仍由前端送出，伺服器只負責擲、記錄與保存；防作弊要把規則搬到伺服器，尚未做）、GM 後台（地圖點選放標記、表單編輯、圖片上傳到 R2、揭露開關）、依技能自動計算戰鬥面板、從試算表匯入角色。網站日後會掛到自己的網域（同站）。
+已經做完、從這份清單拿掉的：角色資料放伺服器（階段 2，伺服器保存並讓 GM 可讀）、從試算表匯入角色、依技能自動計算面板、GM 新增專屬技能／特殊配方／特殊材料、異動紀錄。
+**不做**：防作弊（把規則搬到伺服器，使用者 2026-10-08：自由心證）、GM 後台的地圖標記／圖片上傳／揭露開關（地圖全公開、不用再傳圖片）。
+**還沒做**（詳見 `RULES_OVERVIEW.md`「實作進度」）：GM 在網站編輯內建技能目錄與升級經驗表、神級料理與神級滴露的效果編輯器（等 GM 想出效果）、其他有「%」的技能、寶石取出與打洞配方。網站日後會掛到自己的網域（同站）。
