@@ -36,8 +36,11 @@
   --rarity-2: #c09bf0; /* 大師／困難：紫 */
   --rarity-3: #f6c14b; /* 傳說／史詩：金 */
   --rarity-4: #f6eedb; /* 神話／神級：名稱為象牙白，外框用虹彩 */
+  --rarity-0-rgb: 123, 203, 127;
+  --rarity-1-rgb: 106, 174, 245;
   --rarity-2-rgb: 192, 155, 240;
   --rarity-3-rgb: 246, 193, 75;
+  --rarity-4-rgb: 246, 238, 219;
   --rainbow: linear-gradient(135deg, #ff6b6b, #f6c14b, #7bcb7f, #6aaef5, #c09bf0);
   --rainbow-v: linear-gradient(180deg, #ff6b6b, #f6c14b, #7bcb7f, #6aaef5, #c09bf0);
 

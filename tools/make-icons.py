@@ -49,7 +49,9 @@ def from_source(path, size, scale):
     box = int(size * scale)
     ratio = min(box / src.width, box / src.height)
     src = src.resize((max(1, round(src.width * ratio)), max(1, round(src.height * ratio))), Image.LANCZOS)
-    img = Image.new('RGBA', (size, size), PAPER + (255,))
+    corner = src.getpixel((0, 0))  # 圖片自帶底色（不透明）就用它當背景，邊緣才不會露出一圈不同顏色的框
+    bg = corner[:3] if corner[3] == 255 else PAPER
+    img = Image.new('RGBA', (size, size), bg + (255,))
     img.alpha_composite(src, ((size - src.width) // 2, (size - src.height) // 2))
     return img.convert('RGB')
 

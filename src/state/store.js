@@ -5,6 +5,7 @@
 import { SAMPLE_CHARACTER } from '../data/sample/fude.js';
 import { moveFromCatalog, basicMove } from '../game/skills.js';
 import { maxHp, derivedStats } from '../game/stats.js';
+import { syncBadgeMade } from '../game/badges.js';
 
 const KEY = 'huanjing:character:v1';
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -30,6 +31,7 @@ function upgrade(state) {
   state.adjust = state.adjust ?? {}; // 手動調整與啟動中的技能（statMode 'skills' 的角色才用得到，見 skillTable.js）
   state.skillOn = state.skillOn ?? {};
   delete state.maxHp; // 最大生命改由數值面板計算
+  syncBadgeMade(state); // 匯入的存檔已有徽章物品 → 記成做過（技能等級本來就已經含徽章的 +1）
   // 招式沒有消耗資源欄的舊存檔：依招式名稱從示範角色補上；第一次升級時補上技能庫招式
   for (const m of state.moves) {
     if (!m.cost) m.cost = clone(SAMPLE_CHARACTER.moves.find((x) => x.name === m.name)?.cost ?? {});

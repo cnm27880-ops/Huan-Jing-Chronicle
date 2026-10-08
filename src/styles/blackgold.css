@@ -320,11 +320,20 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .rarity { border-left: 4px solid var(--t); }
 .rarity .rarity__name { color: var(--t); }
 /* 平常和其他稀有度一樣只有左側色條；滑過、聚焦或選取時才出現外框與光暈（使用者 2026-10-07） */
+.rarity[data-rarity='0']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
+  box-shadow: 0 0 0 1.5px var(--rarity-0), 0 0 14px rgba(var(--rarity-0-rgb), 0.28);
+}
+.rarity[data-rarity='1']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
+  box-shadow: 0 0 0 1.5px var(--rarity-1), 0 0 14px rgba(var(--rarity-1-rgb), 0.28);
+}
 .rarity[data-rarity='2']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
   box-shadow: 0 0 0 1.5px var(--rarity-2), 0 0 14px rgba(var(--rarity-2-rgb), 0.28);
 }
 .rarity[data-rarity='3']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
   box-shadow: 0 0 0 1.5px var(--rarity-3), 0 0 22px rgba(var(--rarity-3-rgb), 0.35);
+}
+.rarity[data-rarity='4']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
+  box-shadow: 0 0 0 1.5px var(--rarity-4), 0 0 16px rgba(var(--rarity-4-rgb), 0.3);
 }
 .rarity[data-rarity='3'] .rarity__name {
   color: var(--rarity-3);
@@ -905,7 +914,8 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 #view-rest .diff__can { color: var(--gold); font-weight: 700; }
 #view-rest .diff.is-none .diff__can { color: var(--faint); font-weight: 400; }
 #view-rest .diff.is-none:not([aria-checked='true']) { opacity: 0.6; }
-#view-rest .diff[aria-checked='true'] { background: var(--goldbg); border-color: var(--gold2); border-left-color: var(--t); box-shadow: var(--hover-ring); }
+#view-rest .diff[aria-checked='true'] { background: var(--goldbg); border-color: var(--t); box-shadow: 0 0 0 1.5px var(--t); } /* 選取框跟著難度的稀有度色 */
+#view-rest .diff[data-tier='4'][aria-checked='true'] { box-shadow: 0 0 0 1.5px var(--rarity-4), 0 0 14px rgba(var(--rarity-4-rgb), 0.3); }
 #view-rest .reward-line { display: block; margin-top: 12px; }
 #view-rest .reward-line__tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
 

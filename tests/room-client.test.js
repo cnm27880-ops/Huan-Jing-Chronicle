@@ -353,6 +353,30 @@ test('角色同步：伺服器沒有存檔就上傳本機的；之後修改會�
   stopAll(m);
 });
 
+test('角色同步：全新裝置、伺服器也沒有存檔 → 不上傳示範角色；GM 匯入後自動採用', async () => {
+  resetHub(); store.clear();
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t2w');
+  const state = { name: '示範福德正神', hp: 3 };
+  let notified = 0;
+  const sync = createCharSync({ getState: () => state, adopt: () => assert.fail('伺服器還沒有存檔'), hasLocalSave: () => false, notify: () => { notified++; }, room: m });
+  await flush();
+  assert.equal(hub.core.charRow('300'), null); // 示範角色沒有被傳上去
+  assert.equal(notified, 1);
+  state.hp = 2; sync.markDirty(); // 玩家在等待期間玩了一下：存了本機，還是不上傳
+  mock.timers.tick(2000); await flush();
+  assert.equal(hub.core.charRow('300'), null);
+  stopAll(m);
+  hub.core.onCharPut(P1, { base: 0, data: { name: '玩家自己的角色', hp: 9 } }); // GM 匯入
+  const m2 = await browser(P1);
+  let adopted = null; let asked = 0;
+  createCharSync({ getState: () => state, adopt: (d) => { adopted = d; }, hasLocalSave: () => true, confirmFn: () => { asked++; return true; }, room: m2 });
+  await flush();
+  assert.equal(adopted?.name, '玩家自己的角色');
+  assert.equal(asked, 0);
+  stopAll(m2);
+});
+
 test('角色同步：兩邊都有不同存檔時問玩家；選伺服器就採用，選本機就覆蓋伺服器', async () => {
   for (const [choice, expectAdopt, expectHp] of [[true, true, 7], [false, false, 3]]) {
     resetHub(); store.clear();
