@@ -12,6 +12,7 @@ import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/r
 import { newEncounter, addMobs, addBosses, isDowned } from '../../src/game/combat.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
+import { describeCharChange } from './audit.js';
 import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
@@ -517,9 +518,16 @@ export class RoomCore {
     if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以匯入玩家角色。');
     const uid = String(msg.uid);
     if (!UID.test(uid) || this.accessState(uid) !== 'ok') return err(rid, 'bad_char', '這個玩家不在白名單內。');
+    const before = this.charRow(uid);
     const r = this.storeChar(uid, msg.base, msg.data, rid);
     if (r.out) return r;
-    return { out: [{ to: 'self', msg: { t: 'charSaved', rid, uid, ...r } }], close: null };
+    const saved = [{ to: 'self', msg: { t: 'charSaved', rid, uid, ...r } }];
+    if (!r.ok) return { out: saved, close: null }; // 版本對不上沒有寫入，不記
+    // 異動紀錄：誰、何時、改了什麼（GM 替玩家改角色），所有人都看得到，和擲骰紀錄放在同一條時間軸
+    const member = this.db.exec('SELECT name FROM members WHERE uid = ?', uid)[0]?.name ?? uid;
+    const { lines } = describeCharChange(before ? JSON.parse(before.json) : null, msg.data);
+    const ev = this.record({ who: '系統', kind: 'audit', label: `${user.name} 修改了「${cleanStr(msg.data.name, 80)}」（${member}）的角色`, lines }, user);
+    return { out: [...saved, ...this.broadcastEvent(ev).out], close: null };
   }
 
   /** GM：所有已存檔玩家的清單（不含角色內容），模擬戰挑人用 */

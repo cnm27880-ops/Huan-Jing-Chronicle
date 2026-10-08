@@ -40,6 +40,17 @@ export function badgeStatus(state, skill) {
   });
 }
 
+/** 背包裡已經有徽章物品的（匯入的存檔）永久記成「做過」，之後把物品改名、賣掉或移除也不會再開放製作而重複 +1 */
+export function syncBadgeMade(state) {
+  for (const skill of LIFE_SKILLS) {
+    for (const kind of BADGE_KINDS) {
+      if (countOf(state, badgeItemName(state, skill, kind)) > 0 || countOf(state, badgeName(skill, kind)) > 0) {
+        state.badgeMade = { ...state.badgeMade, [keyOf(skill, kind)]: true };
+      }
+    }
+  }
+}
+
 /** 名稱檢查：1～20 字、不能和背包裡別的東西或別的徽章同名（同名會合併成同一種物品）。回傳錯誤文字或 null */
 function nameError(state, skill, kind, name) {
   if (!name || name.length > BADGE_NAME_MAX) return `名稱要 1～${BADGE_NAME_MAX} 字。`;

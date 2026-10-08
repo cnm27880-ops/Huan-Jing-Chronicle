@@ -19,7 +19,9 @@ import { createBattleView, isBattleEvent } from './battleView.js';
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
 
 export function createSessionView({ root, getState, commit }) {
-  const ui = { sides: 20, count: 1, mod: 0, text: '', battleOpen: false };
+  const ui = { sides: 20, count: 1, mod: 0, text: '', battleOpen: false, logFilter: 'all' };
+  const LOG_FILTERS = [['all', '全部'], ['roll', '擲骰'], ['audit', '異動']]; // 異動 = GM 替玩家改角色（誰、改了什麼）
+  const logFilterFn = { all: null, roll: (e) => e.kind !== 'audit', audit: (e) => e.kind === 'audit' };
   const node = root;
   let feeds = [];
   let roomPanel = null;
@@ -167,12 +169,16 @@ export function createSessionView({ root, getState, commit }) {
         h('section', { class: 'tray__section' },
           h('div', { class: 'tray__title-row' },
             h('h3', { class: 'tray__title', text: '紀錄' }),
+            h('div', { class: 'tabs-seg', role: 'tablist', 'aria-label': '紀錄類型' }, LOG_FILTERS.map(([id, label]) => h('button', {
+              type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.logFilter === id),
+              onclick: () => { ui.logFilter = id; render(); },
+            }, label))),
             getRoomStatus().phase === 'online'
               ? h('span', { class: 'hint', text: '房間共用，保存最近 200 筆' })
               : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')),
           historyBox))));
     roomPanel = mountRoomPanel(roomBox);
-    feeds = [mountFeed(battleLogBox, { limit: 10, filter: isBattleEvent, empty: '出招、承受攻擊或喝藥水後，戰鬥紀錄會出現在這裡。' }), mountFeed(latestBox, { limit: 1, empty: '按下任何一顆骰子，結果會出現在這裡。' }), mountFeed(historyBox, { limit: 30, skip: 1, empty: '' })];
+    feeds = [mountFeed(battleLogBox, { limit: 10, filter: isBattleEvent, empty: '出招、承受攻擊或喝藥水後，戰鬥紀錄會出現在這裡。' }), mountFeed(latestBox, { limit: 1, empty: '按下任何一顆骰子，結果會出現在這裡。' }), mountFeed(historyBox, { limit: 30, skip: ui.logFilter === 'all' ? 1 : 0, filter: logFilterFn[ui.logFilter], empty: ui.logFilter === 'audit' ? '還沒有異動紀錄。GM 替玩家修改角色或匯入存檔後，會記在這裡。' : '' })];
     root.scrollTop = scrollY;
     if (ui.battleOpen) battle.render(); // 戰鬥面板開著：資料有變就一起更新
   }

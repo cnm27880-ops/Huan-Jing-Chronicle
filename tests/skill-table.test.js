@@ -11,9 +11,9 @@ import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 
 const mk = (skills, extra = {}) => ({ ...blankCharacter('測試'), statMode: 'skills', skills, ...extra });
 
-test('目錄：117 個技能、每個 10 級；啟動類只有 7 個武裝；升級經驗表有四個位階', () => {
+test('目錄：119 個技能、每個 10 級；啟動類只有 7 個武裝；升級經驗表有四個位階', () => {
   const names = Object.keys(SKILL_TABLE);
-  assert.equal(names.length, 117);
+  assert.equal(names.length, 119);
   assert.ok(names.every((n) => SKILL_TABLE[n].fx.length === 10));
   assert.deepEqual(names.filter(needsActivation).sort(), ['天罰B型武裝', '幽影A型武裝', '海妖AC型武裝', '烈陽AB型武裝', '終焉武裝', '虛空BC型武裝', '霓幻C型武裝']);
   assert.deepEqual(Object.keys(EXP_TABLE), ['初階', '進階', '大師', '傳說']);
@@ -159,4 +159,24 @@ test('一次升到滿級：總共 3 + 2~10 = 57 本書，經驗 = 各級費用�
   poor.inventory.初階技能書 = 54;
   assert.equal(upgradeSkillTo(poor, '八卦掌', 10).level, 10);
   assert.equal(poor.skills.八卦掌, 10);
+});
+
+test('浮腫之軀（夜見祈）：每個 5 級以上的神秘技能 +5 生命上限，自己 5 級以上也算；其他等級或系別不算', () => {
+  assert.ok(inCatalog('浮腫之軀') && SKILL_TABLE.浮腫之軀.personal && SKILL_TABLE.浮腫之軀.school === '神秘');
+  const base = derivedStats(mk({})).生命.total;
+  const hp = (skills) => derivedStats(mk(skills)).生命.total - base;
+  assert.equal(hp({ 浮腫之軀: 4 }), 0); // 自己還沒到 5 級、沒有別的神秘技能
+  assert.equal(hp({ 浮腫之軀: 5 }), 5); // 自己 5 級也算
+  assert.equal(hp({ 浮腫之軀: 1, 呢喃低語: 5 }), 5); // 呢喃低語是神秘系，5 級
+  assert.equal(hp({ 浮腫之軀: 5, 呢喃低語: 10, 八卦掌: 10 }), 10); // 八卦掌是修仙系，不算
+  assert.equal(hp({ 呢喃低語: 5 }), 0); // 沒學浮腫之軀就沒有這個被動
+  assert.ok(derivedStats(mk({ 浮腫之軀: 5 })).生命.parts.some((p) => p.label === '浮腫之軀' && p.value === 5));
+});
+
+test('暗影斗篷（我要把朋友賣掉）：只有文字、不影響任何面板數值', () => {
+  assert.ok(inCatalog('暗影斗篷') && SKILL_TABLE.暗影斗篷.personal && SKILL_TABLE.暗影斗篷.school === '西幻');
+  assert.ok(SKILL_TABLE.暗影斗篷.fx.every((f) => Object.keys(f).length === 0));
+  const before = derivedStats(mk({}));
+  const after = derivedStats(mk({ 暗影斗篷: 10 }));
+  for (const k of Object.keys(before)) assert.equal(after[k].total, before[k].total);
 });

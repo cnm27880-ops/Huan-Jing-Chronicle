@@ -7,7 +7,7 @@ import { TRACKS, TRACK_ATK_STAT } from '../game/rules.js';
 import { getLog, subscribe } from '../state/rollLog.js';
 
 const ICON = {
-  check: '🎲', dice: '🎲', identify: '🔍', attack: '⚔️', defend: '🛡️', potion: '🧪', skill: '✨', note: '📝', divider: '⚔️',
+  check: '🎲', dice: '🎲', identify: '🔍', attack: '⚔️', defend: '🛡️', potion: '🧪', skill: '✨', note: '📝', audit: '📋', divider: '⚔️',
 };
 
 const clock = (t) => new Date(t).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });

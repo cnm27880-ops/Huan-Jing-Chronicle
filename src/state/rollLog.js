@@ -7,7 +7,7 @@
 //
 // 事件格式（伺服器也用同一份）：
 //   { id, t, who, kind, label, big, tone, lines }
-//   kind：check 檢定｜dice 自訂骰｜identify 鑑定｜attack 出招｜defend 承受攻擊｜potion 藥水｜skill 輔助技能｜note 備註｜divider 新戰鬥分隔線
+//   kind：check 檢定｜dice 自訂骰｜identify 鑑定｜attack 出招｜defend 承受攻擊｜potion 藥水｜skill 輔助技能｜note 備註｜audit 異動紀錄（GM 替玩家改角色，只有伺服器產生）｜divider 新戰鬥分隔線
 //   big：醒目的大數字或短文字；tone：'ok' | 'fail' | 'crit' | 'warn' | undefined；lines：說明文字陣列
 //
 // 信任邊界（階段 1-B）：骰子的數量與加值仍由前端算出再送上去，伺服器只負責「擲」與「記錄」；

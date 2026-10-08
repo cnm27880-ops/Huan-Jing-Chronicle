@@ -520,7 +520,7 @@ button.tile:hover { border-color: var(--bronze); border-left-color: var(--t); }
 .bag-foot { display: grid; justify-items: start; padding-top: 1rem; border-top: 1px solid var(--ink-line); }
 
 /* ---------- 彈出面板 ---------- */
-.sheet { position: fixed; inset: 0; z-index: 60; display: grid; align-items: center; justify-items: center; }
+.sheet { position: fixed; inset: 0; z-index: 60; display: grid; grid-template-rows: minmax(0, 1fr); align-items: center; justify-items: center; } /* 列高固定成畫面高，面板的 max-height 百分比才有依據（否則內容很長時面板會超出畫面、滑不到底） */
 .sheet__backdrop { position: absolute; inset: 0; background: rgba(var(--paper-rgb), 0.6); opacity: 0; transition: opacity 0.2s ease; }
 
 .sheet__panel {

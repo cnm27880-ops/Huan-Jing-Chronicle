@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { blankCharacter } from '../src/game/importBot.js';
-import { badgeStatus, craftBadge, renameBadge, badgeName } from '../src/game/badges.js';
+import { badgeStatus, craftBadge, renameBadge, badgeName, syncBadgeMade } from '../src/game/badges.js';
 import { drawBooks, chooseDraw, drawPool, hasPendingDraw } from '../src/game/skillDraw.js';
 import { upgradePlan, upgradeSkillTo } from '../src/game/skillTable.js';
 import { gather, craft } from '../src/game/engine.js';
@@ -21,6 +21,15 @@ test('徽章：500 次達標才能做，做了技能 +1、徽章進背包、不�
   assert.equal(s.inventory[badgeName('釣魚', '500次')], 1);
   assert.equal(craftBadge(s, '釣魚', '500次').ok, false);
   assert.equal(s.lifeSkills.釣魚, 18);
+});
+
+test('徽章：匯入的存檔有徽章物品 → 記成做過；之後把物品移除也不會再開放製作（避免等級重複 +1）', () => {
+  const s = mk({ inventory: { '【寒江問道一蓑翁】500次釣魚': 1 } });
+  s.counters.釣魚 = 692;
+  syncBadgeMade(s);
+  delete s.inventory['【寒江問道一蓑翁】500次釣魚'];
+  assert.equal(badgeStatus(s, '釣魚').find((b) => b.kind === '500次').made, true);
+  assert.equal(craftBadge(s, '釣魚', '500次').ok, false);
 });
 
 test('徽章：背包已有徽章物品（機器人匯入）視為做過，不重複加等級', () => {
@@ -61,6 +70,7 @@ test('抽取：扣書、每本 3 個不重複選項、選了拿同名書；沒�
 
 test('抽取：技能池不含個人專屬技能', () => {
   assert.ok(!drawPool('初階').includes('奶龍寶庫'));
+  assert.ok(!drawPool('初階').includes('浮腫之軀') && !drawPool('初階').includes('暗影斗篷'));
   assert.ok(drawPool('傳說').length > 3);
 });
 

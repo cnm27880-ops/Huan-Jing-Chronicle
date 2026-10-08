@@ -3,6 +3,8 @@
 // - 每次存檔後 1.5 秒（防抖）把整份角色上傳；用版本號（樂觀鎖）避免手機與電腦互相悄悄覆蓋。
 // - 連不上就先存本機，標記「待上傳」，下次連上房間時處理。
 // - 遇到兩邊都有不同的存檔：問玩家要用哪一份，不會自己決定。
+// - 全新裝置、伺服器也沒有存檔時，本機只是示範角色（不是這位玩家的）：不上傳，標記「等待中」，
+//   等 GM 匯入後自動採用（以前會把示範角色傳上去，變成每位玩家都顯示 GM 的角色）。
 // 伺服器端規則見 worker/src/room-core.js 的「角色存檔」。
 // ============================================================
 import * as defaultRoom from './rollLog.js';
@@ -15,9 +17,9 @@ const DEBOUNCE_MS = 1500;
 function readMeta() {
   try {
     const m = JSON.parse(localStorage.getItem(META_KEY));
-    if (m && Number.isInteger(m.version)) return { uid: m.uid ?? null, version: m.version, dirty: Boolean(m.dirty) };
+    if (m && Number.isInteger(m.version)) return { uid: m.uid ?? null, version: m.version, dirty: Boolean(m.dirty), waiting: Boolean(m.waiting) };
   } catch { /* 讀不到就當作沒同步過 */ }
-  return { uid: null, version: 0, dirty: false };
+  return { uid: null, version: 0, dirty: false, waiting: false };
 }
 function writeMeta(meta) {
   try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* 忽略 */ }
@@ -75,9 +77,22 @@ export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) 
   async function reconcile() {
     if (!online()) return;
     let meta = readMeta();
-    if (meta.uid !== null && meta.uid !== myUid()) meta = { uid: myUid(), version: 0, dirty: true }; // 這台裝置的存檔同步給另一個帳號
+    if (meta.uid !== null && meta.uid !== myUid()) meta = { uid: myUid(), version: 0, dirty: true, waiting: meta.waiting }; // 這台裝置的存檔同步給另一個帳號
     const res = await request({ t: 'charGet' });
-    if (res.data === null) { await push(0); return; } // 伺服器還沒有：把本機的上傳
+    if (res.data === null) {
+      if (meta.waiting || !hasLocalSave()) { // 本機只有示範角色：不上傳，等 GM 匯入
+        if (!meta.waiting) notify('伺服器還沒有你的角色，請 GM 匯入；匯入後會自動套用。這台裝置的示範角色不會上傳。');
+        writeMeta({ uid: myUid(), version: 0, dirty: false, waiting: true });
+        return;
+      }
+      await push(0); // 伺服器還沒有：把本機的上傳
+      return;
+    }
+    if (meta.waiting) { // 之前在等 GM 匯入：現在有了，直接用（本機的只是示範角色）
+      adopt(res.data);
+      writeMeta({ uid: myUid(), version: res.version, dirty: false, waiting: false });
+      return;
+    }
     if (res.version === meta.version) { // 同一版：有待上傳的修改就上傳
       if (meta.dirty) await push(res.version); else writeMeta({ ...meta, uid: myUid() });
       return;
@@ -95,7 +110,7 @@ export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) 
     timer = setTimeout(() => run(async () => {
       if (!online()) return;
       const meta = readMeta();
-      if (!meta.dirty) return;
+      if (!meta.dirty || meta.waiting) return;
       await push(meta.version);
     }), DEBOUNCE_MS);
   }
@@ -107,12 +122,13 @@ export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) 
   });
   if (wasOnline) run(reconcile); // 建立時已經在房間裡（通常是測試或重新建立）
   document.addEventListener('visibilitychange', () => { // 切到背景前盡快上傳，避免關掉分頁漏存
-    if (document.visibilityState === 'hidden' && online() && readMeta().dirty) { clearTimeout(timer); run(() => push(readMeta().version)); }
+    if (document.visibilityState === 'hidden' && online() && readMeta().dirty && !readMeta().waiting) { clearTimeout(timer); run(() => push(readMeta().version)); }
   });
 
   return {
     /** 角色有修改（每次存檔後呼叫） */
     markDirty() {
+      if (readMeta().waiting) return; // 等 GM 匯入期間，示範角色的修改不上傳
       gen++;
       writeMeta({ ...readMeta(), dirty: true });
       if (online()) schedule();
