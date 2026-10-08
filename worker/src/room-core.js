@@ -14,6 +14,7 @@ import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
 import { describeCharChange } from './audit.js';
 import { validateCustomRecipe, validateCustomMaterial, MAX_CUSTOM_RECIPES, MAX_CUSTOM_MATERIALS } from '../../src/game/special.js';
+import { validateCustomSkill, formatFxLine, MAX_CUSTOM_SKILLS } from '../../src/game/skillTable.js';
 import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
@@ -130,6 +131,7 @@ export class RoomCore {
       encounter: this.encounter(),
       mail: this.pendingMail(user.uid),
       special: this.special(),
+      skills: this.customSkills(),
       members: this.membersView(online),
       history: this.history(),
     };
@@ -196,6 +198,7 @@ export class RoomCore {
       case 'charList': return this.onCharList(user, rid);
       case 'charImport': return this.onCharImport(user, msg, rid);
       case 'specialSet': case 'specialDel': return this.onSpecial(user, msg, rid);
+      case 'skillSet': case 'skillDel': return this.onSkillEdit(user, msg, rid);
       case 'mailSend': return this.onMailSend(user, msg, rid);
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': return this.onEncounter(user, msg, rid, online);
@@ -509,6 +512,37 @@ export class RoomCore {
     this.setMeta('special', JSON.stringify(sp));
     const ev = this.record({ who: '系統', kind: 'audit', label, lines: lines.filter(Boolean) }, user);
     return { out: [{ to: 'self', msg: { t: 'specialOk', rid } }, ...this.broadcastEvent(ev).out, { to: 'all', msg: { t: 'special', special: sp } }], close: null };
+  }
+
+  // ---------- 專屬技能（GM 新增的；內建的技能目錄在 src/data/skills.js，不能改） ----------
+  /** GM 新增的技能：{ 名稱: 定義 }，所有人都讀得到 */
+  customSkills() {
+    try { return JSON.parse(this.getMeta('custom_skills') ?? '{}'); } catch { return {}; }
+  }
+
+  /** GM 新增／修改（skillSet）或刪除（skillDel）一個專屬技能；每次改動記一條異動紀錄並通知所有人 */
+  onSkillEdit(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以編輯專屬技能。');
+    const all = this.customSkills();
+    let label; let lines = [];
+    if (msg.t === 'skillDel') {
+      const name = cleanStr(msg.name, 40);
+      if (!(name in all)) return err(rid, 'bad_skill', `沒有「${name}」可以刪除（內建技能不能刪）。`);
+      delete all[name];
+      label = `${user.name} 刪除了專屬技能「${name}」`;
+    } else {
+      const v = validateCustomSkill(msg.name, msg.def);
+      if (!v.ok) return err(rid, 'bad_skill', v.error);
+      const isNew = !(v.name in all);
+      if (isNew && Object.keys(all).length >= MAX_CUSTOM_SKILLS) return err(rid, 'bad_skill', '專屬技能已經太多了，請先刪掉不用的。');
+      all[v.name] = v.def;
+      label = `${user.name} ${isNew ? '新增' : '修改'}了專屬技能「${v.name}」`;
+      const fxLines = v.def.fx.map((f, i) => (Object.keys(f).length ? `${i + 1} 級：${formatFxLine(f)}` : '')).filter(Boolean);
+      lines = [`${v.def.tier}・${v.def.kind}・${v.def.school}`, ...fxLines.slice(0, 12)];
+    }
+    this.setMeta('custom_skills', JSON.stringify(all));
+    const ev = this.record({ who: '系統', kind: 'audit', label, lines }, user);
+    return { out: [{ to: 'self', msg: { t: 'skillOk', rid } }, ...this.broadcastEvent(ev).out, { to: 'all', msg: { t: 'skills', skills: all } }], close: null };
   }
 
   // ---------- 角色存檔（階段 2） ----------

@@ -413,6 +413,35 @@ test('特殊配方：GM 新增後，在線的玩家立刻收到；之後才進�
   stopAll(p, gm, late);
 });
 
+test('專屬技能：GM 新增後，在線的玩家立刻收到；之後才進來的玩家連線時就拿到；玩家不能改', async () => {
+  resetHub(); store.clear();
+  const p = await browser(P1);
+  const gm = await browser(GM);
+  const def = { tier: '進階', kind: '被動', school: '獨特', text: '測試', fx: [{ 生命: 5 }] };
+  const res = await gm.roomRequest({ t: 'skillSet', name: '我的技能', def });
+  assert.equal(res.t, 'skillOk');
+  await flush();
+  assert.equal(p.getRoomStatus().skills.我的技能.fx[0].生命, 5); // 在線的玩家立刻收到
+  assert.ok(p.getLog().some((e) => e.kind === 'audit' && /新增了專屬技能/.test(e.label)));
+  await assert.rejects(p.roomRequest({ t: 'skillSet', name: '偷改', def }), /只有 GM/);
+  const late = await browser({ uid: '200', name: '開發者', avatar: null });
+  assert.equal(late.getRoomStatus().skills.我的技能.tier, '進階'); // 之後才連線的人
+  stopAll(p, gm, late);
+});
+
+test('專屬技能本機快取：存了就讀得回來；壞資料當作沒有', async () => {
+  store.clear();
+  const { loadCachedCustomSkills, saveCachedCustomSkills } = await import('../src/state/customSkills.js');
+  assert.equal(loadCachedCustomSkills(), null);
+  saveCachedCustomSkills({ 我的技能: { tier: '進階' } });
+  assert.deepEqual(loadCachedCustomSkills(), { 我的技能: { tier: '進階' } });
+  store.set('huanjing:customSkills:v1', '不是 JSON');
+  assert.equal(loadCachedCustomSkills(), null);
+  store.set('huanjing:customSkills:v1', '[1,2]');
+  assert.equal(loadCachedCustomSkills(), null);
+  store.clear();
+});
+
 test('角色同步：兩邊都有不同存檔時問玩家；選伺服器就採用，選本機就覆蓋伺服器', async () => {
   for (const [choice, expectAdopt, expectHp] of [[true, true, 7], [false, false, 3]]) {
     resetHub(); store.clear();

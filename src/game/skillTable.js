@@ -11,11 +11,91 @@
 // ============================================================
 import { SKILL_TABLE, EXP_TABLE } from '../data/skills.js';
 import { countOf, removeItem } from './engine.js';
+import { ALL_STATS } from './rules.js';
 
 export { SKILL_TABLE, EXP_TABLE };
 export const MAX_SKILL_LEVEL = 10;
 
 export const inCatalog = (name) => Object.prototype.hasOwnProperty.call(SKILL_TABLE, name);
+
+// ============================================================
+// GM 新增的專屬技能（使用者 2026-10-08）：資料存在伺服器（房間），連線時送到前端、也快取在本機（見 src/state/customSkills.js），
+// 用 setCustomSkills 放進 SKILL_TABLE（同一個物件，所有地方都讀得到）。內建的技能不能被改或蓋掉。
+// 只能表達「每級累積的固定屬性加成」＋效果文字；要程式計算的被動（像老狗識途）要另外寫程式。
+// ============================================================
+export const CUSTOM_TIERS = ['初階', '進階', '大師', '傳說'];
+export const CUSTOM_KINDS = ['主動', '被動', '綜合']; // 「啟動」類（武裝）要程式處理，不開放
+export const CUSTOM_SCHOOLS = ['修仙', '獨特', '生活', '神秘', '科技', '西幻'];
+export const MAX_CUSTOM_SKILLS = 60;
+export const CUSTOM_TEXT_MAX = 600;
+const CUSTOM_NAME_MAX = 20;
+const BUILTIN_SKILLS = new Set(Object.keys(SKILL_TABLE)); // 載入時的目錄 = 內建
+let customNames = [];
+
+export const isBuiltinSkill = (name) => BUILTIN_SKILLS.has(name);
+export const isCustomSkill = (name) => customNames.includes(name);
+export const getCustomSkillNames = () => [...customNames];
+
+const cleanText = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').replace(/\r/g, '').trim().slice(0, max) : '');
+
+/** 「生命+5 真實傷害+1」→ { 生命: 5, 真實傷害: 1 }；空字串 = 沒有加成。回傳 { ok, fx } 或 { ok:false, error } */
+export function parseFxLine(text) {
+  const out = {};
+  const parts = String(text ?? '').split(/[\s,，、;；]+/).filter(Boolean);
+  for (const part of parts) {
+    const m = part.match(/^(.+?)([+\-－＋]?)(\d+)$/);
+    const stat = m?.[1];
+    if (!m || !ALL_STATS.includes(stat)) return { ok: false, error: `看不懂「${part}」。格式：屬性名稱＋數字，例如「生命+5」。可用屬性：${ALL_STATS.join('、')}。` };
+    const value = (m[2] === '-' || m[2] === '－' ? -1 : 1) * Number(m[3]);
+    if (value === 0) continue;
+    out[stat] = (out[stat] ?? 0) + value;
+  }
+  return { ok: true, fx: out };
+}
+/** { 生命: 5, 真實傷害: 1 } → 「生命+5 真實傷害+1」 */
+export const formatFxLine = (fx) => Object.entries(fx ?? {}).map(([k, v]) => `${k}${v < 0 ? '-' : '+'}${Math.abs(v)}`).join(' ');
+
+/**
+ * 檢查並整理一個 GM 新增的技能。raw = { tier, kind, school, text, fx: [10 個「累積加成」物件] }。
+ * 回傳 { ok, name, def } 或 { ok:false, error }
+ */
+export function validateCustomSkill(rawName, raw) {
+  const name = cleanText(rawName, CUSTOM_NAME_MAX + 1);
+  if (!name || name.length > CUSTOM_NAME_MAX) return { ok: false, error: `技能名稱要 1～${CUSTOM_NAME_MAX} 字。` };
+  if (isBuiltinSkill(name)) return { ok: false, error: `「${name}」是內建技能，不能蓋掉，換一個名字。` };
+  if (!raw || typeof raw !== 'object') return { ok: false, error: '技能資料格式錯誤。' };
+  if (!CUSTOM_TIERS.includes(raw.tier)) return { ok: false, error: `位階要是：${CUSTOM_TIERS.join('、')}。` };
+  if (!CUSTOM_KINDS.includes(raw.kind)) return { ok: false, error: `類型要是：${CUSTOM_KINDS.join('、')}。` };
+  if (!CUSTOM_SCHOOLS.includes(raw.school)) return { ok: false, error: `系別要是：${CUSTOM_SCHOOLS.join('、')}。` };
+  const text = cleanText(raw.text, CUSTOM_TEXT_MAX + 1);
+  if (text.length > CUSTOM_TEXT_MAX) return { ok: false, error: `效果文字最多 ${CUSTOM_TEXT_MAX} 字。` };
+  const fxIn = Array.isArray(raw.fx) ? raw.fx : [];
+  if (fxIn.length > MAX_SKILL_LEVEL) return { ok: false, error: `數值表最多 ${MAX_SKILL_LEVEL} 級。` };
+  const fx = [];
+  for (let i = 0; i < MAX_SKILL_LEVEL; i++) {
+    const src = fxIn[i];
+    if (src != null && (typeof src !== 'object' || Array.isArray(src))) return { ok: false, error: `第 ${i + 1} 級的數值格式錯誤。` };
+    const level = {};
+    for (const [stat, v] of Object.entries(src ?? {})) {
+      if (!ALL_STATS.includes(stat)) return { ok: false, error: `第 ${i + 1} 級有不認得的屬性「${stat}」。` };
+      if (!Number.isInteger(v) || Math.abs(v) > 9999) return { ok: false, error: `第 ${i + 1} 級「${stat}」要是 -9999～9999 的整數。` };
+      if (v !== 0) level[stat] = v;
+    }
+    fx.push(level);
+  }
+  return { ok: true, name, def: { tier: raw.tier, kind: raw.kind, school: raw.school, text, fx, personal: true, custom: true } };
+}
+
+/** 把伺服器送來（或本機快取）的 GM 新增技能放進目錄（逐項重新檢查，壞的丟掉；先清掉上一批）；null = 清空 */
+export function setCustomSkills(data) {
+  for (const n of customNames) delete SKILL_TABLE[n];
+  customNames = [];
+  for (const [n, d] of Object.entries(data ?? {})) {
+    if (customNames.length >= MAX_CUSTOM_SKILLS) break;
+    const v = validateCustomSkill(n, d);
+    if (v.ok && !(v.name in SKILL_TABLE)) { SKILL_TABLE[v.name] = v.def; customNames.push(v.name); }
+  }
+}
 export const needsActivation = (name) => Boolean(SKILL_TABLE[name]?.activate);
 export const usesSkillTable = (state) => state.statMode === 'skills';
 

@@ -27,6 +27,8 @@ import { startRoom, stopRoom, getRoomStatus, subscribeRoom } from './state/rollL
 import { mountWaitNotice } from './ui/waitNotice.js';
 import { blankCharacter } from './game/importBot.js';
 import { setCustomSpecial } from './game/special.js';
+import { setCustomSkills } from './game/skillTable.js';
+import { loadCachedCustomSkills, saveCachedCustomSkills } from './state/customSkills.js';
 import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
 import { createMailbox } from './state/mailbox.js';
@@ -74,6 +76,7 @@ async function init() {
   else mapImg.addEventListener('load', () => map.reset(false), { once: true });
 
   // ---------- 角色資料與分頁 ----------
+  setCustomSkills(loadCachedCustomSkills()); // 先放進上次的 GM 專屬技能，再載入角色（載入時會依數值上限修正生命與資源）
   let character = loadCharacter();
   const getState = () => character;
   let views;
@@ -149,9 +152,16 @@ async function init() {
   }
   sync.onWaitingChange(() => showView());
   let lastSpecial;
+  let lastSkills = getRoomStatus().skills;
   subscribeRoom(() => {
     applyWait();
     const status = getRoomStatus();
+    if (status.phase === 'online' && status.skills !== lastSkills) { // GM 新增／修改了專屬技能：換成最新的、快取起來並重畫目前頁面（離線時沿用快取）
+      lastSkills = status.skills;
+      setCustomSkills(status.skills);
+      saveCachedCustomSkills(status.skills);
+      if (currentView !== 'map') views[currentView]?.render();
+    }
     const special = status.phase === 'online' ? status.special : null;
     if (special !== lastSpecial) { // GM 新增／修改了特殊配方或材料（或離開房間）：換成最新的資料並重畫修整日
       lastSpecial = special;

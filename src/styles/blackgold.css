@@ -1232,3 +1232,6 @@ input[type='number'], .amount__input { text-align: center; }
 .special-edit__form { display: grid; gap: 6px; }
 .special-edit__pair { display: grid; grid-template-columns: minmax(0, 1fr) 6.5em; gap: 6px; }
 .special-edit__skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(6em, 1fr)); gap: 6px 10px; }
+.special-edit__trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.special-edit__level { display: grid; grid-template-columns: 3.2em minmax(0, 1fr); align-items: center; gap: 6px; }
+.special-edit__lv { color: var(--soft); font-size: 0.85rem; text-align: right; }
