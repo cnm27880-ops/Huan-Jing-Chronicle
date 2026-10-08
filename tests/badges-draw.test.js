@@ -70,6 +70,7 @@ test('抽取：扣書、每本 3 個不重複選項、選了拿同名書；沒�
 
 test('抽取：技能池不含個人專屬技能', () => {
   assert.ok(!drawPool('初階').includes('奶龍寶庫'));
+  assert.ok(!drawPool('初階').includes('浮腫之軀') && !drawPool('初階').includes('暗影斗篷'));
   assert.ok(drawPool('傳說').length > 3);
 });
 

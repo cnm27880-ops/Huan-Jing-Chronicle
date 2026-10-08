@@ -51,7 +51,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；全新裝置且伺服器沒有存檔時不上傳示範角色（標記等待，GM 匯入後自動採用）；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔 |
 | `src/game/importBot.js` | 機器人存檔（players_data.json 的一位玩家）→ 網站角色（純函式）：只填機器人有的欄位，技能與基礎數值空白；可合併進既有角色 |
 | `src/ui/botImport.js` | GM 專用的「匯入機器人存檔」面板（在跑團頁的房間區塊）：檔案只在瀏覽器讀取轉換，轉好才送伺服器（`charImport`）；`players_data.json` 永遠不能進 git |
-| `src/data/skills.js` | 技能目錄（**自動產生，不要手改**）：117 個技能、每級累積數值、位階／類型／系別／效果文字、升級經驗表。由 `tools/extract-skills.py` 從 GM 的自動角色卡產生 |
+| `src/data/skills.js` | 技能目錄（**自動產生，不要手改**；試算表沒有的個人專屬技能放 `tools/extra-skills.json`）：119 個技能、每級累積數值、位階／類型／系別／效果文字、升級經驗表。由 `tools/extract-skills.py` 從 GM 的自動角色卡產生 |
 | `tools/extract-skills.py` | 更新技能目錄用（需要 openpyxl，只在技能資料改版時才跑）：`python3 tools/extract-skills.py 標準卡.xlsx [補充卡.xlsx …]` |
 | `src/game/skillTable.js` | 技能數值：查表、啟動類技能（武裝）、skills 模式（`statMode: 'skills'`）的規則（純函式） |
 | `src/game/skillDraw.js` | 抽取技能書（3 選 1，結果存 `pendingDraws`，選完前不能做其他事）（純函式） |

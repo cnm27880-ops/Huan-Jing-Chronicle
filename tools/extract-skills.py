@@ -7,12 +7,13 @@
   python3 tools/extract-skills.py 標準卡.xlsx [補充卡1.xlsx 補充卡2.xlsx ...]
 - 第一個檔案是標準：所有技能與每級數值都以它為準。
 - 其餘檔案只用來「補」標準卡沒有的技能（個人專屬技能），標記 personal: true。
+- tools/extra-skills.json：試算表裡沒有、手動維護的個人專屬技能（只有文字、沒有試算表數值）；重新產生時會一併補入。
 資料來源（每個 xlsx）：
   「技能表」A 名稱／B 位階／C 類型／D 系別／E 效果文字
   「後台_技能計算」AN:BL 的「技能 × 等級 → 累積數值加成」、AB:AL 的升級經驗表
 輸出不含任何玩家資料。
 """
-import json, re, sys
+import json, os, re, sys
 import openpyxl
 from openpyxl.utils import column_index_from_string as CI
 
@@ -76,6 +77,12 @@ def main(paths):
             else:  # 玩家自己加進技能表、後台沒有數值表：收進目錄但沒有自動數值（效果在該玩家的手動調整裡）
                 table[name] = dict(i, fx=[{} for _ in range(10)], personal=True, manual=True)
             print('補入個人專屬技能', name, '（來自', p, '）', '' if name in fx else '＊後台沒有數值表，數值要手動調整')
+    extra_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'extra-skills.json')
+    if os.path.exists(extra_path):  # 試算表沒有、手動維護的個人專屬技能（只有文字；被動數值由程式算，見 skillTable.js 的 DYNAMIC_FX）
+        for name, spec in json.load(open(extra_path, encoding='utf-8')).items():
+            if name not in table:
+                table[name] = dict(spec, fx=[{} for _ in range(10)], personal=True)
+                print('補入手動維護的個人專屬技能', name)
     for name, t in table.items():
         m = ACTIVATE.search(t['text'])
         if m:  # 一次性被動：扣算力上限，之後才有「啟動」的數值（見 src/game/skillTable.js）

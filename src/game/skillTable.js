@@ -29,6 +29,19 @@ export function skillFx(name, level) {
 }
 
 /**
+ * 目錄 fx 算不出來、要看其他技能的被動：{ 技能名: (state, level) => { 屬性: 數值 } }。
+ * 浮腫之軀：每擁有一個 5 級以上的神秘技能，生命上限 +5（自己 5 級以上也算，使用者確認）。
+ */
+const MYSTIC_STEP = 5;
+const MYSTIC_LEVEL = 5;
+const DYNAMIC_FX = {
+  浮腫之軀: (state) => {
+    const n = Object.entries(state.skills ?? {}).filter(([name, lv]) => inCatalog(name) && SKILL_TABLE[name].school === '神秘' && skillActive(state, name) && Number(lv) >= MYSTIC_LEVEL).length;
+    return n ? { 生命: n * MYSTIC_STEP } : {};
+  },
+};
+
+/**
  * 這個角色所有生效技能提供的數值：{ 屬性: [{ label, value }] }（只有 skills 模式才有）。
  * 不含啟動的算力上限扣除（那個要等其他數值加完才能判斷「不能為負數」，見 activationCosts）。
  */
@@ -37,7 +50,9 @@ export function skillParts(state) {
   if (!usesSkillTable(state)) return out;
   for (const [name, level] of Object.entries(state.skills ?? {})) {
     if (!inCatalog(name) || !skillActive(state, name)) continue;
-    for (const [stat, value] of Object.entries(skillFx(name, level))) (out[stat] ??= []).push({ label: name, value });
+    const fx = { ...skillFx(name, level) };
+    if (DYNAMIC_FX[name] && Number(level) >= 1) for (const [stat, value] of Object.entries(DYNAMIC_FX[name](state))) fx[stat] = (fx[stat] ?? 0) + value;
+    for (const [stat, value] of Object.entries(fx)) (out[stat] ??= []).push({ label: name, value });
   }
   return out;
 }
