@@ -9,7 +9,7 @@ import { parseDiceExpr, rollExpr, rollDie, rollSum, MAX_SIDES } from '../../src/
 import { d20 } from '../../src/game/engine.js';
 import { diceEvent, checkEvent } from '../../src/game/events.js';
 import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/rules.js';
-import { newEncounter, addMobs, addBosses, isDowned } from '../../src/game/combat.js';
+import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
 import { describeCharChange } from './audit.js';
@@ -440,6 +440,14 @@ export class RoomCore {
       }
       if (enc.monsters.length + sp.count > MAX_MONSTERS) return err(rid, 'bad_enc', `場上最多 ${MAX_MONSTERS} 隻敵人。`);
       const spec = { count: sp.count, atkPower: sp.atkPower, defPower: sp.defPower, hp: sp.hp, absDef: sp.absDef ?? 0, atkMod: cleanStr(sp.atkMod, 40), defMod: cleanStr(sp.defMod, 40) };
+      for (const side of ['atk', 'def']) { // GM 指定的強度分配（選填）：類型 extreme／dual／balanced，集中的軌道
+        const type = sp[`${side}Type`];
+        const focus = sp[`${side}Focus`];
+        if (type == null && focus == null) continue;
+        if (!SPLIT_TYPES.includes(type) || (focus != null && !(SPLIT_FOCUS[type] ?? []).includes(focus))) return err(rid, 'bad_enc', '強度分配的類型或集中軌道不正確。');
+        spec[`${side}Type`] = type;
+        if (focus != null) spec[`${side}Focus`] = focus;
+      }
       const added = (msg.kind === 'boss' ? addBosses : addMobs)(enc, spec, this.rng);
       if (this.hasImage(msg.img)) added.forEach((m) => { m.img = msg.img; }); // 建立時就指定立繪（選填）
       this.saveEncounter(enc);

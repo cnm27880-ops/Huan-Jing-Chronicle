@@ -129,3 +129,18 @@ test('還沒抽先攻就換人會被拒絕；移除怪物會一併從先攻順�
   const cleared = encOf(send(core, GM, { t: 'encClear' }));
   assert.deepEqual([cleared.monsters.length, cleared.order.length, cleared.round], [0, 0, 0]);
 });
+
+test('新增敵人時 GM 可以指定強度分配：極端型集中在指定軌、雙軌型集中在指定兩軌；不合法的拒絕', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { count: 3, atkPower: 1000, defPower: 1000, hp: 10, atkType: 'extreme', atkFocus: 'B', defType: 'dual', defFocus: 'AC' } });
+  for (const m of core.encounter().monsters) {
+    assert.ok(m.atk.B >= 500 && m.atk.B <= 700, `B 是集中軌 ${JSON.stringify(m.atk)}`);
+    assert.ok(m.def.B <= 250 && m.def.A >= 375 && m.def.C >= 375, `B 是弱軌 ${JSON.stringify(m.def)}`);
+  }
+  send(core, GM, { t: 'encAdd', kind: 'boss', spec: { count: 1, atkPower: 999, defPower: 999, hp: 10, atkType: 'balanced' } });
+  const boss = core.encounter().monsters.find((m) => m.kind === 'boss');
+  assert.ok(boss.atk.every((a) => a.A === 333 && a.B === 333 && a.C === 333));
+  for (const bad of [{ atkType: 'weird' }, { atkType: 'extreme', atkFocus: 'AB' }, { defType: 'dual', defFocus: 'A' }, { atkFocus: 'A' }]) {
+    assert.equal(errorOf(send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, ...bad } }))?.code, 'bad_enc', JSON.stringify(bad));
+  }
+});

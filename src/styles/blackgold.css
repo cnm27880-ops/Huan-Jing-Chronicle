@@ -1622,3 +1622,7 @@ input[type='number'], .amount__input { text-align: center; }
 #view-gear .stat-group .field-label { margin: 0 0 3px; }
 .stat-food { margin-top: 12px; }
 @media (max-width: 759px) { #view-gear .stat-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); } #view-gear .stat { padding: 4px 6px; } }
+
+/* 新增敵人：攻擊／防禦的強度分配（類型＋集中軌道） */
+.split-row { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.split-pick { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 6px; }

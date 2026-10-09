@@ -151,14 +151,19 @@ function shuffle(arr, rng) {
   return arr;
 }
 
+export const SPLIT_TYPES = ['extreme', 'dual', 'balanced'];
+/** 極端型可以集中在哪一軌、雙軌型可以集中在哪兩軌 */
+export const SPLIT_FOCUS = { extreme: ['A', 'B', 'C'], dual: ['AB', 'AC', 'BC'] };
+
 /**
  * 把總強度隨機分到 A/B/C 三軌，再加上區域補正 bonus（{A,B,C}）。照機器人 generate_abc_split，三種類型各 1/3：
  *   極端：一軌 50%～70%（機器人原本是 60%～80%，使用者 2026-10-09 改小），其餘平分；雙軌：一軌 0%～25%，其餘平分；平均：各 1/3
+ * opts.type：GM 指定類型（沒給就隨機）；opts.focus：極端型集中在哪一軌（'A'），雙軌型集中在哪兩軌（'AB'）（沒給就隨機）
  */
-export function generateAbcSplit(total, bonus = { A: 0, B: 0, C: 0 }, rng = Math.random) {
+export function generateAbcSplit(total, bonus = { A: 0, B: 0, C: 0 }, rng = Math.random, opts = {}) {
   const stats = { A: 0, B: 0, C: 0 };
   if (total > 0) {
-    const mode = ['extreme', 'dual', 'balanced'][Math.floor(rng() * 3)];
+    const mode = SPLIT_TYPES.includes(opts.type) ? opts.type : SPLIT_TYPES[Math.floor(rng() * 3)];
     let vals;
     if (mode === 'extreme') {
       let v1 = Math.max(1, Math.floor(total * (0.5 + 0.2 * rng())));
@@ -175,8 +180,15 @@ export function generateAbcSplit(total, bonus = { A: 0, B: 0, C: 0 }, rng = Math
       vals = [Math.floor(total / 3), Math.floor(total / 3), Math.floor(total / 3)];
       for (let i = 0; i < total % 3; i++) vals[i] += 1;
     }
-    shuffle(vals, rng);
-    [stats.A, stats.B, stats.C] = vals;
+    const focus = mode !== 'balanced' && SPLIT_FOCUS[mode].includes(opts.focus) ? opts.focus : null;
+    if (focus) { // vals[0] 是特別的那一份：極端型的大份給 focus，雙軌型的小份給 focus 以外那一軌
+      const special = mode === 'extreme' ? focus : TRACKS.find((t) => !focus.includes(t));
+      const rest = TRACKS.filter((t) => t !== special);
+      stats[special] = vals[0]; stats[rest[0]] = vals[1]; stats[rest[1]] = vals[2];
+    } else {
+      shuffle(vals, rng);
+      [stats.A, stats.B, stats.C] = vals;
+    }
   }
   return { A: stats.A + (bonus.A ?? 0), B: stats.B + (bonus.B ?? 0), C: stats.C + (bonus.C ?? 0) };
 }
@@ -187,13 +199,16 @@ export const BOSS_DEF_MODES = ['常規', '變換', '極限'];
 export const newEncounter = () => ({ monsters: [], next: { mob: 1, boss: 1 } });
 
 /** 新增小怪：power 是機器人的「強度」（會隨機分配到三軌） */
-export function addMobs(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0 }, rng = Math.random) {
+/** GM 指定的分配方式：{ atkType, atkFocus, defType, defFocus }（都可以不給＝隨機） */
+const splitOpts = (spec, side) => ({ type: spec[`${side}Type`], focus: spec[`${side}Focus`] });
+
+export function addMobs(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, ...split }, rng = Math.random) {
   const added = [];
   for (let i = 0; i < count; i++) {
     const m = {
       id: `小怪${enc.next.mob++}`, kind: 'mob', hp, maxHp: hp, abs: absDef,
-      atk: generateAbcSplit(atkPower, parseAbc(atkMod), rng),
-      def: generateAbcSplit(defPower, parseAbc(defMod), rng),
+      atk: generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk')),
+      def: generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def')),
     };
     enc.monsters.push(m);
     added.push(m);
@@ -202,13 +217,13 @@ export function addMobs(enc, { count, atkPower, defPower, hp, atkMod = '', defMo
 }
 
 /** 新增 BOSS：攻擊 3 組（輕擊/重擊/絕殺）、防禦 3 組（常規/變換/極限） */
-export function addBosses(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0 }, rng = Math.random) {
+export function addBosses(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, ...split }, rng = Math.random) {
   const added = [];
   for (let i = 0; i < count; i++) {
     const m = {
       id: `BOSS${enc.next.boss++}`, kind: 'boss', hp, maxHp: hp, abs: absDef,
-      atk: [0, 1, 2].map(() => generateAbcSplit(atkPower, parseAbc(atkMod), rng)),
-      def: [0, 1, 2].map(() => generateAbcSplit(defPower, parseAbc(defMod), rng)),
+      atk: [0, 1, 2].map(() => generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk'))), // 指定時三組都用同一種分配（比例各自隨機）
+      def: [0, 1, 2].map(() => generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def'))),
     };
     enc.monsters.push(m);
     added.push(m);
