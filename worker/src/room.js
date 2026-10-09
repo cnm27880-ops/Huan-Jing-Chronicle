@@ -32,6 +32,21 @@ export class Room extends DurableObject {
   }
 
   async fetch(request) {
+    // 怪物立繪：Worker 已經驗證過登入與白名單才會轉到這裡（index.js 的 roomImage）
+    const img = /\/img\/([a-f0-9]{32})$/.exec(new URL(request.url).pathname);
+    if (img && request.method === 'GET') {
+      const file = this.core.imageFile(img[1]);
+      if (!file) return new Response('not found', { status: 404 });
+      return new Response(file.bytes, {
+        headers: {
+          'Content-Type': file.mime,
+          'Cache-Control': 'private, max-age=31536000, immutable', // 每張圖的編號都是新的，內容不會變
+          'X-Content-Type-Options': 'nosniff',
+          'Cross-Origin-Resource-Policy': 'same-site',
+          'Content-Security-Policy': "default-src 'none'",
+        },
+      });
+    }
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return new Response('expected websocket', { status: 426 });
     // 身分是 Worker 驗證過 session cookie 後才放進這些標頭的（Worker 會先刪掉瀏覽器自己送的 x-hj-*）
     const uid = request.headers.get('X-HJ-Uid');

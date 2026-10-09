@@ -151,15 +151,22 @@ export function renderRoll(ev, { fresh = false } = {}) {
 /**
  * 把紀錄清單掛進 container，之後有新事件會自動更新。
  * 回傳 { destroy }；limit 是最多顯示幾筆，skip 是略過最新的幾筆，filter 是只留下哪些事件（沒給就全留）。
+ * oldestFirst：舊的在上、新的在下（聊天室那樣），而且 container 本身會捲動：
+ *   一開始捲到最底；有新紀錄時，原本就在底部附近才自動捲到底（正在往上看舊紀錄時不打擾）。
  */
-export function mountFeed(container, { limit = 30, skip = 0, empty = '還沒有人擲骰。', filter = null } = {}) {
+export function mountFeed(container, { limit = 30, skip = 0, empty = '還沒有人擲骰。', filter = null, oldestFirst = false } = {}) {
+  let first = true;
   const draw = (latest) => {
     const all = filter ? getLog().filter(filter) : getLog();
     const list = all.slice(skip, skip + limit);
+    if (oldestFirst) list.reverse();
+    const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
     container.replaceChildren(
       list.length
         ? h('ol', { class: 'roll-list' }, list.map((e) => renderRoll(e, { fresh: Boolean(latest) && latest.id === e.id })))
         : h('p', { class: 'empty', text: empty }));
+    if (oldestFirst && (first || nearBottom)) container.scrollTop = container.scrollHeight;
+    first = false;
   };
   draw(null);
   const off = subscribe(draw);

@@ -16,7 +16,7 @@
 import { rollExpr } from '../game/dice.js';
 import { sessionCheck } from '../game/engine.js';
 import { checkEvent, diceEvent } from '../game/events.js';
-import { getRoomAccess, roomWsUrl, DEFAULT_ROOM_ID } from '../api/auth.js';
+import { getRoomAccess, roomWsUrl, DEFAULT_ROOM_ID, API_BASE } from '../api/auth.js';
 import { createRoomClient } from './roomClient.js';
 import { planDice, applyDice, TapeError } from './diceTape.js';
 
@@ -98,6 +98,8 @@ const room = {
   encounter: null, // GM 建立、全員共享的遭遇戰（階段 C）；本機模式是 null
   skills: null, // GM 新增的專屬技能 { 名稱: 定義 }；本機模式是 null（只有內建的）
   special: null, // GM 新增的特殊配方與材料 { recipes, materials }；本機模式是 null（只有內建的）
+  images: [], // GM 上傳的怪物立繪清單 [{ id, name, t }]（圖片本身用 imageUrl(id) 讀）
+  vitals: {}, // 隊友狀態 { uid: { name, hp, maxHp, downed, res, tox, shield } }
   notice: '', // 伺服器回的錯誤（例如不是 GM 還按新戰鬥）
 };
 let roomLog = [];
@@ -179,7 +181,7 @@ function onRoomMessage(msg) {
   switch (msg.t) {
     case 'hello':
       roomLog = Array.isArray(msg.history) ? msg.history.slice(0, MAX_ROOM_LOG) : [];
-      setPhase('online', { me: msg.me, gm: msg.gm, members: msg.members ?? [], battleNo: msg.battleNo ?? 0, encounter: msg.encounter ?? null, special: msg.special ?? null, skills: msg.skills ?? null, roomId: msg.room ?? room.roomId, notice: '' });
+      setPhase('online', { me: msg.me, gm: msg.gm, members: msg.members ?? [], battleNo: msg.battleNo ?? 0, encounter: msg.encounter ?? null, special: msg.special ?? null, skills: msg.skills ?? null, images: msg.images ?? [], vitals: msg.vitals ?? {}, roomId: msg.room ?? room.roomId, notice: '' });
       deliverMail(msg.mail); // 要等狀態變成「已加入」才能領信（領信要走房間連線）
       break;
     case 'event':
@@ -200,6 +202,13 @@ function onRoomMessage(msg) {
       room.special = msg.special ?? null;
       notifyRoom();
       break;
+    case 'images':
+      room.images = Array.isArray(msg.images) ? msg.images : [];
+      notifyRoom();
+      break;
+    case 'vitals':
+      if (typeof msg.uid === 'string' && msg.v) { room.vitals = { ...room.vitals, [msg.uid]: msg.v }; notifyRoom(); }
+      break;
     case 'presence':
       room.members = msg.members ?? room.members;
       notifyRoom();
@@ -209,7 +218,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': {
+    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;
@@ -347,5 +356,19 @@ export function setGmOverride(action) {
 /** 房間裡的遭遇戰（怪物、先攻）；不在房間（本機模式）時是 null，畫面改用角色自己的 state.encounter */
 export const getEncounter = () => (isOnline() ? room.encounter : null);
 
-/** 遭遇戰操作：GM 的 encAdd／encRemove／encClear／encInit／encNext，玩家的 encHit。失敗丟 RollError */
+/** 遭遇戰操作：GM 的 encAdd／encRemove／encClear／encInit／encNext／encImg，玩家的 encHit。失敗丟 RollError */
 export const encounterAction = (msg) => request(msg);
+
+// ---------- 怪物立繪（GM 上傳） ----------
+/** 立繪的網址（只有登入且在白名單內的人讀得到；<img> 會自動帶登入 cookie） */
+export const imageUrl = (id) => `${API_BASE}/rooms/${room.roomId}/img/${id}`;
+/** GM 上傳立繪：mime + base64；assign = 怪物編號時直接套上去。回傳 { id } */
+export const uploadImage = (msg) => request({ t: 'imgPut', ...msg });
+/** GM 刪除立繪（用到它的怪物會一起拿掉） */
+export const deleteImage = (id) => request({ t: 'imgDel', id });
+
+// ---------- 隊友狀態 ----------
+/** 回報自己的生命與資源（不用等回覆；沒連上房間就不送） */
+export function sendVitals(v) {
+  if (isOnline()) client?.send({ t: 'vitals', v });
+}

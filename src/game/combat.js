@@ -248,16 +248,30 @@ function resolveHit(state, move, target, mode, atkPlan, rng) {
 /**
  * 玩家對怪物出招。流程：付資源（含魔女額外 30 魔力）→ 對每個目標結算 → 響應效果（百分比傷害、吸血）。
  * opts.yuwai：域外魔祖「花 30 靈氣，追加扣目標現有生命 10%」（只對修仙招式）。
+ * opts.targetIds：玩家手動選的目標（依點選順序）。最多選「招式的目標數」個，選太多回傳錯誤、選比較少就只打選到的。
+ *   沒給時照舊：monsterId 加上後面還活著的怪物，補到招式的目標數。
+ * opts.modes：每隻 BOSS 各自的防禦模式（怪物 id → 模式）；沒寫的用 mode。
  * 回傳 { move, target, hits[], cost, heal, ... }；失敗回傳 { error }。第一個目標的欄位也放在最外層，方便畫面使用。
  */
 export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math.random, opts = {}) {
   const move = state.moves.find((m) => m.id === moveId);
-  const first = enc.monsters.find((m) => m.id === monsterId);
+  const picked = Array.isArray(opts.targetIds);
+  const first = enc.monsters.find((m) => m.id === (picked ? opts.targetIds[0] : monsterId));
   if (!move) return { error: '找不到這個招式。' };
   if (move.kind === 'heal' || move.kind === 'shield') return { error: `${move.name}是輔助技能，請用「使用」按鈕。` };
-  if (!first) return { error: '找不到目標。' };
+  if (!first) return { error: picked && !opts.targetIds.length ? '先選目標。' : '找不到目標。' };
   if (isDowned(state)) return { error: '你已經倒地，無法出招。' };
-  const targets = [first, ...enc.monsters.filter((m) => m !== first && !isDowned(m))].slice(0, Math.max(1, move.targets ?? 1));
+  const maxTargets = Math.max(1, move.targets ?? 1);
+  let targets;
+  if (picked) {
+    const ids = [...new Set(opts.targetIds)];
+    if (ids.length > maxTargets) return { error: `${move.name}最多打 ${maxTargets} 個目標。` };
+    targets = ids.map((id) => enc.monsters.find((m) => m.id === id));
+    if (targets.some((m) => !m)) return { error: '找不到目標，可能已被移除。' };
+    if (targets.some(isDowned)) return { error: '選到的目標已經倒下了。' };
+  } else {
+    targets = [first, ...enc.monsters.filter((m) => m !== first && !isDowned(m))].slice(0, maxTargets);
+  }
   const yuwai = Boolean(opts.yuwai) && skillLevel(state, '域外魔祖') > 0 && move.school === '修仙';
   const extraCost = yuwai ? PASSIVE_RIDERS.域外魔祖.cost : {};
   const cost = actionCost(state, move, extraCost);
@@ -268,7 +282,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   const potion = state.buffs.atk;
   const pooled = move.mode === 'all' || move.mode === 'abs';
   const atk = pooled ? pooledAttack(state, move, potion) : attackDice(state, move, potion);
-  const hits = targets.map((t) => resolveHit(state, move, t, mode, atk, rng));
+  const hits = targets.map((t) => resolveHit(state, move, t, opts.modes?.[t.id] ?? mode, atk, rng));
   const notes = [];
 
   // 響應：萬物歸一破防時，額外扣目標現有生命 %

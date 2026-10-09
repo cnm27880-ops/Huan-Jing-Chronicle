@@ -1,6 +1,6 @@
 # 幻境編年史（網遊網站）
 
-GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包、裝備、交易、跑團（骰盤、遭遇戰、戰鬥面板）分頁，資料存在瀏覽器（localStorage）。
+GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包、裝備、交易、跑團（三欄工作台：角色與招式、遭遇戰舞台、擲骰紀錄）分頁，資料存在瀏覽器（localStorage）。
 **改到遊戲規則、擲骰、加值、胃袋、紀念品、裝備、戰鬥、藥水時，先讀 `GAME_RULES.md`，並在改完後執行 `npm test`。**
 開發者是程式新手：回覆用繁體中文，步驟要具體，指令要能直接複製貼上。
 **所有 UI 樣式依 `DESIGN.md`（黑金主題）。** 色碼只能寫在 `src/styles/theme.css`，其他檔案用變數。
@@ -38,9 +38,9 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/simulate.js` | 模擬戰（階段 D，純函式）：續航最長招式、怪物隨機打人、自動喝藥與隊友救人、勝率／回合數／傷害／剩餘生命統計；不碰真實存檔 |
 | `src/ui/simPanel.js` | GM 專用「模擬戰」面板（跑團頁房間區塊）：選玩家＋敵人＋場數，畫回合分布與剩餘生命條狀圖 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
-| `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
+| `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`，立繪與隊友狀態在 `worker/test/images.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
-| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏）、GM 寫入玩家角色時記「異動」事件（`worker/src/audit.js` 比對前後差異）、GM 新增的特殊配方與材料（`specialSet`／`specialDel`）與專屬技能（`skillSet`／`skillDel`），存在 meta、全員同步、每次改動記異動 |
+| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏）、GM 寫入玩家角色時記「異動」事件（`worker/src/audit.js` 比對前後差異）、GM 新增的特殊配方與材料（`specialSet`／`specialDel`）與專屬技能（`skillSet`／`skillDel`），存在 meta、全員同步、每次改動記異動；怪物立繪（`imgPut`／`imgDel`／`encImg`，GM 上傳、存 SQLite、`room.js` 的 GET `/img/:id` 讀，網址由 `index.js` 驗登入）；隊友狀態（`vitals`，每人回報生命與資源、全員廣播） |
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |
@@ -48,6 +48,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/api/auth.js` | 前端登入 API：查詢登入者、登出；任何失敗都當未登入（維持單機試玩） |
 | `src/ui/userChip.js` | 頂部列的登入者頭像與登出 |
 | `src/state/rollLog.js` | 擲骰紀錄，**畫面與房間之間唯一的接線點**：房間模式走 WebSocket、伺服器擲骰；本機模式（沒登入／連不上）照舊存 localStorage |
+| `src/state/vitals.js` | 隊友狀態回報：存檔後 0.6 秒比對，生命／資源／毒性／護盾有變才送給房間；等 GM 匯入期間不送 |
 | `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；全新裝置且伺服器沒有存檔時不上傳示範角色（標記等待，GM 匯入後自動採用，畫面在 `src/ui/waitNotice.js`，新玩家也可以在那裡自己建立空白角色）；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔 |
 | `src/game/importBot.js` | 機器人存檔（players_data.json 的一位玩家）→ 網站角色（純函式）：只填機器人有的欄位，技能與基礎數值空白；可合併進既有角色 |
 | `src/ui/botImport.js` | GM 專用的「匯入機器人存檔」面板（在跑團頁的房間區塊）：檔案只在瀏覽器讀取轉換，轉好才送伺服器（`charImport`）；`players_data.json` 永遠不能進 git |
@@ -72,12 +73,12 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、寶石、背包裝備（不能丟棄，只能賣出） |
 | `src/ui/reveal.js` | 鑑定開獎動畫（翻牌、數值跳動；只是畫面，數值鑑定時就已存好） |
 | `src/ui/marketView.js` | 交易頁（交易大廳／黑市／特殊黑市）＋裝備頁「賣出」面板 |
-| `src/ui/battleView.js` | 戰鬥面板（跑團頁的懸浮面板，原戰鬥頁）：頂部固定列（生命／資源）、行動／紀錄／狀態三分頁、招式、藥水；遭遇戰在 encounterCard.js |
+| `src/ui/battleView.js` | 戰鬥的個人部分（跑團頁左欄常駐，原戰鬥面板拆開）：HUD（生命／資源／防禦三軌／狀態標籤）、手機膠囊 HUD、招式條（選中的有「出招」）、藥水、狀態與防禦骰 |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
-| `src/ui/sessionView.js` | 跑團頁（原骰盤抽屜，階段 B）：房間資訊、一鍵技能檢定、跑團胃袋與結束跑團、自訂骰、遭遇戰、擲骰紀錄（可篩選：全部／擲骰／異動）；離開頁面會停掉紀錄更新 |
-| `src/ui/encounterCard.js` | 遭遇戰卡片（跑團頁用）：怪物、新增敵人、選招式出招、承受攻擊、先攻位置（隨機、玩家可交換、GM 開打後鎖定）。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
-| `src/ui/battleSelect.js` | 戰鬥頁與跑團頁共用的「目前選擇」（出招招式、怪物攻防模式），不存檔 |
-| `src/ui/rollFeed.js` | 擲骰紀錄的畫面（跑團頁與戰鬥頁共用）：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要 |
+| `src/ui/sessionView.js` | 跑團頁的三欄工作台（版面規格見 `DESIGN.md`「跑團頁」）：左欄 HUD＋招式／生活技能／探索檢定分頁、中欄遭遇戰舞台、右欄房間＋紀錄（全部／擲骰／戰鬥／異動，新的在下）＋快速擲骰；平板與手機的底部抽屜與快捷列；離開頁面會停掉紀錄更新 |
+| `src/ui/encounterCard.js` | 遭遇戰舞台（跑團頁中欄）：先攻軸（隨機、玩家可交換、GM 開打後鎖定）、BOSS 大立繪與 3 段血條（只是視覺）、小怪矩陣、多選目標（上限＝招式目標數）、出招與承受攻擊、我方隊伍血量、GM 的新增敵人／敵人管理／立繪庫（上傳前在瀏覽器縮成 WebP）。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
+| `src/ui/battleSelect.js` | 跑團頁共用的「目前選擇」（出招招式、選中的目標、顯示哪隻 BOSS、怪物攻防模式），不存檔 |
+| `src/ui/rollFeed.js` | 擲骰紀錄的畫面：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要；`oldestFirst` 時新的在下並自動捲到底 |
 | `src/ui/dom.js` | 建立元素的小工具 |
 | `src/api/lore.js` | **資料存取層**。UI 只能透過這裡拿資料 |
 | `src/data/regions.js` | 四大區域＋中央海域 |
@@ -107,5 +108,5 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 
 ## 未來規劃（現在不要做，除非我明確要求）
 已經做完、從這份清單拿掉的：角色資料放伺服器（階段 2，伺服器保存並讓 GM 可讀）、從試算表匯入角色、依技能自動計算面板、GM 新增專屬技能／特殊配方／特殊材料、異動紀錄。
-**不做**：防作弊（把規則搬到伺服器，使用者 2026-10-08：自由心證）、GM 後台的地圖標記／圖片上傳／揭露開關（地圖全公開、不用再傳圖片）。
+**不做**：防作弊（把規則搬到伺服器，使用者 2026-10-08：自由心證）、GM 後台的地圖標記／地圖圖片上傳／揭露開關（地圖全公開、不用再傳圖片；怪物立繪是另外的功能，已做）、跑團頁嵌入 Discord 或場外聊天輸入框（使用者 2026-10-09）。
 **還沒做**（詳見 `RULES_OVERVIEW.md`「實作進度」）：GM 在網站編輯內建技能目錄與升級經驗表、神級料理與神級滴露的效果編輯器（等 GM 想出效果）、其他有「%」的技能、寶石取出與打洞配方。網站日後會掛到自己的網域（同站）。

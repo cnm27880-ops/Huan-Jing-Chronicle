@@ -168,6 +168,7 @@ function logout(request, env) {
 
 // ---------- 固定團房間（階段 1-B） ----------
 const ROOM_PATH = /^\/rooms\/([a-z0-9_-]{1,32})\/(access|ws)$/;
+const IMG_PATH = /^\/rooms\/([a-z0-9_-]{1,32})\/img\/([a-f0-9]{32})$/;
 
 /** 前端用來決定「進房間還是維持本機模式」，並能顯示明確原因。不會碰到 Durable Object。 */
 async function roomAccess(request, env, roomId) {
@@ -204,6 +205,19 @@ async function roomSocket(request, env, roomId) {
   return env.ROOM.get(env.ROOM.idFromName(roomId)).fetch(new Request(request, { headers }));
 }
 
+/** 怪物立繪：只有登入且在白名單內的人看得到（<img> 會自動帶 cookie；SameSite=Lax 讓別的網站拿不到） */
+async function roomImage(request, env, roomId, imageId) {
+  if (request.method !== 'GET') return json({ error: 'method_not_allowed' }, 405);
+  if (!ROOM_IDS.includes(roomId)) return json({ error: 'not_found' }, 404);
+  const s = await readSession(request, env);
+  if (!s) return json({ error: 'unauthenticated' }, 401);
+  if (roomAccessState(env, s.uid) !== 'ok') return json({ error: 'not_allowed' }, 403);
+  if (!env.ROOM) return json({ error: 'server_misconfigured' }, 500);
+  const headers = new Headers();
+  headers.set('X-HJ-Uid', s.uid);
+  return env.ROOM.get(env.ROOM.idFromName(roomId)).fetch(new Request(`https://room/img/${imageId}`, { headers }));
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -213,6 +227,12 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(request, env) });
     }
     if (path === '/health' && request.method === 'GET') return withCors(json({ status: 'ok' }), request, env);
+
+    const img = IMG_PATH.exec(path);
+    if (img) {
+      if (!configured(env)) return json({ error: 'server_misconfigured' }, 500);
+      return roomImage(request, env, img[1], img[2]);
+    }
 
     const room = ROOM_PATH.exec(path);
     if (room) {

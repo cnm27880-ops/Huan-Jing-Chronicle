@@ -20,3 +20,7 @@ export const MAX_CHAR_JSON_CHARS = 200_000; // 角色 JSON 本身的上限
 export const MAX_PENDING_MAIL = 50; // 每人最多同時放幾封未領取的
 export const MAX_MAIL_ITEM_KINDS = 30; // 一封最多幾種東西
 export const MAX_MAIL_ITEM_QTY = 9999; // 單一種東西的數量上限
+
+// 怪物立繪（GM 上傳）：前端先縮成 WebP 再送，伺服器存在房間的 SQLite，用網址讀取
+export const MAX_IMAGES = 40; // 立繪庫最多幾張；滿了要先刪
+export const MAX_IMAGE_B64_CHARS = 240_000; // 單張 base64 字數上限（約 175 KB 的圖）
