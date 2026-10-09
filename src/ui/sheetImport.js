@@ -13,7 +13,7 @@ import { RESOURCE_STATS } from '../game/rules.js';
 const STAT_ORDER = ['真實傷害', '物理傷害', '能量傷害', '靈魂傷害', '絕對防禦', '體魄強韌', '抗性免疫', '精神意志', ...RESOURCE_STATS];
 
 export function openSheetImportSheet() {
-  const ui = { text: '', uid: '', customUid: '', parsed: null, activated: new Set(), existing: null, busy: false, message: '', done: '' };
+  const ui = { text: '', uid: '', customUid: '', parsed: null, activated: new Set(), replace: false, existing: null, busy: false, message: '', done: '' };
   let sheet;
   const targetUid = () => (ui.customUid.trim() || ui.uid);
 
@@ -31,7 +31,7 @@ export function openSheetImportSheet() {
     ui.busy = true; ui.message = ''; sheet.refresh();
     try {
       const cur = await fetchCharacter(uid); // 伺服器上已有角色就合併（保留背包、裝備、金幣）
-      const { data, report, error } = convertSheet(ui.parsed, cur.data, { activated: ui.activated });
+      const { data, report, error } = convertSheet(ui.parsed, ui.replace ? null : cur.data, { activated: ui.activated }); // 取代＝不合併，伺服器現有存檔整份丟掉
       if (error) throw new Error(error);
       const res = await roomRequest({ t: 'charImport', uid, base: cur.version, data });
       ui.done = res.ok
@@ -75,9 +75,12 @@ export function openSheetImportSheet() {
       members().map((m) => h('option', { value: m.uid, selected: ui.uid === m.uid ? true : null, text: m.name }))),
     h('input', { class: 'field', type: 'text', inputmode: 'numeric', placeholder: '或輸入 Discord ID（還沒登入過網站的玩家）', value: ui.customUid, oninput: (e) => { ui.customUid = e.target.value; } }),
     h('textarea', { class: 'field import-text', rows: 6, placeholder: '貼上角色卡文字…', oninput: (e) => { ui.text = e.target.value; } }, ui.text),
+    h('label', { class: 'check' },
+      h('input', { type: 'checkbox', checked: ui.replace ? true : null, onchange: (e) => { ui.replace = e.target.checked; } }),
+      h('span', { text: '取代現有存檔（不合併）：伺服器上的角色整份丟掉重建，背包、裝備、金幣也會清空。角色被弄錯（例如變成別人的角色）時才勾。' })),
     h('div', { class: 'row' },
       h('button', { type: 'button', class: 'btn', disabled: ui.busy ? true : null, onclick: analyse }, '解析'),
-      ui.parsed ? h('button', { type: 'button', class: 'btn btn--primary', disabled: ui.busy ? true : null, onclick: () => { if (confirm('寫入伺服器？已有角色的玩家會被合併。')) write(); } }, ui.busy ? '寫入中…' : '寫入伺服器') : null),
+      ui.parsed ? h('button', { type: 'button', class: 'btn btn--primary', disabled: ui.busy ? true : null, onclick: () => { if (confirm(ui.replace ? '取代伺服器上的角色？現有存檔（含背包、裝備、金幣）會整份丟掉。' : '寫入伺服器？已有角色的玩家會被合併。')) write(); } }, ui.busy ? '寫入中…' : '寫入伺服器') : null),
     ui.message ? h('p', { class: 'notice notice--bad', text: ui.message }) : null,
     ui.done ? h('p', { class: 'notice', text: ui.done }) : null,
     ui.parsed ? preview() : null));

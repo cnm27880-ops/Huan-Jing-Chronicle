@@ -15,7 +15,7 @@ const GAP_MS = 250; // 伺服器每人每秒最多 6 則訊息，匯入時放慢
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function openBotImportSheet() {
-  const ui = { rows: null, existing: {}, picked: new Set(), merge: new Set(), message: '', results: [], busy: false };
+  const ui = { rows: null, existing: {}, picked: new Set(), merge: new Set(), replace: new Set(), message: '', results: [], busy: false };
   let sheet;
 
   async function loadFile(file) {
@@ -32,7 +32,7 @@ export function openBotImportSheet() {
     const names = Object.fromEntries(getRoomStatus().members.map((m) => [m.uid, m.name]));
     ui.rows = Object.entries(json).map(([uid, bot]) => ({ uid, bot, who: names[uid] ?? null, conv: convertBotPlayer(bot) }));
     ui.picked = new Set(ui.rows.filter((r) => !r.conv.error && !ui.existing[r.uid]).map((r) => r.uid)); // 預設只選「伺服器還沒有角色」的人
-    ui.merge = new Set();
+    ui.merge = new Set(); ui.replace = new Set();
     sheet.refresh();
   }
 
@@ -44,8 +44,9 @@ export function openBotImportSheet() {
         let base = null; let version = 0;
         if (ui.existing[row.uid]) {
           const cur = await fetchCharacter(row.uid);
-          if (!ui.merge.has(row.uid)) { ui.results.push(`${label}：略過（伺服器已有存檔，且沒有勾選合併）`); continue; }
-          base = cur.data; version = cur.version;
+          if (!ui.merge.has(row.uid) && !ui.replace.has(row.uid)) { ui.results.push(`${label}：略過（伺服器已有存檔，且沒有勾選合併或取代）`); continue; }
+          base = ui.replace.has(row.uid) ? null : cur.data; version = cur.version; // 取代＝base 用 null，等於重建新角色
+
         }
         const { data, error } = convertBotPlayer(row.bot, base);
         if (error) { ui.results.push(`${label}：失敗（${error}）`); continue; }
@@ -74,12 +75,20 @@ export function openBotImportSheet() {
         ? h('p', { class: 'notice notice--bad', text: r.conv.error })
         : h('p', { class: 'hint', text: `第 ${fmt(s.loginDays)} 天・金幣 ${fmt(s.gold)}・經驗 ${fmt(s.exp)}・背包 ${fmt(s.kinds)} 種共 ${fmt(s.items)} 件` }),
       ex && ui.picked.has(r.uid)
-        ? h('label', { class: 'check' },
-            h('input', {
-              type: 'checkbox', checked: ui.merge.has(r.uid) ? true : null,
-              onchange: (e) => { if (e.target.checked) ui.merge.add(r.uid); else ui.merge.delete(r.uid); },
-            }),
-            h('span', { text: `伺服器已有存檔（第 ${ex.version} 版）：勾選＝合併，只覆蓋背包、金幣、經驗、天數、生產次數；技能、數值、裝備、招式保留。不勾＝略過。` }))
+        ? h('div', {},
+            h('label', { class: 'check' },
+              h('input', {
+                type: 'checkbox', checked: ui.merge.has(r.uid) ? true : null,
+                onchange: (e) => { if (e.target.checked) { ui.merge.add(r.uid); ui.replace.delete(r.uid); } else ui.merge.delete(r.uid); sheet.refresh(); },
+              }),
+              h('span', { text: `伺服器已有存檔（第 ${ex.version} 版，角色名「${ex.charName ?? '？'}」）：勾選＝合併，只覆蓋背包、金幣、經驗、天數、生產次數；技能、數值、裝備、招式、角色名保留。` })),
+            h('label', { class: 'check' },
+              h('input', {
+                type: 'checkbox', checked: ui.replace.has(r.uid) ? true : null,
+                onchange: (e) => { if (e.target.checked) { ui.replace.add(r.uid); ui.merge.delete(r.uid); } else ui.replace.delete(r.uid); sheet.refresh(); },
+              }),
+              h('span', { text: '取代：伺服器現有存檔整份丟掉，用機器人存檔重建新角色（技能與基礎數值空白）。角色被弄錯時才勾。' })),
+            h('p', { class: 'hint', text: '兩個都不勾＝略過。' }))
         : (!ex && ui.picked.has(r.uid) ? h('p', { class: 'hint', text: '新建角色：技能與基礎數值是空白的（機器人存檔沒有這些），之後要另外補。' }) : null));
   }
 

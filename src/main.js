@@ -29,7 +29,7 @@ import { blankCharacter } from './game/importBot.js';
 import { setCustomSpecial } from './game/special.js';
 import { setCustomSkills } from './game/skillTable.js';
 import { loadCachedCustomSkills, saveCachedCustomSkills } from './state/customSkills.js';
-import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter } from './state/store.js';
+import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter, stashLocalCharacter, unstashLocalCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
 import { createMailbox } from './state/mailbox.js';
 import { toast } from './ui/controls.js';
@@ -104,6 +104,12 @@ async function init() {
   sync = createCharSync({
     getState,
     hasLocalSave: hasSavedCharacter,
+    stashLocal: stashLocalCharacter,
+    unstashLocal: unstashLocalCharacter,
+    onAccountSwitch: () => { // 換帳號：畫面改讀這個帳號的本機存檔（沒有就是示範角色，之後等 GM 匯入）
+      character = loadCharacter();
+      views[currentView]?.render();
+    },
     notify: toast,
     adopt: (data) => { // 伺服器的存檔套用到畫面（不經過 commit，免得又上傳一次）
       character = importCharacter(data);
