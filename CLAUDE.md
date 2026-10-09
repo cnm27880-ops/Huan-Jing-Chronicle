@@ -66,7 +66,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `public/manifest.webmanifest`、`public/sw.js`、`public/icons/` | PWA（可加到主畫面）：manifest、Service Worker（只快取 /assets、/icons、/img，網頁與 API 不碰，改版後要讓舊快取失效就把 `sw.js` 的 `CACHE` 版本號 +1）、圖示（暫用，`tools/make-icons.py` 產生；換正式圖示：`python3 tools/make-icons.py --source 圖片.png`） |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |
-| `src/ui/skillTile.js` | 技能方格（三格並排；電腦滑過浮動顯示效果、手機點開面板）：修整日學習與裝備頁技能共用 |
+| `src/ui/skillTile.js` | 技能方格（一格一行：名稱、位階類型、等級；電腦滑過浮動顯示效果、手機點開面板）：修整日學習與裝備頁技能共用 |
 | `src/ui/restView.js` | 修整日頁面：上方 HUD、採集／製作／跑團檢定分頁、設定步驟＋大按鈕、結果卡 |
 | `src/ui/statusBar.js` | 修整日的 HUD（時間、熟練、胃袋）與「吃東西」面板 |
 | `src/ui/bagView.js` | 背包頁面 |
@@ -75,7 +75,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/marketView.js` | 交易頁（交易大廳／黑市／特殊黑市）＋裝備頁「賣出」面板 |
 | `src/ui/battleView.js` | 戰鬥的個人部分（跑團頁左欄常駐，原戰鬥面板拆開）：HUD（生命／資源／防禦三軌／狀態標籤）、手機膠囊 HUD、招式條（選中的有「出招」）、藥水、狀態與防禦骰 |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
-| `src/ui/sessionView.js` | 跑團頁的三欄工作台（版面規格見 `DESIGN.md`「跑團頁」）：左欄 HUD＋招式／藥水與狀態／技能檢定分頁、中欄遭遇戰舞台、右欄房間＋紀錄（全部／檢定與骰子／戰鬥／GM 改角色，新的在下）＋快速擲骰（擲完播 `diceFx.js` 特效）；平板與手機的底部抽屜與快捷列；離開頁面會停掉紀錄更新 |
+| `src/ui/sessionView.js` | 跑團頁的三欄工作台（版面規格見 `DESIGN.md`「跑團頁」）：左欄 HUD＋招式／藥水與狀態／技能檢定分頁、中欄遭遇戰舞台、右欄房間＋紀錄（全部／擲骰／戰鬥，新的在下）＋快速擲骰（擲完播 `diceFx.js` 特效）；平板與手機的底部抽屜與快捷列；離開頁面會停掉紀錄更新 |
 | `src/ui/encounterCard.js` | 遭遇戰舞台（跑團頁中欄）：先攻軸（隨機、玩家可交換、GM 開打後鎖定）、BOSS 大立繪與 3 段血條（只是視覺）、三種防禦（點選）與三種攻擊（點兩下＝承受，第一下只待命）同時列出、小怪矩陣、多選目標（上限＝招式目標數）、出招與承受攻擊、我方隊伍血量、GM 的新增敵人／敵人管理／立繪庫（上傳前在瀏覽器縮成 WebP）。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
 | `src/ui/diceFx.js` | 擲骰特效（只是畫面）：骰子翻滾→落定→總和放大，1D20 的 20／1 有大成功／大失敗效果 |
 | `src/ui/battleSelect.js` | 跑團頁共用的「目前選擇」（出招招式、選中的目標、顯示哪隻 BOSS、怪物攻防模式），不存檔 |
