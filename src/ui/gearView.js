@@ -85,7 +85,7 @@ export function createGearView({ root, getState, commit }) {
             const footer = needsActivation(name)
               ? h('label', { class: 'check skill-tile__on', onclick: (e) => e.stopPropagation() },
                   h('input', { type: 'checkbox', checked: state.skillOn?.[name] ? true : null, onchange: (e) => { state.skillOn = { ...state.skillOn, [name]: e.target.checked }; commit(); } }),
-                  h('span', { text: `啟動（算力 −${t.activate.算力}）` }))
+                  h('span', { text: `啟動 −${t.activate.算力} 算力` }))
               : null;
             return skillTile(name, {
               level: lv, footer, note: t.manual ? '數值手動' : null,
@@ -392,8 +392,8 @@ export function createGearView({ root, getState, commit }) {
     const scrollY = root.scrollTop;
     root.replaceChildren(
       h('div', { class: 'page-wrap gear-layout' },
-        h('div', { class: 'gear-col' }, slotsCard(state), identifyCard(state), gemCard(state)),
-        h('div', { class: 'gear-col' }, panelCard(state), skillCard(state), ownedCard(state))));
+        h('div', { class: 'gear-col' }, slotsCard(state), identifyCard(state), gemCard(state), ownedCard(state)), // 背包裝備放寶石下面，右欄技能表才不會太長
+        h('div', { class: 'gear-col' }, panelCard(state), skillCard(state))));
     root.scrollTop = scrollY;
   }
 

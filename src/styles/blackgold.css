@@ -1122,7 +1122,14 @@ input[type='number'], .amount__input { text-align: center; }
 .skill-tile__tag { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-tile__note { order: 2; flex: none; }
 .skill-tile__lv { order: 3; flex: none; }
-.skill-tile > :not(.skill-tile__name):not(.skill-tile__tag):not(.skill-tile__note):not(.skill-tile__lv) { order: 4; flex-basis: 100%; }
+.skill-tile > :not(.skill-tile__name):not(.skill-tile__tag):not(.skill-tile__note):not(.skill-tile__lv):not(.skill-tile__on) { order: 5; flex-basis: 100%; }
+/* 啟動開關（武裝類，扣算力上限）：做成同一行最右邊的小膠囊，不另起一行 */
+.skill-tile > .skill-tile__on {
+  order: 4; flex: none; flex-basis: auto; align-self: center; gap: 4px; margin: 0; min-height: 0; padding: 1px 8px 1px 4px;
+  font-size: 0.72rem; color: var(--soft); background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill); white-space: nowrap;
+}
+.skill-tile > .skill-tile__on input { width: 14px; height: 14px; margin: 0; }
+.skill-tile > .skill-tile__on:has(input:checked) { color: var(--res-calc); border-color: var(--res-calc); }
 @media (max-width: 420px) { .skill-tile { padding: 6px 8px; } .skill-tile__name { font-size: 0.82rem; } }
 
 /* 電腦滑鼠移上技能時浮動顯示效果 */
@@ -1151,9 +1158,14 @@ input[type='number'], .amount__input { text-align: center; }
 
 
 /* 抽取技能書、生活徽章 */
-.draw-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.draw-card { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
-.draw-card .row { display: flex; flex-wrap: wrap; gap: 6px; }
+.draw-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 759px) { .draw-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 一張：第一行「書名　有 N」，第二行兩顆按鈕 */
+.draw-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px 8px; padding: 8px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.draw-card > strong { overflow: hidden; font-size: 0.9rem; text-overflow: ellipsis; white-space: nowrap; }
+.draw-card > .num { color: var(--soft); font-size: 0.82rem; }
+.draw-card .row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.draw-card .row .btn { flex: 1; margin: 0; padding-inline: 6px; }
 .draw-set { display: grid; gap: 6px; }
 .draw-options { display: grid; gap: 6px; }
 .draw-option { display: grid; gap: 4px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
