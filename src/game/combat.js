@@ -151,14 +151,17 @@ function shuffle(arr, rng) {
   return arr;
 }
 
-/** 把總強度隨機分到 A/B/C 三軌，再加上區域補正 bonus（{A,B,C}） */
+/**
+ * 把總強度隨機分到 A/B/C 三軌，再加上區域補正 bonus（{A,B,C}）。照機器人 generate_abc_split，三種類型各 1/3：
+ *   極端：一軌 50%～70%（機器人原本是 60%～80%，使用者 2026-10-09 改小），其餘平分；雙軌：一軌 0%～25%，其餘平分；平均：各 1/3
+ */
 export function generateAbcSplit(total, bonus = { A: 0, B: 0, C: 0 }, rng = Math.random) {
   const stats = { A: 0, B: 0, C: 0 };
   if (total > 0) {
     const mode = ['extreme', 'dual', 'balanced'][Math.floor(rng() * 3)];
     let vals;
     if (mode === 'extreme') {
-      let v1 = Math.max(1, Math.floor(total * (0.6 + 0.2 * rng())));
+      let v1 = Math.max(1, Math.floor(total * (0.5 + 0.2 * rng())));
       if (v1 === total && total > 1) v1 -= 1;
       const rem = total - v1;
       const v2 = Math.floor(rem / 2);
