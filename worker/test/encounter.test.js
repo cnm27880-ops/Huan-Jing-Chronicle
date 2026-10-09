@@ -144,3 +144,33 @@ test('新增敵人時 GM 可以指定強度分配：極端型集中在指定軌�
     assert.equal(errorOf(send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, ...bad } }))?.code, 'bad_enc', JSON.stringify(bad));
   }
 });
+
+test('敵人預組：只有 GM 能用；存下場上的敵人（生命全滿）、載入時取代場上並清空先攻、刪除', () => {
+  const core = room();
+  const presetsOf = (res) => res.out.find((o) => o.msg.t === 'presets');
+  assert.equal(errorOf(send(core, P1, { t: 'presetList' }))?.code, 'forbidden');
+  assert.equal(errorOf(send(core, GM, { t: 'presetSave', name: '空的' }))?.code, 'bad_preset');
+  send(core, GM, { t: 'encAdd', kind: 'boss', spec: { count: 1, atkPower: 900, defPower: 900, hp: 500 } });
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 2 } });
+  send(core, P1, { t: 'encHit', hits: [{ id: 'BOSS1', dmg: 100 }] });
+  const saved = presetsOf(send(core, GM, { t: 'presetSave', name: '第三章魔王' }));
+  assert.equal(saved.to, 'self');
+  const p = saved.msg.list[0];
+  assert.equal(p.name, '第三章魔王');
+  assert.deepEqual(p.monsters.map((m) => m.id), ['BOSS1', '小怪1', '小怪2']);
+  assert.equal(p.monsters[0].hp, 500); // 存成全滿
+  const bossAtk = JSON.stringify(core.encounter().monsters[0].atk);
+  send(core, GM, { t: 'encClear' });
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: SPEC });
+  send(core, GM, { t: 'encInit' }, { online: ['300'] });
+  const res = send(core, GM, { t: 'presetLoad', name: '第三章魔王' });
+  const enc = encOf(res);
+  assert.equal(res.out.find((o) => o.msg.t === 'enc').to, 'all');
+  assert.deepEqual(enc.monsters.map((m) => m.id), ['BOSS1', '小怪1', '小怪2']);
+  assert.equal(JSON.stringify(enc.monsters[0].atk), bossAtk); // 抽好的 A/B/C 原封不動
+  assert.deepEqual([enc.order.length, enc.locked, enc.next.mob, enc.next.boss], [0, false, 3, 2]);
+  assert.ok(!res.out.find((o) => o.msg.t === 'event').msg.event.label.includes('第三章')); // 紀錄不寫預組名稱
+  assert.equal(errorOf(send(core, GM, { t: 'presetLoad', name: '沒有這個' }))?.code, 'bad_preset');
+  assert.equal(presetsOf(send(core, GM, { t: 'presetDel', name: '第三章魔王' })).msg.list.length, 0);
+  assert.ok(!('presets' in core.hello(P1)));
+});

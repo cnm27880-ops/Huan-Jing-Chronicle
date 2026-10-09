@@ -19,7 +19,7 @@ import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
-  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS,
+  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -66,6 +66,7 @@ export class RoomCore {
     db.exec('CREATE TABLE IF NOT EXISTS characters (uid TEXT PRIMARY KEY, json TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, name TEXT NOT NULL, mime TEXT NOT NULL, data TEXT NOT NULL, t INTEGER NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS vitals (uid TEXT PRIMARY KEY, json TEXT NOT NULL, t INTEGER NOT NULL)');
+    db.exec('CREATE TABLE IF NOT EXISTS presets (name TEXT PRIMARY KEY, json TEXT NOT NULL, t INTEGER NOT NULL)');
   }
 
   // ---------- 成員與權限 ----------
@@ -218,6 +219,7 @@ export class RoomCore {
       case 'encImg': return this.onEncImg(user, msg, rid);
       case 'imgPut': return this.onImgPut(user, msg, rid);
       case 'imgDel': return this.onImgDel(user, msg, rid);
+      case 'presetList': case 'presetSave': case 'presetDel': case 'presetLoad': return this.onPreset(user, msg, rid);
       case 'vitals': return this.onVitals(user, msg);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
     }
@@ -512,6 +514,45 @@ export class RoomCore {
     else return err(rid, 'bad_img', '找不到這張立繪，可能已被刪除。');
     this.saveEncounter(enc);
     return this.encOk(enc, rid, user);
+  }
+
+  // ---------- 敵人預組（GM 備團）：只有 GM 看得到（內容是還沒登場的敵人，避免劇透），不廣播 ----------
+  presetsView() {
+    return this.db.exec('SELECT name, json, t FROM presets ORDER BY t DESC, name').map((r) => ({ name: r.name, t: r.t, monsters: JSON.parse(r.json) }));
+  }
+
+  onPreset(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以使用敵人預組。');
+    const reply = (extra = []) => ({ out: [{ to: 'self', msg: { t: 'presets', rid, list: this.presetsView() } }, ...extra], close: null });
+    if (msg.t === 'presetList') return reply();
+    const name = cleanStr(msg.name, 40);
+    if (!name) return err(rid, 'bad_preset', '請輸入預組名稱。');
+    const row = this.db.exec('SELECT json FROM presets WHERE name = ?', name)[0];
+    if (msg.t === 'presetDel') {
+      if (!row) return err(rid, 'bad_preset', `沒有「${name}」這個預組。`);
+      this.db.exec('DELETE FROM presets WHERE name = ?', name);
+      return reply();
+    }
+    if (msg.t === 'presetSave') { // 把場上目前的敵人（已抽好 A/B/C）存起來；生命存成全滿
+      const monsters = this.encounter().monsters.map((m) => ({ ...m, hp: m.maxHp }));
+      if (!monsters.length) return err(rid, 'bad_preset', '場上沒有敵人可以存。');
+      if (!row && this.db.exec('SELECT COUNT(*) AS n FROM presets')[0].n >= MAX_PRESETS) return err(rid, 'bad_preset', `預組最多 ${MAX_PRESETS} 筆，請先刪掉不用的。`);
+      this.db.exec('INSERT INTO presets(name, json, t) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET json = excluded.json, t = excluded.t', name, JSON.stringify(monsters), this.now());
+      return reply();
+    }
+    // presetLoad：用預組取代場上的敵人（生命全滿、先攻清空）；已被刪掉的立繪拿掉
+    if (!row) return err(rid, 'bad_preset', `沒有「${name}」這個預組。`);
+    const monsters = JSON.parse(row.json).map((m) => {
+      const x = { ...m, hp: m.maxHp };
+      if (x.img && !this.hasImage(x.img)) delete x.img;
+      return x;
+    });
+    const maxNo = (kind) => Math.max(0, ...monsters.filter((m) => m.kind === kind).map((m) => Number(String(m.id).replace(/\D/g, '')) || 0));
+    const enc = { monsters, next: { mob: maxNo('mob') + 1, boss: maxNo('boss') + 1 }, round: 0, order: [], turn: 0, locked: false };
+    this.saveEncounter(enc);
+    // 紀錄只寫登場的敵人，不寫預組名稱（名稱可能劇透）
+    const ok = this.encOk(enc, rid, user, { label: `遭遇：敵人登場 ${monsters.map((m) => m.id).join('、')}` });
+    return reply(ok.out.filter((o) => o.msg.t !== 'encOk'));
   }
 
   // ---------- 怪物立繪（GM 上傳；所有人用網址讀，見 room.js 的 GET /img/:id） ----------

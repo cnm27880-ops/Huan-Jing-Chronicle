@@ -8,6 +8,8 @@ import { toast } from './controls.js';
 import { listCharacters, fetchCharacter } from '../state/charSync.js';
 import { normalizeCharacter } from '../state/store.js';
 import { simulateBattle, summarize, DEFAULT_MAX_ROUNDS } from '../game/simulate.js';
+import { getEncounter, presetAction } from '../state/rollLog.js';
+import { formatAbc } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 
 const RUN_CHOICES = [200, 1000, 3000];
@@ -21,8 +23,10 @@ const column = (label, value, max, tone, title) => h('div', { class: 'simchart__
   h('small', { class: 'simchart__label', text: label }));
 
 /** deps 只給測試用（換掉讀玩家角色的來源）；平常不用傳 */
-export function openSimPanel({ list = listCharacters, fetch = fetchCharacter } = {}) {
+export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, presets = () => presetAction({ t: 'presetList' }) } = {}) {
   const ui = {
+    source: 'custom', // 敵人來源：custom 自訂強度（每場重抽 A/B/C）｜stage 場上的敵人｜preset:名稱 敵人預組（固定）
+    presetList: [],
     list: null, error: '', picked: new Set(), cache: new Map(), loading: false,
     specs: [], form: { kind: 'mob', count: 1, atkPower: 100, defPower: 100, hp: 1000, absDef: 0, atkMod: '', defMod: '' },
     runs: 1000, running: false, progress: 0, result: null, names: [],
@@ -31,7 +35,15 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter } =
 
   async function loadList() {
     try { ui.list = await list(); } catch (e) { ui.error = e.message; }
+    try { ui.presetList = await presets(); } catch { ui.presetList = []; } // 不是 GM 或沒連線：只能用自訂強度
     sheet.refresh();
+  }
+
+  /** 固定敵人（場上的或預組）；自訂強度回傳 null */
+  function fixedEnemies() {
+    if (ui.source === 'stage') return getEncounter()?.monsters?.length ? { monsters: getEncounter().monsters } : null;
+    if (ui.source.startsWith('preset:')) return ui.presetList.find((p) => `preset:${p.name}` === ui.source) ?? null;
+    return null;
   }
 
   async function ensureLoaded(uid) {
@@ -46,7 +58,9 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter } =
   async function run() {
     if (ui.running) return;
     if (!ui.picked.size) return toast('至少選一位玩家。');
-    if (!ui.specs.length) return toast('至少加一組敵人。');
+    const fixed = ui.source === 'custom' ? null : fixedEnemies();
+    if (ui.source !== 'custom' && !fixed) return toast('場上沒有敵人，或找不到這個預組。');
+    if (!fixed && !ui.specs.length) return toast('至少加一組敵人。');
     ui.running = true; ui.progress = 0; ui.result = null; sheet.refresh();
     try {
       const uids = [...ui.picked];
@@ -55,7 +69,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter } =
       ui.names = uids.map((uid, i) => players[i].name || ui.list?.find((c) => c.uid === uid)?.name || uid);
       const results = [];
       for (let i = 0; i < ui.runs; i++) {
-        results.push(simulateBattle(players, ui.specs.map((s) => ({ ...s }))));
+        results.push(fixed ? simulateBattle(players, [], { encounter: fixed }) : simulateBattle(players, ui.specs.map((s) => ({ ...s }))));
         if ((i + 1) % BATCH === 0) {
           ui.progress = (i + 1) / ui.runs;
           sheet.refresh();
@@ -81,6 +95,26 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter } =
         h('input', { type: 'checkbox', checked: ui.picked.has(c.uid) ? true : null, disabled: ui.running ? true : null, onchange: (e) => { if (e.target.checked) ui.picked.add(c.uid); else ui.picked.delete(c.uid); } }),
         h('span', { text: c.charName || c.name })),
       h('small', { class: 'hint', text: c.name }))));
+  }
+
+  /** 敵人來源：自訂強度（每場重抽）、場上的敵人、預組（後兩種 A/B/C 固定） */
+  function sourceCard() {
+    const options = [['custom', '自訂強度（每場重抽 A/B/C）'], ['stage', '場上的敵人（固定）'], ...ui.presetList.map((p) => [`preset:${p.name}`, `預組：${p.name}（固定）`])];
+    const fixed = fixedEnemies();
+    return h('div', {},
+      h('label', { class: 'extra' }, h('span', { text: '敵人來源' }),
+        h('select', { class: 'field', disabled: ui.running ? true : null, onchange: (e) => { ui.source = e.target.value; sheet.refresh(); } },
+          options.map(([v, label]) => h('option', { value: v, selected: v === ui.source ? true : null, text: label })))),
+      h('p', { class: 'hint', text: ui.source === 'custom'
+        ? '每一場都重新抽怪物的 A/B/C，所以勝率代表「這種強度的敵人，平均來說打不打得贏」（會包含抽到很兇或很弱的情況）。'
+        : '每一場都用同一組已經抽好的敵人，勝率代表「這一團打不打得贏」。' }),
+      ui.source === 'custom'
+        ? enemiesCard()
+        : fixed
+          ? h('ul', { class: 'import-list' }, fixed.monsters.map((m) => h('li', { class: 'import-row' },
+              h('span', { text: `${m.kind === 'boss' ? '👹' : '👾'} ${m.id}　血 ${fmt(m.maxHp)}${m.abs ? `・絕防 ${fmt(m.abs)}` : ''}` }),
+              h('small', { class: 'hint', text: m.kind === 'boss' ? `攻 ${m.atk.map(formatAbc).join('／')}` : `攻 ${formatAbc(m.atk)}・防 ${formatAbc(m.def)}` }))))
+          : h('p', { class: 'notice', text: '場上沒有敵人。先在跑團頁新增，或改選預組／自訂強度。' }));
   }
 
   function enemiesCard() {
@@ -140,14 +174,14 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter } =
         h('span', { class: 'simbar' }, h('span', { class: 'simbar__fill', style: `width:${d.rate * 100}%` })),
         h('strong', { class: 'num', text: pct(d.rate) })))),
       h('details', { class: 'skill-row__text' }, h('summary', { text: '模擬的假設（需驗證）' }),
-        h('p', { text: '每場開始：生命與資源補滿、毒性歸零。每回合玩家依序行動、再輪到怪物（沒有模擬先攻）。玩家用「續航最長」的招式（資源能放最多次的），不夠就換下一個，最後用普攻；魔女付不起就放棄行動回復魔力。怪物每回合隨機打一位還沒倒地的玩家，BOSS 的輕擊／重擊／絕殺由被打的玩家挑預期傷害最低的。玩家自動喝藥水（毒性滿了不能喝），隊友倒地會餵回復藥水（毒性算被救的人），喝藥水不佔行動；攻擊／防禦加成藥水只要身上沒有加成就會喝（所以輕鬆的戰鬥也會用掉藥水）。怪物的 A/B/C 分配每一場各自隨機。玩家全員倒地才算敗。' })));
+        h('p', { text: '每場開始：生命與資源補滿、毒性歸零。每回合玩家依序行動、再輪到怪物（沒有模擬先攻）。玩家用「續航最長」的招式（資源能放最多次的），不夠就換下一個，最後用普攻；魔女付不起就放棄行動回復魔力。怪物每回合隨機打一位還沒倒地的玩家，BOSS 的輕擊／重擊／絕殺由被打的玩家挑預期傷害最低的。玩家自動喝藥水（毒性滿了不能喝），隊友倒地會餵回復藥水（毒性算被救的人），喝藥水不佔行動；攻擊／防禦加成藥水只要身上沒有加成就會喝（所以輕鬆的戰鬥也會用掉藥水）。選「自訂強度」時怪物的 A/B/C 分配每一場各自隨機；選場上的敵人或預組時每場都是同一組。玩家全員倒地才算敗。' })));
   }
 
   function body() {
     return h('div', { class: 'simpanel' },
       h('p', { class: 'hint', text: '在這個瀏覽器裡跑模擬，只讀取玩家的角色，不會改動任何存檔。' }),
       h('h3', { class: 'section-title', text: '1. 選玩家' }), playersCard(),
-      h('h3', { class: 'section-title', text: '2. 敵人' }), enemiesCard(),
+      h('h3', { class: 'section-title', text: '2. 敵人' }), sourceCard(),
       h('h3', { class: 'section-title', text: '3. 場數' }),
       h('div', { class: 'toggle-row' }, RUN_CHOICES.map((n) => h('button', {
         type: 'button', class: 'toggle', 'aria-pressed': String(ui.runs === n), disabled: ui.running ? true : null, onclick: () => { ui.runs = n; sheet.refresh(); },

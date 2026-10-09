@@ -81,3 +81,17 @@ test('整理結果：勝率加起來是 1、回合分布總數 = 場數、固定
   assert.equal(a.downRate[0].name, '福德');
   assert.deepEqual(run(), a);
 });
+
+test('固定敵人：每場用同一組 A/B/C（生命補滿），原本的資料不被改動', async () => {
+  const { fixedEncounter, buildEncounter } = await import('../src/game/simulate.js');
+  const src = buildEncounter([{ kind: 'boss', count: 1, atkPower: 300, defPower: 300, hp: 500 }]);
+  src.monsters[0].hp = 10; // 場上被打過的也一樣，模擬時補滿
+  const a = fixedEncounter(src);
+  assert.equal(a.monsters[0].hp, 500);
+  assert.deepEqual(a.monsters[0].atk, src.monsters[0].atk);
+  a.monsters[0].hp = 0;
+  assert.equal(src.monsters[0].hp, 10);
+  const players = [JSON.parse(JSON.stringify(SAMPLE_CHARACTER))];
+  const r = simulateBattle(players, [], { encounter: src, maxRounds: 3 });
+  assert.equal(r.monsterHp, 500);
+});

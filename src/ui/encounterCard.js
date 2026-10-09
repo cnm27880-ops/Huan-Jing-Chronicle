@@ -15,7 +15,7 @@ import {
 import { maxHp } from '../game/stats.js';
 import { costText } from '../game/resources.js';
 import {
-  publish, rollWith, getEncounter, encounterAction, getRoomStatus, imageUrl, uploadImage, deleteImage,
+  publish, rollWith, getEncounter, encounterAction, getRoomStatus, imageUrl, uploadImage, deleteImage, presetAction,
 } from '../state/rollLog.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { battleSel as sel } from './battleSelect.js';
@@ -82,6 +82,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
     uploading: false,
     armed: null, // 承受攻擊的二次確認：第一次點只「待命」，3 秒內再點同一個才真的承受
+    presets: null, // GM 的敵人預組清單（第一次打開 GM 工具時向伺服器要）
+    presetName: '',
   };
   let armTimer = null;
   /** 承受攻擊要點兩次：第一次點亮「再點一次確認」，3 秒內再點同一個才執行，點別的或逾時就取消 */
@@ -516,6 +518,55 @@ export function createEncounterCard({ getState, commit, rerender }) {
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => removeEnemy(state, m) }, '移除')))));
   }
 
+  // ---------- 敵人預組（GM 備團）：把場上抽好的整團存起來，跑團時一鍵換上；模擬戰也能選 ----------
+  async function presetDo(msg, done) {
+    try { ui.presets = await presetAction(msg); if (done) toast(done); } catch (e) { toast(e.message || '操作失敗。'); }
+    rerender();
+  }
+  const presetSummary = (p) => {
+    const boss = p.monsters.filter((m) => m.kind === 'boss').length;
+    const mob = p.monsters.length - boss;
+    return [boss ? `👹×${boss}` : '', mob ? `👾×${mob}` : ''].filter(Boolean).join(' ');
+  };
+
+  function presetBox(enc) {
+    if (!online() || !isGm()) return null;
+    if (ui.presets === null) { ui.presets = []; presetDo({ t: 'presetList' }); }
+    const save = () => {
+      const name = ui.presetName.trim();
+      if (!name) return toast('先幫這團取個名字。');
+      if (ui.presets.some((p) => p.name === name) && !confirm(`已經有「${name}」，要用場上的敵人覆蓋嗎？`)) return undefined;
+      ui.presetName = '';
+      return presetDo({ t: 'presetSave', name }, `已存成預組「${name}」。`);
+    };
+    return h('section', { class: 'gm-tools__sec' },
+      h('h3', { class: 'tray__title', text: `敵人預組（${ui.presets.length}）` }),
+      h('p', { class: 'hint', text: '把場上抽好的整團敵人（A/B/C 不會再變）存起來：跑團時一鍵換上，模擬戰也能選它當固定敵人。只有 GM 看得到。' }),
+      h('div', { class: 'row preset-save' },
+        h('input', {
+          class: 'field', type: 'text', maxlength: 40, placeholder: '預組名稱，例如：第三章魔王戰', value: ui.presetName, 'aria-label': '預組名稱',
+          oninput: (e) => { ui.presetName = e.target.value; }, onkeydown: (e) => { if (e.key === 'Enter') save(); },
+        }),
+        h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.monsters.length, onclick: save }, '把場上的敵人存成預組')),
+      ui.presets.length
+        ? h('ul', { class: 'manage' }, ui.presets.map((p) => h('li', { class: 'manage__row' },
+            h('span', { class: 'manage__name', text: p.name }),
+            h('small', { class: 'hint', text: presetSummary(p) }),
+            h('button', {
+              type: 'button', class: 'btn btn--primary btn--small',
+              onclick: () => {
+                if (getEncounter()?.monsters.length && !confirm(`用「${p.name}」取代場上目前的敵人？（先攻會清空）`)) return;
+                sel.targets = []; sel.modes = {};
+                presetDo({ t: 'presetLoad', name: p.name }, `已換上「${p.name}」。`);
+              },
+            }, '換上場'),
+            h('button', {
+              type: 'button', class: 'btn btn--ghost btn--small',
+              onclick: () => { if (confirm(`刪除預組「${p.name}」？`)) presetDo({ t: 'presetDel', name: p.name }); },
+            }, '刪除'))))
+        : null);
+  }
+
   /** 立繪庫（GM）：上傳、刪除 */
   function libraryBox() {
     if (!online() || !isGm()) return null;
@@ -576,7 +627,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
         : null,
       partyRow(),
       canEdit
-        ? addBox('gm', online() ? '⚙️ 敵人與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), manageBox(state, enc), libraryBox()))
+        ? addBox('gm', online() ? '⚙️ 敵人與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), manageBox(state, enc), presetBox(enc), libraryBox()))
         : null);
   }
 

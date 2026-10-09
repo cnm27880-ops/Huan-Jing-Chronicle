@@ -1243,6 +1243,8 @@ input[type='number'], .amount__input { text-align: center; }
 /* 左欄：HUD（不再黏在頂部，整欄自己捲） */
 .sx .bt-hud { position: static; margin: 0; padding: 12px; background: var(--card); border: 0; border-radius: var(--r-panel); box-shadow: var(--panel-shadow); }
 .bt-hud__def { display: flex; gap: 4px; margin-left: auto; }
+.sx .bt-hud__top { flex-wrap: wrap; row-gap: 4px; } /* 欄位窄時防禦膠囊整排換到名字下面，不會把字拆開 */
+.bt-hud__trk { white-space: nowrap; }
 .bt-hud__trk { display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 7px; font-size: 0.78rem; background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill); }
 .bt-hud__trk b { font-size: 0.72rem; }
 .bt-hud__trk[data-track='A'] b { color: var(--gold); }
@@ -1626,3 +1628,9 @@ input[type='number'], .amount__input { text-align: center; }
 /* 新增敵人：攻擊／防禦的強度分配（類型＋集中軌道） */
 .split-row { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .split-pick { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 6px; }
+.preset-save { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.preset-save .field { flex: 1 1 200px; min-width: 0; }
+.preset-save .btn, .manage__row .btn { margin: 0; }
+.hud-meter__name { white-space: nowrap; }
+.sx .bt-hud__res .hud-meter { padding: 6px 7px; column-gap: 4px; }
+.sx .bt-hud__res .hud-meter__val { font-size: 0.78rem; }
