@@ -1332,6 +1332,12 @@ input[type='number'], .amount__input { text-align: center; }
 .boss-mode[data-kind='atk']:hover:not(:disabled) { border-color: var(--rose); box-shadow: 0 0 12px rgba(var(--rose-rgb), 0.35); transform: translateY(-1px); }
 .boss-mode[data-kind='atk']:active:not(:disabled) { transform: translateY(1px); }
 .boss-mode:disabled { cursor: default; opacity: 0.5; }
+/* 承受攻擊的二次確認：第一次點＝待命（玫瑰紅框閃動、字變「再點一次確認」），3 秒內再點才執行 */
+.boss-mode[data-kind='atk'][data-armed='1'] { border-color: var(--rose); background: var(--rosebg); animation: arm-pulse 0.9s ease-in-out infinite; }
+.boss-mode[data-kind='atk'][data-armed='1'] .boss-mode__name { color: var(--ink); }
+.mob__hit[data-armed='1'] { color: var(--ink); background: var(--rosebg); border-color: var(--rose); opacity: 1; animation: arm-pulse 0.9s ease-in-out infinite; }
+@keyframes arm-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(var(--rose-rgb), 0.55); } 50% { box-shadow: 0 0 0 5px rgba(var(--rose-rgb), 0); } }
+@media (prefers-reduced-motion: reduce) { .boss-mode[data-armed='1'], .mob__hit[data-armed='1'] { animation: none; } }
 .boss-mode:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .boss.is-downed .boss__art { filter: grayscale(1); opacity: 0.4; }
 

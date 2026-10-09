@@ -81,7 +81,17 @@ export function createEncounterCard({ getState, commit, rerender }) {
     form: { kind: 'mob', count: 1, atk: 10, def: 10, hp: 100, atkMod: '', defMod: '', absDef: 0, img: '' },
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
     uploading: false,
+    armed: null, // 承受攻擊的二次確認：第一次點只「待命」，3 秒內再點同一個才真的承受
   };
+  let armTimer = null;
+  /** 承受攻擊要點兩次：第一次點亮「再點一次確認」，3 秒內再點同一個才執行，點別的或逾時就取消 */
+  function confirmHit(key, run) {
+    clearTimeout(armTimer);
+    if (ui.armed === key) { ui.armed = null; run(); return; }
+    ui.armed = key;
+    armTimer = setTimeout(() => { ui.armed = null; rerender(); }, 3000);
+    rerender();
+  }
 
   function addBox(key, summary, ...children) {
     return h('details', {
@@ -349,12 +359,15 @@ export function createEncounterCard({ getState, commit, rerender }) {
         h('div', { class: 'boss__group' },
           h('p', { class: 'boss__k' },
             h('span', { text: '⚔️ 攻擊' }),
-            h('small', { text: '點一下＝你承受這一招' })),
-          h('div', { class: 'boss__modes', 'aria-label': `${m.id} 的攻擊` }, BOSS_ATK_MODES.map((name, i) => h('button', {
-            type: 'button', class: 'boss-mode', dataset: { kind: 'atk' }, disabled: downed,
-            'aria-label': `承受 ${m.id} 的${name}`,
-            onclick: () => { modes.atk = i; doDefend(state, m); },
-          }, h('span', { class: 'boss-mode__name', text: name }), abcCells(monsterAtk(m, i))))))));
+            h('small', { text: '點兩下＝你承受這一招' })),
+          h('div', { class: 'boss__modes', 'aria-label': `${m.id} 的攻擊` }, BOSS_ATK_MODES.map((name, i) => {
+            const armed = ui.armed === `${m.id}:${i}`;
+            return h('button', {
+              type: 'button', class: 'boss-mode', dataset: { kind: 'atk', armed: armed ? '1' : '0' }, disabled: downed,
+              'aria-label': armed ? `再點一次確認承受 ${m.id} 的${name}` : `承受 ${m.id} 的${name}（要點兩下）`,
+              onclick: () => confirmHit(`${m.id}:${i}`, () => { modes.atk = i; doDefend(state, m); }),
+            }, h('span', { class: 'boss-mode__name', text: armed ? '再點一次確認' : name }), abcCells(monsterAtk(m, i)));
+          })))));
   }
 
   // ---------- 小怪矩陣 ----------
@@ -375,9 +388,11 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('span', { class: 'mob__def num', text: `${TRACKS.map((t) => `${t}${fmt(m.def[t])}`).join(' ')}${abs ? `・絕${fmt(abs)}` : ''}` }),
       orderBadge(m.id)),
       h('button', {
-        type: 'button', class: 'mob__hit', disabled: downed, title: `承受 ${m.id} 的攻擊（${formatAbc(m.atk)}）`,
-        'aria-label': `承受 ${m.id} 的攻擊`, onclick: () => doDefend(state, m),
-      }, '🛡️'));
+        type: 'button', class: 'mob__hit', disabled: downed, dataset: { armed: ui.armed === m.id ? '1' : '0' },
+        title: ui.armed === m.id ? '再點一次確認' : `承受 ${m.id} 的攻擊（${formatAbc(m.atk)}），要點兩下`,
+        'aria-label': ui.armed === m.id ? `再點一次確認承受 ${m.id} 的攻擊` : `承受 ${m.id} 的攻擊（要點兩下）`,
+        onclick: () => confirmHit(m.id, () => doDefend(state, m)),
+      }, ui.armed === m.id ? '✔' : '🛡️'));
   }
 
   function targetBar(state, enc) {
