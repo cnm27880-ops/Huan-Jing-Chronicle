@@ -31,8 +31,12 @@ const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) 
  * getState()：目前的角色；adopt(data)：把伺服器的角色套用到畫面與本機；
  * hasLocalSave()：這台裝置有沒有存過角色；confirmFn(文字)：要玩家選擇時用；notify(文字)：提示訊息。
  * room：房間介面（預設就是 rollLog.js；測試時換成另一份模組實例）。
+ * stashLocal(uid)／unstashLocal(uid)／onAccountSwitch()：換帳號時收起、換出本機存檔，並讓畫面重讀本機角色。
  */
-export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) => window.confirm(t), notify = () => {}, room = defaultRoom }) {
+export function createCharSync({
+  getState, adopt, hasLocalSave, confirmFn = (t) => window.confirm(t), notify = () => {}, room = defaultRoom,
+  stashLocal = () => {}, unstashLocal = () => false, onAccountSwitch = () => {},
+}) {
   const { roomRequest: request, getRoomStatus, subscribeRoom } = room;
   let timer = null;
   const waitSubs = new Set();
@@ -76,11 +80,35 @@ export function createCharSync({ getState, adopt, hasLocalSave, confirmFn = (t) 
     }
   }
 
+  /**
+   * 同一台裝置換帳號：把上一個帳號的本機存檔與同步狀態收起來，換出新帳號以前收起來的（沒有就當全新裝置）。
+   * 以前會把上一個人的角色上傳給新帳號，造成大家都變成同一個角色。
+   */
+  function switchAccount(meta, toUid) {
+    const metaStash = (uid) => `${META_KEY}:stash:${uid}`;
+    if (!meta.waiting) { // 等待中表示本機只是示範角色，不用收
+      stashLocal(meta.uid);
+      try { localStorage.setItem(metaStash(meta.uid), JSON.stringify(meta)); } catch { /* 忽略 */ }
+    }
+    let next = { uid: toUid, version: 0, dirty: false, waiting: false };
+    if (unstashLocal(toUid)) {
+      try {
+        const m = JSON.parse(localStorage.getItem(metaStash(toUid)));
+        if (m && Number.isInteger(m.version)) next = { uid: toUid, version: m.version, dirty: Boolean(m.dirty), waiting: false };
+        else next.dirty = true;
+        localStorage.removeItem(metaStash(toUid));
+      } catch { next.dirty = true; }
+    }
+    writeMeta(next);
+    onAccountSwitch();
+    return next;
+  }
+
   /** 連上房間時：比對伺服器與本機 */
   async function reconcile() {
     if (!online()) return;
     let meta = readMeta();
-    if (meta.uid !== null && meta.uid !== myUid()) meta = { uid: myUid(), version: 0, dirty: true, waiting: meta.waiting }; // 這台裝置的存檔同步給另一個帳號
+    if (meta.uid !== null && meta.uid !== myUid()) meta = switchAccount(meta, myUid()); // 這台裝置換了帳號：舊存檔收起來，不能傳給新帳號
     const res = await request({ t: 'charGet' });
     if (res.data === null) {
       if (meta.waiting || !hasLocalSave()) { // 本機只有示範角色：不上傳，等 GM 匯入

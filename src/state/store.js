@@ -93,6 +93,29 @@ export function saveCharacter(state) {
   }
 }
 
+// ---------- 同一台裝置換帳號：各帳號的存檔分開收，不互相覆蓋 ----------
+const stashKey = (uid) => `${KEY}:stash:${uid}`;
+
+/** 把目前本機存檔收到某帳號名下（本機存檔清空，之後 loadCharacter 會給示範角色） */
+export function stashLocalCharacter(uid) {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw !== null) localStorage.setItem(stashKey(uid), raw);
+    localStorage.removeItem(KEY);
+  } catch { /* 忽略 */ }
+}
+
+/** 把某帳號收起來的存檔放回本機；有放回回傳 true */
+export function unstashLocalCharacter(uid) {
+  try {
+    const raw = localStorage.getItem(stashKey(uid));
+    if (raw === null) return false;
+    localStorage.setItem(KEY, raw);
+    localStorage.removeItem(stashKey(uid));
+    return true;
+  } catch { return false; }
+}
+
 export function resetCharacter() {
   try {
     localStorage.removeItem(KEY);
