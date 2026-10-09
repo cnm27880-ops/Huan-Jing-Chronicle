@@ -148,6 +148,12 @@ export function createEncounterCard({ getState, commit, rerender }) {
     return rerender();
   }
 
+  /** 確保這隻被選為目標（已選就不動；招式只能打 1 個就換成它；滿了就提示） */
+  function pickTarget(state, m) {
+    if (!isDowned(m) && !sel.targets.includes(m.id)) return toggleTarget(state, m);
+    return rerender();
+  }
+
   function selectAllAlive(state) {
     const alive = currentEnc(state).monsters.filter((m) => !isDowned(m));
     const cap = capOf(state);
@@ -331,7 +337,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const downed = isDowned(m);
     const modes = sel.modes[m.id] ?? (sel.modes[m.id] = { atk: 0, def: 0 });
     const picked = sel.targets.includes(m.id);
-    return h('section', { class: `boss${downed ? ' is-downed' : ''}`, 'aria-label': `BOSS ${m.id}` },
+    return h('section', { class: `boss${downed ? ' is-downed' : ''}`, 'aria-label': `BOSS ${m.id}`, dataset: { picked: picked ? '1' : '0' } },
       bosses.length > 1
         ? h('div', { class: 'boss__tabs', role: 'tablist', 'aria-label': '切換 BOSS' }, bosses.map((b) => h('button', {
             type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(b.id === m.id), dataset: { down: isDowned(b) ? '1' : '0' },
@@ -350,11 +356,11 @@ export function createEncounterCard({ getState, commit, rerender }) {
         h('div', { class: 'boss__group' },
           h('p', { class: 'boss__k' },
             h('span', { text: '🛡️ 防禦' }),
-            h('small', { text: '選一種：你打它時用哪一組' }),
+            h('small', { text: '點一種＝選它當目標，打它時用這一組' }),
             monsterAbs(m) ? h('span', { class: 'boss__abs num', text: `絕防 ${fmt(monsterAbs(m))}` }) : null),
           h('div', { class: 'boss__modes', role: 'radiogroup', 'aria-label': `${m.id} 的防禦模式` }, BOSS_DEF_MODES.map((name, i) => h('button', {
             type: 'button', class: 'boss-mode', role: 'radio', 'aria-checked': String(modes.def === i), dataset: { kind: 'def' },
-            onclick: () => { modes.def = i; rerender(); },
+            onclick: () => { modes.def = i; pickTarget(state, m); }, // 選防禦＝也把它選為目標（之前只換模式，出招會說還沒選目標）
           }, h('span', { class: 'boss-mode__name', text: name }), abcCells(monsterDef(m, i)))))),
         h('div', { class: 'boss__group' },
           h('p', { class: 'boss__k' },

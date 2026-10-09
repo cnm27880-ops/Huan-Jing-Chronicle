@@ -162,7 +162,7 @@ export function createSessionView({ root, getState, commit }) {
     const panel = ui.leftTab === 'skills'
       ? skillPanel(state)
       : ui.leftTab === 'items'
-        ? h('div', { class: 'sx-stack' }, battle.potionCard(state), battle.statusCard(state), battle.defenseCard(state))
+        ? h('div', { class: 'sx-stack' }, battle.potionCard(state), battle.statusCard(state))
         : battle.moveCard(state);
     left.replaceChildren(
       h('div', { class: 'sx-left__hud' }, battle.hud(state)),

@@ -1347,6 +1347,9 @@ input[type='number'], .amount__input { text-align: center; }
 .boss-mode[data-kind='def']:hover { border-color: var(--sky2); }
 .boss-mode[data-kind='def'][aria-checked='true'] { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 14px rgba(var(--gold-rgb), 0.4); }
 .boss-mode[data-kind='def'][aria-checked='true'] .boss-mode__name { color: var(--gold); }
+/* 還沒選它當目標：只用藍框標出目前的防禦模式，金色發光留給「已選為目標」 */
+.boss[data-picked='0'] .boss-mode[data-kind='def'][aria-checked='true'] { border-color: var(--sky2); box-shadow: none; }
+.boss[data-picked='0'] .boss-mode[data-kind='def'][aria-checked='true'] .boss-mode__name { color: var(--sky); }
 .boss-mode[data-kind='atk'] .boss-mode__name { color: var(--rose); }
 .boss-mode[data-kind='atk']:hover:not(:disabled) { border-color: var(--rose); box-shadow: 0 0 12px rgba(var(--rose-rgb), 0.35); transform: translateY(-1px); }
 .boss-mode[data-kind='atk']:active:not(:disabled) { transform: translateY(1px); }
