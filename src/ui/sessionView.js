@@ -1,10 +1,14 @@
 // ============================================================
-// 跑團頁（原本的骰盤抽屜，階段 B 改成獨立分頁 #session）：
-// 房間資訊、一鍵技能檢定、跑團胃袋、自訂骰式（取代機器人 !投骰）、遭遇戰、所有人的擲骰紀錄。
+// 跑團頁（#session）：固定三欄工作台（版面規格見 DESIGN.md「跑團頁」）。
+//   左欄：個人 HUD（生命、資源、防禦三軌、狀態）＋ 分頁：招式／生活技能／探索檢定（battleView.js）
+//   中欄：遭遇戰舞台：先攻軸、BOSS、小怪矩陣、選目標、隊友血量、GM 工具（encounterCard.js）
+//   右欄：房間、擲骰紀錄（新的在下、自動捲到底）、快速擲骰
+// 電腦（≥1100px）三欄各自捲動；901–1099px 左欄改成底部抽屜；≤900px 紀錄當主畫面，
+// 左欄與中欄都變成底部抽屜（⚔️ 招式／🌿 技能／🎯 目標），頂部是膠囊 HUD 與目標血量。
 // 紀錄是「房間內所有玩家」共用（見 src/state/rollLog.js）。
 // ============================================================
 import { h } from './dom.js';
-import { amountPicker, rollFailed } from './controls.js';
+import { rollFailed } from './controls.js';
 import { mountRoomPanel } from './roomPanel.js';
 import { mountFeed } from './rollFeed.js';
 import { openFoodSheet } from './statusBar.js';
@@ -15,40 +19,92 @@ import { rollDice, rollCheck, clearLog, getRoomStatus, subscribeRoom, getEncount
 import { iconOf } from './items.js';
 import { createEncounterCard } from './encounterCard.js';
 import { createBattleView, isBattleEvent } from './battleView.js';
+import { battleSel as sel } from './battleSelect.js';
 
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
+const LEFT_TABS = [['moves', '⚔️ 招式'], ['life', '🌿 生活技能'], ['explore', '🔍 探索檢定']];
+// 紀錄篩選：異動 = GM 替玩家改角色（誰、改了什麼）
+const LOG_FILTERS = [['all', '全部'], ['roll', '擲骰'], ['battle', '戰鬥'], ['audit', '異動']];
+const LOG_FILTER_FN = {
+  all: null,
+  roll: (e) => e.kind !== 'audit' && !isBattleEvent(e),
+  battle: isBattleEvent,
+  audit: (e) => e.kind === 'audit',
+};
+const LOG_EMPTY = {
+  all: '按下任何一顆骰子，結果會出現在這裡。',
+  roll: '還沒有擲骰或檢定。',
+  battle: '出招、承受攻擊或喝藥水後，戰鬥紀錄會出現在這裡。',
+  audit: '還沒有異動紀錄。GM 替玩家修改角色或匯入存檔後，會記在這裡。',
+};
 
 export function createSessionView({ root, getState, commit }) {
-  const ui = { sides: 20, count: 1, mod: 0, text: '', battleOpen: false, logFilter: 'all' };
-  const LOG_FILTERS = [['all', '全部'], ['roll', '擲骰'], ['audit', '異動']]; // 異動 = GM 替玩家改角色（誰、改了什麼）
-  const logFilterFn = { all: null, roll: (e) => e.kind !== 'audit', audit: (e) => e.kind === 'audit' };
-  const node = root;
-  let feeds = [];
+  const ui = {
+    leftTab: 'moves',
+    logFilter: 'all',
+    sheet: '', // 手機／平板目前打開的抽屜：'' | 'left' | 'center'
+    hudOpen: false, // 手機膠囊 HUD 是否展開
+    sides: 20, count: 1, mod: 0, text: '',
+  };
+  const stage = createEncounterCard({ getState, commit, rerender: () => render() });
+  const battle = createBattleView({
+    getState, commit, rerender: () => render(), onFire: () => stage.attack(), fireInfo: () => stage.fireInfo(),
+  });
+
+  // ---------- 固定骨架（只建一次；重畫時換各欄內容，紀錄與房間區塊不重建，捲動位置不會跳） ----------
+  const left = h('aside', { class: 'sx-col sx-left', id: 'sx-left', 'aria-label': '角色與招式' });
+  const center = h('section', { class: 'sx-col sx-center', id: 'sx-center', 'aria-label': '戰鬥舞台' });
+  const top = h('div', { class: 'sx-top' }); // 手機：膠囊 HUD ＋ 目標血量
+  const roomBox = h('div', { class: 'sx-room__body' });
+  const roomSummary = h('summary', { class: 'sx-room__sum', text: '房間' });
+  const roomDetails = h('details', { class: 'sx-room' }, roomSummary, roomBox);
+  const feedHead = h('div', { class: 'sx-feedhead' });
+  const feedBox = h('div', { class: 'sx-feed', role: 'log', 'aria-label': '擲骰紀錄' });
+  const diceBox = h('div', { class: 'sx-dice' });
+  const right = h('aside', { class: 'sx-col sx-right', 'aria-label': '紀錄與擲骰' }, top, roomDetails, feedHead, feedBox, diceBox);
+  const barBtn = (id, label, controls) => h('button', {
+    type: 'button', class: 'sx-bar__btn', dataset: { id }, 'aria-controls': controls, 'aria-expanded': 'false',
+    onclick: () => openSheet(id),
+  }, label);
+  const bar = h('nav', { class: 'sx-bar', 'aria-label': '跑團快捷' },
+    barBtn('moves', '⚔️ 招式', 'sx-left'), barBtn('skills', '🌿 技能', 'sx-left'), barBtn('targets', '🎯 目標', 'sx-center'));
+  const scrim = h('div', { class: 'sx-scrim', 'aria-hidden': 'true', onclick: () => setSheet('') });
+  const wrap = h('div', { class: 'sx', dataset: { sheet: '' } }, left, center, right, scrim, bar);
+
+  let mounted = false;
+  let feed = null;
   let roomPanel = null;
-  let encBox = null;
   let unsubRoom = null;
-  let encSig = '';
-  const encounter = createEncounterCard({ getState, commit, rerender: () => render() });
+  let roomSig = '';
+  let deferred = false; // 正在中欄輸入框打字時，房間更新先不重畫（免得打到一半的數字不見），離開輸入框再畫
+  const typingIn = (el) => el.contains(document.activeElement) && document.activeElement.matches('input, select, textarea');
+  center.addEventListener('focusout', () => setTimeout(() => {
+    if (!deferred || !mounted || typingIn(center)) return;
+    deferred = false;
+    renderCenter();
+  }, 0));
 
-  // 戰鬥面板：原本的戰鬥頁（生命與資源、招式、藥水、狀態）改成跑團頁裡的懸浮面板，隨時可以打開
-  const panelBody = h('div', { class: 'battle-float__body' });
-  const battle = createBattleView({ root: panelBody, getState, commit });
-  const panel = h('aside', { class: 'battle-float', 'aria-label': '戰鬥面板', 'aria-hidden': 'true', dataset: { open: 'false' } },
-    h('header', { class: 'battle-float__head' },
-      h('h2', { class: 'tray__heading', text: '戰鬥面板' }),
-      h('button', { type: 'button', class: 'sheet__close', onclick: () => setBattleOpen(false) }, '關閉')),
-    panelBody);
-  const toggle = h('button', { type: 'button', class: 'btn btn--primary battle-float__toggle', 'aria-expanded': 'false', onclick: () => setBattleOpen(!ui.battleOpen) }, '⚔️ 戰鬥面板');
-
-  function setBattleOpen(open) {
-    ui.battleOpen = open;
-    panel.dataset.open = String(open);
-    panel.setAttribute('aria-hidden', String(!open));
-    toggle.setAttribute('aria-expanded', String(open));
-    if (open) battle.render(); else battle.leave();
+  // ---------- 抽屜（手機、平板） ----------
+  function setSheet(sheet) {
+    ui.sheet = sheet;
+    wrap.dataset.sheet = sheet;
+    bar.querySelectorAll('.sx-bar__btn').forEach((b) => {
+      const on = (b.dataset.id === 'targets' && sheet === 'center') || (sheet === 'left' && ((b.dataset.id === 'moves' && ui.leftTab === 'moves') || (b.dataset.id === 'skills' && ui.leftTab !== 'moves')));
+      b.setAttribute('aria-expanded', String(on));
+    });
   }
+  function openSheet(id) {
+    if (id === 'targets') return setSheet(ui.sheet === 'center' ? '' : 'center');
+    if (ui.sheet === 'left' && (id === 'moves') === (ui.leftTab === 'moves')) return setSheet(''); // 再按一次同一顆：收起
+    const tab = id === 'moves' ? 'moves' : ui.leftTab === 'moves' ? 'life' : ui.leftTab;
+    if (tab !== ui.leftTab) { ui.leftTab = tab; renderLeft(); }
+    setSheet('left');
+    left.scrollTop = 0;
+    return undefined;
+  }
+  const onKey = (e) => { if (e.key === 'Escape' && ui.sheet) setSheet(''); };
 
-  // ---------- 一鍵技能檢定 ----------
+  // ---------- 左欄：技能檢定 ----------
   async function checkSkill(skill) {
     const state = getState();
     try { await rollCheck(state.name, state, skill); } catch (e) { rollFailed(e); }
@@ -62,136 +118,199 @@ export function createSessionView({ root, getState, commit }) {
       h('small', { text: isLife ? `${value} + 熟練` : `技能 ${value}` }));
   }
 
-  // ---------- 自訂骰 ----------
+  function lifePanel(state) {
+    const prof = proficiency(state, 'session');
+    const stomach = state.sessionStomach;
+    return h('section', { class: 'card' },
+      h('h2', { class: 'section-title', text: '生活技能' }),
+      h('div', { class: 'tray__stomach' },
+        h('span', { class: 'field-label', text: '跑團熟練' }),
+        h('strong', { text: String(prof.total) }),
+        h('span', { class: 'mini-slots' }, Array.from({ length: STOMACH_SLOTS }, (_, i) =>
+          stomach[i]
+            ? h('span', { class: 'mini-slot', title: stomach[i].food }, h('span', { 'aria-hidden': 'true', text: iconOf(stomach[i].food) || '🍽️' }))
+            : h('button', {
+                type: 'button', class: 'mini-slot mini-slot--empty', 'aria-label': '空胃袋，點一下吃東西',
+                onclick: () => openFoodSheet(state, 'session', commit),
+              }, '＋')))),
+      stomach.length
+        ? h('button', {
+            type: 'button', class: 'btn btn--ghost btn--small',
+            onclick: () => { if (!confirm('結束本次跑團？跑團胃袋會清空。')) return; endSession(state); commit(); },
+          }, '結束本次跑團')
+        : null,
+      h('p', { class: 'hint', text: '點一下直接檢定（1D20 ＋ 技能 ＋ 熟練），結果在右邊紀錄。' }),
+      h('div', { class: 'skill-grid' }, LIFE_SKILLS.map((s) => skillButton(state, s, state.lifeSkills[s] ?? 0, true))));
+  }
+
+  function explorePanel(state) {
+    return h('section', { class: 'card' },
+      h('h2', { class: 'section-title', text: '探索檢定' }),
+      h('p', { class: 'hint', text: '非生活技能：點一下直接檢定，結果在右邊紀錄。' }),
+      h('div', { class: 'skill-grid' }, ART_SKILLS.map((s) => skillButton(state, s, state.arts[s] ?? 0, false))));
+  }
+
+  function renderLeft() {
+    const state = getState();
+    const y = left.scrollTop;
+    const tabs = h('div', { class: 'sx-tabs', role: 'tablist', 'aria-label': '左欄分頁' }, LEFT_TABS.map(([id, label]) => h('button', {
+      type: 'button', role: 'tab', class: 'sx-tab', 'aria-selected': String(ui.leftTab === id),
+      onclick: () => { ui.leftTab = id; renderLeft(); setSheet(ui.sheet); },
+    }, label)));
+    const panel = ui.leftTab === 'life'
+      ? lifePanel(state)
+      : ui.leftTab === 'explore'
+        ? explorePanel(state)
+        : h('div', { class: 'sx-stack' },
+            battle.moveCard(state),
+            battle.potionCard(state),
+            h('details', { class: 'add-box sx-more' },
+              h('summary', { text: '狀態、防禦骰與結束戰鬥' }),
+              battle.statusCard(state),
+              battle.defenseCard(state)));
+    left.replaceChildren(
+      h('div', { class: 'sx-left__hud' }, battle.hud(state)),
+      h('div', { class: 'sx-sheethead' },
+        h('span', { class: 'sx-sheethead__grip', 'aria-hidden': 'true' }),
+        h('button', { type: 'button', class: 'sheet__close', onclick: () => setSheet('') }, '收起')),
+      tabs, panel);
+    left.scrollTop = y;
+  }
+
+  // ---------- 中欄與手機頂部 ----------
+  function renderCenter() {
+    const y = center.scrollTop;
+    center.replaceChildren(
+      h('div', { class: 'sx-sheethead' },
+        h('span', { class: 'sx-sheethead__grip', 'aria-hidden': 'true' }),
+        h('button', { type: 'button', class: 'sheet__close', onclick: () => setSheet('') }, '收起')),
+      stage.render());
+    center.scrollTop = y;
+    const n = sel.targets.length;
+    bar.querySelector('[data-id="targets"]').textContent = n ? `🎯 目標（${n}）` : '🎯 目標';
+  }
+
+  function renderTop() {
+    const state = getState();
+    top.replaceChildren(...[
+      battle.miniHud(state, { open: ui.hudOpen, onToggle: () => { ui.hudOpen = !ui.hudOpen; renderTop(); } }),
+      ui.hudOpen ? h('div', { class: 'sx-top__hud' }, battle.hud(state)) : null,
+      stage.targetStrip()].filter(Boolean)); // replaceChildren 會把 null 變成文字，要先濾掉
+  }
+
+  // ---------- 右欄：紀錄與快速擲骰 ----------
+  function mountLog() {
+    feed?.destroy();
+    feed = mountFeed(feedBox, { limit: 60, oldestFirst: true, filter: LOG_FILTER_FN[ui.logFilter], empty: LOG_EMPTY[ui.logFilter] });
+  }
+
+  function renderFeedHead() {
+    feedHead.replaceChildren(
+      h('div', { class: 'tabs-seg', role: 'tablist', 'aria-label': '紀錄類型' }, LOG_FILTERS.map(([id, label]) => h('button', {
+        type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.logFilter === id),
+        onclick: () => { ui.logFilter = id; renderFeedHead(); mountLog(); },
+      }, label))),
+      getRoomStatus().phase === 'online'
+        ? h('span', { class: 'hint', text: '房間共用・最近 200 筆' })
+        : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空'));
+  }
+
   function expression() {
     if (ui.text.trim()) return parseDiceExpr(ui.text);
     return parseDiceExpr(`${ui.count}D${ui.sides}${ui.mod ? (ui.mod > 0 ? '+' : '') + ui.mod : ''}`);
   }
 
   async function rollCustom() {
-    const state = getState();
     const expr = expression();
     if (expr.error) return;
-    try { await rollDice(state.name, expr); } catch (e) { rollFailed(e); }
+    try { await rollDice(getState().name, expr); } catch (e) { rollFailed(e); }
   }
 
-  function customPanel() {
+  /** 快速擲骰：骰子面數、顆數、加減值，或直接輸入骰式 */
+  function renderDice() {
     const expr = expression();
-    return h('section', { class: 'tray__section' },
-      h('h3', { class: 'tray__title', text: '自訂骰' }),
-      h('div', { class: 'chip-row', role: 'radiogroup', 'aria-label': '骰子面數' },
-        SIDES.map((n) => h('button', {
-          type: 'button', class: 'chip', role: 'radio', 'aria-checked': String(!ui.text.trim() && ui.sides === n),
-          onclick: () => { ui.sides = n; ui.text = ''; render(); },
-        }, `D${n}`))),
-      h('p', { class: 'field-label', text: '幾顆' }),
-      amountPicker({ value: ui.count, max: MAX_DICE, quick: [1, 2, 3, 5, 10], onChange: (n) => { ui.count = n; ui.text = ''; render(); } }),
-      h('div', { class: 'row tray__mod' },
-        h('label', { class: 'field-label', for: 'tray-mod', text: '加減值' }),
+    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), onclick: rollCustom }, expr.error ? '格式不對' : `🎲 ${expr.text}`);
+    diceBox.replaceChildren(
+      h('div', { class: 'sx-dice__sides', role: 'radiogroup', 'aria-label': '骰子面數' }, SIDES.map((n) => h('button', {
+        type: 'button', class: 'chip', role: 'radio', 'aria-checked': String(!ui.text.trim() && ui.sides === n),
+        onclick: () => { ui.sides = n; ui.text = ''; renderDice(); },
+      }, `D${n}`))),
+      h('div', { class: 'sx-dice__row' },
+        h('label', { class: 'sx-dice__f' }, h('span', { text: '顆' }),
+          h('input', {
+            class: 'field', type: 'number', inputmode: 'numeric', min: 1, max: MAX_DICE, value: ui.count, 'aria-label': '幾顆',
+            onchange: (e) => { ui.count = Math.min(MAX_DICE, Math.max(1, Math.trunc(Number(e.target.value)) || 1)); ui.text = ''; renderDice(); },
+          })),
+        h('label', { class: 'sx-dice__f' }, h('span', { text: '加減' }),
+          h('input', {
+            class: 'field', type: 'number', inputmode: 'numeric', value: ui.mod, 'aria-label': '加減值',
+            onchange: (e) => { ui.mod = Math.trunc(Number(e.target.value)) || 0; ui.text = ''; renderDice(); },
+          })),
         h('input', {
-          id: 'tray-mod', class: 'field', type: 'number', inputmode: 'numeric', value: ui.mod,
-          onchange: (e) => { ui.mod = Math.trunc(Number(e.target.value)) || 0; ui.text = ''; render(); },
-        })),
-      h('div', { class: 'row tray__mod' },
-        h('label', { class: 'field-label', for: 'tray-expr', text: '或直接輸入' }),
-        h('input', {
-          id: 'tray-expr', class: 'field', type: 'text', placeholder: '例如 2D6+3', value: ui.text, autocomplete: 'off',
+          class: 'field sx-dice__expr', type: 'text', placeholder: '或輸入 2D6+3', value: ui.text, autocomplete: 'off', 'aria-label': '直接輸入骰式',
           oninput: (e) => {
             ui.text = e.target.value;
-            const btn = node.querySelector('.tray__roll');
             const ex = expression();
-            btn.disabled = Boolean(ex.error);
-            btn.textContent = ex.error ? '格式不對' : `🎲 擲 ${ex.text}`;
+            rollBtn.disabled = Boolean(ex.error);
+            rollBtn.textContent = ex.error ? '格式不對' : `🎲 ${ex.text}`;
+            diceBox.querySelectorAll('.sx-dice__sides .chip').forEach((c) => c.setAttribute('aria-checked', String(!ui.text.trim() && c.textContent === `D${ui.sides}`)));
           },
           onkeydown: (e) => { if (e.key === 'Enter') rollCustom(); },
-        })),
-      h('button', {
-        type: 'button', class: 'btn btn--primary btn--go tray__roll', disabled: Boolean(expr.error), onclick: rollCustom,
-      }, expr.error ? '格式不對' : `🎲 擲 ${expr.text}`));
+        }),
+        rollBtn));
   }
 
-  /** 遭遇戰畫面相關的房間狀態：變了才需要重畫（presence 之類的更新不用） */
-  const encounterSig = () => `${getRoomStatus().phase}|${getRoomStatus().me?.isGm ? 1 : 0}|${JSON.stringify(getEncounter())}`;
+  function renderRoomSummary() {
+    const r = getRoomStatus();
+    roomDetails.hidden = r.phase === 'local';
+    const online = r.members.filter((m) => m.online).length;
+    roomSummary.textContent = r.phase === 'online' ? `房間・${online} / ${r.members.length} 人在線` : r.phase === 'denied' ? '房間（本機模式）' : '房間（連線中…）';
+  }
+
+  /** 中欄要重畫的房間狀態：變了才重畫（打字中的左欄表單不受隊友狀態更新影響） */
+  const sigOf = () => {
+    const r = getRoomStatus();
+    return JSON.stringify([r.phase, r.me?.isGm, getEncounter(), r.images, r.vitals, r.members.map((m) => [m.uid, m.online]), r.gm?.uids]);
+  };
 
   // ---------- 組合 ----------
   function render() {
-    const state = getState();
-    feeds.forEach((f) => f.destroy());
-    roomPanel?.destroy();
-    const roomBox = h('div', { class: 'tray__room' });
-    encBox = h('div', { class: 'session-encounter' }, encounter.render());
-    encSig = encounterSig();
-    unsubRoom?.();
-    unsubRoom = subscribeRoom(() => { // 房間的遭遇戰（敵人、先攻）有變才重畫這一塊，不動別的
-      const sig = encounterSig();
-      if (sig !== encSig) { encSig = sig; encBox.replaceChildren(encounter.render()); }
-    });
-    const latestBox = h('div', { class: 'tray__latest', 'aria-live': 'polite' });
-    const historyBox = h('div', { class: 'tray__history' });
-    const battleLogBox = h('div', { class: 'tray__history' });
-    const prof = proficiency(state, 'session');
-    const stomach = state.sessionStomach;
-    const scrollY = root.scrollTop;
-
-    node.replaceChildren(panel, toggle, h('div', { class: 'session-root' },
-      h('header', { class: 'tray__head' },
-        h('h2', { class: 'tray__heading', text: '跑團' }),
-        h('span', { class: 'tray__who', text: state.name })),
-      roomBox, // 房間狀態：只有登入後才會出現
-      h('div', { class: 'tray__body' },
-        latestBox, // 最新結果放在內容最上面，跟著一起捲動（不再釘在畫面上佔空間）
-        h('section', { class: 'tray__section' },
-          h('div', { class: 'tray__stomach' },
-            h('span', { class: 'field-label', text: '跑團熟練' }),
-            h('strong', { text: String(prof.total) }),
-            h('span', { class: 'mini-slots' }, Array.from({ length: STOMACH_SLOTS }, (_, i) =>
-              stomach[i]
-                ? h('span', { class: 'mini-slot', title: stomach[i].food }, h('span', { 'aria-hidden': 'true', text: iconOf(stomach[i].food) || '🍽️' }))
-                : h('button', {
-                    type: 'button', class: 'mini-slot mini-slot--empty', 'aria-label': '空胃袋，點一下吃東西',
-                    onclick: () => openFoodSheet(state, 'session', commit),
-                  }, '＋')))),
-          stomach.length
-            ? h('button', {
-                type: 'button', class: 'btn btn--ghost btn--small',
-                onclick: () => { if (!confirm('結束本次跑團？跑團胃袋會清空。')) return; endSession(state); commit(); },
-              }, '結束本次跑團')
-            : null,
-          h('p', { class: 'field-label', text: '生活技能（加熟練）' }),
-          h('div', { class: 'skill-grid' }, LIFE_SKILLS.map((s) => skillButton(state, s, state.lifeSkills[s] ?? 0, true))),
-          h('p', { class: 'field-label', text: '非生活技能' }),
-          h('div', { class: 'skill-grid' }, ART_SKILLS.map((s) => skillButton(state, s, state.arts[s] ?? 0, false)))),
-        customPanel(),
-        encBox,
-        h('section', { class: 'tray__section' },
-          h('h3', { class: 'tray__title', text: '戰鬥紀錄' }),
-          battleLogBox),
-        h('section', { class: 'tray__section' },
-          h('div', { class: 'tray__title-row' },
-            h('h3', { class: 'tray__title', text: '紀錄' }),
-            h('div', { class: 'tabs-seg', role: 'tablist', 'aria-label': '紀錄類型' }, LOG_FILTERS.map(([id, label]) => h('button', {
-              type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.logFilter === id),
-              onclick: () => { ui.logFilter = id; render(); },
-            }, label))),
-            getRoomStatus().phase === 'online'
-              ? h('span', { class: 'hint', text: '房間共用，保存最近 200 筆' })
-              : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')),
-          historyBox))));
-    roomPanel = mountRoomPanel(roomBox);
-    feeds = [mountFeed(battleLogBox, { limit: 10, filter: isBattleEvent, empty: '出招、承受攻擊或喝藥水後，戰鬥紀錄會出現在這裡。' }), mountFeed(latestBox, { limit: 1, empty: '按下任何一顆骰子，結果會出現在這裡。' }), mountFeed(historyBox, { limit: 30, skip: ui.logFilter === 'all' ? 1 : 0, filter: logFilterFn[ui.logFilter], empty: ui.logFilter === 'audit' ? '還沒有異動紀錄。GM 替玩家修改角色或匯入存檔後，會記在這裡。' : '' })];
-    root.scrollTop = scrollY;
-    if (ui.battleOpen) battle.render(); // 戰鬥面板開著：資料有變就一起更新
+    if (!mounted) {
+      mounted = true;
+      root.replaceChildren(wrap);
+      roomPanel = mountRoomPanel(roomBox);
+      mountLog();
+      renderDice();
+      document.addEventListener('keydown', onKey);
+      roomSig = sigOf();
+      unsubRoom = subscribeRoom(() => {
+        renderRoomSummary();
+        const sig = sigOf();
+        if (sig === roomSig) return;
+        const before = sel.targets.join();
+        roomSig = sig;
+        if (typingIn(center)) deferred = true; else renderCenter();
+        renderTop();
+        if (sel.targets.join() !== before) renderLeft(); // 目標倒下或被移除：左欄「出招」按鈕的目標文字跟著更新
+        renderFeedHead();
+      });
+    }
+    renderRoomSummary();
+    renderFeedHead();
+    renderCenter();
+    renderLeft();
+    renderTop();
+    setSheet(ui.sheet);
   }
 
-  /** 離開跑團頁：停掉紀錄的自動更新，背景擲骰時不用重畫看不到的清單 */
+  /** 離開跑團頁：停掉紀錄與房間的自動更新，背景擲骰時不用重畫看不到的畫面 */
   function leave() {
-    unsubRoom?.();
-    unsubRoom = null;
-    battle.leave();
-    feeds.forEach((f) => f.destroy());
-    feeds = [];
-    roomPanel?.destroy();
-    roomPanel = null;
+    unsubRoom?.(); unsubRoom = null;
+    feed?.destroy(); feed = null;
+    roomPanel?.destroy(); roomPanel = null;
+    document.removeEventListener('keydown', onKey);
+    setSheet('');
+    mounted = false;
   }
 
   return { render, leave };

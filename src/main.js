@@ -20,6 +20,7 @@ import { createBagView } from './ui/bagView.js';
 import { createGearView } from './ui/gearView.js';
 import { createMarketView } from './ui/marketView.js';
 import { createSessionView } from './ui/sessionView.js';
+import { createVitalsReporter } from './state/vitals.js';
 import { showCover } from './ui/cover.js';
 import { createUserChip } from './ui/userChip.js';
 import { getCurrentUser, consumeLoginResult } from './api/auth.js';
@@ -81,9 +82,11 @@ async function init() {
   const getState = () => character;
   let views;
   let sync = null;
+  let vitals = null;
   const commit = () => {
     saveCharacter(character);
     sync?.markDirty(); // 已連上房間時，稍後同步到伺服器
+    vitals?.changed(); // 生命、資源有變就回報給房間（隊友看得到）
     views[currentView]?.render();
   };
   views = {
@@ -109,13 +112,16 @@ async function init() {
     onAccountSwitch: () => { // 換帳號：畫面改讀這個帳號的本機存檔（沒有就是示範角色，之後等 GM 匯入）
       character = loadCharacter();
       views[currentView]?.render();
+      vitals?.changed();
     },
     notify: toast,
     adopt: (data) => { // 伺服器的存檔套用到畫面（不經過 commit，免得又上傳一次）
       character = importCharacter(data);
       views[currentView]?.render();
+      vitals?.changed();
     },
   });
+  vitals = createVitalsReporter({ getState, skip: () => sync.isWaiting() }); // 等 GM 匯入期間不回報示範角色
 
   createMailbox({ getState, commit }); // 別人送的東西、餵的藥：領取後直接放進自己的角色
 
@@ -144,6 +150,7 @@ async function init() {
     onCreate: (name) => { // 新玩家自己建立空白角色：存本機、解除等待、上傳伺服器
       character = importCharacter({ ...blankCharacter(name), statMode: 'skills' });
       sync.release();
+      vitals.changed();
       toast(`已建立角色「${name}」。`);
       showView();
     },

@@ -19,7 +19,7 @@ import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
-  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY,
+  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -28,9 +28,18 @@ const TONES = new Set(['ok', 'fail', 'crit', 'warn']);
 const SKILLS = new Set([...LIFE_SKILLS, ...ART_SKILLS]);
 const RID = /^[A-Za-z0-9_-]{1,40}$/;
 const UID = /^\d{1,25}$/;
-const CHAR_PREFIXES = ['{"t":"charPut"', '{"t":"charImport"']; // 前端組訊息時 t 一定排第一；只有這兩種訊息可以放寬大小上限
+const CHAR_PREFIXES = ['{"t":"charPut"', '{"t":"charImport"', '{"t":"imgPut"']; // 前端組訊息時 t 一定排第一；只有這幾種訊息可以放寬大小上限
 const MAX_MONSTERS = 40;
-const isCharType = (t) => t === 'charPut' || t === 'charImport';
+const isCharType = (t) => t === 'charPut' || t === 'charImport' || t === 'imgPut';
+// 怪物立繪：只收這三種格式，並檢查檔頭（不收 SVG，免得圖片裡藏程式）
+const IMAGE_MAGIC = { // 參數是解碼後的開頭幾個位元組（每個字元一個位元組）
+  'image/webp': (bin) => bin.slice(0, 4) === 'RIFF' && bin.slice(8, 12) === 'WEBP',
+  'image/jpeg': (bin) => bin.startsWith('\xff\xd8\xff'),
+  'image/png': (bin) => bin.startsWith('\x89PNG'),
+};
+const IMAGE_ID = /^[a-f0-9]{32}$/;
+const B64 = /^[A-Za-z0-9+/]+={0,2}$/;
+const VITAL_KEY = /^[\u4e00-\u9fff]{1,4}$/; // 資源名稱（靈氣、魔力…）
 
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const cleanStr = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
@@ -55,6 +64,8 @@ export class RoomCore {
     db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS mail (id TEXT PRIMARY KEY, to_uid TEXT NOT NULL, t INTEGER NOT NULL, json TEXT NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS characters (uid TEXT PRIMARY KEY, json TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL)');
+    db.exec('CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, name TEXT NOT NULL, mime TEXT NOT NULL, data TEXT NOT NULL, t INTEGER NOT NULL)');
+    db.exec('CREATE TABLE IF NOT EXISTS vitals (uid TEXT PRIMARY KEY, json TEXT NOT NULL, t INTEGER NOT NULL)');
   }
 
   // ---------- 成員與權限 ----------
@@ -132,6 +143,8 @@ export class RoomCore {
       mail: this.pendingMail(user.uid),
       special: this.special(),
       skills: this.customSkills(),
+      images: this.imagesView(),
+      vitals: this.vitalsView(),
       members: this.membersView(online),
       history: this.history(),
     };
@@ -202,6 +215,10 @@ export class RoomCore {
       case 'mailSend': return this.onMailSend(user, msg, rid);
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': return this.onEncounter(user, msg, rid, online);
+      case 'encImg': return this.onEncImg(user, msg, rid);
+      case 'imgPut': return this.onImgPut(user, msg, rid);
+      case 'imgDel': return this.onImgDel(user, msg, rid);
+      case 'vitals': return this.onVitals(user, msg);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
     }
   }
@@ -424,6 +441,7 @@ export class RoomCore {
       if (enc.monsters.length + sp.count > MAX_MONSTERS) return err(rid, 'bad_enc', `場上最多 ${MAX_MONSTERS} 隻敵人。`);
       const spec = { count: sp.count, atkPower: sp.atkPower, defPower: sp.defPower, hp: sp.hp, absDef: sp.absDef ?? 0, atkMod: cleanStr(sp.atkMod, 40), defMod: cleanStr(sp.defMod, 40) };
       const added = (msg.kind === 'boss' ? addBosses : addMobs)(enc, spec, this.rng);
+      if (this.hasImage(msg.img)) added.forEach((m) => { m.img = msg.img; }); // 建立時就指定立繪（選填）
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user, { label: `遭遇：新增 ${added.map((m) => m.id).join('、')}` });
     }
@@ -473,6 +491,97 @@ export class RoomCore {
     }
     this.saveEncounter(enc);
     return this.encOk(enc, rid, user);
+  }
+
+  /** GM 指定（或拿掉）某隻怪物的立繪：img = 立繪庫的編號，null = 拿掉 */
+  onEncImg(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以設定立繪。');
+    const enc = this.encounter();
+    const m = typeof msg.id === 'string' ? enc.monsters.find((x) => x.id === msg.id) : null;
+    if (!m) return err(rid, 'bad_enc', '找不到這隻敵人，可能已被移除。');
+    if (msg.img === null) delete m.img;
+    else if (this.hasImage(msg.img)) m.img = msg.img;
+    else return err(rid, 'bad_img', '找不到這張立繪，可能已被刪除。');
+    this.saveEncounter(enc);
+    return this.encOk(enc, rid, user);
+  }
+
+  // ---------- 怪物立繪（GM 上傳；所有人用網址讀，見 room.js 的 GET /img/:id） ----------
+  imagesView() { return this.db.exec('SELECT id, name, t FROM images ORDER BY t DESC, id'); }
+
+  hasImage(id) { return typeof id === 'string' && IMAGE_ID.test(id) && this.db.exec('SELECT 1 AS x FROM images WHERE id = ?', id).length > 0; }
+
+  /** 讀一張立繪：{ mime, bytes } 或 null */
+  imageFile(id) {
+    if (typeof id !== 'string' || !IMAGE_ID.test(id)) return null;
+    const row = this.db.exec('SELECT mime, data FROM images WHERE id = ?', id)[0];
+    if (!row) return null;
+    const bin = atob(row.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { mime: row.mime, bytes };
+  }
+
+  /** GM 上傳立繪（base64）。assign = 怪物編號時，上傳完直接套到那隻怪物身上 */
+  onImgPut(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以上傳立繪。');
+    const { mime, data } = msg;
+    if (typeof mime !== 'string' || !Object.hasOwn(IMAGE_MAGIC, mime)) return err(rid, 'bad_img', '只能上傳 WebP、JPEG 或 PNG 圖片。');
+    if (typeof data !== 'string' || data.length < 16 || data.length > MAX_IMAGE_B64_CHARS || data.length % 4 !== 0 || !B64.test(data)) {
+      return err(rid, 'bad_img', '圖片太大或格式錯誤。');
+    }
+    let head;
+    try { head = atob(data.slice(0, 16)); } catch { return err(rid, 'bad_img', '圖片格式錯誤。'); }
+    if (!IMAGE_MAGIC[mime](head)) return err(rid, 'bad_img', '檔案內容不是圖片。');
+    if (this.db.exec('SELECT COUNT(*) AS n FROM images')[0].n >= MAX_IMAGES) return err(rid, 'bad_img', `立繪庫最多 ${MAX_IMAGES} 張，請先刪掉不用的。`);
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+    this.db.exec('INSERT INTO images(id, name, mime, data, t) VALUES (?, ?, ?, ?, ?)', id, cleanStr(msg.name, 40) || '立繪', mime, data, this.now());
+    const out = [{ to: 'self', msg: { t: 'imgOk', rid, id } }, { to: 'all', msg: { t: 'images', images: this.imagesView() } }];
+    if (typeof msg.assign === 'string') {
+      const enc = this.encounter();
+      const m = enc.monsters.find((x) => x.id === msg.assign);
+      if (m) { m.img = id; this.saveEncounter(enc); out.push({ to: 'all', msg: { t: 'enc', encounter: enc } }); }
+    }
+    return { out, close: null };
+  }
+
+  /** GM 刪除立繪：用到它的怪物一起拿掉 */
+  onImgDel(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以刪除立繪。');
+    if (!this.hasImage(msg.id)) return err(rid, 'bad_img', '找不到這張立繪。');
+    this.db.exec('DELETE FROM images WHERE id = ?', msg.id);
+    const out = [{ to: 'self', msg: { t: 'imgOk', rid, id: msg.id } }, { to: 'all', msg: { t: 'images', images: this.imagesView() } }];
+    const enc = this.encounter();
+    const used = enc.monsters.filter((m) => m.img === msg.id);
+    if (used.length) {
+      used.forEach((m) => delete m.img);
+      this.saveEncounter(enc);
+      out.push({ to: 'all', msg: { t: 'enc', encounter: enc } });
+    }
+    return { out, close: null };
+  }
+
+  // ---------- 隊友狀態：每位玩家自己回報生命與資源（前端算的，和角色存檔一樣的信任邊界），全員看得到 ----------
+  vitalsView() {
+    const out = {};
+    for (const r of this.db.exec('SELECT uid, json FROM vitals')) { try { out[r.uid] = JSON.parse(r.json); } catch { /* 壞掉的略過 */ } }
+    return out;
+  }
+
+  onVitals(user, msg) {
+    const v = msg.v;
+    const BIG = 10_000_000;
+    if (!v || typeof v !== 'object' || !isInt(v.hp, 0, BIG) || !isInt(v.maxHp, 0, BIG)) return err(undefined, 'bad_vitals', '狀態格式錯誤。');
+    const clean = { name: cleanStr(v.name, 40) || user.name, hp: v.hp, maxHp: v.maxHp, downed: v.downed === true, res: {} };
+    if (isInt(v.shield, 1, BIG)) clean.shield = v.shield;
+    if (isInt(v.tox, 0, 1000)) clean.tox = v.tox;
+    if (v.res && typeof v.res === 'object' && !Array.isArray(v.res)) {
+      for (const [k, pair] of Object.entries(v.res).slice(0, 8)) {
+        if (VITAL_KEY.test(k) && Array.isArray(pair) && pair.length === 2 && isInt(pair[0], 0, BIG) && isInt(pair[1], 0, BIG)) clean.res[k] = pair;
+      }
+    }
+    this.db.exec('INSERT INTO vitals(uid, json, t) VALUES (?, ?, ?) ON CONFLICT(uid) DO UPDATE SET json = excluded.json, t = excluded.t', user.uid, JSON.stringify(clean), this.now());
+    return { out: [{ to: 'all', msg: { t: 'vitals', uid: user.uid, v: clean } }], close: null };
   }
 
   // ---------- 特殊配方與特殊材料（GM 新增的；內建的寫在 src/game/special.js，不能改） ----------

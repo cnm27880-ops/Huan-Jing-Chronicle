@@ -340,6 +340,39 @@ test('吞天噬血陣：打 3 個目標，回復「目標扣除生命」的一�
   assert.ok(r.healed <= cap);
 });
 
+test('手動選目標：只打選到的（依點選順序），最多到招式的目標數；選太多、選到倒下的都拒絕且不扣資源', () => {
+  const s = fresh();
+  s.hp = 5;
+  const enc = newEncounter();
+  enc.monsters.push(dummy(10000), { ...dummy(10000), id: '小怪2' }, { ...dummy(10000), id: '小怪3' }, { ...dummy(10000), id: '小怪4' }, { ...dummy(0), id: '小怪5' });
+  const m = s.moves.find((x) => x.name === '吞天噬血陣'); // 3 個目標
+  const qi = s.resources.靈氣;
+  assert.equal(playerAttack(s, enc, m.id, null, 0, d4(2), { targetIds: ['小怪1', '小怪2', '小怪3', '小怪4'] }).error, '吞天噬血陣最多打 3 個目標。');
+  assert.equal(playerAttack(s, enc, m.id, null, 0, d4(2), { targetIds: ['小怪1', '小怪5'] }).error, '選到的目標已經倒下了。');
+  assert.equal(playerAttack(s, enc, m.id, null, 0, d4(2), { targetIds: [] }).error, '先選目標。');
+  assert.equal(s.resources.靈氣, qi);
+  const r = playerAttack(s, enc, m.id, null, 0, d4(2), { targetIds: ['小怪4', '小怪2'] });
+  assert.deepEqual(r.hits.map((h) => h.target.id), ['小怪4', '小怪2']); // 選比較少：只打選到的，不自動補
+  assert.equal(enc.monsters[0].hp, 10000);
+  assert.equal(enc.monsters[2].hp, 10000);
+  assert.ok(enc.monsters[3].hp < 10000);
+});
+
+test('手動選目標：每隻 BOSS 用自己的防禦模式', () => {
+  const s = fresh();
+  s.skills = {};
+  s.moves.push({ id: 'aoe', name: '群攻', tracks: ['C'], extra: { C: 0 }, cost: {}, targets: 2 });
+  const boss = (id) => ({
+    id, kind: 'boss', hp: 100, maxHp: 100, abs: 0,
+    atk: [{ A: 0, B: 0, C: 0 }, { A: 0, B: 0, C: 0 }, { A: 0, B: 0, C: 0 }],
+    def: [{ A: 0, B: 0, C: 1 }, { A: 0, B: 0, C: 5 }, { A: 0, B: 0, C: 9 }],
+  });
+  const enc = newEncounter();
+  enc.monsters.push(boss('BOSS1'), boss('BOSS2'));
+  const r = playerAttack(s, enc, 'aoe', null, 0, d4(1), { targetIds: ['BOSS1', 'BOSS2'], modes: { BOSS1: 2, BOSS2: 1 } });
+  assert.deepEqual(r.hits.map((h) => h.def.C), [9, 5]);
+});
+
 test('不可名狀：神秘招式造成傷害，回復損失生命的一半，上限 = 最大生命 × 5% × 等級', () => {
   const s = bare();
   s.skills = { 不可名狀: 2 };

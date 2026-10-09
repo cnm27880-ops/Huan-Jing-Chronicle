@@ -143,20 +143,9 @@
 .extra { display: flex; flex-direction: column; gap: .15rem; font-size: .72rem; color: var(--muted); }
 .extra .field { padding: .35rem .5rem; font-size: 14px; }
 
-.monster-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
-.monster { display: flex; flex-direction: column; gap: .4rem; padding: .6rem .7rem; background: var(--input); border: 1px solid var(--line); border-left: 3px solid var(--red); border-radius: 7px; }
-.monster[data-kind='boss'] { border-left-color: var(--gold); }
-.monster.is-downed { opacity: .55; }
-.monster__head { display: flex; align-items: center; gap: .5rem; }
-.monster__head .btn { margin-left: auto; }
-.monster__stats { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem; margin: 0; }
-.monster__stats div { padding: .25rem .45rem; background: var(--card); border-radius: 5px; min-width: 0; }
-.monster__stats dt { font-size: .65rem; color: var(--dim); }
-.monster__stats dd { margin: 0; font-family: var(--font-mono); font-size: .82rem; color: var(--text); overflow-wrap: anywhere; }
 .modes { gap: .5rem; }
 .mode { display: flex; flex-direction: column; gap: .15rem; flex: 1; font-size: .7rem; color: var(--muted); }
 .mode .field { padding: .3rem .4rem; font-size: 14px; }
-.monster__btns { flex-wrap: wrap; }
 
 @media (prefers-reduced-motion: reduce) {
   .roll[data-fresh='1'], .bar__fill { transition: none; animation: none; }
@@ -223,43 +212,6 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 .roll--divider .roll__label { color: var(--bronze, var(--gold)); }
 .roll__sub { flex-basis: 100%; color: var(--muted); font-size: .72rem; }
 
-/* 跑團頁（原骰盤抽屜改成獨立分頁） */
-.session-root { max-width: 760px; margin: 0 auto; padding: 0 .9rem calc(2rem + env(safe-area-inset-bottom, 0px)); }
-.session-root .skill-grid { margin-bottom: .6rem; }
-
-/* 戰鬥面板（跑團頁的懸浮面板；原本的戰鬥頁）。裡面沿用 .bt-* 的版面，一律用「分頁」排法，不受視窗寬度影響 */
-.battle-float {
-  position: fixed; top: var(--topbar-h); right: 0; bottom: 0; z-index: 55;
-  width: min(440px, 100vw); display: flex; flex-direction: column;
-  background: var(--paper2); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(var(--shadow-rgb), .45);
-  transform: translateX(104%); visibility: hidden;
-  transition: transform .22s var(--ease, ease), visibility 0s linear .22s;
-}
-.battle-float[data-open='true'] { transform: none; visibility: visible; transition: transform .22s var(--ease, ease); }
-.battle-float__head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .7rem .9rem; border-bottom: 1px solid var(--line); }
-.battle-float__body { flex: 1; overflow-y: auto; }
-.btn.battle-float__toggle { position: fixed; right: 14px; bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 40; box-shadow: 0 6px 18px var(--shadow); }
-.battle-float[data-open='true'] ~ .btn.battle-float__toggle { visibility: hidden; }
-.battle-float .bt-root { padding: 0 12px 12px; }
-.battle-float .bt-tabs { display: grid; }
-.battle-float .bt-hud__res { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.battle-float .bt-layout { display: block; }
-.battle-float .bt-layout > .bt-pane { display: flex !important; }
-.battle-float .bt-layout[data-pane='action'] > .bt-pane:not([data-id='action']),
-.battle-float .bt-layout[data-pane='log'] > .bt-pane:not([data-id='log']),
-.battle-float .bt-layout[data-pane='state'] > .bt-pane:not([data-id='state']) { display: none !important; }
-.battle-float .bt-pane[data-id='log'] { position: static; max-height: none; overflow: visible; }
-@media (max-width: 700px) {
-  .battle-float { top: auto; left: 0; width: 100%; height: min(88vh, 720px); border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; transform: translateY(104%); }
-  .battle-float[data-open='true'] { transform: none; }
-}
-@media (prefers-reduced-motion: reduce) { .battle-float { transition: none; } }
-
-/* 先攻位置 */
-.initiative { margin: .4rem 0 .6rem; }
-.initiative__list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; }
-.initiative__item button { cursor: pointer; font: inherit; min-height: 36px; }
-.initiative__item button:disabled { cursor: default; opacity: .85; }
 .info-chip.is-warn { color: var(--gold); border-color: var(--gold); }
 
 /* 模擬戰（GM） */
