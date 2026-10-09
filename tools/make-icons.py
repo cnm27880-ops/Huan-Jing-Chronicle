@@ -44,16 +44,17 @@ def placeholder(size, scale):
     return img
 
 
-def from_source(path, size, scale):
+def from_source(path, size, scale, keep_alpha=False):
+    """keep_alpha：去背圖保留透明（瀏覽器分頁、一般 PWA 圖示）；iPhone 與 maskable 一定要不透明，用深色底"""
     src = Image.open(path).convert('RGBA')
     box = int(size * scale)
     ratio = min(box / src.width, box / src.height)
     src = src.resize((max(1, round(src.width * ratio)), max(1, round(src.height * ratio))), Image.LANCZOS)
     corner = src.getpixel((0, 0))  # 圖片自帶底色（不透明）就用它當背景，邊緣才不會露出一圈不同顏色的框
     bg = corner[:3] if corner[3] == 255 else PAPER
-    img = Image.new('RGBA', (size, size), bg + (255,))
+    img = Image.new('RGBA', (size, size), (0, 0, 0, 0) if keep_alpha and corner[3] < 255 else bg + (255,))
     img.alpha_composite(src, ((size - src.width) // 2, (size - src.height) // 2))
-    return img.convert('RGB')
+    return img if keep_alpha else img.convert('RGB')
 
 
 def main():
@@ -64,10 +65,11 @@ def main():
         im = Image.open(a.source)
         if min(im.size) < 256:
             print(f'警告：圖片只有 {im.size[0]}×{im.size[1]}，放大後會模糊，建議跟 GM 要 512×512 以上的原圖。', file=sys.stderr)
-    make = (lambda s, sc: from_source(a.source, s, sc)) if a.source else placeholder
+    make = (lambda s, sc, alpha: from_source(a.source, s, sc, alpha)) if a.source else (lambda s, sc, alpha: placeholder(s, sc))
     os.makedirs(OUT, exist_ok=True)
-    for name, size, scale in [('icon-192.png', 192, 0.86), ('icon-512.png', 512, 0.86), ('icon-maskable-512.png', 512, 0.58), ('apple-touch-icon.png', 180, 0.86)]:
-        make(size, scale).save(os.path.join(OUT, name), optimize=True)
+    # 一般圖示（分頁、PWA any）：去背圖保留透明、放滿；maskable 要留安全區；iPhone 不支援透明
+    for name, size, scale, alpha in [('icon-192.png', 192, 1.0, True), ('icon-512.png', 512, 1.0, True), ('icon-maskable-512.png', 512, 0.72, False), ('apple-touch-icon.png', 180, 0.9, False)]:
+        make(size, scale, alpha).save(os.path.join(OUT, name), optimize=True)
         print('寫入', name)
 
 

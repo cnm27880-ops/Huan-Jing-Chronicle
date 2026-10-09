@@ -1050,7 +1050,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
   #view-market .mk-session { margin-left: 0; }
   .trade-row { grid-template-columns: 40px minmax(0, 1fr); }
   .trade-row__act { grid-column: 1 / -1; justify-content: flex-end; }
-  .trade-row__qty { flex: 1; max-width: 8rem; }
+  .trade-row__qty { flex: 0 1 5rem; }
 }
 
 .sell-sheet { display: grid; gap: 8px; }
@@ -1068,7 +1068,8 @@ input[type='number'], .amount__input { text-align: center; }
 
 /* 裝備取名欄：身上（整列）與背包（整列） */
 .gear-slot .gear-name { grid-area: name; }
-.owned .gear-name { flex: 1 1 100%; padding: 6px 10px; font-size: 14px; }
+.owned .owned__main { flex: 1 1 100%; }
+.owned .gear-name { flex: 1 1 180px; min-width: 0; padding: 5px 10px; font-size: 14px; } /* 名字欄和按鈕放同一行 */
 
 /* GM 匯入機器人存檔 */
 .import-list, .import-results { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
@@ -1095,10 +1096,10 @@ input[type='number'], .amount__input { text-align: center; }
   .sheet__panel[data-size='tall'] { height: 67dvh; max-height: 67dvh; }
 }
 
-/* 技能方格：三格並排（學習、裝備頁共用） */
-.skill-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 6px 0 10px; }
+/* 技能方格（學習、裝備頁共用）：一格一行＝名稱、位階類型、（備註）、等級；啟動開關才換行 */
+.skill-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); align-items: start; gap: 6px; margin: 6px 0 10px; }
 .skill-tile {
-  display: grid; align-content: start; gap: 2px; min-width: 0; padding: 8px;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; padding: 7px 10px;
   color: var(--ink); text-align: left; background: var(--raise); border-radius: 10px;
   box-shadow: 0 0 0 1px var(--line); cursor: pointer; transition: box-shadow 0.15s ease;
 }
@@ -1117,7 +1118,12 @@ input[type='number'], .amount__input { text-align: center; }
 .skill-tile__lv { color: var(--gold); font-size: 0.85rem; }
 .skill-tile__note { color: var(--soft); font-size: 0.7rem; }
 .skill-tile__on { font-size: 0.72rem; }
-@media (max-width: 420px) { .skill-tile { padding: 6px; } .skill-tile__name { font-size: 0.82rem; } }
+.skill-tile__name { flex: none; white-space: nowrap; }
+.skill-tile__tag { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.skill-tile__note { order: 2; flex: none; }
+.skill-tile__lv { order: 3; flex: none; }
+.skill-tile > :not(.skill-tile__name):not(.skill-tile__tag):not(.skill-tile__note):not(.skill-tile__lv) { order: 4; flex-basis: 100%; }
+@media (max-width: 420px) { .skill-tile { padding: 6px 8px; } .skill-tile__name { font-size: 0.82rem; } }
 
 /* 電腦滑鼠移上技能時浮動顯示效果 */
 .skill-tip {
@@ -1153,23 +1159,24 @@ input[type='number'], .amount__input { text-align: center; }
 .draw-option { display: grid; gap: 4px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .draw-option .skill-info__text { margin: 0; font-size: 0.82rem; }
 @media (min-width: 640px) { .draw-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.badge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.badge-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 6px; }
 .badge-row { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .badge-row__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .badge-made { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; font-size: 0.8rem; color: var(--soft); }
 .badge-made__name { min-width: 0; overflow-wrap: anywhere; }
 
 /* 修整日「特殊」分頁 */
-.special-list { display: grid; gap: 6px; margin-top: 6px; }
+.special-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; margin-top: 6px; }
 .special-card { display: grid; gap: 6px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .special-card__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
 .special-card .row { display: flex; flex-wrap: wrap; gap: 6px; }
-.special-card .field { flex: 1; min-width: 0; }
-/* 餵肉球：一個材料一小行（名稱＋持有／倍率、輸入數量、餵） */
-.feed-list { display: grid; gap: 4px; margin-top: 6px; }
+.special-card .field { flex: 1; min-width: 0; padding: 6px 8px; font-size: 14px; }
+.special-card .row .btn { margin: 0; }
+/* 餵肉球：材料排成小卡片網格（名稱＋持有／倍率、輸入數量、餵），不再拉滿整行 */
+.feed-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin-top: 6px; }
 .feed-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 84px auto;
+  grid-template-columns: minmax(0, 1fr) 64px auto;
   align-items: center;
   gap: 0 8px;
   padding: 6px 10px;
@@ -1179,7 +1186,7 @@ input[type='number'], .amount__input { text-align: center; }
 }
 .feed-row__name { grid-column: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed-row__have { grid-column: 1; grid-row: 2; color: var(--soft); font-size: 0.78rem; }
-.feed-row__qty { grid-column: 2; grid-row: 1 / 3; min-width: 0; padding: 6px 8px; text-align: center; }
+.feed-row__qty { grid-column: 2; grid-row: 1 / 3; min-width: 0; padding: 4px 6px; font-size: 14px; text-align: center; }
 .feed-row .btn { grid-column: 3; grid-row: 1 / 3; margin: 0; }
 @media (max-width: 420px) { #view-rest .rest-tab { gap: 3px; padding: 0 4px; font-size: 0.9rem; } #view-rest .rest-tab__icon { display: none; } }
 
@@ -1590,3 +1597,13 @@ input[type='number'], .amount__input { text-align: center; }
 @media (prefers-reduced-motion: reduce) {
   .dfx, .dfx__die, .dfx__total, .dfx__tag, .dfx__burst, .dfx[data-phase] .dfx__die, .dfx[data-phase] .dfx__total { animation: none !important; }
 }
+
+/* 裝備頁數值面板：緊湊格子（資源一排放得下），跑團胃袋按鈕和數值隔開 */
+#view-gear .stat-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 4px; }
+#view-gear .stat { gap: 0; padding: 4px 8px; }
+#view-gear .stat__name { font-size: 0.68rem; }
+#view-gear .stat__value { font-size: 1rem; line-height: 1.3; }
+#view-gear .stat-group + .stat-group { margin-top: 6px; }
+#view-gear .stat-group .field-label { margin: 0 0 3px; }
+.stat-food { margin-top: 12px; }
+@media (max-width: 759px) { #view-gear .stat-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); } #view-gear .stat { padding: 4px 6px; } }

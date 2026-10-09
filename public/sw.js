@@ -6,7 +6,7 @@
 // 所以不會出現「登出了畫面還是舊的」或存檔版本衝突；網頁永遠拿最新的，沒網路就和沒裝一樣打不開。
 // 改版後要讓舊快取失效：把 CACHE 的版本號 +1。
 // ============================================================
-const CACHE = 'huanjing-static-v2';
+const CACHE = 'huanjing-static-v3';
 const PREFIXES = ['/assets/', '/icons/', '/img/'];
 
 /** 要不要由 Service Worker 快取這個請求 */

@@ -26,22 +26,19 @@ const SIDES = [4, 6, 8, 10, 12, 20, 100];
 const LEFT_TABS = [['moves', '⚔️ 招式'], ['items', '🧪 藥水與狀態'], ['skills', '🎲 技能檢定']];
 // 紀錄篩選：[id, 按鈕文字, 滑過時的說明]
 const LOG_FILTERS = [
-  ['all', '全部', '所有紀錄'],
-  ['roll', '🎲 檢定與骰子', '技能檢定、自訂骰，以及鑑定、黑市等其他結果'],
+  ['all', '全部', '所有紀錄（房間共用，保存最近 200 筆）'],
+  ['roll', '🎲 擲骰', '技能檢定、自訂骰，以及鑑定、黑市等其他結果'],
   ['battle', '⚔️ 戰鬥', '出招、承受攻擊、喝藥水、遭遇戰（新增敵人、先攻）'],
-  ['audit', '📋 GM 改角色', 'GM 替玩家修改或匯入角色：誰、改了什麼'],
 ];
 const LOG_FILTER_FN = {
   all: null,
   roll: (e) => e.kind !== 'audit' && !isBattleEvent(e),
   battle: isBattleEvent,
-  audit: (e) => e.kind === 'audit',
 };
 const LOG_EMPTY = {
   all: '按下任何一顆骰子，結果會出現在這裡。',
   roll: '還沒有檢定或擲骰。左邊「技能檢定」或下面的骰子都可以擲。',
   battle: '出招、承受攻擊或喝藥水後，戰鬥紀錄會出現在這裡。',
-  audit: 'GM 還沒有修改過任何人的角色。GM 改角色或匯入存檔後，會記在這裡（誰、改了什麼）。',
 };
 
 export function createSessionView({ root, getState, commit }) {
@@ -210,7 +207,7 @@ export function createSessionView({ root, getState, commit }) {
         onclick: () => { ui.logFilter = id; renderFeedHead(); mountLog(); },
       }, label))),
       getRoomStatus().phase === 'online'
-        ? h('span', { class: 'hint', text: '房間共用・最近 200 筆' })
+        ? null
         : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空'));
   }
 

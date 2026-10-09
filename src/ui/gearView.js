@@ -61,7 +61,7 @@ export function createGearView({ root, getState, commit }) {
       group('攻擊', ATK_STATS),
       group('防禦', DEF_STATS),
       group('資源', RESOURCE_STATS),
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => openFoodSheet(state, 'session', commit) }, '🍽️ 跑團胃袋吃東西'));
+      h('button', { type: 'button', class: 'btn btn--ghost btn--small stat-food', onclick: () => openFoodSheet(state, 'session', commit) }, '🍽️ 跑團胃袋吃東西'));
   }
 
   // ---------- 技能等級（原本在戰鬥頁，功能不變） ----------
