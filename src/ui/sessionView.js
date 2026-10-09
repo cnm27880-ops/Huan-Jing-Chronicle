@@ -10,7 +10,8 @@
 import { h } from './dom.js';
 import { rollFailed } from './controls.js';
 import { mountRoomPanel } from './roomPanel.js';
-import { mountFeed } from './rollFeed.js';
+import { mountFeed, readFaces } from './rollFeed.js';
+import { playDiceFx } from './diceFx.js';
 import { openFoodSheet } from './statusBar.js';
 import { LIFE_SKILLS, ART_SKILLS, STOMACH_SLOTS } from '../game/rules.js';
 import { modifier, proficiency, endSession } from '../game/engine.js';
@@ -22,9 +23,14 @@ import { createBattleView, isBattleEvent } from './battleView.js';
 import { battleSel as sel } from './battleSelect.js';
 
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
-const LEFT_TABS = [['moves', '⚔️ 招式'], ['life', '🌿 生活技能'], ['explore', '🔍 探索檢定']];
-// 紀錄篩選：異動 = GM 替玩家改角色（誰、改了什麼）
-const LOG_FILTERS = [['all', '全部'], ['roll', '擲骰'], ['battle', '戰鬥'], ['audit', '異動']];
+const LEFT_TABS = [['moves', '⚔️ 招式'], ['items', '🧪 藥水與狀態'], ['skills', '🎲 技能檢定']];
+// 紀錄篩選：[id, 按鈕文字, 滑過時的說明]
+const LOG_FILTERS = [
+  ['all', '全部', '所有紀錄'],
+  ['roll', '🎲 檢定與骰子', '技能檢定、自訂骰，以及鑑定、黑市等其他結果'],
+  ['battle', '⚔️ 戰鬥', '出招、承受攻擊、喝藥水、遭遇戰（新增敵人、先攻）'],
+  ['audit', '📋 GM 改角色', 'GM 替玩家修改或匯入角色：誰、改了什麼'],
+];
 const LOG_FILTER_FN = {
   all: null,
   roll: (e) => e.kind !== 'audit' && !isBattleEvent(e),
@@ -33,9 +39,9 @@ const LOG_FILTER_FN = {
 };
 const LOG_EMPTY = {
   all: '按下任何一顆骰子，結果會出現在這裡。',
-  roll: '還沒有擲骰或檢定。',
+  roll: '還沒有檢定或擲骰。左邊「技能檢定」或下面的骰子都可以擲。',
   battle: '出招、承受攻擊或喝藥水後，戰鬥紀錄會出現在這裡。',
-  audit: '還沒有異動紀錄。GM 替玩家修改角色或匯入存檔後，會記在這裡。',
+  audit: 'GM 還沒有修改過任何人的角色。GM 改角色或匯入存檔後，會記在這裡（誰、改了什麼）。',
 };
 
 export function createSessionView({ root, getState, commit }) {
@@ -67,7 +73,7 @@ export function createSessionView({ root, getState, commit }) {
     onclick: () => openSheet(id),
   }, label);
   const bar = h('nav', { class: 'sx-bar', 'aria-label': '跑團快捷' },
-    barBtn('moves', '⚔️ 招式', 'sx-left'), barBtn('skills', '🌿 技能', 'sx-left'), barBtn('targets', '🎯 目標', 'sx-center'));
+    barBtn('moves', '⚔️ 招式', 'sx-left'), barBtn('items', '🧪 藥水', 'sx-left'), barBtn('skills', '🎲 檢定', 'sx-left'), barBtn('targets', '🎯 目標', 'sx-center'));
   const scrim = h('div', { class: 'sx-scrim', 'aria-hidden': 'true', onclick: () => setSheet('') });
   const wrap = h('div', { class: 'sx', dataset: { sheet: '' } }, left, center, right, scrim, bar);
 
@@ -89,15 +95,14 @@ export function createSessionView({ root, getState, commit }) {
     ui.sheet = sheet;
     wrap.dataset.sheet = sheet;
     bar.querySelectorAll('.sx-bar__btn').forEach((b) => {
-      const on = (b.dataset.id === 'targets' && sheet === 'center') || (sheet === 'left' && ((b.dataset.id === 'moves' && ui.leftTab === 'moves') || (b.dataset.id === 'skills' && ui.leftTab !== 'moves')));
+      const on = (b.dataset.id === 'targets' && sheet === 'center') || (sheet === 'left' && b.dataset.id === ui.leftTab);
       b.setAttribute('aria-expanded', String(on));
     });
   }
   function openSheet(id) {
     if (id === 'targets') return setSheet(ui.sheet === 'center' ? '' : 'center');
-    if (ui.sheet === 'left' && (id === 'moves') === (ui.leftTab === 'moves')) return setSheet(''); // 再按一次同一顆：收起
-    const tab = id === 'moves' ? 'moves' : ui.leftTab === 'moves' ? 'life' : ui.leftTab;
-    if (tab !== ui.leftTab) { ui.leftTab = tab; renderLeft(); }
+    if (ui.sheet === 'left' && ui.leftTab === id) return setSheet(''); // 再按一次同一顆：收起
+    if (id !== ui.leftTab) { ui.leftTab = id; renderLeft(); }
     setSheet('left');
     left.scrollTop = 0;
     return undefined;
@@ -107,7 +112,10 @@ export function createSessionView({ root, getState, commit }) {
   // ---------- 左欄：技能檢定 ----------
   async function checkSkill(skill) {
     const state = getState();
-    try { await rollCheck(state.name, state, skill); } catch (e) { rollFailed(e); }
+    try {
+      const r = await rollCheck(state.name, state, skill);
+      playDiceFx({ faces: [r.roll], sides: 20, total: r.total, label: `${skill}檢定` });
+    } catch (e) { rollFailed(e); }
   }
 
   function skillButton(state, skill, value, isLife) {
@@ -118,11 +126,13 @@ export function createSessionView({ root, getState, commit }) {
       h('small', { text: isLife ? `${value} + 熟練` : `技能 ${value}` }));
   }
 
-  function lifePanel(state) {
+  /** 技能檢定：生活技能（加跑團熟練，含跑團胃袋）＋非生活技能，點一下直接檢定 */
+  function skillPanel(state) {
     const prof = proficiency(state, 'session');
     const stomach = state.sessionStomach;
     return h('section', { class: 'card' },
-      h('h2', { class: 'section-title', text: '生活技能' }),
+      h('h2', { class: 'section-title', text: '技能檢定' }),
+      h('p', { class: 'hint', text: '點一下直接擲 1D20 ＋ 加值，結果在右邊紀錄。' }),
       h('div', { class: 'tray__stomach' },
         h('span', { class: 'field-label', text: '跑團熟練' }),
         h('strong', { text: String(prof.total) }),
@@ -139,14 +149,9 @@ export function createSessionView({ root, getState, commit }) {
             onclick: () => { if (!confirm('結束本次跑團？跑團胃袋會清空。')) return; endSession(state); commit(); },
           }, '結束本次跑團')
         : null,
-      h('p', { class: 'hint', text: '點一下直接檢定（1D20 ＋ 技能 ＋ 熟練），結果在右邊紀錄。' }),
-      h('div', { class: 'skill-grid' }, LIFE_SKILLS.map((s) => skillButton(state, s, state.lifeSkills[s] ?? 0, true))));
-  }
-
-  function explorePanel(state) {
-    return h('section', { class: 'card' },
-      h('h2', { class: 'section-title', text: '探索檢定' }),
-      h('p', { class: 'hint', text: '非生活技能：點一下直接檢定，結果在右邊紀錄。' }),
+      h('p', { class: 'field-label', text: '生活技能（技能 ＋ 跑團熟練）' }),
+      h('div', { class: 'skill-grid' }, LIFE_SKILLS.map((s) => skillButton(state, s, state.lifeSkills[s] ?? 0, true))),
+      h('p', { class: 'field-label', text: '非生活技能' }),
       h('div', { class: 'skill-grid' }, ART_SKILLS.map((s) => skillButton(state, s, state.arts[s] ?? 0, false))));
   }
 
@@ -157,17 +162,11 @@ export function createSessionView({ root, getState, commit }) {
       type: 'button', role: 'tab', class: 'sx-tab', 'aria-selected': String(ui.leftTab === id),
       onclick: () => { ui.leftTab = id; renderLeft(); setSheet(ui.sheet); },
     }, label)));
-    const panel = ui.leftTab === 'life'
-      ? lifePanel(state)
-      : ui.leftTab === 'explore'
-        ? explorePanel(state)
-        : h('div', { class: 'sx-stack' },
-            battle.moveCard(state),
-            battle.potionCard(state),
-            h('details', { class: 'add-box sx-more' },
-              h('summary', { text: '狀態、防禦骰與結束戰鬥' }),
-              battle.statusCard(state),
-              battle.defenseCard(state)));
+    const panel = ui.leftTab === 'skills'
+      ? skillPanel(state)
+      : ui.leftTab === 'items'
+        ? h('div', { class: 'sx-stack' }, battle.potionCard(state), battle.statusCard(state), battle.defenseCard(state))
+        : battle.moveCard(state);
     left.replaceChildren(
       h('div', { class: 'sx-left__hud' }, battle.hud(state)),
       h('div', { class: 'sx-sheethead' },
@@ -206,8 +205,8 @@ export function createSessionView({ root, getState, commit }) {
 
   function renderFeedHead() {
     feedHead.replaceChildren(
-      h('div', { class: 'tabs-seg', role: 'tablist', 'aria-label': '紀錄類型' }, LOG_FILTERS.map(([id, label]) => h('button', {
-        type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.logFilter === id),
+      h('div', { class: 'tabs-seg', role: 'tablist', 'aria-label': '紀錄類型' }, LOG_FILTERS.map(([id, label, tip]) => h('button', {
+        type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.logFilter === id), title: tip,
         onclick: () => { ui.logFilter = id; renderFeedHead(); mountLog(); },
       }, label))),
       getRoomStatus().phase === 'online'
@@ -223,13 +222,18 @@ export function createSessionView({ root, getState, commit }) {
   async function rollCustom() {
     const expr = expression();
     if (expr.error) return;
-    try { await rollDice(getState().name, expr); } catch (e) { rollFailed(e); }
+    try {
+      const ev = await rollDice(getState().name, expr);
+      const f = ev && readFaces(ev);
+      if (f) playDiceFx({ faces: f.faces, sides: f.sides, total: ev.big, label: f.formula });
+    } catch (e) { rollFailed(e); }
   }
+
 
   /** 快速擲骰：骰子面數、顆數、加減值，或直接輸入骰式 */
   function renderDice() {
     const expr = expression();
-    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), onclick: rollCustom }, expr.error ? '格式不對' : `🎲 ${expr.text}`);
+    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), title: expr.error ? '骰式格式不對' : `擲 ${expr.text}`, onclick: rollCustom }, '🎲 投骰');
     diceBox.replaceChildren(
       h('div', { class: 'sx-dice__sides', role: 'radiogroup', 'aria-label': '骰子面數' }, SIDES.map((n) => h('button', {
         type: 'button', class: 'chip', role: 'radio', 'aria-checked': String(!ui.text.trim() && ui.sides === n),
@@ -252,7 +256,7 @@ export function createSessionView({ root, getState, commit }) {
             ui.text = e.target.value;
             const ex = expression();
             rollBtn.disabled = Boolean(ex.error);
-            rollBtn.textContent = ex.error ? '格式不對' : `🎲 ${ex.text}`;
+            rollBtn.title = ex.error ? '骰式格式不對' : `擲 ${ex.text}`;
             diceBox.querySelectorAll('.sx-dice__sides .chip').forEach((c) => c.setAttribute('aria-checked', String(!ui.text.trim() && c.textContent === `D${ui.sides}`)));
           },
           onkeydown: (e) => { if (e.key === 'Enter') rollCustom(); },

@@ -25,7 +25,7 @@ function badgeText(ev) {
  * 一般檢定的骰面：從事件文字讀出每一顆骰子（格式見 src/game/events.js 的 checkEvent／diceEvent）。
  * 回傳 { faces:[數字], sides, formula, rest:[其他說明行] }；讀不出來回傳 null。
  */
-function readFaces(ev) {
+export function readFaces(ev) {
   const lines = ev.lines ?? [];
   if (ev.kind === 'check') {
     const m = String(lines[0] ?? '').match(/^1D20（(\d+)）\+ (-?\d+)$/);

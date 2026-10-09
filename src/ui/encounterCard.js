@@ -312,16 +312,9 @@ export function createEncounterCard({ getState, commit, rerender }) {
     return i >= 0 ? h('span', { class: 'pick-no num', 'aria-hidden': 'true', text: String(i + 1) }) : null;
   };
 
-  function modeSelect(label, names, value, onChange) {
-    return h('label', { class: 'mode' },
-      h('span', { text: label }),
-      h('select', { class: 'field', onchange: (e) => onChange(Number(e.target.value)) },
-        names.map((n, i) => h('option', { value: String(i), selected: i === value ? true : null, text: n }))));
-  }
-
-  const defCells = (def, abs) => h('div', { class: 'abc' },
-    TRACKS.map((t) => h('span', { class: 'abc__cell', dataset: { track: t } }, h('b', { text: t }), h('span', { class: 'num', text: fmt(def[t]) }))),
-    abs ? h('span', { class: 'abc__abs', text: `絕防 ${fmt(abs)}` }) : null);
+  /** A／B／C 三格數值 */
+  const abcCells = (abc) => h('span', { class: 'abc' },
+    TRACKS.map((t) => h('span', { class: 'abc__cell', dataset: { track: t } }, h('b', { text: t }), h('span', { class: 'num', text: fmt(abc[t]) }))));
 
   function bossHero(state, bosses) {
     const m = bosses.find((b) => b.id === sel.focusBoss) ?? bosses.find((b) => !isDowned(b)) ?? bosses[0];
@@ -343,17 +336,25 @@ export function createEncounterCard({ getState, commit, rerender }) {
         type: 'button', class: 'boss__art', 'aria-pressed': String(picked), disabled: downed,
         'aria-label': `${picked ? '取消選取' : '選取'} ${m.id} 為目標`, onclick: () => toggleTarget(state, m),
       }, portrait(m, 'boss__img'), orderBadge(m.id)),
-      h('div', { class: 'boss__info' },
-        h('div', { class: 'boss__row' },
-          h('span', { class: 'boss__k', text: `攻擊（${BOSS_ATK_MODES[modes.atk]}）` }),
-          h('span', { class: 'boss__v num', text: formatAbc(monsterAtk(m, modes.atk)) })),
-        h('div', { class: 'boss__row' },
-          h('span', { class: 'boss__k', text: `防禦（${BOSS_DEF_MODES[modes.def]}）` }),
-          defCells(monsterDef(m, modes.def), monsterAbs(m))),
-        h('div', { class: 'row modes' },
-          modeSelect('它的攻擊', BOSS_ATK_MODES, modes.atk, (v) => { modes.atk = v; rerender(); }),
-          modeSelect('它的防禦', BOSS_DEF_MODES, modes.def, (v) => { modes.def = v; rerender(); })),
-        h('button', { type: 'button', class: 'btn btn--small', disabled: downed, onclick: () => doDefend(state, m) }, '🛡️ 承受它的攻擊')));
+      h('div', { class: 'boss__stats' },
+        h('div', { class: 'boss__group' },
+          h('p', { class: 'boss__k' },
+            h('span', { text: '🛡️ 防禦' }),
+            h('small', { text: '選一種：你打它時用哪一組' }),
+            monsterAbs(m) ? h('span', { class: 'boss__abs num', text: `絕防 ${fmt(monsterAbs(m))}` }) : null),
+          h('div', { class: 'boss__modes', role: 'radiogroup', 'aria-label': `${m.id} 的防禦模式` }, BOSS_DEF_MODES.map((name, i) => h('button', {
+            type: 'button', class: 'boss-mode', role: 'radio', 'aria-checked': String(modes.def === i), dataset: { kind: 'def' },
+            onclick: () => { modes.def = i; rerender(); },
+          }, h('span', { class: 'boss-mode__name', text: name }), abcCells(monsterDef(m, i)))))),
+        h('div', { class: 'boss__group' },
+          h('p', { class: 'boss__k' },
+            h('span', { text: '⚔️ 攻擊' }),
+            h('small', { text: '點一下＝你承受這一招' })),
+          h('div', { class: 'boss__modes', 'aria-label': `${m.id} 的攻擊` }, BOSS_ATK_MODES.map((name, i) => h('button', {
+            type: 'button', class: 'boss-mode', dataset: { kind: 'atk' }, disabled: downed,
+            'aria-label': `承受 ${m.id} 的${name}`,
+            onclick: () => { modes.atk = i; doDefend(state, m); },
+          }, h('span', { class: 'boss-mode__name', text: name }), abcCells(monsterAtk(m, i))))))));
   }
 
   // ---------- 小怪矩陣 ----------
@@ -420,7 +421,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
 
   function enemyForm(state) {
     const f = ui.form;
-    return addBox('enemy', '＋ 新增敵人',
+    return h('section', { class: 'gm-tools__sec' },
+      h('h3', { class: 'tray__title', text: '新增敵人' }),
       h('div', { class: 'toggle-row' },
         [['mob', '小怪'], ['boss', 'BOSS']].map(([id, label]) => h('button', {
           type: 'button', class: 'toggle', 'aria-pressed': String(f.kind === id), onclick: () => { f.kind = id; rerender(); },
@@ -458,7 +460,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
   function manageBox(state, enc) {
     if (!enc.monsters.length) return null;
     const gmOnline = online() && isGm();
-    return addBox('manage', `敵人管理（${enc.monsters.length}）`,
+    return h('section', { class: 'gm-tools__sec' },
+      h('h3', { class: 'tray__title', text: `場上的敵人（${enc.monsters.length}）` }),
       h('ul', { class: 'manage' }, enc.monsters.map((m) => h('li', { class: 'manage__row' },
         h('span', { class: 'manage__name', text: `${glyph(m)} ${m.id}` }),
         gmOnline ? imageSelect(m.img ?? '', (v) => act({ t: 'encImg', id: m.id, img: v || null }), `${m.id} 的立繪`) : null,
@@ -470,7 +473,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
   function libraryBox() {
     if (!online() || !isGm()) return null;
     const images = getRoomStatus().images ?? [];
-    return addBox('library', `立繪庫（${images.length}）`,
+    return h('section', { class: 'gm-tools__sec' },
+      h('h3', { class: 'tray__title', text: `立繪庫（${images.length}）` }),
       h('p', { class: 'hint', text: '上傳後會自動縮小。指定給怪物後，所有玩家會即時看到。刪除立繪時，用到它的怪物會改回圖示。' }),
       h('button', { type: 'button', class: 'btn btn--small', disabled: ui.uploading, onclick: () => pickAndUpload(null) }, ui.uploading ? '上傳中…' : '＋ 上傳新立繪'),
       images.length
@@ -524,7 +528,9 @@ export function createEncounterCard({ getState, commit, rerender }) {
             h('span', { text: '域外魔祖：這次攻擊花 30 靈氣，追加扣目標現有生命 10%' }))
         : null,
       partyRow(),
-      canEdit ? h('div', { class: 'stage__tools' }, enemyForm(state), manageBox(state, enc), libraryBox()) : null);
+      canEdit
+        ? addBox('gm', online() ? '⚙️ 敵人與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), manageBox(state, enc), libraryBox()))
+        : null);
   }
 
   /** 手機頂部的目標條：選中的目標（沒選就顯示 BOSS）的血量 */

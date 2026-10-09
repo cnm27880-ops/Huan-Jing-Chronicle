@@ -16,6 +16,12 @@
   --sky: #7fa6d6;     --sky2: #3f6290;  --skybg: #1c2634;   /* 成功／破防 */
   --lilac: #a897d4;                                     /* 靈魂條 */
   --die0: #2c2419;                                      /* 骰面 */
+  /* 資源條：每種資源一個顏色（靈氣用上面的 --lilac） */
+  --res-mana: #5f9cf0;    --res-mana-rgb: 95, 156, 240;     /* 魔力：藍 */
+  --res-energy: #f2b84b;  --res-energy-rgb: 242, 184, 75;   /* 能量：琥珀 */
+  --res-fight: #ee7a45;   --res-fight-rgb: 238, 122, 69;    /* 鬥氣：橙紅 */
+  --res-calc: #45c7bd;    --res-calc-rgb: 69, 199, 189;     /* 算力：青 */
+  --res-tox: #8fca5a;     --res-tox-rgb: 143, 202, 90;      /* 毒性：綠 */
   --on-gold: #1b1610;                                   /* 金底上的字 */
   --shadow: rgba(0, 0, 0, 0.35);
 
