@@ -1861,3 +1861,25 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
   .special-card { gap: 4px; padding: 7px 9px; }
   .special-card__head { line-height: 1.25; }
 }
+
+/* 網頁自己的確認框（src/ui/confirmPop.js）：貼在按鈕旁邊，蓋在彈出面板（z-index 60）之上 */
+.confirm-pop {
+  position: fixed; z-index: 110; box-sizing: border-box; padding: 12px 14px;
+  background: var(--card); color: var(--ink); border: 1px solid var(--gold2); border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(var(--shadow-rgb), 0.55);
+  opacity: 0; transform: translateY(4px); transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.confirm-pop[data-open='true'] { opacity: 1; transform: none; }
+.confirm-pop__title { margin: 0 0 4px; font-weight: 700; color: var(--gold); overflow-wrap: anywhere; }
+.confirm-pop__line { margin: 2px 0; font-size: 0.9rem; color: var(--ink2); overflow-wrap: anywhere; }
+.confirm-pop__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.confirm-pop__actions .btn { min-height: 44px; min-width: 76px; }
+.confirm-pop::after { /* 小箭頭：指向按鈕 */
+  content: ''; position: absolute; left: var(--arrow-x, 50%); width: 10px; height: 10px; margin-left: -5px;
+  background: var(--card); border: 1px solid var(--gold2); transform: rotate(45deg);
+}
+.confirm-pop[data-side='above']::after { bottom: -6px; border-top: 0; border-left: 0; }
+.confirm-pop[data-side='below']::after { top: -6px; border-bottom: 0; border-right: 0; }
+.confirm-pop[data-side='center']::after { display: none; }
+.btn--danger { background: var(--rosebg); border-color: var(--rose2); color: var(--rose); }
+@media (prefers-reduced-motion: reduce) { .confirm-pop { transition: none; } }
