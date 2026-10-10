@@ -231,3 +231,30 @@ test('整理：背包裡鑲了寶石的裝備不會被列為可丟棄', () => {
   socketGem(s, gem.id, weak.id);
   assert.ok(!findJunk(s).includes(weak.id));
 });
+
+import { addManualGear as _addManualGear, equipmentEffects as _effects } from '../src/game/equipment.js';
+import { blankCharacter as _blank } from '../src/game/importBot.js';
+
+test('GM 手動放裝備：穿上並從手動調整扣掉，面板不變', () => {
+  const s = _blank('測試');
+  s.adjust = { 真實傷害: 34 };
+  const r = _addManualGear(s, { name: '奶綠大劍', tier: '初階', slot: 'weapon', effects: [{ stat: '真實傷害', value: 29 }], equip: true, compensate: true });
+  assert.ok(r.ok && r.equipped);
+  assert.equal(s.equipment.weapon.name, '奶綠大劍');
+  assert.equal(s.adjust.真實傷害, 5);
+  assert.equal(_effects(s).真實傷害, 29);
+});
+
+test('GM 手動放裝備：欄位已有裝備時只放進背包；不合法的輸入被擋下', () => {
+  const s = _blank('測試');
+  s.adjust = {};
+  assert.ok(_addManualGear(s, { tier: '初階', slot: 'weapon', effects: [{ stat: '真實傷害', value: 3 }], equip: true }).equipped);
+  const second = _addManualGear(s, { tier: '初階', slot: 'weapon', effects: [{ stat: '真實傷害', value: 2 }], equip: true, compensate: true });
+  assert.ok(second.ok && !second.equipped);
+  assert.equal(s.gear.length, 1);
+  assert.equal(s.adjust.真實傷害, undefined); // 沒穿上就不扣調整
+  assert.ok(!_addManualGear(s, { tier: '神級', slot: 'weapon', effects: [{ stat: '真實傷害', value: 1 }] }).ok);
+  assert.ok(!_addManualGear(s, { tier: '初階', slot: 'weapon', effects: [{ stat: '亂寫', value: 1 }] }).ok);
+  assert.ok(!_addManualGear(s, { tier: '初階', slot: 'weapon', effects: [] }).ok);
+  assert.ok(!_addManualGear(s, { tier: '初階', slot: 'weapon', effects: [{ stat: '真實傷害', value: 1 }, { stat: '物理傷害', value: 1 }] }).ok);
+});

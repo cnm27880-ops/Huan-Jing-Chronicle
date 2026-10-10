@@ -4,7 +4,7 @@
 // ============================================================
 import {
   GEAR_TIERS, GEAR_TIER_ALIAS, GEAR_SLOT_NAME, GEAR_BONUS, WEAPON_STATS, ARMOR_STATS,
-  ACC_STATS, ACC_VALUES, ACC_SPECIAL_ROLL, EQUIP_SLOTS, GEM_DICE, GEM_SOCKET_TIER,
+  ACC_STATS, ACC_VALUES, ACC_SPECIAL_ROLL, EQUIP_SLOTS, GEM_DICE, GEM_SOCKET_TIER, ALL_STATS,
 } from './rules.js';
 import { rollDie, rollSum } from './dice.js';
 import { removeItem, countOf } from './engine.js';
@@ -232,3 +232,46 @@ export function findJunk(state) {
 /** 背包中通用裝備與已鑑定裝備的總數，給畫面顯示 */
 export const genericCount = (state) => identifiable(state).reduce((a, x) => a + x.qty, 0);
 export { countOf };
+
+// ---------- GM 手動放裝備（試算表上已穿著、機器人背包沒有的裝備，例如金先生的奶綠大劍） ----------
+/**
+ * GM 替玩家新增一件已知數值的裝備。spec = { name?, tier, slot: 'weapon'|'armor'|'accessory', effects: [{ stat, value }], equip, compensate }
+ *  - equip：順便穿上（目標欄位是空的才穿；飾品先放飾品 1 再飾品 2；欄位已有裝備就只放進背包，不會頂掉原本的）
+ *  - compensate：穿上時把效果從「手動調整」扣掉，面板數值不變（試算表面板本來就含這件裝備時用）
+ * 回傳 { ok: true, equipped, gear } 或 { ok: false, error }。
+ */
+export function addManualGear(state, spec) {
+  const tier = GEAR_TIER_ALIAS[spec.tier] ?? spec.tier;
+  if (!GEAR_TIERS.includes(tier)) return { ok: false, error: '階級不對。' };
+  if (!GEAR_SLOT_NAME[spec.slot]) return { ok: false, error: '部位不對。' };
+  const name = typeof spec.name === 'string' ? spec.name.trim().slice(0, 40) : '';
+  const effects = [];
+  for (const e of spec.effects ?? []) {
+    if (!e || e.value === '' || e.value == null) continue;
+    const value = Math.floor(Number(e.value));
+    if (!ALL_STATS.includes(e.stat)) return { ok: false, error: `沒有「${e.stat}」這個屬性。` };
+    if (!Number.isFinite(value) || value < 1 || value > 999) return { ok: false, error: `${e.stat} 的數值要是 1～999 的整數。` };
+    effects.push({ stat: e.stat, value });
+  }
+  if (!effects.length) return { ok: false, error: '至少填一個屬性加成。' };
+  if (spec.slot !== 'accessory' && effects.length > 1) return { ok: false, error: '武器與防具只加一種屬性。' };
+  if (effects.length > 2) return { ok: false, error: '一件裝備最多兩個屬性。' };
+  state.gear = state.gear ?? [];
+  state.equipment = state.equipment ?? { weapon: null, armor: null, acc1: null, acc2: null };
+  if (!Number.isInteger(state.nextGearId)) state.nextGearId = 1 + Math.max(0, ...state.gear.map((g) => g.id), ...Object.values(state.equipment).map((g) => g?.id ?? 0));
+  const gear = { id: state.nextGearId++, tier, slot: spec.slot, effects, roll: {}, ...(name ? { name } : {}) };
+  state.gear.push(gear);
+  let equipped = false;
+  if (spec.equip) {
+    const key = spec.slot === 'accessory' ? ['acc1', 'acc2'].find((k) => !state.equipment[k]) : spec.slot;
+    if (key && !state.equipment[key]) {
+      equip(state, gear.id, key);
+      equipped = true;
+      if (spec.compensate) {
+        state.adjust = state.adjust ?? {};
+        for (const e of effects) state.adjust[e.stat] = (state.adjust[e.stat] ?? 0) - e.value;
+      }
+    }
+  }
+  return { ok: true, equipped, gear };
+}

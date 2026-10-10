@@ -8,14 +8,15 @@ import { openSheet } from './sheet.js';
 import { listCharacters, fetchCharacter } from '../state/charSync.js';
 import { roomRequest } from '../state/rollLog.js';
 import { derivedStats } from '../game/stats.js';
-import { ALL_STATS } from '../game/rules.js';
+import { ALL_STATS, GEAR_TIERS, GEAR_SLOT_NAME, EQUIP_SLOTS, EQUIP_SLOT_LABEL } from '../game/rules.js';
+import { addManualGear, gearName, unequip } from '../game/equipment.js';
 import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL, getCustomSkillNames } from '../game/skillTable.js';
 
 const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) : '不明');
 const int = (v) => Math.trunc(Number(v)) || 0;
 
 export function openGmCharEditor() {
-  const ui = { list: null, error: '', uid: null, version: 0, data: null, busy: false, message: '', addSkill: '', addLevel: 1 };
+  const ui = { list: null, error: '', uid: null, version: 0, data: null, busy: false, message: '', addSkill: '', addLevel: 1, gear: null };
   let sheet;
 
   async function loadList() {
@@ -71,6 +72,56 @@ export function openGmCharEditor() {
       }, '＋ 指定給玩家'));
   }
 
+  const newGearForm = () => ({ name: '', tier: GEAR_TIERS[0], slot: 'weapon', stat1: '真實傷害', value1: '', stat2: '真實傷害', value2: '', equip: true, compensate: true });
+  const effectText = (g) => g.effects.map((e) => `${e.stat} +${e.value}`).join('、');
+
+  /** 替玩家放一件試算表上已穿著的裝備（機器人背包沒有的）：穿上並從手動調整扣掉，面板數值不變 */
+  function gearSection(d) {
+    const f = ui.gear ?? (ui.gear = newGearForm());
+    const statSelect = (key) => h('select', { class: 'field', 'aria-label': '屬性', onchange: (e) => { f[key] = e.target.value; } },
+      ALL_STATS.map((s) => h('option', { value: s, selected: f[key] === s ? true : null, text: s })));
+    const numInput = (key) => h('input', { class: 'field', type: 'number', min: 1, inputmode: 'numeric', placeholder: '數值', value: f[key], style: 'max-width: 6em;', 'aria-label': '數值', oninput: (e) => { f[key] = e.target.value; } });
+    const slotLine = (key) => {
+      const g = d.equipment?.[key];
+      return h('li', { class: 'skill-row' },
+        h('span', { text: `${EQUIP_SLOT_LABEL[key]}：` }),
+        g
+          ? [h('strong', { text: `${gearName(g)}（${g.tier}）` }), h('small', { class: 'hint', text: effectText(g) }),
+             h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { unequip(d, key); sheet.refresh(); } }, '卸下（面板數值會變）')]
+          : h('small', { class: 'hint', text: '空' }));
+    };
+    return h('div', {},
+      h('p', { class: 'field-label', text: '裝備（試算表上已穿著、機器人背包沒有的，在這裡放進去）' }),
+      h('ul', { class: 'skill-list' }, EQUIP_SLOTS.map(slotLine)),
+      d.gear?.length ? h('p', { class: 'hint', text: `背包裡的裝備：${d.gear.map((g) => `${gearName(g)}（${effectText(g)}）`).join('；')}` }) : null,
+      h('div', { class: 'row' },
+        h('input', { class: 'field', type: 'text', maxlength: 40, placeholder: '裝備名稱（選填，例如 奶綠大劍）', value: f.name, oninput: (e) => { f.name = e.target.value; } }),
+        h('select', { class: 'field', 'aria-label': '階級', onchange: (e) => { f.tier = e.target.value; } },
+          GEAR_TIERS.map((t) => h('option', { value: t, selected: f.tier === t ? true : null, text: t }))),
+        h('select', { class: 'field', 'aria-label': '部位', onchange: (e) => { f.slot = e.target.value; sheet.refresh(); } },
+          Object.entries(GEAR_SLOT_NAME).map(([k, v]) => h('option', { value: k, selected: f.slot === k ? true : null, text: v })))),
+      h('div', { class: 'row' }, statSelect('stat1'), numInput('value1')),
+      f.slot === 'accessory' ? h('div', { class: 'row' }, statSelect('stat2'), numInput('value2')) : null,
+      h('label', { class: 'check' },
+        h('input', { type: 'checkbox', checked: f.equip ? true : null, onchange: (e) => { f.equip = e.target.checked; sheet.refresh(); } }),
+        h('span', { text: '穿上（對應欄位是空的才會穿，不會頂掉原本的裝備）' })),
+      h('label', { class: 'check' },
+        h('input', { type: 'checkbox', checked: f.compensate && f.equip ? true : null, disabled: f.equip ? null : true, onchange: (e) => { f.compensate = e.target.checked; } }),
+        h('span', { text: '從手動調整扣掉同樣數值（試算表面板本來就含這件裝備時要勾，面板數值才不會算兩次）' })),
+      h('button', {
+        type: 'button', class: 'btn btn--small',
+        onclick: () => {
+          const effects = [{ stat: f.stat1, value: f.value1 }, ...(f.slot === 'accessory' ? [{ stat: f.stat2, value: f.value2 }] : [])];
+          const r = addManualGear(d, { name: f.name, tier: f.tier, slot: f.slot, effects, equip: f.equip, compensate: f.compensate });
+          ui.message = r.ok
+            ? `已加上「${gearName(r.gear)}」${r.equipped ? '並穿上' : f.equip ? '（對應欄位已有裝備，放進背包沒穿）' : '（放進背包）'}，記得按「儲存到伺服器」。`
+            : r.error;
+          if (r.ok) ui.gear = newGearForm();
+          sheet.refresh();
+        },
+      }, '＋ 放進角色'));
+  }
+
   function editor() {
     const d = ui.data;
     if (!usesSkillTable(d)) {
@@ -101,6 +152,7 @@ export function openGmCharEditor() {
               h('span', { text: `啟動（算力上限 −${SKILL_TABLE[n].activate.算力}）` }))
           : null))),
       addSkillRow(d),
+      gearSection(d),
       h('button', { type: 'button', class: 'btn btn--primary', disabled: ui.busy ? true : null, onclick: save }, ui.busy ? '儲存中…' : '儲存到伺服器'),
       ui.message ? h('p', { class: 'notice', text: ui.message }) : null);
   }
