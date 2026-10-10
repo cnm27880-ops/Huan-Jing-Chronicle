@@ -1243,7 +1243,12 @@ input[type='number'], .amount__input { text-align: center; }
 /* 左欄：HUD（不再黏在頂部，整欄自己捲） */
 .sx .bt-hud { position: static; margin: 0; padding: 12px; background: var(--card); border: 0; border-radius: var(--r-panel); box-shadow: var(--panel-shadow); }
 .bt-hud__def { display: flex; gap: 4px; margin-left: auto; }
-.sx .bt-hud__top { flex-wrap: wrap; row-gap: 4px; } /* 欄位窄時防禦膠囊整排換到名字下面，不會把字拆開 */
+/* 名字與 A防／B防／C防 固定同一排：名字太長時縮成「…」，膠囊不換行、不被擠開 */
+.sx .bt-hud__top { flex-wrap: nowrap; gap: 6px; }
+.sx .bt-hud__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0.04em; }
+.sx .bt-hud__def { flex: none; gap: 3px; }
+.sx .bt-hud__trk { padding: 1px 6px; font-size: 0.74rem; }
+.sx .bt-hud__trk b { font-size: 0.68rem; }
 .bt-hud__trk { white-space: nowrap; }
 .bt-hud__trk { display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 7px; font-size: 0.78rem; background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill); }
 .bt-hud__trk b { font-size: 0.72rem; }
