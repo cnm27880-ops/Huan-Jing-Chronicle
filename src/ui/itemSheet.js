@@ -7,7 +7,7 @@ import { openSheet, closeSheet } from './sheet.js';
 import { itemTile, amountPicker, toast, rarityTag } from './controls.js';
 import { KNOWN_ITEMS, rarityOf, iconOf, plainName } from './items.js';
 import { FOODS, STOMACH_SLOTS } from '../game/rules.js';
-import { addItem, removeItem, countOf, eat } from '../game/engine.js';
+import { addItem, removeItem, countOf, eat, useKeepsake } from '../game/engine.js';
 
 export function openItemSheet(state, name, commit) {
   let amount = 1;
@@ -23,6 +23,14 @@ export function openItemSheet(state, name, commit) {
       commit();
       sheet.refresh();
     };
+    const doUse = () => {
+      const r = useKeepsake(state, name);
+      if (!r.ok) return toast(r.error);
+      const got = [...Object.entries(r.gives ?? {}).map(([k, q]) => `${k} ×${q}`), r.time ? `時間 +${r.time}` : ''].filter(Boolean).join('、');
+      toast(`使用 ${name}：${got}`);
+      commit();
+      countOf(state, name) ? sheet.refresh() : close();
+    };
     return h('div', { class: 'item-sheet' },
       h('div', { class: `item-sheet__hero${tier !== null ? ' rarity' : ''}`, dataset: { tier: tier ?? 'none', rarity: tier ?? 'none' } },
         h('span', { class: 'item-sheet__icon', text: iconOf(name) }),
@@ -31,6 +39,9 @@ export function openItemSheet(state, name, commit) {
           h('p', { class: 'item-sheet__have' }, '持有 ', h('strong', { text: fmt(have) })))),
       def ? h('p', { class: 'item-sheet__desc', text: def.desc }) : null,
       food ? h('p', { class: 'item-sheet__desc', text: `效果：${food.effect}` }) : null,
+      def?.use && have > 0
+        ? h('div', { class: 'item-sheet__eat' }, h('button', { type: 'button', class: 'btn btn--primary', onclick: doUse }, '使用 1 個'))
+        : null,
       food && have > 0
         ? h('div', { class: 'item-sheet__eat' },
             h('button', { type: 'button', class: 'btn btn--ghost', disabled: state.restStomach.length >= STOMACH_SLOTS, onclick: () => doEat('rest') },

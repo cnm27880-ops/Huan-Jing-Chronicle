@@ -3,7 +3,8 @@
 // 達標後可以自己製作（各只能一次），製作當下該生活技能等級 +1，徽章進背包。
 // 神級的定義（需驗證）：採集擲出神級評級；製作成功做出神級難度的東西（見 engine.js 的 godReached）。
 // 次數用 state.counters（採集與製作按鈕各算一次，匯入機器人存檔時會帶入）。
-// 已經有徽章物品的（機器人存檔匯入的）視為做過，不會重複 +1。
+// 已經有徽章物品的（機器人存檔匯入的，名稱前面常有表情符號）視為做過，不會重複 +1。
+// 試算表自己加過等級、背包沒有物品的玩家：用 markBadgeOwned「我已經做過了」，只記起來、不加等級。
 // ============================================================
 import { LIFE_SKILLS } from './rules.js';
 import { countOf, addItem } from './engine.js';
@@ -26,6 +27,19 @@ const keyOf = (skill, kind) => `${skill}:${kind}`;
 /** 玩家目前用的名稱：自己改過的優先，否則預設 */
 export const badgeItemName = (state, skill, kind) => state.badgeNames?.[keyOf(skill, kind)] ?? badgeName(skill, kind);
 
+const stripIcon = (name) => name.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').trim();
+
+/**
+ * 背包裡屬於這個徽章的物品名稱（可能多個）：名稱完全相同、拿掉前面表情符號後相同、
+ * 或是【稱號】加上「神級釣魚／500次釣魚」這種格式（玩家自己改過稱號的也認得）
+ */
+export function badgeKeys(state, skill, kind) {
+  const names = new Set([badgeItemName(state, skill, kind), badgeName(skill, kind)]);
+  const tail = `${kind}${skill}`;
+  return Object.keys(state.inventory ?? {}).filter((n) => countOf(state, n) > 0
+    && (names.has(n) || names.has(stripIcon(n)) || (/【.+】/.test(n) && stripIcon(n).endsWith(tail))));
+}
+
 /** 某個生活技能的兩個徽章狀態：[{ kind, item, reached, made, progress }] */
 export function badgeStatus(state, skill) {
   return BADGE_KINDS.map((kind) => {
@@ -34,7 +48,7 @@ export function badgeStatus(state, skill) {
     return {
       kind, item,
       reached: kind === '神級' ? Boolean(state.godReached?.[skill]) : count >= BADGE_COUNT,
-      made: Boolean(state.badgeMade?.[keyOf(skill, kind)]) || countOf(state, item) > 0 || countOf(state, badgeName(skill, kind)) > 0,
+      made: Boolean(state.badgeMade?.[keyOf(skill, kind)]) || badgeKeys(state, skill, kind).length > 0,
       progress: kind === '神級' ? null : { have: count, need: BADGE_COUNT },
     };
   });
@@ -44,11 +58,19 @@ export function badgeStatus(state, skill) {
 export function syncBadgeMade(state) {
   for (const skill of LIFE_SKILLS) {
     for (const kind of BADGE_KINDS) {
-      if (countOf(state, badgeItemName(state, skill, kind)) > 0 || countOf(state, badgeName(skill, kind)) > 0) {
+      if (badgeKeys(state, skill, kind).length > 0) {
         state.badgeMade = { ...state.badgeMade, [keyOf(skill, kind)]: true };
       }
     }
   }
+}
+
+/** 「我已經做過了」：試算表或機器人已經加過等級的徽章，只記成做過，不加等級、不放物品。回傳 { ok, error? } */
+export function markBadgeOwned(state, skill, kind) {
+  if (!LIFE_SKILLS.includes(skill) || !BADGE_KINDS.includes(kind)) return { ok: false, error: '沒有這種徽章。' };
+  if (badgeStatus(state, skill).find((x) => x.kind === kind).made) return { ok: false, error: '這個徽章已經記成做過了。' };
+  state.badgeMade = { ...state.badgeMade, [keyOf(skill, kind)]: true };
+  return { ok: true };
 }
 
 /** 名稱檢查：1～20 字、不能和背包裡別的東西或別的徽章同名（同名會合併成同一種物品）。回傳錯誤文字或 null */
@@ -86,8 +108,8 @@ export function renameBadge(state, skill, kind, newName) {
   if (err) return { ok: false, error: err };
   const old = badgeItemName(state, skill, kind);
   if (name !== old) {
-    // 舊名稱可能是預設名（機器人匯入的）或上次改的名字：把背包裡所有舊名稱的數量搬到新名稱
-    for (const from of new Set([old, badgeName(skill, kind)])) {
+    // 舊名稱可能是預設名、帶表情符號的機器人原名或上次改的名字：把背包裡所有舊名稱的數量搬到新名稱
+    for (const from of new Set([old, badgeName(skill, kind), ...badgeKeys(state, skill, kind)])) {
       const n = countOf(state, from);
       if (n > 0 && from !== name) {
         delete state.inventory[from];

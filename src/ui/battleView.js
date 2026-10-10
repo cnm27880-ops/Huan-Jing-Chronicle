@@ -12,7 +12,7 @@ import {
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
-  SKILL_CATALOG, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST,
+  SKILL_CATALOG, bindableSkills, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST,
 } from '../game/skills.js';
 import {
   OTHER_RESOURCES, resourceMax, resourceNow, setResource, restoreAllResources, actionCost, shortfall, costText, witchRest,
@@ -337,7 +337,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   function moveCard(state) {
     if (!state.moves.some((m) => m.id === sel.moveId)) sel.moveId = state.moves.find((m) => m.kind !== 'heal' && m.kind !== 'shield')?.id ?? state.moves[0]?.id ?? null;
     const f = ui.moveForm;
-    const learned = Object.keys(SKILL_CATALOG).filter((n) => skillLevel(state, n) > 0);
+    const learned = bindableSkills(state);
     const skillSummary = (n) => {
       const m = moveFromCatalog(n);
       if (m.kind === 'heal' || m.kind === 'shield') return `輔助技能（${m.kind === 'heal' ? '回復' : '護盾'}），照技能的檔位使用。`;

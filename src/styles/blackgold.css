@@ -1174,6 +1174,7 @@ input[type='number'], .amount__input { text-align: center; }
 .badge-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 6px; }
 .badge-row { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .badge-row__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.badge-cell { display: grid; gap: 4px; align-content: start; }
 .badge-made { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; font-size: 0.8rem; color: var(--soft); }
 .badge-made__name { min-width: 0; overflow-wrap: anywhere; }
 
@@ -1312,9 +1313,17 @@ input[type='number'], .amount__input { text-align: center; }
   display: grid; gap: 10px; padding: 14px;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: 'tabs' 'head' 'bar' 'art' 'stats';
+  position: relative;
   background: radial-gradient(ellipse at 30% 40%, rgba(var(--rose-rgb), 0.12), transparent 65%), var(--card);
-  border-radius: var(--r-panel); box-shadow: 0 0 0 1px var(--rose2), 0 4px 12px var(--shadow);
+  border-radius: var(--r-panel); box-shadow: 0 0 0 1px var(--rose2), 0 0 0 4px var(--card), 0 0 0 5px var(--gold2), 0 6px 18px var(--shadow);
+  margin: 6px; /* 讓外框的雙線不被旁邊切掉 */
 }
+.boss::before, .boss::after { /* 四角的小金飾 */
+  content: ''; position: absolute; width: 14px; height: 14px; pointer-events: none;
+  border: 2px solid var(--gold); opacity: 0.85;
+}
+.boss::before { top: 7px; left: 7px; border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
+.boss::after { bottom: 7px; right: 7px; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
 .boss__tabs { grid-area: tabs; display: flex; flex-wrap: wrap; gap: 4px; }
 .boss__tabs .seg { min-height: 32px; padding: 0 10px; font: inherit; font-size: 0.8rem; color: var(--soft); background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill); cursor: pointer; }
 .boss__tabs .seg[aria-selected='true'] { color: var(--gold); border-color: var(--gold); }
@@ -1370,18 +1379,19 @@ input[type='number'], .amount__input { text-align: center; }
 .boss-mode:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .boss.is-downed .boss__art { filter: grayscale(1); opacity: 0.4; }
 
-.lbar { display: flex; align-items: center; gap: 8px; }
-.lbar__track { position: relative; flex: 1; height: 18px; overflow: hidden; background: var(--paper); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line3); }
-.lbar__fill { position: absolute; inset: 0 auto 0 0; transition: width 0.3s ease; }
-.lbar__text { position: relative; display: block; font-size: 0.76rem; line-height: 18px; text-align: center; color: var(--ink); text-shadow: 0 1px 2px var(--shadow); }
-.lbar__count { min-width: 2.2em; font-size: 1rem; font-weight: 700; text-align: right; color: var(--rose); }
-/* 每一段的顏色：最上層玫瑰紅 → 金 → 紫；底色是下一段的顏色，打完一段就露出來 */
-.lbar[data-layer='3'] .lbar__track { background: linear-gradient(90deg, var(--gold2), var(--gold)); }
-.lbar[data-layer='3'] .lbar__fill { background: linear-gradient(90deg, var(--rose2), var(--rose)); }
-.lbar[data-layer='2'] .lbar__track { background: linear-gradient(90deg, rgba(var(--lilac-rgb), 0.55), var(--lilac)); }
-.lbar[data-layer='2'] .lbar__fill { background: linear-gradient(90deg, var(--gold2), var(--gold)); }
+.lbar { display: grid; gap: 6px; }
+.lbar__bars { display: grid; gap: 5px; padding: 6px; background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.1), rgba(var(--gold-rgb), 0.02)); border-radius: 10px; box-shadow: 0 0 0 1px var(--gold2), inset 0 0 0 1px var(--shadow), 0 2px 8px var(--shadow); }
+.lbar__track { position: relative; height: 16px; overflow: hidden; background: var(--paper); border-radius: 5px; box-shadow: inset 0 0 0 1px var(--line3), inset 0 2px 4px var(--shadow); }
+.lbar__fill { position: absolute; inset: 0 auto 0 0; border-radius: 5px; transition: width 0.3s ease; box-shadow: inset 0 1px 0 rgba(var(--gold-rgb), 0.35); }
+.lbar__track[data-layer='3'] .lbar__fill { background: linear-gradient(90deg, var(--rose2), var(--rose)); }
+.lbar__track[data-layer='2'] .lbar__fill { background: linear-gradient(90deg, var(--gold2), var(--gold)); }
+.lbar__track[data-layer='1'] .lbar__fill { background: linear-gradient(90deg, rgba(var(--lilac-rgb), 0.55), var(--lilac)); }
+.lbar__track[data-state='full'] { box-shadow: inset 0 0 0 1px var(--line3), 0 0 8px rgba(var(--rose-rgb), 0.25); }
+.lbar__track[data-state='empty'] { opacity: 0.5; }
+.lbar__info { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 4px; }
+.lbar__text { font-size: 0.8rem; color: var(--ink2); }
+.lbar__count { font-size: 1.05rem; font-weight: 700; color: var(--rose); }
 .lbar[data-layer='2'] .lbar__count { color: var(--gold); }
-.lbar[data-layer='1'] .lbar__fill { background: linear-gradient(90deg, rgba(var(--lilac-rgb), 0.55), var(--lilac)); }
 .lbar[data-layer='1'] .lbar__count { color: var(--lilac); }
 .lbar[data-layer='0'] .lbar__count { color: var(--faint); }
 

@@ -9,6 +9,7 @@ import {
 } from './rules.js';
 import { rollDie } from './dice.js';
 import { skillParts } from './skillTable.js';
+import { isKeepsake, KEEPSAKES } from './keepsakes.js';
 
 export const d20 = (rng = Math.random) => rollDie(20, rng);
 const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
@@ -19,6 +20,7 @@ export function countOf(state, item) {
 }
 export function addItem(state, item, n = 1) {
   state.inventory[item] = countOf(state, item) + n;
+  if (isKeepsake(item)) (state.keepsakes ??= {})[item] = structuredClone(KEEPSAKES[item]); // 得到目錄裡的紀念品 → 效果跟著補上
   if (!state.sortOrder.includes(item)) state.sortOrder.push(item);
 }
 export function removeItem(state, item, n = 1) {
@@ -43,9 +45,13 @@ export function proficiency(state, ctx) {
   return { total: parts.reduce((a, p) => a + p.value, 0), parts };
 }
 
-/** 紀念品是否適用於這次修整檢定 */
-export function keepsakeApplies(def, action) {
+/**
+ * 紀念品是否適用於這次修整檢定
+ * kctx：{ kind: 'gather'|'craft'|'special', diff }。有 diff 限制的紀念品只在一般製作的那幾個難度有效；不給 kctx 時不檢查難度
+ */
+export function keepsakeApplies(def, action, kctx) {
   if (!def || def.manual) return false;
+  if (def.diff && kctx && !(kctx.kind === 'craft' && def.diff.includes(kctx.diff))) return false;
   return def.scope === 'rest' || (Array.isArray(def.scope) && def.scope.includes(action));
 }
 
@@ -54,7 +60,7 @@ export function keepsakeApplies(def, action) {
  * 生活技能：技能值 + 熟練；非生活技能：技能值
  * keepsakes：本次要消耗的紀念品名稱（只在修整日適用）
  */
-export function modifier(state, skill, ctx, keepsakes = []) {
+export function modifier(state, skill, ctx, keepsakes = [], kctx) {
   const isLife = LIFE_SKILLS.includes(skill);
   const base = isLife ? state.lifeSkills[skill] ?? 0 : state.arts[skill] ?? 0;
   const parts = [{ label: skill, value: base }];
@@ -65,7 +71,7 @@ export function modifier(state, skill, ctx, keepsakes = []) {
   if (ctx === 'rest') {
     keepsakes.forEach((name) => {
       const def = state.keepsakes[name];
-      if (keepsakeApplies(def, skill) && countOf(state, name) > 0) {
+      if (def?.bonus && keepsakeApplies(def, skill, kctx) && countOf(state, name) > 0) {
         parts.push({ label: name, value: def.bonus });
       }
     });
@@ -104,12 +110,25 @@ export function newDay(state) {
 }
 
 /** 消耗本次檢定用到的紀念品，回傳實際用掉的清單 */
-export function consumeKeepsakes(state, action, keepsakes) {
+export function consumeKeepsakes(state, action, keepsakes, kctx) {
   const used = [];
   keepsakes.forEach((name) => {
-    if (keepsakeApplies(state.keepsakes[name], action) && removeItem(state, name)) used.push(name);
+    if (keepsakeApplies(state.keepsakes[name], action, kctx) && removeItem(state, name)) used.push(name);
   });
   return used;
+}
+
+/** 用掉的紀念品裡有沒有「產出雙倍」的 */
+export const doublesOutput = (state, used) => used.some((n) => state.keepsakes[n]?.double);
+
+/** 直接使用紀念品（旅行青蛙的禮物、加爾姆的專屬時間）。回傳 { ok, error?, gives?, time? } */
+export function useKeepsake(state, name) {
+  const u = state.keepsakes?.[name]?.use;
+  if (!u) return { ok: false, error: '這個紀念品不能直接使用。' };
+  if (!removeItem(state, name)) return { ok: false, error: `背包裡沒有${name}。` };
+  for (const [item, n] of Object.entries(u.gives ?? {})) addItem(state, item, n);
+  if (u.time) state.time += u.time; // 沒有上限（惜未央也一樣）；上限需向 GM 確認
+  return { ok: true, gives: u.gives, time: u.time };
 }
 
 // ---------- 採集 ----------
@@ -120,8 +139,9 @@ export function gather(state, action, times, keepsakes = [], rng = Math.random) 
   let exp = 0;
   for (let i = 0; i < times; i++) {
     if (state.time <= 0) break;
-    const mod = modifier(state, action, 'rest', keepsakes);
-    const used = consumeKeepsakes(state, action, keepsakes);
+    const kctx = { kind: 'gather' };
+    const mod = modifier(state, action, 'rest', keepsakes, kctx);
+    const used = consumeKeepsakes(state, action, keepsakes, kctx);
     state.time -= 1;
     state.counters[action] = (state.counters[action] ?? 0) + 1;
     const roll = d20(rng);
@@ -156,23 +176,25 @@ export function craft(state, action, diff, times, keepsakes = [], rng = Math.ran
   const loot = {};
   for (let i = 0; i < times; i++) {
     if (!removeItem(state, recipe.cost, CRAFT_COST_AMOUNT)) break;
-    const mod = modifier(state, action, 'rest', keepsakes);
-    const used = consumeKeepsakes(state, action, keepsakes);
+    const kctx = { kind: 'craft', diff };
+    const mod = modifier(state, action, 'rest', keepsakes, kctx);
+    const used = consumeKeepsakes(state, action, keepsakes, kctx);
     state.counters[action] = (state.counters[action] ?? 0) + 1;
     const roll = d20(rng);
     const total = roll + mod.total;
     const success = total >= recipe.dc;
+    const copies = doublesOutput(state, used) ? 2 : 1; // 紀念品：產出雙倍
     if (success && diff === '神級') (state.godReached ??= {})[action] = true; // 徽章用：製作出神級
     const got = {};
     if (success) {
       for (let k = 0; k < recipe.count; k++) {
         const item = pick(recipe.rewards, rng);
-        addItem(state, item);
-        got[item] = (got[item] ?? 0) + 1;
-        loot[item] = (loot[item] ?? 0) + 1;
+        addItem(state, item, copies);
+        got[item] = (got[item] ?? 0) + copies;
+        loot[item] = (loot[item] ?? 0) + copies;
       }
     }
-    rolls.push({ roll, mod: mod.total, parts: mod.parts, total, dc: recipe.dc, success, got, used });
+    rolls.push({ roll, mod: mod.total, parts: mod.parts, total, dc: recipe.dc, success, got, used, doubled: copies > 1 });
     tickRestStomach(state);
   }
   return { rolls, loot, cost: recipe.cost };

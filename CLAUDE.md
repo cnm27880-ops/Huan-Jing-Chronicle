@@ -59,6 +59,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/special.js` | 特殊配方（內建 10 個）、特殊材料（每日 1 次）、餵肉球與收割（純函式）；GM 新增的配方與材料也在這裡檢查與合併（`allRecipes`／`allMaterials`，畫面一律用這兩個）；畫面在修整日「特殊」分頁 |
 | `src/ui/skillEdit.js`、`src/state/customSkills.js` | GM 專用的「專屬技能」面板（新增、修改、刪除；每級填累積屬性加成＋效果文字；內建技能不能改）；`customSkills.js` 是 GM 專屬技能的本機快取（載入角色前先放進目錄，免得生命上限算低、生命被砍）。指定給玩家在「玩家角色」面板 |
 | `src/ui/specialEdit.js` | GM 專用的「特殊配方與材料」面板（跑團頁房間區塊）：新增、修改、刪除 GM 自己加的配方與每日材料（只產生物品、效果寫文字）；內建的不能改 |
+| `src/game/keepsakes.js` | 紀念品目錄（13 種：加值、困難／史詩製作產出雙倍、直接使用、手動處理）與 `syncKeepsakes`（背包有同名物品就補上效果）（純資料與函式） |
 | `src/game/badges.js` | 生活技能徽章（神級、500 次）：判斷達標、製作後技能 +1（純函式） |
 | `src/game/importSheet.js` | 試算表角色卡（貼上的文字）→ 網站角色：用標題文字找位置，不看固定格子；算出「手動調整」（純函式） |
 | `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |

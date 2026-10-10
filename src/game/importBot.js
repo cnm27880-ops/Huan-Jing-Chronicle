@@ -10,6 +10,7 @@
 import { SAMPLE_CHARACTER } from '../data/sample/fude.js';
 import { LIFE_SKILLS, ART_SKILLS, MAX_TIME } from './rules.js';
 import { basicMove } from './skills.js';
+import { syncKeepsakes } from './keepsakes.js';
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const nonNeg = (v) => Math.max(0, Math.floor(Number(v)) || 0);
@@ -71,9 +72,9 @@ export function convertBotPlayer(bot, base = null) {
   if (bot.counters && typeof bot.counters === 'object') {
     for (const s of LIFE_SKILLS) if (s in bot.counters) data.counters[s] = nonNeg(bot.counters[s]);
   }
-  // 紀念品效果：機器人存檔沒有，沿用示範角色已知的（名稱相同就是同一個紀念品）
+  // 紀念品效果：機器人存檔沒有，用目錄裡已知的（名稱相同就是同一個紀念品）
   data.keepsakes = { ...(data.keepsakes ?? {}) };
-  for (const n of Object.keys(inventory)) if (SAMPLE_CHARACTER.keepsakes[n] && !data.keepsakes[n]) data.keepsakes[n] = clone(SAMPLE_CHARACTER.keepsakes[n]);
+  syncKeepsakes(data);
 
   if (!base) { // 新角色：最大生命照機器人；目前生命夾在 0～最大之間（倒地 = 0）
     const maxHp = Math.max(1, nonNeg(bot.max_hp));

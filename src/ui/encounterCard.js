@@ -35,12 +35,17 @@ function hpBar(cur, max, downed) {
 function layeredBar(cur, max) {
   const per = max / BOSS_LAYERS;
   const left = cur <= 0 ? 0 : Math.min(BOSS_LAYERS, Math.ceil(cur / per - 1e-9));
-  const inLayer = cur <= 0 ? 0 : cur - (left - 1) * per;
+  // 三條各自獨立：第 3 條（最上面）先被打掉，第 1 條最後
+  const bars = Array.from({ length: BOSS_LAYERS }, (_, i) => BOSS_LAYERS - i).map((layer) => {
+    const part = Math.max(0, Math.min(1, (cur - (layer - 1) * per) / per));
+    return h('div', { class: 'lbar__track', dataset: { layer: String(layer), state: part >= 1 ? 'full' : part > 0 ? 'part' : 'empty' } },
+      h('div', { class: 'lbar__fill', style: `width:${part * 100}%` }));
+  });
   return h('div', { class: 'lbar', dataset: { layer: String(left) }, role: 'img', 'aria-label': `生命 ${cur} / ${max}，剩 ${left} 條` },
-    h('div', { class: 'lbar__track' },
-      h('div', { class: 'lbar__fill', style: `width:${pctOf(inLayer, per)}%` }),
-      h('span', { class: 'lbar__text num', text: `${fmt(cur)} / ${fmt(max)}` })),
-    h('span', { class: 'lbar__count num', text: `×${left}` }));
+    h('div', { class: 'lbar__bars' }, bars),
+    h('div', { class: 'lbar__info' },
+      h('span', { class: 'lbar__text num', text: `${fmt(cur)} / ${fmt(max)}` }),
+      h('span', { class: 'lbar__count num', text: `×${left}` })));
 }
 
 const trackLines = (result) => result.tracks.filter((t) => t.atkDice > 0).map(trackLine);
@@ -237,7 +242,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
         r.potion ? `藥水加成：絕對防禦 +${r.potion} 骰（三軌）` : null,
         r.absorbed?.toShield ? `護盾吸收 ${fmt(r.absorbed.toShield)}` : null,
         `${state.name} 生命 ${fmt(before)} → ${fmt(state.hp)} / ${fmt(maxHp(state))}`,
-        r.newlyDowned ? `${state.name} 倒地！（不會死亡）` : null,
+        r.newlyDowned ? `${state.name} 倒地！` : null,
       ].filter(Boolean),
     }, { draw });
     commit();
@@ -346,9 +351,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
             onclick: () => { sel.focusBoss = b.id; rerender(); },
           }, b.id, sel.targets.includes(b.id) ? ` ・${sel.targets.indexOf(b.id) + 1}` : '')))
         : null,
-      h('div', { class: 'boss__head' },
-        h('strong', { class: 'boss__name', text: `👹 ${m.id}` }),
-        downed ? h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒下' } ) : null),
+      downed ? h('div', { class: 'boss__head' }, h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒下' })) : null,
       layeredBar(m.hp, m.maxHp),
       h('button', {
         type: 'button', class: 'boss__art', 'aria-pressed': String(picked), disabled: downed,

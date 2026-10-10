@@ -109,8 +109,9 @@ export function craftSpecial(state, name, times, keepsakes = [], rng = Math.rand
   for (let i = 0; i < times; i++) {
     if (specialMaxTimes(state, name) < 1) break;
     for (const [item, n] of Object.entries(r.materials)) removeItem(state, item, n);
-    const mod = modifier(state, r.skill, 'rest', keepsakes);
-    const used = consumeKeepsakes(state, r.skill, keepsakes);
+    const kctx = { kind: 'special' }; // 有難度限制的紀念品（非配方的困難製作等）不適用
+    const mod = modifier(state, r.skill, 'rest', keepsakes, kctx);
+    const used = consumeKeepsakes(state, r.skill, keepsakes, kctx);
     state.counters[r.skill] = (state.counters[r.skill] ?? 0) + 1; // 製作按鈕的次數也算進 500 次徽章
     const roll = d20(rng);
     const total = roll + mod.total;
