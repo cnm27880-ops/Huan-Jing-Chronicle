@@ -38,7 +38,7 @@ export function badgeCard({ getState, commit }) {
         }
         // 試算表／機器人已經加過等級的玩家：只記起來，不再加等級（背包有徽章物品的不會走到這裡，會直接算做過）
         const owned = h('button', {
-          type: 'button', class: 'btn btn--ghost btn--small badge-owned', title: '我已經做過了：技能等級已經含這個徽章的 +1（例如在試算表自己加過），只記錄、不再加等級', 'aria-label': `記為已做過：${label.split('（')[0]}`,
+          type: 'button', class: 'badge-link', title: '技能等級已經含這個徽章的 +1（例如在試算表自己加過）',
           onclick: () => {
             if (!confirm(`確定「${skill}」的${label.split('（')[0]}你已經做過、等級已經含它的 +1 嗎？\n按確定只會記成做過，不會再加等級，之後無法再製作這個徽章。`)) return;
             const r = markBadgeOwned(getState(), skill, b.kind);
@@ -47,7 +47,7 @@ export function badgeCard({ getState, commit }) {
             logActivity(getState(), { cat: 'learn', text: `記錄已做過的徽章：${b.item}（技能等級不變）`, lines: [] });
             commit();
           },
-        }, '✓');
+        }, '我已經做過了');
         const craftBtn = b.reached
           ? h('button', {
               type: 'button', class: 'btn btn--primary btn--small',
