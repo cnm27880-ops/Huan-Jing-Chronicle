@@ -1459,14 +1459,14 @@ input[type='number'], .amount__input { text-align: center; }
 /* 隊友資源條＝懸浮面板（右欄、房間上方；src/ui/partyBars.js）：常駐一條精簡列，展開時浮在紀錄上方、不擠佔版面。圓環＝生命、膠囊＝每種資源「還剩多少」，顏色和自己的 HUD 一致 */
 .sx-party { position: relative; z-index: 20; flex-shrink: 0; }
 .sx-party[hidden] { display: none; }
-.sx-party__bar { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 6px 12px; text-align: left; color: var(--ink); background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.06), transparent 50%), var(--card); border: 0; border-radius: var(--r-panel); box-shadow: var(--panel-shadow); cursor: pointer; }
+.sx-party__bar { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 3px 12px; text-align: left; color: var(--ink); background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.06), transparent 50%), var(--card); border: 0; border-radius: var(--r-panel); box-shadow: var(--panel-shadow); cursor: pointer; }
 .sx-party__bar:hover { background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.1), transparent 50%), var(--card); }
 .sx-party[data-level='bad'] .sx-party__bar { box-shadow: var(--panel-shadow), 0 0 0 1px var(--rose2); }
 .sx-party__label { flex: none; font-size: 0.88rem; font-weight: 700; letter-spacing: 0.08em; color: var(--gold); }
 .sx-party__dots { flex: 1; display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
 .sx-party__chips { flex: none; display: flex; gap: 4px; }
 .sx-party__chev { flex: none; width: 1em; font-size: 0.8rem; color: var(--gold2); }
-.sx-party__pop { position: absolute; left: 0; right: 0; top: calc(100% + 6px); max-height: min(62vh, 480px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 10px; background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.05), transparent 40%), var(--card); border-radius: var(--r-panel); box-shadow: 0 16px 40px rgba(var(--shadow-rgb), 0.6), 0 0 0 1px var(--gold2); animation: party-pop 0.15s ease; }
+.sx-party__pop { position: absolute; left: 0; right: 0; top: calc(100% + 4px); max-height: min(62vh, 480px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 7px; background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.05), transparent 40%), var(--card); border-radius: var(--r-panel); box-shadow: 0 16px 40px rgba(var(--shadow-rgb), 0.6), 0 0 0 1px var(--gold2); animation: party-pop 0.15s ease; }
 .sx-party__pop[hidden] { display: none; }
 @keyframes party-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .sx-chip { padding: 1px 9px; font-size: 0.72rem; border-radius: var(--r-pill); background: var(--paper); box-shadow: inset 0 0 0 1px var(--line3); color: var(--soft); overflow-wrap: anywhere; }
@@ -1474,25 +1474,25 @@ input[type='number'], .amount__input { text-align: center; }
 .sx-chip[data-tone='bad'] { color: var(--rose); background: var(--rosebg); box-shadow: inset 0 0 0 1px var(--rose2); }
 
 /* 精簡列的小頭像：環＝生命 */
-.pdot { --ring: var(--sky); position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: conic-gradient(var(--ring) calc(var(--hp) * 1%), rgba(var(--ink-rgb), 0.14) 0); }
+.pdot { --ring: var(--sky); position: relative; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: conic-gradient(var(--ring) calc(var(--hp) * 1%), rgba(var(--ink-rgb), 0.14) 0); }
 .pdot[data-state='mid'] { --ring: var(--gold); }
 .pdot[data-state='low'] { --ring: var(--rose); box-shadow: 0 0 8px rgba(var(--rose-rgb), 0.45); }
 .pdot[data-state='down'] { --ring: var(--rose2); opacity: 0.8; }
-.pdot__initial { display: grid; place-items: center; width: 23px; height: 23px; font-size: 0.78rem; font-weight: 700; color: var(--ink); background: var(--paper); border-radius: 50%; }
+.pdot__initial { display: grid; place-items: center; width: 18px; height: 18px; font-size: 0.66rem; font-weight: 700; color: var(--ink); background: var(--paper); border-radius: 50%; }
 .pdot[data-state='down'] .pdot__initial { color: var(--rose); }
 .pdot__bell { position: absolute; right: -5px; top: -6px; font-size: 0.7rem; }
 
-.party__list { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.party__list { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 0; padding: 0; list-style: none; }
 
-.mate { --ring: var(--sky); display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 6px 10px; align-items: center; padding: 10px; background: var(--paper); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); }
+.mate { --ring: var(--sky); display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 4px 8px; align-items: center; padding: 7px 10px; background: var(--paper); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); }
 .mate[data-state='mid'] { --ring: var(--gold); }
 .mate[data-state='low'] { --ring: var(--rose); box-shadow: inset 0 0 0 1px var(--rose2), 0 0 12px rgba(var(--rose-rgb), 0.18); }
 .mate[data-state='down'] { --ring: var(--rose2); background: var(--rosebg); box-shadow: inset 0 0 0 1px var(--rose2); }
 .mate[data-online='0'] { opacity: 0.55; }
-.mate__avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(var(--ring) calc(var(--hp) * 1%), rgba(var(--ink-rgb), 0.12) 0); }
-.mate__initial { display: grid; place-items: center; width: 31px; height: 31px; font-size: 0.95rem; font-weight: 700; color: var(--ink); background: var(--card); border-radius: 50%; }
+.mate__avatar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: conic-gradient(var(--ring) calc(var(--hp) * 1%), rgba(var(--ink-rgb), 0.12) 0); }
+.mate__initial { display: grid; place-items: center; width: 23px; height: 23px; font-size: 0.8rem; font-weight: 700; color: var(--ink); background: var(--card); border-radius: 50%; }
 .mate[data-state='down'] .mate__initial { color: var(--rose); filter: grayscale(0.6); }
-.mate__main { display: grid; gap: 5px; min-width: 0; }
+.mate__main { display: grid; gap: 3px; min-width: 0; }
 .mate__top { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .mate__name { overflow: hidden; font-size: 0.9rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
 .mate[data-state='down'] .mate__name { color: var(--rose); }
@@ -1504,9 +1504,9 @@ input[type='number'], .amount__input { text-align: center; }
 .mate__bar { flex: 1; height: 6px; overflow: hidden; background: rgba(var(--ink-rgb), 0.1); border-radius: var(--r-pill); }
 .mate__fill { display: block; height: 100%; background: var(--ring); border-radius: inherit; transition: width 0.25s ease; }
 .mate__hp { flex: none; font-size: 0.72rem; color: var(--ink2); }
-.mate__bars { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 4px 6px; }
+.mate__bars { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 3px 6px; }
 
-.rpill { --rc: var(--soft); --rc-rgb: var(--ink-rgb); position: relative; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; height: 22px; padding: 0 8px; overflow: hidden; font-size: 0.7rem; background: rgba(var(--rc-rgb), 0.08); border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(var(--rc-rgb), 0.25); }
+.rpill { --rc: var(--soft); --rc-rgb: var(--ink-rgb); position: relative; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; height: 17px; padding: 0 8px; overflow: hidden; font-size: 0.7rem; background: rgba(var(--rc-rgb), 0.08); border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(var(--rc-rgb), 0.25); }
 .rpill[data-res='靈氣'] { --rc: var(--lilac); --rc-rgb: var(--lilac-rgb); }
 .rpill[data-res='魔力'] { --rc: var(--res-mana); --rc-rgb: var(--res-mana-rgb); }
 .rpill[data-res='能量'] { --rc: var(--res-energy); --rc-rgb: var(--res-energy-rgb); }
@@ -1533,9 +1533,9 @@ input[type='number'], .amount__input { text-align: center; }
 .library__item .btn { margin-top: 0; }
 
 /* 右欄：房間、紀錄（新的在下）、快速擲骰 */
-.sx-room { flex-shrink: 0; padding: 8px 12px; background: var(--card); border-radius: var(--r-panel); box-shadow: var(--panel-shadow); }
-.sx-room__sum { cursor: pointer; font-size: 0.86rem; color: var(--soft); }
-.sx-room[open] .sx-room__sum { margin-bottom: 8px; color: var(--gold); }
+.sx-room { flex-shrink: 0; padding: 4px 12px; background: var(--card); border-radius: var(--r-panel); box-shadow: var(--panel-shadow); }
+.sx-room__sum { cursor: pointer; font-size: 0.82rem; line-height: 1.25; color: var(--soft); }
+.sx-room[open] .sx-room__sum { margin-bottom: 4px; color: var(--gold); }
 .sx-room__body .room { margin: 0; }
 .sx-feedhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex-shrink: 0; }
 .sx-feedhead[hidden] { display: none; }
@@ -1814,13 +1814,13 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .stage__result { align-items: center; gap: 6px; }
 .stage__result [data-result='full'] { color: var(--gold); border-color: var(--gold2); }
 .stage__result [data-result='defeat'] { color: var(--rose); border-color: var(--rose2); }
-.dou { margin: 8px 0; }
-.dou__field { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 4px 8px 4px 12px; cursor: text; background: var(--paper); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line3); transition: box-shadow 0.15s ease, background 0.15s ease; }
+.dou { margin: 8px 36px 8px 0; } /* 右邊留出招式列「✕」那一欄（30px + 間距），寬度才會和招式一樣 */
+.dou__field { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 2px 6px 2px 12px; cursor: text; background: var(--paper); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line3); transition: box-shadow 0.15s ease, background 0.15s ease; }
 .dou__field:focus-within { box-shadow: inset 0 0 0 1px var(--gold), 0 0 0 3px rgba(var(--gold-rgb), 0.18); }
 .dou__field[data-on='1'] { background: linear-gradient(90deg, rgba(var(--res-fight-rgb), 0.16), transparent 70%), var(--paper); box-shadow: inset 0 0 0 1px var(--res-fight); }
-.dou__icon { font-size: 1.1rem; }
-.dou__label { flex: 1; font-size: 0.9rem; letter-spacing: 0.06em; color: var(--ink2); }
-.dou__input { width: 4.5rem; min-height: 40px; padding: 0 8px; text-align: center; font: inherit; font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--gold); background: var(--card); border: 0; border-radius: 9px; box-shadow: inset 0 0 0 1px var(--line); -moz-appearance: textfield; appearance: textfield; }
+.dou__icon { font-size: 0.95rem; }
+.dou__label { flex: 1; font-size: 0.85rem; letter-spacing: 0.06em; color: var(--ink2); }
+.dou__input { width: 4rem; min-height: 26px; padding: 0 8px; text-align: center; font: inherit; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--gold); background: var(--card); border: 0; border-radius: 9px; box-shadow: inset 0 0 0 1px var(--line); -moz-appearance: textfield; appearance: textfield; }
 .dou__input::-webkit-outer-spin-button, .dou__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dou__input:focus { outline: none; box-shadow: inset 0 0 0 1px var(--gold); }
 .dou__field[data-on='1'] .dou__input { color: var(--res-fight); }
@@ -1983,3 +1983,11 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .nudge__foot { position: sticky; bottom: -16px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 14px -16px -16px; padding: 10px 16px 16px; background: linear-gradient(180deg, transparent, var(--card) 28%); }
 .nudge__foot .btn { min-height: 44px; min-width: 110px; }
 @media (prefers-reduced-motion: reduce) { .nudge, .nudge__icon { animation: none; } }
+
+/* 攻擊響應列（選中的招式裡）：點一下開／關 */
+.resp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.resp__title { font-size: 0.72rem; letter-spacing: 0.1em; color: var(--faint); }
+.resp__chip { padding: 2px 10px; font: inherit; font-size: 0.78rem; color: var(--gold); background: var(--goldbg); border: 1px solid var(--gold2); border-radius: var(--r-pill); cursor: pointer; }
+.resp__chip[data-state='off'] { color: var(--faint); background: transparent; border-color: var(--line3); text-decoration: line-through; }
+.resp__chip[data-state='lack'] { color: var(--rose); background: transparent; border-color: var(--rose2); }
+.resp__chip:disabled { cursor: default; }

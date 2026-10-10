@@ -196,18 +196,19 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 
 /* ---------- 房間（階段 1-B） ---------- */
 .tray__room:empty { display: none; }
-.room { display: grid; gap: .45rem; padding: .7rem .8rem; border-bottom: 1px solid var(--ink-line, rgba(var(--ink-rgb), .12)); font-size: .82rem; }
+.room { display: grid; gap: .3rem; padding: .4rem .6rem; border-bottom: 1px solid var(--ink-line, rgba(var(--ink-rgb), .12)); font-size: .82rem; }
 .room__status { display: flex; align-items: center; gap: .5rem; }
 .room__dot, .user-chip__dot { width: .55rem; height: .55rem; border-radius: 50%; flex: none; background: var(--soft); }
 .room[data-phase='online'] .room__dot, .user-chip__dot[data-phase='online'] { background: var(--sky); box-shadow: 0 0 6px var(--sky); }
 .room[data-phase='connecting'] .room__dot, .room[data-phase='reconnecting'] .room__dot,
 .user-chip__dot[data-phase='connecting'], .user-chip__dot[data-phase='reconnecting'] { background: var(--gold); }
 .room[data-phase='denied'] .room__dot, .user-chip__dot[data-phase='denied'] { background: var(--rose); }
-.room__gm { margin: 0; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
-.room__members { margin: 0; padding: 0; list-style: none; display: flex; gap: .35rem; flex-wrap: wrap; }
-.room__member { padding: .1rem .5rem; border-radius: 999px; border: 1px solid currentColor; opacity: .45; }
+.room__line { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.room__gm { margin: 0 .2rem 0 0; display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; font-size: .76rem; }
+.room__members { margin: 0; padding: 0; list-style: none; display: contents; }
+.room__member { padding: 0 .4rem; font-size: .74rem; line-height: 1.5; border-radius: 999px; border: 1px solid currentColor; opacity: .45; }
 .room__member[data-online='1'] { opacity: 1; color: var(--sky); }
-.room__btns { gap: .4rem; flex-wrap: wrap; }
+.room__btns { gap: .25rem; flex-wrap: wrap; }
 .roll--divider { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; border-top: 1px dashed var(--bronze, var(--gold)); border-bottom: 1px dashed var(--bronze, var(--gold)); background: none; padding: .35rem .2rem; }
 .roll--divider .roll__label { color: var(--bronze, var(--gold)); }
 .roll__sub { flex-basis: 100%; color: var(--muted); font-size: .72rem; }

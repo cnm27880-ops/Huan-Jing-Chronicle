@@ -9,11 +9,11 @@ import { toast, rollFailed } from './controls.js';
 import { TRACKS, POTIONS, TOXICITY_MAX } from '../game/rules.js';
 import {
   attackDice, pooledAttack, endBattle, monsterAbs, ATTACK_MODES, defenseDice, formatAbc, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
-  drinkPotion, useSupport, isDowned, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES,
+  drinkPotion, useSupport, isDowned, planResponses, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES,
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
-  SKILL_CATALOG, bindableSkills, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
+  SKILL_CATALOG, bindableSkills, attackResponses, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
 } from '../game/skills.js';
 import {
   OTHER_RESOURCES, resourceMax, resourceNow, setResource, restoreAllResources, actionCost, shortfall, costText, witchRest,
@@ -117,6 +117,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       state.shield?.hp > 0 ? h('span', { class: 'info-chip is-good', text: `🛡 護盾 ${fmt(state.shield.hp)}${state.shield.res ? `（抗性 +${state.shield.res}）` : ''}` }) : null,
       state.buffs.atk ? h('span', { class: 'info-chip is-good', text: `下次攻擊 真傷 +${state.buffs.atk} 骰` }) : null,
       state.buffs.def ? h('span', { class: 'info-chip is-good', text: `下次防禦 絕防 +${state.buffs.def} 骰` }) : null,
+      state.buffs.dragon ? h('span', { class: 'info-chip is-good', text: `🐉 龍：能量傷害 +${state.buffs.dragon}（戰鬥結束消失）` }) : null,
       state.toxicity >= TOXICITY_MAX ? h('span', { class: 'info-chip is-bad', text: '毒性已滿' }) : null,
     ].filter(Boolean);
   }
@@ -257,13 +258,16 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       bits.push(m.kind === 'heal' ? `回復目標最大生命的 %（${c.tiers.map((t) => `${t.cost.算力}算力→${t.pct}%`).join('／')}）` : `護盾 = 最大生命的 %（${c.tiers.map((t) => `${t.cost.靈氣}靈氣→${t.pct}%`).join('／')}）`);
       return { dice: '輔助', text: bits.join('・'), cost };
     }
-    const a = pooled ? pooledAttack(state, m) : attackDice(state, m);
+    // 預覽含「會自動觸發的響應」（沒關掉、付得起的）；cost 仍是招式本身，用來判斷能不能出招
+    const plan = planResponses(state, m, cost, [...sel.respOff]);
+    const mv = m.id === sel.moveId && sel.targets.length === 1 ? { ...m, single: true } : m; // 選中的招式只選 1 個目標＝單一目標加骰
+    const a = pooled ? pooledAttack(state, mv, 0, 0, plan.respDice) : attackDice(state, mv, 0, 0, plan.respDice);
     const dice = pooled ? `${fmt(a.dice)} 骰` : formatAbc(a.dice);
     const text = pooled
       ? `【${ATTACK_MODES[m.mode]}】 ${a.parts.map((p) => `${p.label} ${fmt(p.value)}`).join(' + ')}`
       : m.tracks.map((t) => a.parts[t].map((p) => `${p.label} ${fmt(p.value)}`).join(' + ')).join('　／　');
     if ((m.targets ?? 1) > 1) bits.push(`${m.targets} 個目標`);
-    return { dice, text: [...bits, text].join('・'), cost };
+    return { dice, text: [...bits, text].join('・'), cost, costShown: plan.cost, plan };
   }
 
   /** 補血／護盾的目標選擇：自己＋房間裡的隊友（補血技能可選的目標數照技能等級，護盾只能選 1 個） */
@@ -370,10 +374,11 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         h('span', { class: 'move__dice', text: d.dice }),
         h('strong', { class: 'move__name', text: m.skill ? `${m.name} Lv${skillLevel(state, m.skill)}` : m.name }),
         !support && max > 1 ? h('span', { class: 'move__targets', text: `${max} 目標` }) : null,
-        support ? null : h('small', { class: 'move__cost', text: `消耗：${costText(d.cost)}` }),
+        support ? null : h('small', { class: 'move__cost', text: `消耗：${costText(d.costShown)}` }),
         open ? h('small', { class: 'move__detail', text: d.text }) : null,
         lack ? h('small', { class: 'move__lack', text: `缺少：${lack}` }) : null),
         support && open ? supportButtons(state, m) : null,
+        armed ? respRow(state, m) : null,
         armed
           ? h('button', {
               type: 'button', class: 'btn btn--primary move__fire', disabled: Boolean(lack) || !fire.ready || isDowned(state), onclick: () => onFire(),
@@ -384,6 +389,29 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         onclick: async (e) => { if (!(await askConfirm(e.currentTarget, { title: `刪除招式「${m.name}」？`, okText: '刪除', danger: true }))) return; state.moves = state.moves.filter((x) => x.id !== m.id); ui.openMoves.delete(m.id); commit(); },
       }, '✕'));
   }
+
+  /**
+   * 攻擊響應列：選中的招式符合條件、而且你學過的響應（腦機協議、殘缺筆記…）。預設全開，點一下關掉（省資源）；
+   * 出招時付不起的會自動略過。不花資源的（真龍九變圖）一定生效。
+   */
+  function respRow(state, m) {
+    const list = attackResponses(state, m);
+    if (!list.length) return null;
+    const plan = d2plan(state, m);
+    const usedNames = new Set(plan.used.map((r) => r.name));
+    return h('div', { class: 'resp', role: 'group', 'aria-label': '響應' },
+      h('span', { class: 'resp__title', text: '響應' }),
+      list.map((r) => {
+        const off = sel.respOff.has(r.name);
+        const lacking = !off && !r.free && !usedNames.has(r.name);
+        return h('button', {
+          type: 'button', class: 'resp__chip', 'aria-pressed': String(!off && !lacking), disabled: r.free ? true : null, dataset: { state: off ? 'off' : lacking ? 'lack' : 'on' },
+          title: `${r.name}：造成${{ A: '物理', B: '能量', C: '靈魂' }[r.track]}傷害時${r.free ? '' : `，消耗 ${costText(r.cost)}`}，${r.tracks.join('')} 軌 +${r.dice} 顆傷害骰。${r.free ? '' : '點一下開／關。'}`,
+          onclick: () => { if (off) sel.respOff.delete(r.name); else sel.respOff.add(r.name); rerender(); },
+        }, `${r.name} ${r.tracks.join('')}+${r.dice}${r.free ? '' : `（${costText(r.cost)}）`}${lacking ? '・不足' : ''}`);
+      }));
+  }
+  const d2plan = (state, m) => planResponses(state, m, actionCost(state, m), [...sel.respOff]);
 
   /** 鬥氣加骰：直接輸入這次出招花幾點鬥氣（不能超過現有的），每點 +1 顆真實傷害骰（冠軍勇士每點 4 顆）；出招後歸零 */
   function douRow(state) {
@@ -401,6 +429,26 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const field = h('label', { class: 'dou__field', dataset: { on: sel.dou > 0 ? '1' : '0' }, title: `每點鬥氣 +${mult} 顆真實傷害骰${mult > 1 ? '（冠軍勇士）' : ''}，只對下一次出招有效` },
       h('span', { class: 'dou__icon', 'aria-hidden': 'true', text: '🔥' }),
       h('span', { class: 'dou__label', text: '鬥氣加骰' }),
+      input);
+    return h('div', { class: 'dou' }, field);
+  }
+
+  /** 大魔導師加骰：造成能量傷害時每花 5 魔力多 1 顆能量傷害骰，上限 12 顆；只在選中的招式有能量軌時出現，出招後歸零 */
+  function mageRow(state) {
+    const cur = state.moves.find((m) => m.id === sel.moveId);
+    if (!mageApplies(state, cur)) { sel.mage = 0; return null; }
+    const cap = Math.min(MAGE.max, Math.floor(resourceNow(state, '魔力') / MAGE.cost));
+    sel.mage = Math.max(0, Math.min(sel.mage, cap));
+    const input = h('input', {
+      class: 'dou__input', type: 'number', inputmode: 'numeric', min: '0', max: String(cap), step: '1', value: String(sel.mage), placeholder: '0',
+      'aria-label': '大魔導師加骰（顆數）',
+      oninput: (e) => { sel.mage = Math.max(0, Math.min(cap, Math.floor(Number(e.target.value)) || 0)); field.dataset.on = sel.mage > 0 ? '1' : '0'; },
+      onchange: (e) => { e.target.value = String(sel.mage); rerender(); },
+      onfocus: (e) => e.target.select(),
+    });
+    const field = h('label', { class: 'dou__field', dataset: { on: sel.mage > 0 ? '1' : '0' }, title: `每顆花 ${MAGE.cost} 魔力 +1 顆能量傷害骰，上限 ${MAGE.max} 顆；只對下一次出招有效` },
+      h('span', { class: 'dou__icon', 'aria-hidden': 'true', text: '🔮' }),
+      h('span', { class: 'dou__label', text: `大魔導師加骰（${MAGE.cost} 魔力／顆，最多 ${cap}）` }),
       input);
     return h('div', { class: 'dou' }, field);
   }
@@ -476,12 +524,13 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           }, `放棄行動・回復 ${WITCH_EXTRA_COST} 魔力`)
         : null,
       douRow(state),
+      mageRow(state),
       state.moves.length
         ? h('ul', { class: 'move-list' }, state.moves.map((m) => moveRow(state, m)))
         : h('p', { class: 'notice', text: '還沒有自訂招式。下面綁定一個主動技能新增。' }),
       convertBox(state),
       addBox('move', '＋ 新增自訂招式',
-        h('p', { class: 'hint', text: '招式要綁定一個已學會的主動技能；傷害軌道、目標數、消耗（含全域響應耗用）、每級加成都照技能，只要取個自己的招式名稱。' }),
+        h('p', { class: 'hint', text: '招式要綁定一個已學會的主動技能；傷害軌道、目標數、消耗、每級加成都照技能（學過的響應會在出招時自動觸發），只要取個自己的招式名稱。' }),
         learned.length
           ? h('div', {},
               h('input', {

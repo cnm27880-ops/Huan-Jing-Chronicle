@@ -23,9 +23,51 @@ export const WITCH_EXTRA_COST = 30;
 /** 鬥氣的基礎用法：攻擊時每花 1 點，額外增加 1 顆真實傷害攻擊骰（2026/10 平衡更新）；冠軍勇士（大師）改成每點 4 顆 */
 export const douMult = (state) => (skillLevel(state, '冠軍勇士') > 0 ? 4 : 1);
 
-/** 試算表「全域條件響應耗用」：A、B 無；含 C 軌（C／BC／ABC）的攻擊招式 2 生命 + 3 算力。各招式的「消耗資源」已含這一份 */
-export const GLOBAL_C_COST = { 生命: 2, 算力: 3 };
-export const globalCost = (tracks) => (tracks.includes('C') ? { ...GLOBAL_C_COST } : {});
+/**
+ * 攻擊響應：「造成○○傷害時，可以消耗 X 增加 N 顆傷害骰」。有學這個技能、招式符合條件就會自動套用（玩家可以在招式區把它關掉省資源）。
+ * 以前試算表把「消耗」直接算進每個含 C 軌的招式（2 生命 + 3 算力），卻沒有加骰；現在改成真的看有沒有學這些技能。
+ * track = 加在哪一軌；school = 限定招式系別（沒寫就不限）；free = 不花資源，一定生效。每次出招每個響應最多觸發 1 次（需驗證）。
+ */
+export const ATTACK_RESPONSES = {
+  腦機協議: { track: 'C', cost: { 算力: 3 }, dice: 1 },
+  殘缺筆記: { track: 'C', cost: { 生命: 2 }, dice: 1 },
+  清心觀想圖: { track: 'C', cost: { 靈氣: 2 }, dice: 1 },
+  血肉法則: { track: 'A', cost: { 生命: 2 }, dice: 1 },
+  特戰數據包: { track: 'A', school: '科技', cost: { 算力: 1 }, dice: 1 },
+  魔能潮汐: { track: 'B', school: '西幻', cost: { 魔力: 3 }, dice: 2 },
+  真龍九變圖: { track: 'A', cost: {}, dice: 4, free: true },
+  // 漆黑血刃：神秘招式，花 16 生命，1／5／9 級加 4／6／8 顆傷害骰；招式是什麼傷害類型就加在哪些軌（多軌招式每軌各加，萬物歸一只加一次，需驗證）
+  漆黑血刃: { track: 'all', school: '神秘', cost: { 生命: 16 }, diceAt: (lv) => (lv >= 9 ? 8 : lv >= 5 ? 6 : 4) },
+};
+
+/** 大魔導師（傳說）：造成能量傷害時，每花 5 魔力多 1 顆傷害骰，上限 12 顆（玩家自己填顆數）。受傷那一半先不做 */
+export const MAGE = { cost: 5, max: 12 };
+export const mageApplies = (state, move) =>
+  skillLevel(state, '大魔導師') > 0 && move && move.kind !== 'heal' && move.kind !== 'shield' && (move.mode === 'all' || (move.tracks ?? []).includes('B'));
+
+/** 泰坦（傳說）：造成物理傷害後，目標的絕對防禦永久（到戰鬥結束）減少 3／級；不疊加，5 級永遠是 −15 */
+export const titanCut = (state) => 3 * skillLevel(state, '泰坦');
+
+/** 這個招式現在可以觸發、而且玩家學過的攻擊響應（不管付不付得起、有沒有被關掉） */
+export function attackResponses(state, move) {
+  if (!move || move.kind === 'heal' || move.kind === 'shield') return [];
+  const tracks = move.mode === 'all' ? ['A', 'B', 'C'] : move.tracks ?? [];
+  const brute = passivesOf(state).brute;
+  return Object.entries(ATTACK_RESPONSES)
+    .filter(([name, r]) => skillLevel(state, name) > 0 && (!r.school || r.school === move.school))
+    .map(([name, r]) => {
+      // track 'all'：加在招式用到的每一軌（暴徒沒有 A；萬物歸一是單一骰池，只加一次）
+      const on = r.track === 'all' ? (move.mode === 'all' ? tracks.slice(0, 1) : tracks.filter((t) => !(t === 'A' && brute))) : tracks.includes(r.track) && !(r.track === 'A' && brute) ? [r.track] : [];
+      return { name, ...r, tracks: on, dice: r.diceAt ? r.diceAt(skillLevel(state, name)) : r.dice };
+    })
+    .filter((r) => r.tracks.length);
+}
+
+/** 龍（傳說）：造成能量傷害時，每 1 級讓自己的能量傷害 +3，直到戰鬥結束（每次造成都疊加，需驗證）。回傳每次增加的點數 */
+export const dragonGain = (state) => 3 * skillLevel(state, '龍');
+
+/** 賽博駭客（大師）：受到靈魂傷害但沒破防，攻擊方扣「精神意志面板」顆 D4 的生命，一回合 1 次 */
+export const hasCyberHacker = (state) => skillLevel(state, '賽博駭客') > 0;
 
 /**
  * 目錄：主動技能。kind = 'attack' | 'heal' | 'shield'
@@ -46,15 +88,15 @@ export const SKILL_CATALOG = {
     resAt: (lv) => (lv >= 10 ? 14 : lv >= 7 ? 10 : lv >= 4 ? 6 : lv >= 1 ? 2 : 0),
   },
   吞天噬血陣: {
-    school: '修仙', kind: 'attack', tracks: ['C'], targets: 3, cost: { 靈氣: 30 }, // 另加全域耗用（見 moveFromCatalog）
+    school: '修仙', kind: 'attack', tracks: ['C'], targets: 3, cost: { 靈氣: 30 },
     extraAt: (lv) => ({ C: 2 * lv }), // 響應：每 1 級 +2 個靈魂傷害骰
     drain: { ratio: 0.5, capPct: 30 }, // 回復「目標扣除生命」的一半，總回復上限 = 玩家最大生命的 30%
   },
   // 暴徒的主動招式：造成能量與靈魂傷害。響應「每級 +2 個物理骰」因不能造成物理，轉成 B、C 各 +1（每級）——使用者確認。
-  // 消耗：試算表沒有列，暫用全域耗用（含 C 軌 = 2 生命 + 3 算力），需驗證
+  // 消耗：試算表沒有列，目前不花資源，需驗證
   暴徒: { school: '神秘', kind: 'attack', tracks: ['B', 'C'], targets: 1, cost: {}, extraAt: (lv) => ({ B: lv, C: lv }) },
   萬物歸一: {
-    school: '神秘', kind: 'attack', mode: 'all', tracks: ['A', 'B', 'C'], cost: {}, // 只有全域耗用
+    school: '神秘', kind: 'attack', mode: 'all', tracks: ['A', 'B', 'C'], cost: {},
     extraAt: () => ({}),
     bonusCurrentPct: 5, // 破防時額外扣目標「現有生命」5%
   },
@@ -79,21 +121,37 @@ export function generatedAttack(name) {
   // 「每1級增加2個…傷害骰」→ 每級加。看得懂才算，複雜的效果（上限、花費條件）不自動加，需驗證
   const lines = t.text.split('\n').filter((l) => l.startsWith('響應：'));
   const tracksIn = (str) => Object.keys(TRACK_OF).filter((w) => str.includes(w) || (w === '靈魂' && str.includes('物靈魂'))).map((w) => TRACK_OF[w]);
-  const byLevels = lines.flatMap((l) => [...l.matchAll(/(\d+(?:、\d+)*)\s*級時[^。]*?增加\s*(\d+(?:、\d+)*)個([^。，]*傷害骰)/g)])
+  // 「若針對單一目標，則改為…」另外一句：前半是多目標的規則，後半是只打 1 個目標時改用的規則（幽暗魔火陣、至尊術士）
+  const SINGLE = '若針對單一目標';
+  const normal = lines.map((l) => l.split(SINGLE)[0]);
+  const singleText = lines.map((l) => l.split(SINGLE)[1]).filter(Boolean);
+  const parseLevels = (ls) => ls.flatMap((l) => [...l.matchAll(/(\d+(?:、\d+)*)\s*級時[^。]*?增加\s*(\d+(?:、\d+)*)個([^。，]*傷害骰)/g)])
     .map((r) => ({ levels: r[1].split('、').map(Number), amounts: r[2].split('、').map(Number), tracks: tracksIn(r[3]) }));
-  const perLevel = lines.flatMap((l) => [...l.matchAll(/每(\d+)級增加(\d+)個([^。，]*傷害骰)/g)])
+  const parsePer = (ls) => ls.flatMap((l) => [...l.matchAll(/每(\d+)級增加(\d+)個([^。，]*傷害骰)/g)])
     .map((r) => ({ every: Number(r[1]), n: Number(r[2]), tracks: tracksIn(r[3]) }));
-  const extraAt = (lv) => {
+  const byLevels = parseLevels(normal);
+  const perLevel = parsePer(normal);
+  const build = (byL, perL) => (lv) => {
     const out = {};
     const add = (tr, n) => { for (const k of tr) out[k] = (out[k] ?? 0) + n; };
-    for (const r of byLevels) {
+    for (const r of byL) {
       const idx = r.levels.filter((x) => x <= lv).length - 1;
       if (idx >= 0) add(r.tracks, r.amounts[Math.min(idx, r.amounts.length - 1)] ?? 0);
     }
-    for (const r of perLevel) add(r.tracks, Math.floor(lv / r.every) * r.n);
+    for (const r of perL) add(r.tracks, Math.floor(lv / r.every) * r.n);
     return out;
   };
-  return { school: t.school, kind: 'attack', tracks, targets, cost: paid ? { [paid[2]]: Number(paid[1]) } : {}, extraAt };
+  const extraAt = build(byLevels, perLevel);
+  // 單一目標：「改為增加 4、8、12 個」沿用原本的等級門檻；「改為每 1 級增加 3 個」換掉每級的數字
+  let singleExtraAt;
+  if (singleText.length) {
+    const sBy = singleText.flatMap((l) => [...l.matchAll(/增加\s*(\d+(?:、\d+)*)個([^。，]*傷害骰)/g)]).filter((r) => !/每\d+級增加/.test(r[0]));
+    const sPer = parsePer(singleText);
+    const byS = sBy.length && byLevels.length ? byLevels.map((r, i) => (i === 0 ? { ...r, amounts: sBy[0][1].split('、').map(Number), tracks: tracksIn(sBy[0][2]) } : r)) : byLevels;
+    const perS = sPer.length ? sPer : perLevel;
+    singleExtraAt = build(byS, perS);
+  }
+  return { school: t.school, kind: 'attack', tracks, targets, cost: paid ? { [paid[2]]: Number(paid[1]) } : {}, extraAt, ...(singleExtraAt ? { singleExtraAt } : {}) };
 }
 
 /** 手寫目錄優先，沒有的再從技能表產生 */
@@ -125,7 +183,7 @@ export function moveFromCatalog(name) {
   return {
     id: `s_${name}`, name, skill: name, kind: c.kind, school: c.school,
     tracks: c.tracks ?? [], mode: c.mode ?? 'normal', targets: c.targets ?? 1,
-    cost: addCost(c.cost ?? {}, c.kind === 'attack' ? globalCost(c.tracks ?? []) : {}), extra: { A: 0, B: 0, C: 0 },
+    cost: { ...(c.cost ?? {}) }, extra: { A: 0, B: 0, C: 0 },
   };
 }
 
@@ -133,7 +191,8 @@ export function moveFromCatalog(name) {
 export function moveExtra(state, move) {
   const c = move.skill ? catalogOf(move.skill) : null;
   const lv = move.skill ? skillLevel(state, move.skill) : 0;
-  const byLevel = c?.extraAt ? c.extraAt(lv) : {};
+  // move.single：這次只打 1 個目標（幽暗魔火陣、至尊術士有「單一目標」的另一組加骰）
+  const byLevel = move.single && c?.singleExtraAt ? c.singleExtraAt(lv) : c?.extraAt ? c.extraAt(lv) : {};
   return { A: 0, B: 0, C: 0, ...(move.extra ?? {}), ...Object.fromEntries(Object.entries(byLevel).map(([k, v]) => [k, (move.extra?.[k] ?? 0) + v])) };
 }
 
