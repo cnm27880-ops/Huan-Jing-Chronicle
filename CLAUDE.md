@@ -42,6 +42,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/simulate.js` | 模擬戰（階段 D，純函式）：續航最長招式、怪物隨機打人、自動喝藥與隊友救人、勝率／回合數／傷害／剩餘生命統計；不碰真實存檔 |
 | `src/ui/simPanel.js` | GM 專用「模擬戰」面板（跑團頁房間區塊）：選玩家＋敵人來源（自訂強度每場重抽／場上的敵人／預組，後兩種固定 A/B/C）＋場數，畫回合分布與剩餘生命條狀圖 |
 | `src/game/enemy.js` | 敵人等級（普通／菁英 2 打／BOSS 3 打）與技能 A 攻擊強化、B 防禦強化（每回合歸零）、C 喝血（整場戰鬥 1 次）的次數與效果（伺服器與前端共用）（純函式） |
+| `src/game/fairness.js` | 模擬戰的公平性（純函式）：量每位玩家一次出手的傷害並排強弱、小怪血量依最弱玩家設、「第一名只出六成力」的情境（`FAIR` 常數可調） |
 | `src/game/tuning.js` | 模擬戰的目標（2～3 回合、每場約耗一半資源）、評價與策略建議、自動調整（保守版／激進版兩個方案 `PLANS`）：先找回合數的結構下限、必要時拿掉最弱的怪，再二分搜尋血量與攻擊強度（自訂強度 `scaleSpecs`／固定敵人 `scaleEncounter` 都能調）（純函式） |
 | `src/game/activity.js`、`src/state/activityLog.js`、`src/ui/logsView.js` | 玩家日誌：內容格式（修整／學習／物品）、回報點（房間伺服器，離線存本機）、「日誌」大分頁（`#logs`，所有玩家都看得到每位玩家的）；伺服器端在 `room-core.js` 的 `actPost`／`actList`，每人留 500 筆 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |

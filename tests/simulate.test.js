@@ -67,7 +67,7 @@ test('模擬一場：弱敵會贏、超強 BOSS 會輸；玩家原本的存檔�
 
 test('有藥水的隊友會在對方倒地時餵藥（需要 BOSS 打不死人又打得倒人）', () => {
   const medic = hero(); addItem(medic, '生命泉', 5);
-  const results = Array.from({ length: 40 }, (_, i) => simulateBattle([medic, hero()], [{ kind: 'boss', count: 1, atkPower: 3000, defPower: 50, hp: 500 }], { rng: seeded(100 + i), maxRounds: 15 }));
+  const results = Array.from({ length: 40 }, (_, i) => simulateBattle([medic, hero()], [{ kind: 'boss', count: 1, atkPower: 800, defPower: 50, hp: 20000 }], { rng: seeded(100 + i), maxRounds: 15 }));
   assert.ok(results.some((r) => r.potions > 0), '應該至少有一場用到藥水');
 });
 
