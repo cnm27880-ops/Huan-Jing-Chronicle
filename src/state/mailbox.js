@@ -17,7 +17,7 @@ export function createMailbox({ getState, commit }) {
     if (mail.kind === 'trade') { // 交易單不能領走：要在交易頁按接受或拒絕，這裡只跳通知、叫交易頁更新
       if (!seenTrades.has(mail.id)) {
         seenTrades.add(mail.id);
-        showMailNotice({ title: `${mail.fromName || '某位玩家'} 向你提出交易`, lines: ['到「交易」頁的「玩家交易」回覆（接受或拒絕）'] });
+        showMailNotice({ title: `${mail.fromName || '某位玩家'} 向你提出交易`, lines: ['到背包頁的「🎁 贈送／交易」→「📥 待回覆」回覆（接受或拒絕）'] });
       }
       notifyTradeChange();
       return;

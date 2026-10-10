@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { blankCharacter } from '../src/game/importBot.js';
 import { addItem, countOf } from '../src/game/engine.js';
 import { applyMail } from '../src/game/mail.js';
-import { payOffer, shortages, itemsText } from '../src/game/trade.js';
+import { payOffer, shortages, itemsText, takeOffer, refundOffer } from '../src/game/trade.js';
 
 const player = (items) => { const s = blankCharacter('乙'); for (const [n, q] of Object.entries(items)) addItem(s, n, q); return s; };
 const offer = { want: { 豪華蓋飯: 10, 鐵礦: 2 }, give: { 大師技能書: 10 } };
@@ -39,4 +39,37 @@ test('交易結果的信：用伺服器寫的 note 當標題，東西進背包�
   assert.equal(countOf(s, '大師技能書'), 10);
   assert.equal(applyMail(s, { kind: 'gift', items: { 鐵礦: 1 }, fromName: '甲' }).title, '甲 送給你東西');
   assert.equal(itemsText({ 豪華蓋飯: 10, 鐵礦: 5 }), '豪華蓋飯 ×10、鐵礦 ×5');
+});
+
+test('金幣也能交易：付款檢查、只出金幣、寄失敗時還回去', () => {
+  const s = player({ 豪華蓋飯: 10 });
+  s.gold = 500;
+  const o = { want: { 豪華蓋飯: 10 }, wantGold: 300, give: {}, giveGold: 1000 };
+  assert.deepEqual(payOffer(s, o), { ok: true });
+  assert.deepEqual([countOf(s, '豪華蓋飯'), s.gold], [0, 200]);
+  const poor = player({ 豪華蓋飯: 10 });
+  poor.gold = 299;
+  const r = payOffer(poor, o);
+  assert.match(r.error, /金幣 需要 300、只有 299/);
+  assert.deepEqual([countOf(poor, '豪華蓋飯'), poor.gold], [10, 299]); // 一樣都沒扣
+  // 只出金幣（沒有物品）：A 發單時的押金
+  const a = player({});
+  a.gold = 1000;
+  assert.equal(takeOffer(a, {}, 1000), true);
+  assert.equal(a.gold, 0);
+  assert.equal(takeOffer(a, {}, 1), false);
+  refundOffer(a, {}, 1000);
+  assert.equal(a.gold, 1000);
+  assert.equal(itemsText({}, 1500), '金幣 1,500');
+  assert.equal(itemsText({ 鐵礦: 5 }, 0), '鐵礦 ×5');
+});
+
+test('交易的金幣收到：信裡的 gold 加進錢包並寫在通知裡（只有物品的信照舊）', () => {
+  const s = player({});
+  s.gold = 100;
+  const r = applyMail(s, { kind: 'gift', items: {}, gold: 400, fromName: '甲', note: '與 甲 的交易成功' });
+  assert.equal(s.gold, 500);
+  assert.deepEqual(r.lines, ['金幣 +400']);
+  assert.equal(applyMail(s, { kind: 'gift', items: { 鐵礦: 1 }, gold: -5, fromName: '甲' }).lines.length, 1); // 負數、亂寫的不理
+  assert.equal(s.gold, 500);
 });

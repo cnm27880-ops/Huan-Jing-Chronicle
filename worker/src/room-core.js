@@ -21,7 +21,7 @@ import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
-  MAX_PENDING_MAIL, MAX_PENDING_TRADES, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
+  MAX_PENDING_MAIL, MAX_PENDING_TRADES, MAX_MAIL_GOLD, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -46,8 +46,9 @@ const VITAL_KEY = /^[\u4e00-\u9fff]{1,4}$/; // 資源名稱（靈氣、魔力…
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const cleanStr = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
 /** 物品清單（{ 名稱: 數量 }）驗證與整理：回傳 { items } 或 { error } */
-function parseItems(raw) {
+function parseItems(raw, allowEmpty = false) {
   const entries = raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.entries(raw) : [];
+  if (!entries.length && allowEmpty) return { items: {} }; // 玩家交易：只出金幣、沒有物品也可以
   if (!entries.length || entries.length > MAX_MAIL_ITEM_KINDS) return { error: '請至少選一樣東西（最多 30 種）。' };
   const items = {};
   for (const [name, qty] of entries) {
@@ -371,11 +372,14 @@ export class RoomCore {
       Object.assign(mail, { kind: 'gift', items: got.items });
       if (msg.bounced === true) mail.bounced = true; // 對方拒收的藥水退回
     } else if (msg.kind === 'trade') { // 玩家交易：我給 give、要對方拿 want 來換；東西由寄的人先扣（押在這張單上），對方回覆前都留在伺服器
-      const give = parseItems(msg.give);
-      const want = parseItems(msg.want);
+      const giveGold = msg.giveGold == null ? 0 : msg.giveGold;
+      const wantGold = msg.wantGold == null ? 0 : msg.wantGold;
+      if (!isInt(giveGold, 0, MAX_MAIL_GOLD) || !isInt(wantGold, 0, MAX_MAIL_GOLD)) return err(rid, 'bad_mail', '交易單：金幣要是 0 以上的整數。');
+      const give = parseItems(msg.give, giveGold > 0); // 每一邊「物品或金幣」至少要有一樣
+      const want = parseItems(msg.want, wantGold > 0);
       if (give.error || want.error) return err(rid, 'bad_mail', `交易單：${give.error ?? want.error}`);
       if (this.tradeRows(user.uid).filter((o) => o.from === user.uid).length >= MAX_PENDING_TRADES) return err(rid, 'trade_full', `你還有 ${MAX_PENDING_TRADES} 筆交易沒有回覆，先取消或等對方處理。`);
-      Object.assign(mail, { kind: 'trade', to, toName, give: give.items, want: want.items });
+      Object.assign(mail, { kind: 'trade', to, toName, give: give.items, want: want.items, giveGold, wantGold });
     } else if (msg.kind === 'potion') {
       const def = POTIONS[msg.potion];
       if (!def?.heal) return err(rid, 'bad_mail', '只有回復藥水可以餵給別人。');
@@ -439,17 +443,17 @@ export class RoomCore {
     const aName = offer.fromName;
     const bName = this.memberName(offer.to) ?? offer.toName ?? '對方';
     const out = [{ to: 'self', msg: { t: 'tradeOk', rid, action } }];
-    const put = (to, fields) => { // 直接放進信箱（不受信箱上限限制，退回的東西一定要送到）
-      const mail = { id: this.uuid(), t: this.now(), kind: 'gift', ...fields };
+    const put = (to, { gold, ...fields }) => { // 直接放進信箱（不受信箱上限限制，退回的東西一定要送到）；gold > 0 時一併寄金幣
+      const mail = { id: this.uuid(), t: this.now(), kind: 'gift', ...fields, ...(gold > 0 ? { gold } : {}) };
       this.db.exec('INSERT INTO mail(id, to_uid, t, json) VALUES (?, ?, ?, ?)', mail.id, to, mail.t, JSON.stringify(mail));
       out.push({ to: 'user', uid: to, msg: { t: 'mail', mails: [mail] } });
     };
     if (action === 'accept') {
-      put(offer.from, { from: offer.to, fromName: bName, items: offer.want, note: `${bName} 接受了你的交易` });
-      put(offer.to, { from: offer.from, fromName: aName, items: offer.give, note: `與 ${aName} 的交易成功` });
+      put(offer.from, { from: offer.to, fromName: bName, items: offer.want, gold: offer.wantGold, note: `${bName} 接受了你的交易` });
+      put(offer.to, { from: offer.from, fromName: aName, items: offer.give, gold: offer.giveGold, note: `與 ${aName} 的交易成功` });
     } else {
       const note = { reject: `${bName} 拒絕了你的交易，東西已退回`, fail: `${bName} 的東西不夠，交易失敗，東西已退回`, cancel: `你取消了給 ${bName} 的交易，東西已退回` }[action];
-      put(offer.from, { from: action === 'cancel' ? offer.from : offer.to, fromName: action === 'cancel' ? aName : bName, items: offer.give, bounced: true, note });
+      put(offer.from, { from: action === 'cancel' ? offer.from : offer.to, fromName: action === 'cancel' ? aName : bName, items: offer.give, gold: offer.giveGold, bounced: true, note });
     }
     const other = user.uid === offer.from ? offer.to : offer.from;
     out.push({ to: 'user', uid: other, msg: { t: 'tradeChanged' } });

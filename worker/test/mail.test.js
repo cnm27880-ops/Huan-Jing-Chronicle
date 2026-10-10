@@ -172,3 +172,27 @@ test('玩家交易：只有收件人能接受／拒絕、只有發單的人能�
   assert.equal(send(core, P2, { t: 'tradeRespond', id: o.id, action: 'reject' }).out[0].msg.t, 'tradeOk');
   assert.equal(list(P1).length, 0);
 });
+
+test('玩家交易加金幣：每一邊物品或金幣至少一樣；成交時金幣跟著信寄出；退回也帶金幣', () => {
+  const core = room();
+  const code = (res) => errorOf(res)?.code;
+  const send2 = (extra, from = P1) => send(core, from, { t: 'mailSend', rid: 's', to: '400', kind: 'trade', give: {}, want: {}, ...extra });
+  assert.equal(code(send2({})), 'bad_mail'); // 兩邊都空
+  assert.equal(code(send2({ giveGold: 100 })), 'bad_mail'); // 只有一邊有東西
+  assert.equal(code(send2({ giveGold: -1, wantGold: 5 })), 'bad_mail');
+  assert.equal(code(send2({ giveGold: 1.5, wantGold: 5 })), 'bad_mail');
+  assert.equal(code(send2({ giveGold: 2_000_000_000, wantGold: 5 })), 'bad_mail');
+  const o = pushed(send2({ giveGold: 500, wantGold: 300, want: { 豪華蓋飯: 2 } })).msg.mails[0]; // 用 500 金幣換 2 個豪華蓋飯再加 300 金幣
+  assert.deepEqual([o.give, o.giveGold, o.want, o.wantGold], [{}, 500, { 豪華蓋飯: 2 }, 300]);
+  const res = send(core, P2, { t: 'tradeRespond', rid: 'r', id: o.id, action: 'accept' });
+  const toA = mailsTo(res, '300')[0];
+  const toB = mailsTo(res, '400')[0];
+  assert.deepEqual([toA.items, toA.gold], [{ 豪華蓋飯: 2 }, 300]);
+  assert.deepEqual([toB.items, toB.gold], [{}, 500]);
+  const o2 = pushed(send2({ giveGold: 500, wantGold: 300, want: { 豪華蓋飯: 2 } })).msg.mails[0];
+  const back = mailsTo(send(core, P2, { t: 'tradeRespond', rid: 'r', id: o2.id, action: 'reject' }), '300')[0];
+  assert.deepEqual([back.gold, back.bounced], [500, true]); // 拒絕：A 押的金幣退回
+  const noGold = pushed(send2({ give: { 鐵礦: 1 }, want: { 豪華蓋飯: 1 } })).msg.mails[0];
+  const toB2 = mailsTo(send(core, P2, { t: 'tradeRespond', id: noGold.id, action: 'accept' }), '400')[0];
+  assert.equal('gold' in toB2, false); // 沒有金幣就不帶這個欄位
+});

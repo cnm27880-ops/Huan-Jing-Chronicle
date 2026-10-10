@@ -1,5 +1,5 @@
 // ============================================================
-// 交易頁：交易大廳、黑市、特殊黑市、玩家交易（玩家交易在 playerTrade.js；其餘規則見 GAME_RULES.md「交易」，計算在 src/game/market.js）
+// 交易頁：交易大廳、黑市、特殊黑市（玩家之間的交易在背包頁的「贈送／交易」面板；規則見 GAME_RULES.md「交易」，計算在 src/game/market.js）
 // 黑市要擲骰：走 rollWith（房間模式由伺服器擲），結果用 publish 發到擲骰紀錄，大家都看得到。
 // 另外匯出 openGearSellSheet：裝備頁「賣出」已鑑定裝備時用。
 // ============================================================
@@ -18,7 +18,6 @@ import {
 } from '../game/market.js';
 import { publish, rollWith } from '../state/rollLog.js';
 import { logActivity } from '../state/activityLog.js';
-import { createPlayerTradePanel } from './playerTrade.js';
 
 const diceText = (d) => `${d.n}D${d.sides}+${d.add}`;
 const BUY_MIN = (BLACK_BUY_DICE.n + BLACK_BUY_DICE.add + 10) / 10; // ×1.3
@@ -237,8 +236,8 @@ export function createMarketView({ root, getState, commit }) {
 
   function render() {
     const state = getState();
-    const tabs = [['hall', '交易大廳'], ['black', '黑市'], ['special', '特殊黑市'], ['player', '🤝 玩家交易']];
-    const pane = ui.tab === 'hall' ? hallPane(state) : ui.tab === 'black' ? blackPane(state) : ui.tab === 'player' ? [createPlayerTradePanel({ getState, commit })] : specialPane(state);
+    const tabs = [['hall', '交易大廳'], ['black', '黑市'], ['special', '特殊黑市']];
+    const pane = ui.tab === 'hall' ? hallPane(state) : ui.tab === 'black' ? blackPane(state) : specialPane(state);
     const scrollY = root.scrollTop;
     root.replaceChildren(
       h('div', { class: 'mk-root' },
