@@ -3,6 +3,7 @@
 // 可以選「贈送」、「交易」，或到「待回覆」處理別人向我提出的交易。對方不在線時會留在伺服器，上線才跳通知。
 // 東西先從自己的背包扣，寄失敗會還回來。
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { openSheet, closeSheet } from './sheet.js';
 import { toast } from './controls.js';
@@ -55,7 +56,7 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
     return undefined;
   }
 
-  function send(sendBtn) {
+  async function send(sendBtn) {
     const { items: give, gold: giveGold } = splitGold(ui.picked); // 金幣是物品格裡的一格
     if (!ui.to) return toast(ui.mode === 'gift' ? '先選要送給誰。' : '先選要跟誰交易。');
     if (ui.mode === 'gift') {
@@ -77,7 +78,7 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
     if (!Object.keys(give).length && giveGold < 1) return toast('你要給出的東西或金幣，至少要有一樣。');
     if (!Object.keys(want).length && wantGold < 1) return toast('請填你要對方拿什麼來換（物品或金幣）。');
     const odd = Object.keys(want).filter((n) => !KNOWN.has(n));
-    if (odd.length && !confirm(`「${odd.join('、')}」不是已知的物品名稱，對方可能永遠湊不出來。仍要送出？`)) return undefined;
+    if (odd.length && !(await askConfirm(sendBtn, { title: `「${odd.join('、')}」不是已知的物品名稱`, lines: ['對方可能永遠湊不出來。仍要送出？'], okText: '仍要送出' }))) return undefined;
     return dispatch(sendBtn, '🤝 送出交易單', give, giveGold, { kind: 'trade', give, giveGold, want, wantGold }, (state, who) => {
       toast(`交易單已送給 ${who}，等對方回覆（你押的東西隨時可以到「📥 待回覆」取消）。`);
       logActivity(state, { cat: 'item', text: `發起交易給 ${who}`, lines: [`給出：${itemsText(give, giveGold)}`, `要換：${itemsText(want, wantGold)}`] });

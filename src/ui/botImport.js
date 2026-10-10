@@ -3,6 +3,7 @@
 // 檔案只在這個瀏覽器裡讀取與轉換，轉好的角色才送到伺服器；原始檔不會上傳，也不能放進 git。
 // 轉換規則見 src/game/importBot.js（只填機器人有的欄位；技能與基礎數值要另外補）。
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { openSheet } from './sheet.js';
 import { convertBotPlayer } from '../game/importBot.js';
@@ -100,7 +101,7 @@ export function openBotImportSheet() {
     ui.rows && ui.rows.length
       ? h('button', {
           type: 'button', class: 'btn btn--primary', disabled: ui.busy || !ui.picked.size ? true : null,
-          onclick: () => { if (confirm(`匯入 ${ui.picked.size} 位玩家？這會寫入伺服器。`)) run(); },
+          onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: `匯入 ${ui.picked.size} 位玩家？`, lines: ['這會寫入伺服器。'], okText: '匯入' })) run(); },
         }, ui.busy ? '匯入中…' : `匯入選取的 ${ui.picked.size} 位`)
       : null,
     ui.results.length ? h('ul', { class: 'import-results' }, ui.results.map((t) => h('li', { text: t }))) : null));

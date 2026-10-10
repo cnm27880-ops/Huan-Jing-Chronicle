@@ -1,6 +1,7 @@
 // ============================================================
 // 進入點：把資料層和各個 UI 模組接起來
 // ============================================================
+import { askConfirm } from './ui/confirmPop.js';
 import './styles/theme.css';
 import './styles/tokens.css';
 import './styles/layout.css';
@@ -118,6 +119,7 @@ async function init() {
       vitals?.changed();
     },
     notify: toast,
+    confirmFn: (text, o) => askConfirm(null, { title: o?.title ?? '請選擇', lines: [text], okText: o?.okText, cancelText: o?.cancelText }),
     adopt: (data) => { // 伺服器的存檔套用到畫面（不經過 commit，免得又上傳一次）
       character = importCharacter(data);
       views[currentView]?.render();
@@ -144,7 +146,7 @@ async function init() {
       await sync.idle(); // 等連線後的比對做完，免得被它蓋掉
       if (!getRoomStatus().me?.isGm) return;
       if (sync.isWaiting() || character.name === SAMPLE_CHARACTER.name) {
-        const ok = window.confirm(`GM 帳號目前用的角色「${character.name}」看起來是示範角色。\n\n要換成空白角色嗎？（名字會用你的 Discord 名稱）\n按「確定」：換成空白角色，舊角色備份在這台裝置，之後可以還原。\n按「取消」：維持現在的角色，之後不會再問。`);
+        const ok = await askConfirm(null, { title: `GM 帳號目前用的角色「${character.name}」看起來是示範角色`, lines: ['要換成空白角色嗎？（名字會用你的 Discord 名稱）', '換成空白角色：舊角色備份在這台裝置，之後可以還原。', '維持現在的角色：之後不會再問。'], okText: '換成空白角色', cancelText: '維持現在的角色' });
         if (ok) {
           try { if (!localStorage.getItem(BACKUP_KEY)) localStorage.setItem(BACKUP_KEY, localStorage.getItem('huanjing:character:v1') ?? ''); } catch { /* 備份失敗也照做 */ }
           character = importCharacter({ ...blankCharacter(status.me.name || 'GM'), statMode: 'skills' });
@@ -169,7 +171,7 @@ async function init() {
     restoring = true;
     try {
       await sync.idle();
-      const ok = window.confirm(`這台裝置有一份被換掉的角色備份：「${data.name}」（金幣 ${Number(data.gold ?? 0).toLocaleString('zh-TW')}）。\n\n要還原嗎？\n按「確定」：還原這個角色（目前的角色會被取代，並同步到伺服器）。\n按「取消」：先不要，下次開啟網站還會再問。`);
+      const ok = await askConfirm(null, { title: `這台裝置有一份被換掉的角色備份：「${data.name}」`, lines: [`金幣 ${Number(data.gold ?? 0).toLocaleString('zh-TW')}`, '還原：目前的角色會被取代，並同步到伺服器。', '先不要：下次開啟網站還會再問。'], okText: '還原這個角色', cancelText: '先不要' });
       if (!ok) return;
       character = importCharacter(data);
       try { localStorage.removeItem(BACKUP_KEY); localStorage.setItem(GM_BLANK_KEY, getRoomStatus().me?.uid ?? '1'); } catch { /* 忽略 */ }

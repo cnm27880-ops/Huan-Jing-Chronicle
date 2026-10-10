@@ -4,6 +4,7 @@
 // 內建技能不能改。寫入走房間（skillSet／skillDel），伺服器檢查是不是 GM 並驗證內容，改完所有人立刻收到。
 // 欄位檢查規則在 src/game/skillTable.js 的 validateCustomSkill（前端先擋一次，伺服器再擋一次）。
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h } from './dom.js';
 import { openSheet } from './sheet.js';
 import { roomRequest, getRoomStatus, subscribeRoom } from '../state/rollLog.js';
@@ -69,7 +70,7 @@ export function openSkillEditor() {
                 h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.busy ? true : null, onclick: () => edit(n) }, '編輯'),
                 h('button', {
                   type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.busy ? true : null,
-                  onclick: () => { if (confirm(`刪除專屬技能「${n}」？已經學會它的玩家會暫時看不到這個技能（等級資料還在，重新建同名技能就會回來）。`)) send({ t: 'skillDel', name: n }, `已刪除「${n}」`); },
+                  onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: `刪除專屬技能「${n}」？`, lines: ['已經學會它的玩家會暫時看不到這個技能（等級資料還在，重新建同名技能就會回來）。'], okText: '刪除', danger: true })) send({ t: 'skillDel', name: n }, `已刪除「${n}」`); },
                 }, '刪除')))))
           : h('p', { class: 'hint', text: '還沒有新增任何專屬技能。' }),
         h('h4', { class: 'field-label', text: ui.editing ? `編輯「${ui.editing}」` : '新增專屬技能' }),

@@ -1883,3 +1883,6 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .confirm-pop[data-side='center']::after { display: none; }
 .btn--danger { background: var(--rosebg); border-color: var(--rose2); color: var(--rose); }
 @media (prefers-reduced-motion: reduce) { .confirm-pop { transition: none; } }
+.confirm-backdrop { position: fixed; inset: 0; z-index: 109; background: rgba(var(--paper-rgb), 0.6); opacity: 0; transition: opacity 0.15s ease; }
+.confirm-backdrop[data-open='true'] { opacity: 1; }
+.confirm-pop__input { width: 100%; margin-top: 8px; box-sizing: border-box; min-height: 44px; }

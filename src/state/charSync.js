@@ -29,7 +29,7 @@ const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) 
 
 /**
  * getState()：目前的角色；adopt(data)：把伺服器的角色套用到畫面與本機；
- * hasLocalSave()：這台裝置有沒有存過角色；confirmFn(文字)：要玩家選擇時用；notify(文字)：提示訊息。
+ * hasLocalSave()：這台裝置有沒有存過角色；confirmFn(文字, { title, okText, cancelText })：要玩家選擇時用（可以是非同步；網站由 main.js 換成自家對話框）；notify(文字)：提示訊息。
  * room：房間介面（預設就是 rollLog.js；測試時換成另一份模組實例）。
  * stashLocal(uid)／unstashLocal(uid)／onAccountSwitch()：換帳號時收起、換出本機存檔，並讓畫面重讀本機角色。
  */
@@ -66,10 +66,11 @@ export function createCharSync({
   async function resolveConflict() {
     const res = await request({ t: 'charGet' });
     if (res.data === null) return push(0);
-    const useServer = confirmFn(
+    const useServer = await confirmFn(
       `伺服器上已有你的角色存檔（第 ${res.version} 版，${when(res.updatedAt)} 更新）。\n\n`
-      + '按「確定」：使用伺服器的存檔（這台裝置目前的存檔會被取代）。\n'
-      + '按「取消」：用這台裝置的存檔覆蓋伺服器。');
+      + '選「使用伺服器的存檔」：這台裝置目前的存檔會被取代。\n'
+      + '選「用這台裝置覆蓋伺服器」：伺服器的存檔會被這台裝置的取代。',
+      { title: '角色存檔有兩份', okText: '使用伺服器的存檔', cancelText: '用這台裝置覆蓋伺服器' });
     if (useServer) {
       adopt(res.data);
       writeMeta({ uid: myUid(), version: res.version, dirty: false });

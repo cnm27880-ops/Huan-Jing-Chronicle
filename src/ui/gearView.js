@@ -2,6 +2,7 @@
 // 裝備頁：數值面板、裝備欄（武器 1、防具 1、飾品 2）、鑑定（開獎）、背包裝備整理
 // 設計原則：玩家會一次鍛造很多件再挑最好的，所以鑑定可以一次多件，並自動標出「比身上好」的
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { toast, rollFailed, rarityTag } from './controls.js';
 import { iconOf } from './items.js';
@@ -297,9 +298,9 @@ export function createGearView({ root, getState, commit }) {
                 }, targets.map((g) => h('option', { value: String(g.id), selected: g.id === sel ? true : null, text: label(g) }))),
                 h('button', {
                   type: 'button', class: 'btn btn--primary btn--small',
-                  onclick: () => {
+                  onclick: async (e) => {
                     const target = targets.find((g) => g.id === (ui.gemTarget[gem.id] ?? sel));
-                    if (!target || !confirm(`把${gemName(gem)}（${gem.stat} +${gem.value}）鑲進「${label(target)}」？\n鑲上後目前無法取出。`)) return;
+                    if (!target || !(await askConfirm(e.currentTarget, { title: `把${gemName(gem)}（${gem.stat} +${gem.value}）鑲進「${label(target)}」？`, lines: ['鑲上後目前無法取出。'], okText: '鑲嵌' }))) return;
                     const err = socketGem(state, gem.id, target.id);
                     if (err) return toast(err);
                     delete ui.gemTarget[gem.id];

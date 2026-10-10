@@ -3,6 +3,7 @@
 // 黑市要擲骰：走 rollWith（房間模式由伺服器擲），結果用 publish 發到擲骰紀錄，大家都看得到。
 // 另外匯出 openGearSellSheet：裝備頁「賣出」已鑑定裝備時用。
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { toast, rollFailed, rarityTag } from './controls.js';
 import { iconOf, rarityOf, plainName } from './items.js';
@@ -226,9 +227,14 @@ export function createMarketView({ root, getState, commit }) {
       h('label', { class: `mk-session${m.session.open ? ' is-on' : ''}` },
         h('input', {
           type: 'checkbox', checked: m.session.open ? true : null,
-          onchange: (e) => {
-            if (e.target.checked && !confirm('開始黑市團？本團的特殊黑市交易數會從 0 開始算（上限 50 個）。')) { e.target.checked = false; return; }
-            setBlackSession(state, e.target.checked); commit();
+          onchange: async (e) => {
+            const box = e.target;
+            const on = box.checked;
+            if (on) {
+              box.checked = false; // 先還原，確認後才真的打勾
+              if (!(await askConfirm(box, { title: '開始黑市團？', lines: ['本團的特殊黑市交易數會從 0 開始算（上限 50 個）。'], okText: '開始' }))) return;
+            }
+            setBlackSession(state, on); commit();
           },
         }),
         h('span', { text: m.session.open ? `黑市團中（剩 ${specialLeft(state)}）` : '黑市團' })));

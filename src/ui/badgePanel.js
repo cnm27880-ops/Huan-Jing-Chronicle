@@ -2,6 +2,7 @@
 // 生活徽章面板（裝備頁右欄）：神級與 500 次徽章的製作、改名、「我已經做過了」。
 // 規則在 src/game/badges.js；原本在修整日的學習分頁，搬到裝備頁（徽章是裝備性質的收藏）。
 // ============================================================
+import { askConfirm, askText } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { toast } from './controls.js';
 import { logActivity } from '../state/activityLog.js';
@@ -25,8 +26,8 @@ export function badgeCard({ getState, commit }) {
             h('span', { class: 'badge-made__name', title: b.item, text: `✓ ${b.item}` }),
             h('button', {
               type: 'button', class: 'btn btn--ghost btn--small',
-              onclick: () => {
-                const name = prompt(`幫「${b.item}」取新名字（最多 ${BADGE_NAME_MAX} 字）`, b.item);
+              onclick: async (e) => {
+                const name = await askText(e.currentTarget, { title: `幫「${b.item}」取新名字`, lines: [`最多 ${BADGE_NAME_MAX} 字`], value: b.item, maxLength: BADGE_NAME_MAX, okText: '改名' });
                 if (name === null) return;
                 const r = renameBadge(getState(), skill, b.kind, name);
                 if (!r.ok) return toast(r.error);
@@ -39,8 +40,8 @@ export function badgeCard({ getState, commit }) {
         // 試算表／機器人已經加過等級的玩家：只記起來，不再加等級（背包有徽章物品的不會走到這裡，會直接算做過）
         const owned = h('button', {
           type: 'button', class: 'badge-link', title: '技能等級已經含這個徽章的 +1（例如在試算表自己加過）',
-          onclick: () => {
-            if (!confirm(`確定「${skill}」的${label.split('（')[0]}你已經做過、等級已經含它的 +1 嗎？\n按確定只會記成做過，不會再加等級，之後無法再製作這個徽章。`)) return;
+          onclick: async (e) => {
+            if (!(await askConfirm(e.currentTarget, { title: `「${skill}」的${label.split('（')[0]}你已經做過了嗎？`, lines: ['等級已經含它的 +1 才按確定。', '只會記成做過，不會再加等級，之後無法再製作這個徽章。'], okText: '記成做過' }))) return;
             const r = markBadgeOwned(getState(), skill, b.kind);
             if (!r.ok) return toast(r.error);
             toast('已記成做過，不會再加等級');
@@ -51,8 +52,8 @@ export function badgeCard({ getState, commit }) {
         const craftBtn = b.reached
           ? h('button', {
               type: 'button', class: 'btn btn--primary btn--small',
-              onclick: () => {
-                const name = prompt(`製作徽章：${skill}技能等級 +1，每種只能做一次。\n（如果你的等級已經含這個徽章的 +1，請取消，改按「我已經做過了」。）\n名稱可以自己取（最多 ${BADGE_NAME_MAX} 字，之後也能改）：`, b.item);
+              onclick: async (e) => {
+                const name = await askText(e.currentTarget, { title: `製作徽章：${skill}技能等級 +1`, lines: ['每種只能做一次。', '如果你的等級已經含這個徽章的 +1，請取消，改按「我已經做過了」。', `名稱可以自己取（最多 ${BADGE_NAME_MAX} 字，之後也能改）：`], value: b.item, maxLength: BADGE_NAME_MAX, okText: '製作' });
                 if (name === null) return;
                 const r = craftBadge(getState(), skill, b.kind, name);
                 if (!r.ok) return toast(r.error);

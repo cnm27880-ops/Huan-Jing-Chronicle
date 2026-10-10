@@ -2,6 +2,7 @@
 // 背包頁面：物品格排列，點物品打開面板調整數量或直接吃
 // 搜尋與「放進背包」固定在最上方
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { itemTile } from './controls.js';
 import { CATEGORIES, categoryOf } from './items.js';
@@ -77,7 +78,7 @@ export function createBagView({ root, getState, commit, onReset }) {
         h('div', { class: 'bag-foot' },
           h('button', {
             type: 'button', class: 'btn btn--ghost btn--small',
-            onclick: () => confirm('還原成示範資料？目前的變更會消失。') && onReset(),
+            onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: '還原成示範資料？', lines: ['目前的變更會消失。'], okText: '還原', danger: true })) onReset(); },
           }, '還原示範資料')))
     );
     root.scrollTop = scrollY;
