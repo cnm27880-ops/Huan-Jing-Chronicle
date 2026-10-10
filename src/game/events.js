@@ -7,7 +7,7 @@ const partsText = (parts) => parts.map((p) => `${p.label} ${p.value >= 0 ? '+' :
 export function checkEvent(who, r) {
   return {
     who, kind: 'check', label: `${r.skill}檢定`, big: r.total,
-    lines: [`1D20（${r.roll}）+ ${r.mod}`, partsText(r.parts) || '無加值', r.isLife ? '生活技能：已加跑團熟練' : '非生活技能：不加熟練'],
+    lines: [r.rolls?.length === 2 ? `優勢骰 2D20（${r.rolls.join('、')} 取高 ${r.roll}）+ ${r.mod}` : `1D20（${r.roll}）+ ${r.mod}`, partsText(r.parts) || '無加值', r.isLife ? '生活技能：已加跑團熟練' : '非生活技能：不加熟練'],
   };
 }
 

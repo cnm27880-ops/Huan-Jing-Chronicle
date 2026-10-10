@@ -83,6 +83,16 @@ test('伺服器擲骰：技能檢定 1D20 + 前端送來的加值', () => {
   assert.match(art.lines.join(' '), /非生活技能/); // 生活技能與否由伺服器依規則判斷，不信前端
 });
 
+test('伺服器擲骰：技能檢定優勢骰（adv）擲兩顆取高', () => {
+  const { core } = room({ rng: seqRng([5, 17]) });
+  const skill = LIFE_SKILLS[0];
+  const res = send(core, P1, { t: 'check', rid: 'c2', who: '福德', skill, mod: 3, adv: true, parts: [{ label: skill, value: 3 }] });
+  const ev = eventOf(res);
+  assert.equal(ev.big, 20);
+  assert.match(ev.lines.join(' '), /優勢骰 2D20（5、17 取高 17）/);
+  assert.deepEqual(res.out[1].msg.rolls, [5, 17]);
+});
+
 test('輸入驗證：骰式格式、顆數與面數上限', () => {
   const { core } = room();
   for (const expr of ['abc', '0D6', '101D6', '1D10001', '1D0', '', '1D6+', 5, null, 'x'.repeat(41)]) {

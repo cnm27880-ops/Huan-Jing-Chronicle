@@ -8,6 +8,7 @@ import { h, fmt } from './dom.js';
 import { statusBar } from './statusBar.js';
 import { itemTile, amountPicker, toast } from './controls.js';
 import { iconOf, TIERS } from './items.js';
+import { keepsakeTag } from '../game/keepsakes.js';
 import {
   GATHER_ACTIONS, CRAFT_ACTIONS, DIFFICULTIES, RECIPES,
   CRAFT_COST_AMOUNT, LIFE_SKILLS,
@@ -17,7 +18,7 @@ import {
 } from '../game/engine.js';
 import { SKILL_TABLE, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo } from '../game/skillTable.js';
 import { drawBooks, chooseDraw, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
-import { badgeStatus, craftBadge, renameBadge, BADGE_COUNT, BADGE_NAME_MAX } from '../game/badges.js';
+import { badgeStatus, craftBadge, renameBadge, markBadgeOwned, BADGE_COUNT, BADGE_NAME_MAX } from '../game/badges.js';
 import {
   allRecipes, allMaterials, USABLE_ITEMS, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
   specialMaxTimes, craftSpecial, useSpecialItem, gatherDaily, dailyDone, feedMeatball, harvestMeat,
@@ -64,8 +65,8 @@ export function createRestView({ root, getState, commit }) {
       h('span', { class: 'mod-line__parts' }, mod.parts.map((p) => h('span', { class: 'mod-chip' }, `${p.label} `, h('b', { class: 'num', text: `+${p.value}` })))));
   }
 
-  function keepsakeToggles(state, action) {
-    const usable = Object.entries(state.keepsakes).filter(([n, d]) => keepsakeApplies(d, action) && countOf(state, n) > 0);
+  function keepsakeToggles(state, action, kctx) {
+    const usable = Object.entries(state.keepsakes).filter(([n, d]) => keepsakeApplies(d, action, kctx) && countOf(state, n) > 0);
     [...ui.keepsakes].forEach((n) => { if (!usable.some(([u]) => u === n)) ui.keepsakes.delete(n); });
     if (!usable.length) return null;
     return h('div', { class: 'rest-field' },
@@ -77,7 +78,7 @@ export function createRestView({ root, getState, commit }) {
             onclick: () => { ui.keepsakes.has(n) ? ui.keepsakes.delete(n) : ui.keepsakes.add(n); render(); },
           },
           h('span', { class: 'keepsake__icon', 'aria-hidden': 'true', text: iconOf(n) }),
-          h('span', { class: 'keepsake__text' }, h('strong', { text: n }), h('small', { text: `+${d.bonus}　剩 ${fmt(countOf(state, n))}` })),
+          h('span', { class: 'keepsake__text' }, h('strong', { text: n }), h('small', { text: `${keepsakeTag(d)}　剩 ${fmt(countOf(state, n))}` })),
           h('span', { class: 'keepsake__check', 'aria-hidden': 'true', text: ui.keepsakes.has(n) ? '✓' : '' })))));
   }
 
@@ -95,14 +96,14 @@ export function createRestView({ root, getState, commit }) {
   }
 
   /** 次數＋紀念品＋加值，最後是大按鈕 */
-  function runBlock(state, a, { label, hint, max, quick, onRun }) {
-    const mod = modifier(state, a, 'rest', [...ui.keepsakes]);
+  function runBlock(state, a, { label, hint, max, quick, onRun, kctx }) {
+    const mod = modifier(state, a, 'rest', [...ui.keepsakes], kctx);
     return [
       section('次數與加值',
         h('div', { class: 'rest-field' },
           h('p', { class: 'field-label', text: hint }),
           amountPicker({ value: ui.times, max, quick, onChange: (n) => { ui.times = n; render(); } })),
-        keepsakeToggles(state, a),
+        keepsakeToggles(state, a, kctx),
         modLine(mod)),
       h('div', { class: 'rest-go' },
         h('button', { type: 'button', class: 'btn btn--primary btn--go', onclick: onRun }, label)),
@@ -119,7 +120,7 @@ export function createRestView({ root, getState, commit }) {
       ...(max <= 0
         ? [h('p', { class: 'notice notice--bad', text: '今天的時間用完了。點上方的「新的一天」恢復 10 點。' })]
         : runBlock(state, a, {
-            label: `${ICONS[a]} ${a} ${ui.times} 次`, hint: `每次 1 點時間，今天還剩 ${max} 點`, max, quick: [1, 3, 5],
+            kctx: { kind: 'gather' }, label: `${ICONS[a]} ${a} ${ui.times} 次`, hint: `每次 1 點時間，今天還剩 ${max} 點`, max, quick: [1, 3, 5],
             onRun: () => blockedByDraw() || pushResult({ kind: 'gather', action: a, ...gather(state, a, ui.times, [...ui.keepsakes]) }),
           })),
     ];
@@ -153,7 +154,7 @@ export function createRestView({ root, getState, commit }) {
       ...(max <= 0
         ? [h('p', { class: 'notice notice--bad', text: `${recipe.cost}不足 ${CRAFT_COST_AMOUNT} 個，先去採集吧。` })]
         : runBlock(state, a, {
-            label: `${ICONS[a]} ${a}（${d}）${ui.times} 次`, hint: '製作不消耗時間', max, quick: [1, 5, 10],
+            kctx: { kind: 'craft', diff: d }, label: `${ICONS[a]} ${a}（${d}）${ui.times} 次`, hint: '製作不消耗時間', max, quick: [1, 5, 10],
             onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: a, diff: d, ...craft(state, a, d, ui.times, [...ui.keepsakes]) }),
           })),
     ];
@@ -186,7 +187,7 @@ export function createRestView({ root, getState, commit }) {
         }))),
       h('p', { class: 'dice-legend', text: gatherKind ? '每一骰的總分；顏色是評級（綠 簡單、藍 普通、紫 困難、金 史詩、白 神級）' : '每一骰的總分；藍色成功、紅色失敗' }),
       Object.keys(r.loot).length ? lootTiles(r.loot) : h('p', { class: 'hint', text: '全部失敗，原料全毀。' }),
-      used.length ? h('p', { class: 'hint', text: `用掉紀念品 ${used.length} 個` }) : null);
+      used.length ? h('p', { class: 'hint', text: `用掉紀念品 ${used.length} 個${r.rolls.some((x) => x.doubled) ? '（成功的製作產出雙倍）' : ''}` }) : null);
   }
 
   /** 唯一的動畫：最新結果的數字先亂跳再定格 */
@@ -337,18 +338,31 @@ export function createRestView({ root, getState, commit }) {
                 },
               }, '改名'));
           }
-          if (!b.reached) return h('button', { type: 'button', class: 'btn btn--small', disabled: true }, `${label} 未達成`);
-          return h('button', {
-            type: 'button', class: 'btn btn--primary btn--small',
+          // 試算表／機器人已經加過等級的玩家：只記起來，不再加等級（背包有徽章物品的不會走到這裡，會直接算做過）
+          const owned = h('button', {
+            type: 'button', class: 'btn btn--ghost btn--small', title: '技能等級已經含這個徽章的 +1（例如在試算表自己加過）',
             onclick: () => {
-              const name = prompt(`製作徽章：${skill}技能等級 +1，每種只能做一次。\n名稱可以自己取（最多 ${BADGE_NAME_MAX} 字，之後也能改）：`, b.item);
-              if (name === null) return;
-              const r = craftBadge(getState(), skill, b.kind, name);
+              if (!confirm(`確定「${skill}」的${label.split('（')[0]}你已經做過、等級已經含它的 +1 嗎？\n按確定只會記成做過，不會再加等級，之後無法再製作這個徽章。`)) return;
+              const r = markBadgeOwned(getState(), skill, b.kind);
               if (!r.ok) return toast(r.error);
-              toast(`做出 ${r.item}，${skill}技能升到 ${r.level}`);
+              toast('已記成做過，不會再加等級');
               commit();
             },
-          }, `製作${label}`);
+          }, '我已經做過了');
+          const craftBtn = b.reached
+            ? h('button', {
+                type: 'button', class: 'btn btn--primary btn--small',
+                onclick: () => {
+                  const name = prompt(`製作徽章：${skill}技能等級 +1，每種只能做一次。\n（如果你的等級已經含這個徽章的 +1，請取消，改按「我已經做過了」。）\n名稱可以自己取（最多 ${BADGE_NAME_MAX} 字，之後也能改）：`, b.item);
+                  if (name === null) return;
+                  const r = craftBadge(getState(), skill, b.kind, name);
+                  if (!r.ok) return toast(r.error);
+                  toast(`做出 ${r.item}，${skill}技能升到 ${r.level}`);
+                  commit();
+                },
+              }, `製作${label}`)
+            : h('button', { type: 'button', class: 'btn btn--small', disabled: true }, `${label} 未達成`);
+          return h('div', { class: 'badge-cell' }, craftBtn, owned);
         }))))));
   }
 
@@ -467,7 +481,7 @@ export function createRestView({ root, getState, commit }) {
       ...(max <= 0
         ? [h('p', { class: 'notice notice--bad', text: `${name}的材料不足，先去取材料或採集。` })]
         : runBlock(state, r.skill, {
-            label: `${ICONS[r.skill]} ${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 3, 5],
+            kctx: { kind: 'special' }, label: `${ICONS[r.skill]} ${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 3, 5],
             onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSpecial(state, name, ui.times, [...ui.keepsakes]) }),
           })),
       usable.length ? section('使用特殊物品', usable.map((n) => h('div', { class: 'special-card' },

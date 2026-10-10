@@ -12,13 +12,14 @@ const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').ma
 const rand = (sides) => 1 + Math.floor(Math.random() * sides);
 
 /**
- * faces：每顆骰子的點數；sides：面數；total：總和（含加值）；label：上方小字（例如「偵查檢定」「2D6+3」）
+ * faces：每顆骰子的點數；kept：優勢骰留下的那顆（可省略）；sides：面數；total：總和（含加值）；label：上方小字（例如「偵查檢定」「2D6+3」）
  */
-export function playDiceFx({ faces, sides, total, label = '' }) {
+export function playDiceFx({ faces, sides, total, label = '', kept }) {
   if (!Array.isArray(faces) || !faces.length) return;
   current?.remove();
-  const single20 = sides === 20 && faces.length === 1;
-  const tone = single20 && faces[0] === 20 ? 'crit' : single20 && faces[0] === 1 ? 'fumble' : '';
+  const single20 = sides === 20 && (faces.length === 1 || kept !== undefined); // 優勢骰（兩顆取高）：以留下的那顆判斷大成功／大失敗
+  const key = kept ?? faces[0];
+  const tone = single20 && key === 20 ? 'crit' : single20 && key === 1 ? 'fumble' : '';
   const shown = faces.slice(0, MAX_SHOWN);
   const dice = shown.map((n, i) => h('span', { class: 'dfx__die', dataset: { sides: String(sides) }, style: `--i:${i}`, text: String(rand(sides)) }));
   const totalEl = h('strong', { class: 'dfx__total num', text: String(total) });

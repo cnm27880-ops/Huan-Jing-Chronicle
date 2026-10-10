@@ -248,10 +248,11 @@ export class RoomCore {
       clean.push({ label: cleanStr(p.label, 24), value: p.value });
     }
     if (clean.reduce((a, p) => a + p.value, 0) !== mod) return err(rid, 'bad_check', '加值與明細不一致。');
-    const roll = d20(this.rng);
-    const r = { skill, roll, mod, parts: clean, total: roll + mod, isLife: LIFE_SKILLS.includes(skill) };
+    const rolls = msg.adv === true ? [d20(this.rng), d20(this.rng)] : null; // 優勢骰（張亮的驚人發現）：兩顆取高
+    const roll = rolls ? Math.max(...rolls) : d20(this.rng);
+    const r = { skill, roll, mod, parts: clean, total: roll + mod, isLife: LIFE_SKILLS.includes(skill), ...(rolls ? { rolls } : {}) };
     const ev = this.record({ ...checkEvent(whoOf(msg.who, user), r), srv: true }, user);
-    return this.broadcastEvent(ev, [{ to: 'self', msg: { t: 'rolled', rid, event: ev, roll, total: r.total } }]);
+    return this.broadcastEvent(ev, [{ to: 'self', msg: { t: 'rolled', rid, event: ev, roll, total: r.total, ...(rolls ? { rolls } : {}) } }]);
   }
 
   /** 戰鬥、藥水、鑑定：前端說「我要擲這幾組骰子」，伺服器擲好把每一顆的點數交回去 */

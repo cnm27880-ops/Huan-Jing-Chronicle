@@ -16,7 +16,7 @@ import {
 import { rollSum } from './dice.js';
 import { derivedStats, maxHp } from './stats.js';
 import { removeItem } from './engine.js';
-import { passivesOf, skillLevel, moveExtra, SKILL_CATALOG, PASSIVE_RIDERS } from './skills.js';
+import { passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS } from './skills.js';
 import { actionCost, shortfall, pay, costText } from './resources.js';
 
 /** 每 1 點 = 1 顆 D4 */
@@ -304,7 +304,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   const notes = [];
 
   // 響應：萬物歸一破防時，額外扣目標現有生命 %
-  const cat = move.skill ? SKILL_CATALOG[move.skill] : null;
+  const cat = move.skill ? catalogOf(move.skill) : null;
   if (cat?.bonusCurrentPct) {
     for (const h of hits) if (h.result.total > 0 && h.target.hp > 0) {
       const x = Math.floor((h.target.hp * cat.bonusCurrentPct) / 100);
@@ -322,8 +322,8 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   }
   // 回復類：吞天噬血陣（招式內建）、不可名狀（被動，神秘招式）。回復的是「目標扣除的生命」的一半，總量有上限
   const drains = [];
-  if (move.skill && SKILL_CATALOG[move.skill]?.drain) {
-    const d = SKILL_CATALOG[move.skill].drain;
+  if (move.skill && catalogOf(move.skill)?.drain) {
+    const d = catalogOf(move.skill).drain;
     drains.push({ name: move.name, ratio: d.ratio, cap: Math.floor((maxHp(state) * d.capPct) / 100) });
   }
   const lvUnn = skillLevel(state, '不可名狀');

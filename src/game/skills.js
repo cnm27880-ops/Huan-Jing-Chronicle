@@ -3,6 +3,7 @@
 // 純資料與小函式，不碰畫面。技能原文見試算表；括號內為數值出處。
 // 目前只收「使用者指定」的技能；其他技能的被動加值（每級 +N 點）已包含在角色基礎數值裡。
 // ============================================================
+import { SKILL_TABLE } from '../data/skills.js';
 
 /** 角色學會的技能等級：state.skills = { 魔女: 10, 暴徒: 1, ... } */
 export const skillLevel = (state, name) => Number(state.skills?.[name]) || 0;
@@ -56,6 +57,49 @@ export const SKILL_CATALOG = {
   },
 };
 
+// ---------- 從技能表的效果文字自動產生攻擊招式（目錄沒手寫的主動技能；解析方式需驗證） ----------
+const TRACK_OF = { 物理: 'A', 能量: 'B', 靈魂: 'C' };
+const RESOURCES = '生命|靈氣|魔力|能量|鬥氣|算力';
+
+/** 技能表裡「主動：造成○○傷害」的技能 → 目錄格式（kind 'attack'）；輔助、增益、解析不出軌道的回傳 null */
+export function generatedAttack(name) {
+  const t = SKILL_TABLE[name];
+  const first = (t?.text ?? '').split('\n').find((l) => l.startsWith('主動：'))?.slice(3);
+  if (!first || /聚集|凝聚|獲得治療|增加\d+點[^，。]*傷害骰/.test(first)) return null;
+  const hit = first.match(/造成[^，。]*/);
+  if (!hit) return null;
+  const tracks = Object.keys(TRACK_OF).filter((w) => hit[0].includes(w)).map((w) => TRACK_OF[w]);
+  if (!tracks.length) return null;
+  const paid = first.match(new RegExp(`花費(\\d+)點(${RESOURCES})`));
+  const targets = Number(first.match(/對(\d+)個目標/)?.[1]) || 1;
+  // 響應（只看「響應：」開頭的行）：「1、5、9級時…增加1、2、3個物理傷害骰」→ 到該級的累積骰數（與手寫目錄相同的解讀）；
+  // 「每1級增加2個…傷害骰」→ 每級加。看得懂才算，複雜的效果（上限、花費條件）不自動加，需驗證
+  const lines = t.text.split('\n').filter((l) => l.startsWith('響應：'));
+  const tracksIn = (str) => Object.keys(TRACK_OF).filter((w) => str.includes(w) || (w === '靈魂' && str.includes('物靈魂'))).map((w) => TRACK_OF[w]);
+  const byLevels = lines.flatMap((l) => [...l.matchAll(/(\d+(?:、\d+)*)\s*級時[^。]*?增加\s*(\d+(?:、\d+)*)個([^。，]*傷害骰)/g)])
+    .map((r) => ({ levels: r[1].split('、').map(Number), amounts: r[2].split('、').map(Number), tracks: tracksIn(r[3]) }));
+  const perLevel = lines.flatMap((l) => [...l.matchAll(/每(\d+)級增加(\d+)個([^。，]*傷害骰)/g)])
+    .map((r) => ({ every: Number(r[1]), n: Number(r[2]), tracks: tracksIn(r[3]) }));
+  const extraAt = (lv) => {
+    const out = {};
+    const add = (tr, n) => { for (const k of tr) out[k] = (out[k] ?? 0) + n; };
+    for (const r of byLevels) {
+      const idx = r.levels.filter((x) => x <= lv).length - 1;
+      if (idx >= 0) add(r.tracks, r.amounts[Math.min(idx, r.amounts.length - 1)] ?? 0);
+    }
+    for (const r of perLevel) add(r.tracks, Math.floor(lv / r.every) * r.n);
+    return out;
+  };
+  return { school: t.school, kind: 'attack', tracks, targets, cost: paid ? { [paid[2]]: Number(paid[1]) } : {}, extraAt };
+}
+
+/** 手寫目錄優先，沒有的再從技能表產生 */
+export const catalogOf = (name) => SKILL_CATALOG[name] ?? generatedAttack(name) ?? null;
+
+/** 已學會、可以綁定成招式的主動技能名稱 */
+export const bindableSkills = (state) =>
+  Object.keys(state.skills ?? {}).filter((n) => skillLevel(state, n) > 0 && catalogOf(n));
+
 /** 被動「響應」：條件成立時追加效果 */
 export const PASSIVE_RIDERS = {
   域外魔祖: { school: '修仙', cost: { 靈氣: 30 }, currentPct: 10 }, // 可花 30 靈氣，直接扣目標現有生命 10%
@@ -73,7 +117,7 @@ export function addCost(a, b) {
 export const basicMove = () => ({ id: 'basic', name: '普攻', tracks: ['A', 'B', 'C'], extra: { A: 0, B: 0, C: 0 }, cost: {} });
 
 export function moveFromCatalog(name) {
-  const c = SKILL_CATALOG[name];
+  const c = catalogOf(name);
   if (!c) return null;
   return {
     id: `s_${name}`, name, skill: name, kind: c.kind, school: c.school,
@@ -84,7 +128,7 @@ export function moveFromCatalog(name) {
 
 /** 招式實際的加成骰數：手動 extra + 目錄的每級加成 */
 export function moveExtra(state, move) {
-  const c = move.skill ? SKILL_CATALOG[move.skill] : null;
+  const c = move.skill ? catalogOf(move.skill) : null;
   const lv = move.skill ? skillLevel(state, move.skill) : 0;
   const byLevel = c?.extraAt ? c.extraAt(lv) : {};
   return { A: 0, B: 0, C: 0, ...(move.extra ?? {}), ...Object.fromEntries(Object.entries(byLevel).map(([k, v]) => [k, (move.extra?.[k] ?? 0) + v])) };

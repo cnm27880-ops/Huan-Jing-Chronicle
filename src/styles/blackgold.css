@@ -892,17 +892,17 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 
 /* 次數、紀念品、加值 */
 #view-rest .keepsake-row { display: flex; flex-wrap: wrap; gap: 6px; }
-#view-rest .keepsake {
+#view-rest .keepsake, #view-session .keepsake {
   display: flex; align-items: center; gap: 8px; min-height: var(--touch); padding: 4px 10px;
   font: inherit; color: var(--ink); text-align: left; cursor: pointer;
   background: var(--raise); border: 1px solid var(--line); border-radius: 10px;
 }
-#view-rest .keepsake:hover { box-shadow: var(--hover-ring); }
-#view-rest .keepsake__text { display: grid; line-height: 1.3; }
-#view-rest .keepsake__text small { color: var(--soft); font-size: 0.72rem; }
-#view-rest .keepsake__check { display: grid; place-items: center; width: 20px; height: 20px; color: var(--on-gold); font-size: 0.75rem; border: 1.5px solid var(--line3); border-radius: 50%; }
-#view-rest .keepsake[aria-pressed='true'] { background: var(--goldbg); border-color: var(--gold2); }
-#view-rest .keepsake[aria-pressed='true'] .keepsake__check { background: var(--gold); border-color: var(--gold); }
+#view-rest .keepsake:hover, #view-session .keepsake:hover { box-shadow: var(--hover-ring); }
+#view-rest .keepsake__text, #view-session .keepsake__text { display: grid; line-height: 1.3; }
+#view-rest .keepsake__text small, #view-session .keepsake__text small { color: var(--soft); font-size: 0.72rem; }
+#view-rest .keepsake__check, #view-session .keepsake__check { display: grid; place-items: center; width: 20px; height: 20px; color: var(--on-gold); font-size: 0.75rem; border: 1.5px solid var(--line3); border-radius: 50%; }
+#view-rest .keepsake[aria-pressed='true'], #view-session .keepsake[aria-pressed='true'] { background: var(--goldbg); border-color: var(--gold2); }
+#view-rest .keepsake[aria-pressed='true'] .keepsake__check, #view-session .keepsake[aria-pressed='true'] .keepsake__check { background: var(--gold); border-color: var(--gold); }
 #view-rest .mod-line {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
   padding: 10px 12px; background: var(--paper); border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line);
@@ -1174,6 +1174,7 @@ input[type='number'], .amount__input { text-align: center; }
 .badge-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 6px; }
 .badge-row { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .badge-row__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.badge-cell { display: grid; gap: 4px; align-content: start; }
 .badge-made { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; font-size: 0.8rem; color: var(--soft); }
 .badge-made__name { min-width: 0; overflow-wrap: anywhere; }
 
@@ -1312,9 +1313,17 @@ input[type='number'], .amount__input { text-align: center; }
   display: grid; gap: 10px; padding: 14px;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: 'tabs' 'head' 'bar' 'art' 'stats';
+  position: relative;
   background: radial-gradient(ellipse at 30% 40%, rgba(var(--rose-rgb), 0.12), transparent 65%), var(--card);
-  border-radius: var(--r-panel); box-shadow: 0 0 0 1px var(--rose2), 0 4px 12px var(--shadow);
+  border-radius: var(--r-panel); box-shadow: 0 0 0 1px var(--rose2), 0 0 0 4px var(--card), 0 0 0 5px var(--gold2), 0 6px 18px var(--shadow);
+  margin: 6px; /* 讓外框的雙線不被旁邊切掉 */
 }
+.boss::before, .boss::after { /* 四角的小金飾 */
+  content: ''; position: absolute; width: 14px; height: 14px; pointer-events: none;
+  border: 2px solid var(--gold); opacity: 0.85;
+}
+.boss::before { top: 7px; left: 7px; border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
+.boss::after { bottom: 7px; right: 7px; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
 .boss__tabs { grid-area: tabs; display: flex; flex-wrap: wrap; gap: 4px; }
 .boss__tabs .seg { min-height: 32px; padding: 0 10px; font: inherit; font-size: 0.8rem; color: var(--soft); background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill); cursor: pointer; }
 .boss__tabs .seg[aria-selected='true'] { color: var(--gold); border-color: var(--gold); }
@@ -1370,18 +1379,19 @@ input[type='number'], .amount__input { text-align: center; }
 .boss-mode:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .boss.is-downed .boss__art { filter: grayscale(1); opacity: 0.4; }
 
-.lbar { display: flex; align-items: center; gap: 8px; }
-.lbar__track { position: relative; flex: 1; height: 18px; overflow: hidden; background: var(--paper); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line3); }
-.lbar__fill { position: absolute; inset: 0 auto 0 0; transition: width 0.3s ease; }
-.lbar__text { position: relative; display: block; font-size: 0.76rem; line-height: 18px; text-align: center; color: var(--ink); text-shadow: 0 1px 2px var(--shadow); }
-.lbar__count { min-width: 2.2em; font-size: 1rem; font-weight: 700; text-align: right; color: var(--rose); }
-/* 每一段的顏色：最上層玫瑰紅 → 金 → 紫；底色是下一段的顏色，打完一段就露出來 */
-.lbar[data-layer='3'] .lbar__track { background: linear-gradient(90deg, var(--gold2), var(--gold)); }
-.lbar[data-layer='3'] .lbar__fill { background: linear-gradient(90deg, var(--rose2), var(--rose)); }
-.lbar[data-layer='2'] .lbar__track { background: linear-gradient(90deg, rgba(var(--lilac-rgb), 0.55), var(--lilac)); }
-.lbar[data-layer='2'] .lbar__fill { background: linear-gradient(90deg, var(--gold2), var(--gold)); }
+.lbar { display: grid; gap: 6px; }
+.lbar__bars { display: grid; gap: 5px; padding: 6px; background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.1), rgba(var(--gold-rgb), 0.02)); border-radius: 10px; box-shadow: 0 0 0 1px var(--gold2), inset 0 0 0 1px var(--shadow), 0 2px 8px var(--shadow); }
+.lbar__track { position: relative; height: 16px; overflow: hidden; background: var(--paper); border-radius: 5px; box-shadow: inset 0 0 0 1px var(--line3), inset 0 2px 4px var(--shadow); }
+.lbar__fill { position: absolute; inset: 0 auto 0 0; border-radius: 5px; transition: width 0.3s ease; box-shadow: inset 0 1px 0 rgba(var(--gold-rgb), 0.35); }
+.lbar__track[data-layer='3'] .lbar__fill { background: linear-gradient(90deg, var(--rose2), var(--rose)); }
+.lbar__track[data-layer='2'] .lbar__fill { background: linear-gradient(90deg, var(--gold2), var(--gold)); }
+.lbar__track[data-layer='1'] .lbar__fill { background: linear-gradient(90deg, rgba(var(--lilac-rgb), 0.55), var(--lilac)); }
+.lbar__track[data-state='full'] { box-shadow: inset 0 0 0 1px var(--line3), 0 0 8px rgba(var(--rose-rgb), 0.25); }
+.lbar__track[data-state='empty'] { opacity: 0.5; }
+.lbar__info { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 4px; }
+.lbar__text { font-size: 0.8rem; color: var(--ink2); }
+.lbar__count { font-size: 1.05rem; font-weight: 700; color: var(--rose); }
 .lbar[data-layer='2'] .lbar__count { color: var(--gold); }
-.lbar[data-layer='1'] .lbar__fill { background: linear-gradient(90deg, rgba(var(--lilac-rgb), 0.55), var(--lilac)); }
 .lbar[data-layer='1'] .lbar__count { color: var(--lilac); }
 .lbar[data-layer='0'] .lbar__count { color: var(--faint); }
 
@@ -1639,3 +1649,44 @@ input[type='number'], .amount__input { text-align: center; }
 .hud-meter__name { white-space: nowrap; }
 .sx .bt-hud__res .hud-meter { padding: 6px 7px; column-gap: 4px; }
 .sx .bt-hud__res .hud-meter__val { font-size: 0.78rem; }
+
+/* ---------- 封面入場特效（index.html 的 #cover；按鈕約 2.6 秒後浮現，cover.js 的 INTRO_MS 要一起改） ---------- */
+.cover { overflow: hidden; }
+.cover::before, .cover::after { /* 標題後面兩圈慢轉的金色法陣 */
+  content: ''; position: absolute; left: 50%; top: 46%; border-radius: 50%; pointer-events: none;
+  translate: -50% -50%; opacity: 0; animation: cover-ring-in 1.6s ease-out 0.2s forwards, cover-spin 60s linear infinite;
+}
+.cover::before { width: min(78vmin, 640px); aspect-ratio: 1; border: 1px dashed rgba(var(--gold-rgb), 0.3); box-shadow: 0 0 60px rgba(var(--gold-rgb), 0.08) inset; }
+.cover::after { width: min(56vmin, 460px); aspect-ratio: 1; border: 1px solid rgba(var(--gold-rgb), 0.22); animation: cover-ring-in 1.6s ease-out 0.5s forwards, cover-spin 45s linear infinite reverse; }
+.cover__fx { position: absolute; inset: 0; pointer-events: none; }
+.cover__ember {
+  position: absolute; left: var(--x); bottom: -12px; width: var(--s); height: var(--s); border-radius: 50%;
+  background: var(--gold); box-shadow: 0 0 8px 1px rgba(var(--gold-rgb), 0.7); opacity: 0;
+  animation: cover-ember var(--d) linear var(--delay) infinite;
+}
+.cover__inner { position: relative; z-index: 1; }
+.cover__kicker { animation: cover-rise 0.9s ease-out 0.15s backwards; }
+.cover__title { animation: cover-rise 1.1s ease-out 0.4s backwards, cover-glow 3.2s ease-in-out 1.5s infinite alternate; }
+.cover__title::after { animation: cover-line 1.4s ease-out 1s backwards; }
+.cover__lead { animation: cover-rise 1s ease-out 0.9s backwards; }
+.cover__load { display: grid; gap: 8px; justify-items: center; margin-top: 0.4rem; transition: opacity 0.4s ease; }
+.cover__load-text { color: var(--soft); font-size: 0.8rem; letter-spacing: 0.3em; animation: cover-blink 1.4s ease-in-out infinite alternate; }
+.cover__load-bar { position: relative; width: min(16rem, 70%); height: 3px; overflow: hidden; border-radius: 2px; background: rgba(var(--gold-rgb), 0.15); }
+.cover__load-bar::after { content: ''; position: absolute; inset: 0; transform-origin: left; background: linear-gradient(90deg, var(--gold2), var(--gold)); box-shadow: 0 0 10px rgba(var(--gold-rgb), 0.8); animation: cover-load 2.6s cubic-bezier(0.3, 0.1, 0.3, 1) forwards; }
+.cover.is-ready .cover__load { opacity: 0; height: 0; margin: 0; overflow: hidden; }
+.cover__actions { transition: opacity 0.6s ease, transform 0.6s ease; }
+.cover__actions.is-wait { opacity: 0; visibility: hidden; transform: translateY(10px); pointer-events: none; }
+@keyframes cover-rise { from { opacity: 0; transform: translateY(16px); } }
+@keyframes cover-line { from { width: 0; opacity: 0; } }
+@keyframes cover-glow { from { text-shadow: 0 0 16px rgba(var(--gold-rgb), 0.25); } to { text-shadow: 0 0 38px rgba(var(--gold-rgb), 0.7), 0 0 4px rgba(var(--gold-rgb), 0.5); } }
+@keyframes cover-ring-in { to { opacity: 1; } }
+@keyframes cover-spin { to { rotate: 360deg; } }
+@keyframes cover-ember { 0% { opacity: 0; transform: translate(0, 0); } 12% { opacity: 0.9; } 100% { opacity: 0; transform: translate(24px, -105vh); } }
+@keyframes cover-load { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes cover-blink { from { opacity: 0.45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .cover::before, .cover::after { animation: none; opacity: 1; }
+  .cover__kicker, .cover__title, .cover__title::after, .cover__lead, .cover__load-text, .cover__load-bar::after { animation: none; }
+  .cover__load { display: none; }
+  .cover__actions { transition: none; }
+}

@@ -305,15 +305,15 @@ export async function rollDice(who, expr) {
 }
 
 /** 技能檢定。回傳 { skill, roll, mod, parts, total, isLife }（和 sessionCheck 一樣），紀錄會自動發布 */
-export async function rollCheck(who, state, skill) {
+export async function rollCheck(who, state, skill, advantage = false) {
   if (!isOnline()) {
-    const r = sessionCheck(state, skill);
+    const r = sessionCheck(state, skill, Math.random, advantage);
     publishLocal(checkEvent(who, r));
     return r;
   }
   const base = sessionCheck(state, skill, () => 0); // 只取加值與明細；d20 由伺服器擲
-  const res = await request({ t: 'check', who, skill, mod: base.mod, parts: base.parts });
-  return { ...base, roll: res.roll, total: res.total };
+  const res = await request({ t: 'check', who, skill, mod: base.mod, parts: base.parts, ...(advantage ? { adv: true } : {}) });
+  return { ...base, roll: res.roll, total: res.total, ...(res.rolls ? { rolls: res.rolls } : {}) };
 }
 
 let queue = Promise.resolve();

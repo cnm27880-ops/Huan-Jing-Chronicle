@@ -5,6 +5,7 @@
 // 原型展示用，時間設為 10 點方便測試（存檔裡是 0）
 // ============================================================
 import { moveFromCatalog, basicMove } from '../../game/skills.js';
+import { KEEPSAKES } from '../../game/keepsakes.js';
 
 // ---------- 裝備實例（取自試算表「背包」分頁；試算表的「傳奇」在網頁叫「傳說」）----------
 let gearId = 1;
@@ -46,11 +47,11 @@ export const SAMPLE_CHARACTER = {
   counters: { 狩獵: 1, 釣魚: 692, 採藥: 1, 挖礦: 1, 鑄造: 717, 調劑: 19, 書寫: 501, 烹飪: 740 },
   restStomach: [],
   sessionStomach: [],
-  // 紀念品效果（取自試算表背包分頁）。scope：'rest' = 所有修整檢定；陣列 = 指定技能
+  // 紀念品效果：目錄在 game/keepsakes.js（升級存檔時會依背包補齊）
   keepsakes: {
-    兄弟好相助: { desc: '進行日常檢定時消耗 1 個，該次檢定熟練額外 +3', scope: 'rest', bonus: 3 },
-    繃繃狗的爪爪: { desc: '挖礦時消耗 1 個，該次挖礦技能額外 +5', scope: ['挖礦'], bonus: 5 },
-    兔子俠的狩獵指南: { desc: '狩獵時消耗 1 個，該次狩獵技能額外 +5', scope: ['狩獵'], bonus: 5 },
+    兄弟好相助: KEEPSAKES.兄弟好相助,
+    繃繃狗的爪爪: KEEPSAKES.繃繃狗的爪爪,
+    兔子俠的狩獵指南: KEEPSAKES.兔子俠的狩獵指南,
   },
   inventory: {
     代金券: 153200, 南夢水: 473, 奧利哈鋼: 318, 不穩定能量: 201, 鮮美肉: 139, 滿漢全席: 118,
