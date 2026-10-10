@@ -1,8 +1,8 @@
 // 模擬戰的評價、策略與自動調整（GM 目標：2～3 回合、每場耗約一半資源）
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, penalty, autoTune, scaleEncounter, TARGET, PLANS } from '../src/game/tuning.js';
-import { simulateBattle, summarize } from '../src/game/simulate.js';
+import { assess, penalty, autoTune, scaleEncounter, shrinkSpecs, shrinkEncounter, TARGET, PLANS } from '../src/game/tuning.js';
+import { simulateBattle, summarize, seededRng } from '../src/game/simulate.js';
 import { blankCharacter } from '../src/game/importBot.js';
 import { moveFromCatalog } from '../src/game/skills.js';
 
@@ -108,4 +108,50 @@ test('scaleEncounter：固定敵人的血量與攻擊骰數按倍率縮放，不
   assert.deepEqual(out.monsters[1].atk[2], { A: 10, B: 10, C: 10 });
   assert.equal(enc.monsters[0].maxHp, 100); // 原資料不變
   assert.equal(enc.monsters[0].hp, 40);
+});
+
+test('自動調整：怪物太多的結構下限——血量調到最低回合數還是太長，就一次拿掉一隻最弱的怪', async () => {
+  // 假的評估：玩家 1 位、每回合只打倒 1 隻，所以回合數 = max(怪物數, 血量 / 400)；消耗 = 攻擊強度 / 200
+  const evaluate = (specs) => {
+    const n = specs.reduce((a, s) => a + s.count, 0);
+    const hp = specs.reduce((a, s) => a + s.hp * s.count, 0);
+    return sum({ avgRounds: Math.max(n, hp / 400), avgDrain: Math.min(1, specs[0].atkPower / 200), win: 1 });
+  };
+  const specs = [{ kind: 'boss', count: 1, hp: 1000, atkPower: 20 }, { kind: 'mob', count: 6, hp: 100, atkPower: 20 }];
+  const out = await autoTune({ specs, evaluate, target: PLANS.conservative, yieldFn: async () => {} });
+  assert.equal(out.specs[1].count, 2); // 7 隻拿到只剩 BOSS＋2 隻 → 3 回合（保守版上限）
+  assert.equal(out.removed, 4);
+  assert.equal(out.specs[0].count, 1); // BOSS 不會被拿掉
+  assert.equal(out.penalty, 0);
+  assert.match(out.notes.join(' '), /拿掉了 4 隻/);
+  assert.equal(specs[1].count, 6); // 原資料不變
+});
+
+test('shrinkSpecs／shrinkEncounter：先拿小怪、再拿菁英、BOSS 不動，沒得拿回傳 null', () => {
+  const specs = [{ kind: 'boss', count: 1 }, { kind: 'elite', count: 1 }, { kind: 'mob', count: 1 }];
+  const a = shrinkSpecs(specs);
+  assert.deepEqual(a.map((s) => s.count), [1, 1, 0]); // count 0 留著，前後對照的位置才不會錯開
+  assert.deepEqual(shrinkSpecs(a).map((s) => s.count), [1, 0, 0]);
+  assert.equal(shrinkSpecs(shrinkSpecs(a)), null);
+  const enc = { monsters: [{ id: 'BOSS1', kind: 'boss' }, { id: '菁英1', kind: 'mob', rank: 'elite' }, { id: '小怪1', kind: 'mob' }, { id: '小怪2', kind: 'mob' }] };
+  assert.deepEqual(shrinkEncounter(enc).monsters.map((m) => m.id), ['BOSS1', '菁英1', '小怪1']);
+  assert.equal(enc.monsters.length, 4);
+  assert.equal(shrinkEncounter({ monsters: [{ id: 'BOSS1', kind: 'boss' }] }), null);
+});
+
+test('評價：怪物比玩家多很多時，說明回合數有結構下限（只調血量降不下來）', () => {
+  const a = assess(sum({ avgRounds: 7, avgRoundsWin: 7, avgMonsters: 7, playerCount: 1 }));
+  assert.match(a.advice.join(' '), /最快也要約 7 回合/);
+  const b = assess(sum({ avgRounds: 7, avgRoundsWin: 7, avgMonsters: 2, playerCount: 4 })); // 怪不多：照血量建議
+  assert.doesNotMatch(b.advice.join(' '), /最快也要/);
+});
+
+test('回合數只算打贏的場次；同一批種子，結果每次都一樣', () => {
+  const s = { ...blankCharacter('甲'), skills: {} };
+  const run = () => summarize(Array.from({ length: 20 }, (_, i) => simulateBattle([s], [{ kind: 'mob', count: 2, atkPower: 300, defPower: 10, hp: 50 }], { rng: seededRng(i + 1) })), ['甲']);
+  assert.deepEqual(run(), run());
+  const mixed = summarize([{ outcome: 'win', rounds: 4, downs: [], drain: {} }, { outcome: 'lose', rounds: 1, downs: [], drain: {} }]);
+  assert.equal(mixed.avgRounds, 2.5);
+  assert.equal(mixed.avgRoundsWin, 4);
+  assert.equal(penalty({ ...sum(), avgRounds: 2.5, avgRoundsWin: 4 }) > 0, true); // 輸得快不算回合達標
 });

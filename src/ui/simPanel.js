@@ -7,14 +7,16 @@ import { openSheet } from './sheet.js';
 import { toast } from './controls.js';
 import { listCharacters, fetchCharacter } from '../state/charSync.js';
 import { normalizeCharacter } from '../state/store.js';
-import { simulateBattle, summarize, DEFAULT_MAX_ROUNDS } from '../game/simulate.js';
-import { assess, autoTune, penalty, scaleEncounter, PLANS, TARGET } from '../game/tuning.js';
+import { simulateBattle, summarize, seededRng, DEFAULT_MAX_ROUNDS } from '../game/simulate.js';
+import { measureHits, rankPlayers, suggestMobHp, capsFor, FAIR } from '../game/fairness.js';
+import { POTIONS } from '../game/rules.js';
+import { assess, autoTune, penalty, scaleEncounter, shrinkEncounter, PLANS, TARGET } from '../game/tuning.js';
 import { getEncounter, presetAction } from '../state/rollLog.js';
 import { formatAbc } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 
 const RUNS = 200; // 每次模擬的場數（固定）
-const TUNE_RUNS = 40; // 自動調整時，每組候選數值只跑這麼多場（要試很多組，跑 200 場太慢）
+const TUNE_RUNS = 40; // 自動調整時，每組候選數值只跑這麼多場（要試很多組，跑 200 場太慢）；每次都用同一批種子，結果才不會被運氣干擾
 const BATCH = 25; // 每算幾場讓畫面喘口氣，進度才會動
 const pct = (v) => `${(v * 100).toFixed(v > 0 && v < 0.1 ? 1 : 0)}%`;
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
@@ -34,6 +36,8 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     running: false, progress: 0, result: null, names: [],
     tuning: false, tuneProgress: 0, tuneResults: null, // tuneResults：[{ plan, specs, summary, penalty }]（保守版、激進版各一）；固定敵人時 specs 是調整後的 { monsters }
     tuneFrom: null,
+    focus: 'spread', // 怪物怎麼挑目標：spread 平均分散（輪流打每個人）｜random 隨機
+    supply: '回春湯', // 假設每位玩家都備足這種血藥（毒性 15 喝滿）；'' ＝ 只用玩家背包裡有的
     override: null, // 固定敵人套用自動調整後的模擬用版本（只在這個面板用，不會改場上或預組）
   };
   let sheet;
@@ -75,6 +79,27 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     return { players, names };
   }
 
+  /**
+   * 建立評估函式：跑 runs 場（固定種子）；full 時再多跑一組「第一名只出部分力」的情境，算隊伍勝率。
+   * 回傳的結果帶 rank（強弱）、capWin、capBudget，評價與自動調整都靠這些判斷公平性。
+   */
+  function makeEvaluate(players, names, rank, fixed, runs) {
+    const once = (input, caps, n, downed = []) => summarize(Array.from({ length: n }, (_, i) => (fixed
+      ? simulateBattle(players, [], { encounter: input, rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps, downed })
+      : simulateBattle(players, input.map((s) => ({ ...s })), { rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps, downed }))), names);
+    return (input, full = true) => {
+      const sum = once(input, [], runs);
+      sum.rank = rank;
+      sum.focus = ui.focus;
+      if (full && players.length > 1) {
+        sum.capWin = once(input, capsFor(players.length, rank.strongest), Math.max(20, Math.round(runs * 0.6))).win;
+        sum.capBudget = FAIR.topBudget;
+      }
+      if (full && players.length > 1 && ui.focus === 'strongest') sum.outWin = once(input, [], Math.max(20, Math.round(runs * 0.6)), [rank.strongest]).win; // 第一名開場就倒，隊伍還贏不贏
+      return sum;
+    };
+  }
+
   async function run() {
     if (ui.running || ui.tuning) return;
     if (!ui.picked.size) return toast('至少選一位玩家。');
@@ -85,9 +110,12 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     try {
       const { players, names } = await loadPlayers();
       ui.names = names;
+      const source = fixed ?? ui.specs;
+      const rank = rankPlayers(measureHits(players, source, { supply: ui.supply || null }));
       const results = [];
       for (let i = 0; i < RUNS; i++) {
-        results.push(fixed ? simulateBattle(players, [], { encounter: fixed }) : simulateBattle(players, ui.specs.map((s) => ({ ...s }))));
+        const opts = { supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order };
+        results.push(fixed ? simulateBattle(players, [], { encounter: fixed, ...opts }) : simulateBattle(players, ui.specs.map((s) => ({ ...s })), opts));
         if ((i + 1) % BATCH === 0) {
           ui.progress = (i + 1) / RUNS;
           sheet.refresh();
@@ -95,6 +123,19 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         }
       }
       ui.result = summarize(results, ui.names);
+      ui.result.rank = rank;
+      ui.result.focus = ui.focus;
+      ui.result.hits = rank.hits;
+      if (players.length > 1) { // 第一名只出部分力的情境（場數少一點，只看勝率）
+        const caps = capsFor(players.length, rank.strongest);
+        const capRuns = Array.from({ length: Math.round(RUNS / 2) }, () => (fixed ? simulateBattle(players, [], { encounter: fixed, supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps }) : simulateBattle(players, ui.specs.map((s) => ({ ...s })), { supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps })));
+        ui.result.capWin = summarize(capRuns, ui.names).win;
+        ui.result.capBudget = FAIR.topBudget;
+        if (ui.focus === 'strongest') { // 第一名開場就倒，隊伍還贏不贏
+          const outRuns = Array.from({ length: Math.round(RUNS / 2) }, () => (fixed ? simulateBattle(players, [], { encounter: fixed, supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, downed: [rank.strongest] }) : simulateBattle(players, ui.specs.map((s) => ({ ...s })), { supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, downed: [rank.strongest] })));
+          ui.result.outWin = summarize(outRuns, ui.names).win;
+        }
+      }
     } catch (e) { toast(e.message || '模擬失敗。'); }
     ui.running = false; ui.progress = 1;
     sheet.refresh();
@@ -114,18 +155,18 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     ui.tuning = true; ui.tuneProgress = 0; ui.tuneResults = null; sheet.refresh();
     try {
       const { players, names } = await loadPlayers();
-      const evaluate = fixed
-        ? (enc) => summarize(Array.from({ length: TUNE_RUNS }, () => simulateBattle(players, [], { encounter: enc })), names)
-        : (specs) => summarize(Array.from({ length: TUNE_RUNS }, () => simulateBattle(players, specs.map((s) => ({ ...s })))), names);
+      const rank = rankPlayers(measureHits(players, fixed ?? ui.specs, { supply: ui.supply || null }));
+      const evaluate = makeEvaluate(players, names, rank, fixed, TUNE_RUNS);
+      const mob = suggestMobHp(rank.hits); // 小怪血量依最弱玩家一次出手的傷害設
       const plans = [PLANS.conservative, PLANS.aggressive];
       const out = [];
       for (const [i, plan] of plans.entries()) {
         const r = await autoTune({
-          specs: ui.specs, evaluate, target: plan,
-          build: fixed ? (kh, ka) => scaleEncounter(fixed, kh, ka) : null,
+          specs: fixed ?? ui.specs, evaluate, target: plan,
+          ...(fixed ? { scale: scaleEncounter, shrink: shrinkEncounter } : {}), mobHp: mob?.mobHp ?? null,
           onProgress: (p) => { ui.tuneProgress = (i + p) / plans.length; sheet.refresh(); },
         });
-        out.push({ plan, ...r });
+        out.push({ plan, ...r, notes: [...(mob?.note ? [mob.note] : []), ...r.notes], mobHp: mob?.mobHp ?? null });
       }
       ui.tuneResults = out;
       ui.tuneFrom = fixed; // 調整前的固定敵人（畫面比對前後用）；自訂強度時是 null
@@ -139,7 +180,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     const t = ui.tuneResults?.find((x) => x.plan.key === plan.key);
     if (!t) return;
     if (ui.tuneFrom) ui.override = t.specs; // 固定敵人：之後的模擬都用調整後的版本
-    else ui.specs = t.specs.map((s) => ({ ...s }));
+    else ui.specs = t.specs.filter((s) => s.count > 0).map((s) => ({ ...s }));
     ui.tuneResults = null;
     run(); // 套用後馬上用 200 場確認
   }
@@ -213,7 +254,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
   function assessmentView(r) {
     const a = assess(r);
     return h('div', { class: 'simassess' },
-      h('h3', { class: 'section-title', text: `評價（目標：${TARGET.roundsMin}～${TARGET.roundsMax} 回合、每場約耗 ${pct(TARGET.drain)} 資源）` }),
+      h('h3', { class: 'section-title', text: `評價（目標：${TARGET.roundsMin}～${TARGET.roundsMax} 回合、資源消耗 ${pct(TARGET.drain - TARGET.drainTol)}～${pct(TARGET.drain + TARGET.drainTol)} 算合理、第一名不用全力、最弱的也有貢獻）` }),
       h('ul', { class: 'import-list' }, a.items.map((i) => h('li', { class: 'import-row' },
         h('span', { text: `${i.label}：${i.value}（目標 ${i.target}）` }),
         h('span', { class: 'badge', dataset: { tone: i.status === 'ok' ? 'good' : 'bad' }, text: `${STATUS_LABEL[i.status]}・${i.text}` })))),
@@ -228,27 +269,55 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     const list = ui.tuneResults;
     if (!list) return null;
     return h('div', { class: 'simtune' },
-      h('p', { class: 'hint', text: '兩個方案都以目標（2～3 回合、每場約耗一半資源）為範圍，保守版偏輕鬆、激進版偏緊繃；預估每組只跑了少數場次，套用後會用 200 場重新確認。' }),
+      h('p', { class: 'hint', text: '兩個方案都以目標為範圍（2～3 回合、第一名省力也要贏、最弱的也能打倒小怪）：小怪血量依最弱玩家一次出手的傷害設，BOSS 血量補足回合數，怪物攻擊盡量拉高讓血藥有存在感。保守版偏輕鬆、激進版偏緊繃；預估每組只跑了少數場次，套用後會用 200 場重新確認。' }),
       list.map((t) => {
         const a = assess(t.summary);
         const exact = penalty(t.summary, t.plan) === 0;
         return h('section', { class: 'simtune__plan' },
           h('h4', { class: 'field-label', text: `${t.plan.key === 'aggressive' ? '🔥' : '🛡️'} ${t.plan.label}：${t.plan.note}` }),
           ui.tuneFrom
-            ? h('ul', { class: 'import-list' }, t.specs.monsters.map((m, i) => {
-                const o = ui.tuneFrom.monsters[i];
+            ? h('ul', { class: 'import-list' }, ui.tuneFrom.monsters.map((o) => {
+                const m = t.specs.monsters.find((x) => x.id === o.id);
                 const atk = (x) => (Array.isArray(x.atk) ? x.atk.map(formatAbc).join('／') : formatAbc(x.atk));
+                const icon = o.kind === 'boss' ? '👹' : o.rank === 'elite' ? '👺' : '👾';
                 return h('li', { class: 'import-row' },
-                  h('span', { text: `${m.kind === 'boss' ? '👹' : m.rank === 'elite' ? '👺' : '👾'} ${m.id}　血量 ${fmt(o.maxHp)} → ${fmt(m.maxHp)}　攻擊 ${atk(o)} → ${atk(m)}` }));
+                  h('span', { text: m ? `${icon} ${o.id}　血量 ${fmt(o.maxHp)} → ${fmt(m.maxHp)}　攻擊 ${atk(o)} → ${atk(m)}` : `${icon} ${o.id}　拿掉（怪物太多）` }));
               }))
             : h('ul', { class: 'import-list' }, t.specs.map((s, i) => {
                 const o = ui.specs[i];
                 return h('li', { class: 'import-row' },
-                  h('span', { text: `${{ boss: '👹 BOSS', elite: '👺 菁英' }[s.kind] ?? '👾 小怪'} ×${s.count}　血量 ${fmt(o.hp)} → ${fmt(s.hp)}　攻擊強度 ${fmt(o.atkPower)} → ${fmt(s.atkPower)}` }));
+                  h('span', { text: `${{ boss: '👹 BOSS', elite: '👺 菁英' }[s.kind] ?? '👾 小怪'} ×${o.count === s.count ? s.count : `${o.count} → ${s.count}`}　血量 ${fmt(o.hp)} → ${fmt(s.hp)}　攻擊強度 ${fmt(o.atkPower)} → ${fmt(s.atkPower)}` }));
               })),
-          h('p', { class: 'hint', text: `預估：${t.summary.avgRounds.toFixed(1)} 回合、資源消耗 ${pct(t.summary.avgDrain)}、勝率 ${pct(t.summary.win)}（${exact ? '符合這個方案' : '找不到完全符合的，這是最接近的'}${a.ok ? '' : '；還有項目沒達標'}）` }),
+          t.notes?.length ? h('ul', { class: 'simassess__advice' }, t.notes.map((n) => h('li', { text: n }))) : null,
+          h('p', { class: 'hint', text: `預估：${(t.summary.avgRoundsWin ?? t.summary.avgRounds).toFixed(1)} 回合、資源消耗 ${pct(t.summary.avgDrain)}、勝率 ${pct(t.summary.win)}（${exact ? '符合這個方案' : '找不到完全符合的，這是最接近的'}${a.ok ? '' : '；還有項目沒達標'}）` }),
           h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => applyTune(t.plan) }, `套用${t.plan.label}${ui.tuneFrom ? '（只用在模擬）' : ''}，並用 ${RUNS} 場重新模擬`));
       }));
+  }
+
+  /** 每位玩家的貢獻與消耗：看第一名是不是被逼著全力、最弱的有沒有參與 */
+  function playersTable(r) {
+    if (!r.perPlayer?.length) return null;
+    const tag = (i) => (r.rank && r.perPlayer.length > 1 ? (i === r.rank.strongest ? '🥇 ' : i === r.rank.weakest ? '🌱 ' : '') : '');
+    return h('div', {},
+      h('p', { class: 'field-label', text: '每位玩家的表現（🥇 一次出手傷害最高、🌱 最低；單次出手＝對一隻怪）' }),
+      h('ul', { class: 'import-list' }, r.perPlayer.map((p, i) => h('li', { class: 'import-row' },
+        h('span', { text: `${tag(i)}${p.name}` }),
+        h('small', { class: 'hint', text: `輸出占 ${pct(p.share)}・打倒 ${p.kills.toFixed(1)} 隻・出招 ${p.actions.toFixed(1)} 次・被打 ${p.hit.toFixed(1)} 下・受傷 ${pct(p.takenPct)} 生命・藥水 ${p.potions.toFixed(1)} 瓶・資源消耗 ${pct(p.drain)}・單次出手 ${r.hits ? fmt(Math.round(r.hits[i].perTarget)) : '—'}` })))));
+  }
+
+  /** 血藥假設：毒性 15 都拿來喝血，所以怪物可以兇一點 */
+  function supplyCard() {
+    const heal = Object.keys(POTIONS).filter((n) => POTIONS[n].heal);
+    return h('label', { class: 'extra' }, h('span', { text: '血藥假設（每位玩家都備足、毒性 15 喝滿）' }),
+      h('select', { class: 'field', disabled: ui.running ? true : null, onchange: (e) => { ui.supply = e.target.value; ui.result = null; ui.tuneResults = null; sheet.refresh(); } },
+        [['', '只用玩家背包裡有的'], ...heal.map((n) => [n, `${n}（${POTIONS[n].heal.n}D${POTIONS[n].heal.sides}，毒性 +${POTIONS[n].toxicity}）`])].map(([v, label]) => h('option', { value: v, selected: v === ui.supply ? true : null, text: label }))));
+  }
+
+  /** 怪物攻擊分配：GM 跑團時輪流打不同的人，還是隨機（隨機會偶爾集中在同一個人身上） */
+  function focusCard() {
+    return h('label', { class: 'extra' }, h('span', { text: '怪物攻擊分配' }),
+      h('select', { class: 'field', disabled: ui.running ? true : null, onchange: (e) => { ui.focus = e.target.value; ui.result = null; ui.tuneResults = null; sheet.refresh(); } },
+        [['spread', '平均分散（輪流打每個人）'], ['strongest', '集火第一名（先打倒他，再打下一個）'], ['random', '隨機（可能集中在同一人）']].map(([v, label]) => h('option', { value: v, selected: v === ui.focus ? true : null, text: label }))));
   }
 
   function resultView() {
@@ -260,13 +329,13 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       h('h3', { class: 'section-title', text: `結果（${fmt(r.runs)} 場）` }),
       h('div', { class: 'stat-grid' },
         stat('勝率', pct(r.win), `敗 ${pct(r.lose)}・平手 ${pct(r.timeout)}`),
-        stat('平均回合', r.avgRounds.toFixed(1), `上限 ${DEFAULT_MAX_ROUNDS} 回合`),
+        stat('平均回合', r.avgRoundsWin.toFixed(1), `打贏的場次；全部 ${r.avgRounds.toFixed(1)}・上限 ${DEFAULT_MAX_ROUNDS}`),
         stat('每回合傷害', fmt(Math.round(r.avgDamagePerRound)), '全隊對怪物'),
         stat('剩餘生命', pct(r.avgHpLeft), '每場結束時全隊平均'),
-        stat('資源消耗', pct(r.avgDrain), `目標約 ${pct(TARGET.drain)}（每人的資源與毒性）`),
+        stat('資源消耗', pct(r.avgDrain), `合理範圍 ${pct(TARGET.drain - TARGET.drainTol)}～${pct(TARGET.drain + TARGET.drainTol)}（每人的資源與毒性）`),
         stat('用掉藥水', r.avgPotions.toFixed(1), '每場平均瓶數')),
       h('p', { class: 'field-label', text: '各項消耗（全隊平均，毒性以上限 15 計）' }),
-      h('div', { class: 'toggle-row' }, Object.entries(r.drainBy).map(([k, v]) => h('span', { class: 'badge', dataset: { tone: v >= TARGET.drain - TARGET.drainTol && v <= TARGET.drain + TARGET.drainTol ? 'good' : '' }, text: `${k} ${pct(v)}` }))),
+      h('div', { class: 'toggle-row' }, Object.entries(r.drainBy).map(([k, v]) => h('span', { class: 'badge', dataset: { tone: '' }, text: `${k} ${pct(v)}` }))),
       assessmentView(r),
       h('p', { class: 'field-label', text: '回合數分布（金＝勝、紅＝敗、灰＝平手）' }),
       h('div', { class: 'simchart' }, r.roundHist.map((x) => h('div', { class: 'simchart__col', title: `第 ${x.round} 回合結束：勝 ${x.win}・敗 ${x.lose}・平手 ${x.timeout}` },
@@ -277,13 +346,14 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         h('small', { class: 'simchart__label', text: String(x.round) })))),
       h('p', { class: 'field-label', text: '勝利時，玩家剩下多少生命（全隊合計）' }),
       h('div', { class: 'simchart' }, r.hpHist.map((c, i) => column(`${i * 10}%`, c, maxHp10, 'win', `${i * 10}~${(i + 1) * 10}%：${c} 場`))),
+      playersTable(r),
       h('p', { class: 'field-label', text: '各玩家至少倒地一次的機率' }),
       h('ul', { class: 'import-list' }, r.downRate.map((d) => h('li', { class: 'import-row' },
         h('span', { text: d.name }),
         h('span', { class: 'simbar' }, h('span', { class: 'simbar__fill', style: `width:${d.rate * 100}%` })),
         h('strong', { class: 'num', text: pct(d.rate) })))),
       h('details', { class: 'skill-row__text' }, h('summary', { text: '模擬的假設（需驗證）' }),
-        h('p', { text: '每場開始：生命與資源補滿、毒性歸零。每回合玩家依序行動、再輪到怪物（沒有模擬先攻）。玩家用「續航最長」的招式（資源能放最多次的），不夠就換下一個，最後用普攻；魔女付不起就放棄行動回復魔力。怪物每回合隨機打一位還沒倒地的玩家，BOSS 的輕擊／重擊／絕殺由被打的玩家挑預期傷害最低的。玩家自動喝藥水（毒性滿了不能喝），隊友倒地會餵回復藥水（毒性算被救的人），喝藥水不佔行動；攻擊／防禦加成藥水只要身上沒有加成就會喝（所以輕鬆的戰鬥也會用掉藥水）。選「自訂強度」時怪物的 A/B/C 分配每一場各自隨機；選場上的敵人或預組時每場都是同一組。玩家全員倒地才算敗。' })));
+        h('p', { text: '每場開始：生命與資源補滿、毒性歸零。每回合玩家依序行動、再輪到怪物（沒有模擬先攻）。玩家用「續航最長」的招式（資源能放最多次的），不夠就換下一個，最後用普攻；魔女付不起就放棄行動回復魔力。怪物每一下打誰由「怪物攻擊分配」決定（平均分散＝打這場被打次數最少的人，隨機＝隨機挑一位還沒倒地的玩家），BOSS 的輕擊／重擊／絕殺由被打的玩家挑預期傷害最低的。玩家自動喝藥水（毒性滿了不能喝），隊友倒地會餵回復藥水（毒性算被救的人），喝藥水不佔行動；攻擊藥水只在「不喝打不死眼前這隻、喝了打得死」時才喝，防禦藥水在生命低於 60% 時才喝；血藥假設每位玩家都備足（上面選的那種）。評價另外跑一組「第一名只出六成力」的情境，看隊伍還贏不贏。選「自訂強度」時怪物的 A/B/C 分配每一場各自隨機；選場上的敵人或預組時每場都是同一組。玩家全員倒地才算敗。' })));
   }
 
   function body() {
@@ -291,6 +361,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       h('p', { class: 'hint', text: '在這個瀏覽器裡跑模擬，只讀取玩家的角色，不會改動任何存檔。' }),
       h('h3', { class: 'section-title', text: '1. 選玩家' }), playersCard(),
       h('h3', { class: 'section-title', text: '2. 敵人' }), sourceCard(),
+      h('h3', { class: 'section-title', text: '3. 血藥與攻擊分配' }), supplyCard(), focusCard(),
       h('button', { type: 'button', class: 'btn btn--primary btn--go', disabled: ui.running || ui.tuning ? true : null, onclick: run },
         ui.running ? `模擬中… ${Math.round(ui.progress * 100)}%` : `▶ 開始模擬（${RUNS} 場）`),
       resultView());

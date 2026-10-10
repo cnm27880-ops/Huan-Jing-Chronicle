@@ -5,6 +5,7 @@
 // 沒加入房間（本機模式）：照舊由自己建立，存在角色存檔裡（單人試玩）。
 // 選目標：點卡片選取（可多選，依點選順序），最多到目前招式的目標數；出招按鈕在左欄的招式上。
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { toast, rollFailed } from './controls.js';
 import { TRACKS, TRACK_ATK_STAT, TRACK_DEF_STAT } from '../game/rules.js';
@@ -473,8 +474,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('span', { class: 'field-label', text: '戰鬥結果' }),
       RESULTS.map(([id, label, tone, lines]) => h('button', {
         type: 'button', class: 'btn btn--small btn--ghost', dataset: { result: id },
-        onclick: () => {
-          if (!confirm(`記錄這場戰鬥的結果：${label}？\n${lines.join('\n')}`)) return;
+        onclick: async (e) => {
+          if (!(await askConfirm(e.currentTarget, { title: `記錄這場戰鬥的結果：${label}？`, lines, okText: '記錄' }))) return;
           publish({ who: state.name, kind: 'note', label: `戰鬥結束：${label}`, tone, lines });
         },
       }, label)));
@@ -569,26 +570,6 @@ export function createEncounterCard({ getState, commit, rerender }) {
         h('strong', { class: 'num', text: `　已選 ${sel.targets.length}` })),
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: !enc.monsters.some((m) => !isDowned(m)), onclick: () => selectAllAlive(state) }, '全選存活'),
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: !sel.targets.length, onclick: () => { sel.targets = []; rerender(); } }, '清除選取'));
-  }
-
-  // ---------- 我方隊伍 ----------
-  function partyRow() {
-    const r = getRoomStatus();
-    if (r.phase !== 'online') return null;
-    const gm = new Set(r.gm?.uids ?? []);
-    const onlineIds = new Set(r.members.filter((m) => m.online).map((m) => m.uid));
-    const mates = Object.entries(r.vitals ?? {}).filter(([uid]) => uid !== r.me?.uid && !gm.has(uid));
-    return h('section', { class: 'party', 'aria-label': '我方隊伍' },
-      h('h3', { class: 'tray__title', text: '我方隊伍' }),
-      mates.length
-        ? h('ul', { class: 'party__list' }, mates.map(([uid, v]) => h('li', { class: `mate${v.downed ? ' is-downed' : ''}`, dataset: { online: onlineIds.has(uid) ? '1' : '0' } },
-            h('span', { class: 'mate__name', text: v.name }),
-            v.downed ? h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒地' }) : null,
-            h('span', { class: 'mate__bar', role: 'img', 'aria-label': `生命 ${v.hp} / ${v.maxHp}` }, h('span', { class: 'mate__fill', style: `width:${pctOf(v.hp, v.maxHp)}%` })),
-            h('span', { class: 'mate__hp num', text: `${fmt(v.hp)} / ${fmt(v.maxHp)}${v.shield ? `　🛡${fmt(v.shield)}` : ''}` }),
-            h('span', { class: 'mate__res' }, Object.entries(v.res ?? {}).map(([k, [now, max]]) => h('span', { title: `${k} ${now} / ${max}`, text: `${k} ${fmt(now)}` })),
-              v.tox != null ? h('span', { text: `毒 ${v.tox}` }) : null))))
-        : h('p', { class: 'hint', text: '隊友上線並操作過角色後，這裡會顯示他們的血量。' }));
   }
 
   // ---------- GM：新增敵人、立繪、管理 ----------
@@ -688,10 +669,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
   function presetBox(enc) {
     if (!online() || !isGm()) return null;
     if (ui.presets === null) { ui.presets = []; presetDo({ t: 'presetList' }); }
-    const save = () => {
+    const save = async (anchor) => {
       const name = ui.presetName.trim();
       if (!name) return toast('先幫這團取個名字。');
-      if (ui.presets.some((p) => p.name === name) && !confirm(`已經有「${name}」，要用場上的敵人覆蓋嗎？`)) return undefined;
+      if (ui.presets.some((p) => p.name === name) && !(await askConfirm(anchor, { title: `已經有「${name}」`, lines: ['要用場上的敵人覆蓋嗎？'], okText: '覆蓋', danger: true }))) return undefined;
       ui.presetName = '';
       return presetDo({ t: 'presetSave', name }, `已存成預組「${name}」。`);
     };
@@ -701,24 +682,24 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('div', { class: 'row preset-save' },
         h('input', {
           class: 'field', type: 'text', maxlength: 40, placeholder: '預組名稱，例如：第三章魔王戰', value: ui.presetName, 'aria-label': '預組名稱',
-          oninput: (e) => { ui.presetName = e.target.value; }, onkeydown: (e) => { if (e.key === 'Enter') save(); },
+          oninput: (e) => { ui.presetName = e.target.value; }, onkeydown: (e) => { if (e.key === 'Enter') save(e.currentTarget); },
         }),
-        h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.monsters.length, onclick: save }, '把場上的敵人存成預組')),
+        h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.monsters.length, onclick: (e) => save(e.currentTarget) }, '把場上的敵人存成預組')),
       ui.presets.length
         ? h('ul', { class: 'manage' }, ui.presets.map((p) => h('li', { class: 'manage__row' },
             h('span', { class: 'manage__name', text: p.name }),
             h('small', { class: 'hint', text: presetSummary(p) }),
             h('button', {
               type: 'button', class: 'btn btn--primary btn--small',
-              onclick: () => {
-                if (getEncounter()?.monsters.length && !confirm(`用「${p.name}」取代場上目前的敵人？（先攻會清空）`)) return;
+              onclick: async (e) => {
+                if (getEncounter()?.monsters.length && !(await askConfirm(e.currentTarget, { title: `用「${p.name}」取代場上目前的敵人？`, lines: ['先攻會清空。'], okText: '換上場' }))) return;
                 sel.targets = []; sel.modes = {};
                 presetDo({ t: 'presetLoad', name: p.name }, `已換上「${p.name}」。`);
               },
             }, '換上場'),
             h('button', {
               type: 'button', class: 'btn btn--ghost btn--small',
-              onclick: () => { if (confirm(`刪除預組「${p.name}」？`)) presetDo({ t: 'presetDel', name: p.name }); },
+              onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: `刪除預組「${p.name}」？`, okText: '刪除', danger: true })) presetDo({ t: 'presetDel', name: p.name }); },
             }, '刪除'))))
         : null);
   }
@@ -737,8 +718,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
             h('span', { class: 'library__name', text: im.name }),
             h('button', {
               type: 'button', class: 'btn btn--ghost btn--small', 'aria-label': `刪除立繪 ${im.name}`,
-              onclick: async () => {
-                if (!confirm(`刪除立繪「${im.name}」？`)) return;
+              onclick: async (e) => {
+                if (!(await askConfirm(e.currentTarget, { title: `刪除立繪「${im.name}」？`, okText: '刪除', danger: true }))) return;
                 try { await deleteImage(im.id); } catch (e) { toast(e.message || '刪除失敗。'); }
               },
             }, '刪除'))))
@@ -761,8 +742,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
         canEdit && enc.monsters.length
           ? h('button', {
               type: 'button', class: 'btn btn--ghost btn--small',
-              onclick: () => {
-                if (!confirm('清空所有敵人？')) return;
+              onclick: async (e) => {
+                if (!(await askConfirm(e.currentTarget, { title: '清空所有敵人？', okText: '清空', danger: true }))) return;
                 sel.modes = {}; sel.targets = [];
                 if (online()) act({ t: 'encClear' }); else { state.encounter = newEncounter(); commit(); }
               },
@@ -782,7 +763,6 @@ export function createEncounterCard({ getState, commit, rerender }) {
             h('input', { type: 'checkbox', checked: sel.yuwai ? true : null, onchange: (e) => { sel.yuwai = e.target.checked; } }),
             h('span', { text: '域外魔祖：這次攻擊花 30 靈氣，追加扣目標現有生命 10%' }))
         : null,
-      partyRow(),
       canEdit
         ? addBox('gm', online() ? '⚙️ 敵人與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), manageBox(state, enc), presetBox(enc), libraryBox()))
         : null);

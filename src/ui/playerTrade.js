@@ -4,6 +4,7 @@
 //   對方回覆：接受（他的東西夠才成交）／拒絕；接受時東西不夠＝交易失敗，A 的東西退回；A 也可以自己取消
 //   成交或退回的東西都走一般信箱（src/state/mailbox.js），上線就會收到。規則細節見 src/game/trade.js、GAME_RULES.md。
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { toast } from './controls.js';
 import { getRoomStatus, tradeList, tradeRespond, onTradeChange, notifyTradeChange } from '../state/rollLog.js';
@@ -35,13 +36,13 @@ export function createOffersView({ getState, commit }) {
     draw();
   }
 
-  async function respond(o, action) {
+  async function respond(o, action, anchor) {
     if (busy.has(o.id)) return;
     busy.add(o.id);
     const state = getState();
     try {
       if (action === 'accept') {
-        if (!confirm(`接受這筆交易？\n你要交出：${itemsText(o.want, o.wantGold)}\n你會換到：${itemsText(o.give, o.giveGold)}`)) return;
+        if (!(await askConfirm(anchor, { title: '接受這筆交易？', lines: [`你要交出：${itemsText(o.want, o.wantGold)}`, `你會換到：${itemsText(o.give, o.giveGold)}`], okText: '接受' }))) return;
         const pay = payOffer(state, o);
         if (pay.error) { // 接受了但東西不夠：交易失敗，對方的東西退回去
           await tradeRespond(o.id, 'fail');
@@ -61,11 +62,11 @@ export function createOffersView({ getState, commit }) {
         logActivity(state, { cat: 'item', text: `玩家交易成功：${o.fromName}`, lines: [`付出：${itemsText(o.want)}`] });
         toast('交易成功！換到的東西稍後會出現在背包（右下角會有通知）。');
       } else if (action === 'reject') {
-        if (!confirm(`拒絕 ${o.fromName} 的交易？東西會退回給對方。`)) return;
+        if (!(await askConfirm(anchor, { title: `拒絕 ${o.fromName} 的交易？`, lines: ['東西會退回給對方。'], okText: '拒絕', danger: true }))) return;
         await tradeRespond(o.id, 'reject');
         toast('已拒絕，東西退回給對方。');
       } else {
-        if (!confirm(`取消給 ${o.toName} 的交易？東西會退回你的背包（稍後收到通知）。`)) return;
+        if (!(await askConfirm(anchor, { title: `取消給 ${o.toName} 的交易？`, lines: ['東西會退回你的背包（稍後收到通知）。'], okText: '取消交易', cancelText: '先不要', danger: true }))) return;
         await tradeRespond(o.id, 'cancel');
         toast('已取消，東西退回中。');
       }
@@ -88,8 +89,8 @@ export function createOffersView({ getState, commit }) {
       line('要你交出', o.want, o.wantGold),
       h('p', { class: `trade-offer__have${lacks.length ? ' is-short' : ''}`, text: lacks.length ? `你的背包還不夠：${lacks.map((x) => `${x.name} ${fmt(x.have)}/${fmt(x.need)}`).join('、')}（接受會交易失敗）` : '你的背包夠付 ✓' }),
       h('div', { class: 'trade-offer__act' },
-        h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => respond(o, 'accept') }, '接受'),
-        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => respond(o, 'reject') }, '拒絕')));
+        h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: (e) => respond(o, 'accept', e.currentTarget) }, '接受'),
+        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: (e) => respond(o, 'reject', e.currentTarget) }, '拒絕')));
   }
 
   function outgoing(o) {
@@ -98,7 +99,7 @@ export function createOffersView({ getState, commit }) {
       line('你給出（已先扣）', o.give, o.giveGold),
       line('要對方交出', o.want, o.wantGold),
       h('div', { class: 'trade-offer__act' },
-        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => respond(o, 'cancel') }, '取消交易（退回東西）')));
+        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: (e) => respond(o, 'cancel', e.currentTarget) }, '取消交易（退回東西）')));
   }
 
   function draw() {

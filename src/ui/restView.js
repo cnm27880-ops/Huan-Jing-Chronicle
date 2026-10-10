@@ -25,6 +25,7 @@ import {
   specialMaxTimes, craftSpecial, useSpecialItem, gatherDaily, dailyDone, feedMeatball, harvestMeat,
 } from '../game/special.js';
 import { openSheet } from './sheet.js';
+import { askConfirm } from './confirmPop.js';
 import { skillTile, skillInfoBlock, skillTag } from './skillTile.js';
 
 const ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
@@ -219,11 +220,12 @@ export function createRestView({ root, getState, commit }) {
       h('span', { class: 'num', text: `${fmt(need)}（有 ${fmt(have)}）` }),
       h('b', { 'aria-hidden': 'true', text: have >= need ? '✓' : `缺 ${fmt(need - have)}` }));
 
-    function doUpgrade(plan) {
+    async function doUpgrade(plan, anchor) {
       if (blockedByDraw()) return;
       const state = getState();
       const bookText = Object.entries(plan.books).map(([n, q]) => `${n} ×${q}`).join('、');
-      if (!confirm(`${name}：${plan.from ? `${plan.from} 級` : '學習'} → ${plan.to} 級\n將消耗 ${fmt(plan.exp)} 經驗、${bookText}。\n確定嗎？`)) return;
+      const sure = await askConfirm(anchor, { title: `${name}：${plan.from ? `${plan.from} 級` : '學習'} → ${plan.to} 級`, lines: [`將消耗 ${fmt(plan.exp)} 經驗、${bookText}。`], okText: plan.from ? '升級' : '學習' });
+      if (!sure || blockedByDraw()) return;
       const r = upgradeSkillTo(state, name, plan.to);
       if (!r.ok) return toast(r.error);
       const swapText = r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`).join('；');
@@ -261,7 +263,7 @@ export function createRestView({ root, getState, commit }) {
           Object.entries(plan.books).map(([n, q]) => costRow(`${iconOf(n)} ${n}`, q, getState().inventory[n] ?? 0))),
         swapAt.length ? h('p', { class: 'hint', text: `會在 ${swapAt.join('、')} 級自動對調「${FOOL_SWAPS[name][0]}」與「${FOOL_SWAPS[name][1]}」。` }) : null,
         h('button', {
-          type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: () => doUpgrade(plan),
+          type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: (e) => doUpgrade(plan, e.currentTarget),
         }, plan.ok ? `${lv ? '升級' : '學習'}到 ${plan.to} 級` : '材料不夠'));
     }
 
@@ -283,8 +285,8 @@ export function createRestView({ root, getState, commit }) {
             h('p', { class: 'skill-info__text', text: SKILL_TABLE[n].text }),
             h('button', {
               type: 'button', class: 'btn btn--primary btn--small',
-              onclick: () => {
-                if (!confirm(`選「${n}」？選了就不能改。`)) return;
+              onclick: async (e) => {
+                if (!(await askConfirm(e.currentTarget, { title: `選「${n}」？`, lines: ['選了就不能改。'], okText: '選這個' }))) return;
                 const r = chooseDraw(getState(), i, n);
                 if (!r.ok) return toast(r.error);
                 toast(`得到 ${n} 技能書 ×1`);

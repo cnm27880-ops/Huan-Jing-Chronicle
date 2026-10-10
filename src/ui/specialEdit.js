@@ -4,6 +4,7 @@
 // 寫入走房間（specialSet／specialDel），伺服器檢查是不是 GM 並驗證內容，改完所有人立刻收到。
 // 欄位檢查規則在 src/game/special.js（前端先擋一次，伺服器再擋一次）。
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h } from './dom.js';
 import { openSheet } from './sheet.js';
 import { roomRequest, getRoomStatus, subscribeRoom } from '../state/rollLog.js';
@@ -60,7 +61,7 @@ export function openSpecialEditor() {
               h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.busy ? true : null, onclick: () => editRecipe(n, recipes[n]) }, '編輯'),
               h('button', {
                 type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.busy ? true : null,
-                onclick: () => { if (confirm(`刪除配方「${n}」？已經做出來的物品不會消失。`)) send({ t: 'specialDel', kind: 'recipe', name: n }, `已刪除「${n}」`); },
+                onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: `刪除配方「${n}」？`, lines: ['已經做出來的物品不會消失。'], okText: '刪除', danger: true })) send({ t: 'specialDel', kind: 'recipe', name: n }, `已刪除「${n}」`); },
               }, '刪除'))))) 
         : h('p', { class: 'hint', text: '還沒有新增任何配方。' }),
       h('h4', { class: 'field-label', text: ui.editingR ? `編輯「${ui.editingR}」` : '新增配方' }),
@@ -106,7 +107,7 @@ export function openSpecialEditor() {
               }, '編輯'),
               h('button', {
                 type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.busy ? true : null,
-                onclick: () => { if (confirm(`刪除材料「${n}」？玩家背包裡已有的不會消失。`)) send({ t: 'specialDel', kind: 'material', name: n }, `已刪除「${n}」`); },
+                onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: `刪除材料「${n}」？`, lines: ['玩家背包裡已有的不會消失。'], okText: '刪除', danger: true })) send({ t: 'specialDel', kind: 'material', name: n }, `已刪除「${n}」`); },
               }, '刪除')))))
         : h('p', { class: 'hint', text: '還沒有新增任何材料。' }),
       h('h4', { class: 'field-label', text: ui.editingM ? `編輯「${ui.editingM}」` : '新增材料' }),

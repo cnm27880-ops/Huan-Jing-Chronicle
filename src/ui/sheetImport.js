@@ -3,6 +3,7 @@
 // GM 把玩家的試算表另存副本 → 「角色永久狀態」分頁全選複製 → 貼上這裡。
 // 讀取與轉換都在瀏覽器裡，轉好的角色才送到伺服器；規則見 src/game/importSheet.js。
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { openSheet } from './sheet.js';
 import { parseSheet, convertSheet } from '../game/importSheet.js';
@@ -80,7 +81,7 @@ export function openSheetImportSheet() {
       h('span', { text: '取代現有存檔（不合併）：伺服器上的角色整份丟掉重建，背包、裝備、金幣也會清空。角色被弄錯（例如變成別人的角色）時才勾。' })),
     h('div', { class: 'row' },
       h('button', { type: 'button', class: 'btn', disabled: ui.busy ? true : null, onclick: analyse }, '解析'),
-      ui.parsed ? h('button', { type: 'button', class: 'btn btn--primary', disabled: ui.busy ? true : null, onclick: () => { if (confirm(ui.replace ? '取代伺服器上的角色？現有存檔（含背包、裝備、金幣）會整份丟掉。' : '寫入伺服器？已有角色的玩家會被合併。')) write(); } }, ui.busy ? '寫入中…' : '寫入伺服器') : null),
+      ui.parsed ? h('button', { type: 'button', class: 'btn btn--primary', disabled: ui.busy ? true : null, onclick: async (e) => { if (await askConfirm(e.currentTarget, ui.replace ? { title: '取代伺服器上的角色？', lines: ['現有存檔（含背包、裝備、金幣）會整份丟掉。'], okText: '取代', danger: true } : { title: '寫入伺服器？', lines: ['已有角色的玩家會被合併。'], okText: '寫入' })) write(); } }, ui.busy ? '寫入中…' : '寫入伺服器') : null),
     ui.message ? h('p', { class: 'notice notice--bad', text: ui.message }) : null,
     ui.done ? h('p', { class: 'notice', text: ui.done }) : null,
     ui.parsed ? preview() : null));

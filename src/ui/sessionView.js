@@ -7,6 +7,8 @@
 // 左欄與中欄都變成底部抽屜（⚔️ 招式／🌿 技能／🎯 目標），頂部是膠囊 HUD 與目標血量。
 // 紀錄是「房間內所有玩家」共用（見 src/state/rollLog.js）。
 // ============================================================
+import { createPartyPanel } from './partyBars.js';
+import { askConfirm } from './confirmPop.js';
 import { h } from './dom.js';
 import { rollFailed } from './controls.js';
 import { mountRoomPanel } from './roomPanel.js';
@@ -51,7 +53,8 @@ export function createSessionView({ root, getState, commit }) {
   const feedHead = h('div', { class: 'sx-feedhead' });
   const feedBox = h('div', { class: 'sx-feed', role: 'log', 'aria-label': '擲骰紀錄' });
   const diceBox = h('div', { class: 'sx-dice' });
-  const right = h('aside', { class: 'sx-col sx-right', 'aria-label': '紀錄與擲骰' }, top, roomDetails, feedHead, feedBox, diceBox);
+  const party = createPartyPanel(); // 隊友資源條（玩家端；GM 不顯示）
+  const right = h('aside', { class: 'sx-col sx-right', 'aria-label': '紀錄與擲骰' }, top, party.node, roomDetails, feedHead, feedBox, diceBox);
   const barBtn = (id, label, controls) => h('button', {
     type: 'button', class: 'sx-bar__btn', dataset: { id }, 'aria-controls': controls, 'aria-expanded': 'false',
     onclick: () => openSheet(id),
@@ -143,7 +146,7 @@ export function createSessionView({ root, getState, commit }) {
       stomach.length
         ? h('button', {
             type: 'button', class: 'btn btn--ghost btn--small',
-            onclick: () => { if (!confirm('結束本次跑團？跑團胃袋會清空。')) return; endSession(state); commit(); },
+            onclick: async (e) => { if (!(await askConfirm(e.currentTarget, { title: '結束本次跑團？', lines: ['跑團胃袋會清空。'], okText: '結束', danger: true }))) return; endSession(state); commit(); },
           }, '結束本次跑團')
         : null,
       h('p', { class: 'field-label', text: '生活技能（技能 ＋ 跑團熟練）' }),
@@ -206,7 +209,7 @@ export function createSessionView({ root, getState, commit }) {
     const local = getRoomStatus().phase !== 'online';
     feedHead.hidden = !local;
     feedHead.replaceChildren(...(local
-      ? [h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')]
+      ? [h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: '清空這台裝置上的擲骰紀錄？', okText: '清空', danger: true })) clearLog(); } }, '清空')]
       : []));
   }
 
@@ -291,12 +294,14 @@ export function createSessionView({ root, getState, commit }) {
         roomSig = sig;
         if (typingIn(center)) deferred = true; else renderCenter();
         renderTop();
+        party.render();
         if (sel.targets.join() !== before) renderLeft(); // 目標倒下或被移除：左欄「出招」按鈕的目標文字跟著更新
         renderFeedHead();
       });
     }
     renderRoomSummary();
     renderFeedHead();
+    party.render();
     renderCenter();
     renderLeft();
     renderTop();

@@ -3,6 +3,7 @@
 // 遭遇戰（怪物、選目標）在 encounterCard.js；版面組合在 sessionView.js。
 // 規則照機器人的 A/B/C 三軌道（見 GAME_RULES.md「戰鬥」）。結果會發布到擲骰紀錄，所有人看得到。
 // ============================================================
+import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { toast, rollFailed } from './controls.js';
 import { TRACKS, POTIONS, TOXICITY_MAX } from '../game/rules.js';
@@ -169,8 +170,8 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { restoreAllResources(state); commit(); } }, '觸摸存檔點（全部回滿）'),
         h('button', {
           type: 'button', class: 'btn btn--small',
-          onclick: () => {
-            if (!confirm('結束戰鬥？毒性歸零、藥水加成清除、敵人清空。')) return;
+          onclick: async (e) => {
+            if (!(await askConfirm(e.currentTarget, { title: '結束戰鬥？', lines: ['毒性歸零、藥水加成清除、敵人清空。'], okText: '結束戰鬥', danger: true }))) return;
             const r = endBattle(state); sel.modes = {};
             publish({ who: state.name, kind: 'note', label: '戰鬥結束', lines: [`毒性 ${r.toxicity} → 0`] });
             commit();
@@ -215,9 +216,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       have.length
         ? h('div', { class: 'potion-grid' }, have.map((n) => h('button', {
             type: 'button', class: 'potion', title: potionText(POTIONS[n]), disabled: state.toxicity + POTIONS[n].toxicity > TOXICITY_MAX, 'aria-disabled': String(state.toxicity + POTIONS[n].toxicity > TOXICITY_MAX),
-            onclick: async () => {
+            onclick: async (e) => {
               const pd = POTIONS[n];
-              if (pd.heal && !pd.atk && !pd.def && state.hp >= maxHp(state) && !confirm('血量已經是滿的，喝了回血會浪費。還是要喝嗎？')) return;
+              if (pd.heal && !pd.atk && !pd.def && state.hp >= maxHp(state) && !(await askConfirm(e.currentTarget, { title: '血量已經是滿的', lines: ['喝了回血會浪費。還是要喝嗎？'], okText: '還是喝' }))) return;
               let r;
               let draw;
               try { ({ r, draw } = await rollWith(state, (st, rng) => drinkPotion(st, n, rng))); } catch (e) { return rollFailed(e); }
@@ -381,7 +382,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           : null),
       h('button', {
         type: 'button', class: 'move__del', 'aria-label': `刪除招式 ${m.name}`, title: '刪除招式',
-        onclick: () => { if (!confirm(`刪除招式「${m.name}」？`)) return; state.moves = state.moves.filter((x) => x.id !== m.id); ui.openMoves.delete(m.id); commit(); },
+        onclick: async (e) => { if (!(await askConfirm(e.currentTarget, { title: `刪除招式「${m.name}」？`, okText: '刪除', danger: true }))) return; state.moves = state.moves.filter((x) => x.id !== m.id); ui.openMoves.delete(m.id); commit(); },
       }, '✕'));
   }
 
