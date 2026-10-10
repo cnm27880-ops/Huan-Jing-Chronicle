@@ -572,26 +572,6 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: !sel.targets.length, onclick: () => { sel.targets = []; rerender(); } }, '清除選取'));
   }
 
-  // ---------- 我方隊伍 ----------
-  function partyRow() {
-    const r = getRoomStatus();
-    if (r.phase !== 'online') return null;
-    const gm = new Set(r.gm?.uids ?? []);
-    const onlineIds = new Set(r.members.filter((m) => m.online).map((m) => m.uid));
-    const mates = Object.entries(r.vitals ?? {}).filter(([uid]) => uid !== r.me?.uid && !gm.has(uid));
-    return h('section', { class: 'party', 'aria-label': '我方隊伍' },
-      h('h3', { class: 'tray__title', text: '我方隊伍' }),
-      mates.length
-        ? h('ul', { class: 'party__list' }, mates.map(([uid, v]) => h('li', { class: `mate${v.downed ? ' is-downed' : ''}`, dataset: { online: onlineIds.has(uid) ? '1' : '0' } },
-            h('span', { class: 'mate__name', text: v.name }),
-            v.downed ? h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒地' }) : null,
-            h('span', { class: 'mate__bar', role: 'img', 'aria-label': `生命 ${v.hp} / ${v.maxHp}` }, h('span', { class: 'mate__fill', style: `width:${pctOf(v.hp, v.maxHp)}%` })),
-            h('span', { class: 'mate__hp num', text: `${fmt(v.hp)} / ${fmt(v.maxHp)}${v.shield ? `　🛡${fmt(v.shield)}` : ''}` }),
-            h('span', { class: 'mate__res' }, Object.entries(v.res ?? {}).map(([k, [now, max]]) => h('span', { title: `${k} ${now} / ${max}`, text: `${k} ${fmt(now)}` })),
-              v.tox != null ? h('span', { text: `毒 ${v.tox}` }) : null))))
-        : h('p', { class: 'hint', text: '隊友上線並操作過角色後，這裡會顯示他們的血量。' }));
-  }
-
   // ---------- GM：新增敵人、立繪、管理 ----------
   function numField(label, key, min = 0) {
     return h('label', { class: 'extra' },
@@ -783,7 +763,6 @@ export function createEncounterCard({ getState, commit, rerender }) {
             h('input', { type: 'checkbox', checked: sel.yuwai ? true : null, onchange: (e) => { sel.yuwai = e.target.checked; } }),
             h('span', { text: '域外魔祖：這次攻擊花 30 靈氣，追加扣目標現有生命 10%' }))
         : null,
-      partyRow(),
       canEdit
         ? addBox('gm', online() ? '⚙️ 敵人與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), manageBox(state, enc), presetBox(enc), libraryBox()))
         : null);

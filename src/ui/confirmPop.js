@@ -51,7 +51,7 @@ function openPop(anchor, title, build, cancelValue) {
     const modal = !anchor?.isConnected;
     const done = (v) => close(v);
     const { content, focusEl } = build(done);
-    const node = h('div', { class: 'confirm-pop', role: 'alertdialog', 'aria-modal': 'true', 'aria-label': title }, content);
+    const node = h('div', { class: 'confirm-pop', role: 'alertdialog', 'aria-modal': 'true', 'aria-label': title }, ...[content].flat(Infinity));
     const backdrop = modal ? h('div', { class: 'confirm-backdrop', onclick: () => close(cancelValue) }) : null;
     if (backdrop) document.body.append(backdrop);
     document.body.append(node);

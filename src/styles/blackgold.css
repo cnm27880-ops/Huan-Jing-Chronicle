@@ -1456,17 +1456,36 @@ input[type='number'], .amount__input { text-align: center; }
 .stage__targetinfo { flex: 1; min-width: 10rem; font-size: 0.84rem; color: var(--soft); }
 .stage__targetinfo strong { color: var(--gold); }
 
-/* 我方隊伍：隊友血量橫條 */
-.party .tray__title { margin: 0 0 6px; }
-.party__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
-.mate { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 3px 6px; padding: 8px 10px; background: var(--card); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+/* 隊友資源條（右欄、房間上方；src/ui/partyBars.js）：每條都是「還剩多少」，顏色和自己的 HUD 一致 */
+.sx-party { flex-shrink: 0; padding: 8px 12px; background: var(--card); border-radius: var(--r-panel); box-shadow: var(--panel-shadow); }
+.sx-party[hidden] { display: none; }
+.sx-party__sum { cursor: pointer; font-size: 0.86rem; color: var(--soft); overflow-wrap: anywhere; }
+.sx-party[open] .sx-party__sum { margin-bottom: 8px; color: var(--gold); }
+.sx-party[data-level='warn'] .sx-party__sum { color: var(--gold); }
+.sx-party[data-level='bad'] .sx-party__sum { color: var(--rose); font-weight: 700; }
+.sx-party__body { max-height: 38vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.party__list { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.mate { display: grid; gap: 3px; padding: 8px 10px; background: var(--paper); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .mate[data-online='0'] { opacity: 0.6; }
+.mate__head { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .mate__name { overflow: hidden; font-size: 0.84rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; color: var(--ink2); }
 .mate.is-downed .mate__name { color: var(--rose); }
-.mate__bar { grid-column: 1 / -1; height: 7px; overflow: hidden; background: var(--paper); border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--line); }
+.mate__idle { flex: none; font-size: 0.7rem; color: var(--gold); }
+.mate__use { flex: none; margin-left: auto; font-size: 0.72rem; color: var(--soft); }
+.mate__bar { height: 7px; overflow: hidden; background: var(--card); border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--line); }
 .mate__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--rose2), var(--rose)); transition: width 0.25s ease; }
-.mate__hp { grid-column: 1 / -1; font-size: 0.74rem; color: var(--ink2); }
-.mate__res { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 0.7rem; color: var(--soft); }
+.mate__hp { font-size: 0.72rem; color: var(--ink2); }
+.mate__bars { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 3px 8px; margin-top: 2px; }
+.rbar { display: flex; align-items: center; gap: 4px; min-width: 0; --rc: var(--soft); }
+.rbar[data-res='靈氣'] { --rc: var(--lilac); }
+.rbar[data-res='魔力'] { --rc: var(--res-mana); }
+.rbar[data-res='能量'] { --rc: var(--res-energy); }
+.rbar[data-res='鬥氣'] { --rc: var(--res-fight); }
+.rbar[data-res='算力'] { --rc: var(--res-calc); }
+.rbar[data-res='毒性'] { --rc: var(--res-tox); }
+.rbar__label { flex: none; width: 1em; font-size: 0.72rem; text-align: center; color: var(--rc); }
+.rbar__track { flex: 1; height: 6px; overflow: hidden; background: var(--card); border-radius: var(--r-pill); box-shadow: inset 0 0 0 1px var(--line); }
+.rbar__fill { display: block; height: 100%; background: var(--rc); transition: width 0.25s ease; }
 
 /* GM：敵人管理、立繪庫 */
 .manage { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -1594,7 +1613,7 @@ input[type='number'], .amount__input { text-align: center; }
   .firebar__fire { min-height: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sx-left, .sx-center, .mob, .boss__art, .lbar__fill, .mob__fill, .mate__fill { transition: none; }
+  .sx-left, .sx-center, .mob, .boss__art, .lbar__fill, .mob__fill, .mate__fill, .rbar__fill { transition: none; }
 }
 
 /* ============================================================
@@ -1886,3 +1905,18 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .confirm-backdrop { position: fixed; inset: 0; z-index: 109; background: rgba(var(--paper-rgb), 0.6); opacity: 0; transition: opacity 0.15s ease; }
 .confirm-backdrop[data-open='true'] { opacity: 1; }
 .confirm-pop__input { width: 100%; margin-top: 8px; box-sizing: border-box; min-height: 44px; }
+
+/* 戰鬥提醒（src/ui/nudgeModal.js）：擋住畫面、只能按「我知道了」關；蓋在彈出面板之上、確認框之下 */
+.nudge { position: fixed; inset: 0; z-index: 108; display: grid; place-items: center; padding: 16px; background: rgba(var(--paper-rgb), 0.78); }
+.nudge__panel { box-sizing: border-box; width: min(460px, 100%); max-height: min(86dvh, 640px); overflow-y: auto; padding: 16px; background: var(--card); border: 2px solid var(--rose2); border-radius: var(--r-panel); box-shadow: 0 12px 40px rgba(var(--shadow-rgb), 0.6); }
+.nudge__title { margin: 0 0 10px; font-size: 1.1rem; color: var(--rose); letter-spacing: 0.04em; }
+.nudge__ev { margin: 0 0 10px; padding: 10px; background: var(--rosebg); border-radius: 10px; }
+.nudge__evtitle { margin: 0 0 6px; font-size: 0.98rem; color: var(--ink); overflow-wrap: anywhere; }
+.nudge__acts { display: flex; flex-direction: column; gap: 6px; }
+.nudge__acts .btn { min-height: 44px; text-align: left; }
+.nudge__you-title { margin: 8px 0 4px; font-size: 0.84rem; font-weight: 700; color: var(--gold); }
+.nudge__tips { margin: 0; padding-left: 1.2em; font-size: 0.88rem; color: var(--ink2); }
+.nudge__tips li { margin: 2px 0; overflow-wrap: anywhere; }
+.nudge__foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.nudge__foot .btn { min-height: 44px; min-width: 96px; }
+.nudge__none { margin: 0; font-size: 0.84rem; color: var(--soft); }

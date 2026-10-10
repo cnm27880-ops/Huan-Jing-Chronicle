@@ -36,6 +36,7 @@ import { loadCachedCustomSkills, saveCachedCustomSkills } from './state/customSk
 import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter, stashLocalCharacter, unstashLocalCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
 import { createMailbox } from './state/mailbox.js';
+import { mountNudges } from './ui/nudgeModal.js';
 import { toast } from './ui/controls.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -128,6 +129,7 @@ async function init() {
   });
   vitals = createVitalsReporter({ getState, skip: () => sync.isWaiting() }); // 等 GM 匯入期間不回報示範角色
 
+  mountNudges({ getState, commit }); // 戰鬥提醒：隊友倒地、危急、全隊吃緊時跳出（GM 不顯示）
   createMailbox({ getState, commit }); // 別人送的東西、餵的藥：領取後直接放進自己的角色
 
   // GM 不用示範角色：連上房間後，如果 GM 的角色看起來還是示範角色（名字相同、或還在等匯入），**先問**要不要換成空白角色（名字用 Discord 名稱）。
