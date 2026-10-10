@@ -22,7 +22,7 @@ export function badgeCard({ getState, commit }) {
         const label = b.kind === '神級' ? '神級徽章' : `${BADGE_COUNT}次徽章（${fmt(Math.min(b.progress.have, BADGE_COUNT))}/${BADGE_COUNT}）`;
         if (b.made) {
           return h('div', { class: 'badge-made' },
-            h('span', { class: 'badge-made__name', text: `✓ ${b.item}` }),
+            h('span', { class: 'badge-made__name', title: b.item, text: `✓ ${b.item}` }),
             h('button', {
               type: 'button', class: 'btn btn--ghost btn--small',
               onclick: () => {

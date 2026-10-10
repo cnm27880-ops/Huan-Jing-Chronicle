@@ -1182,7 +1182,8 @@ input[type='number'], .amount__input { text-align: center; }
 .badge-link:hover { color: var(--gold); background: var(--goldbg); }
 .badge-link:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 .badge-made { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; font-size: 0.8rem; color: var(--soft); }
-.badge-made__name { min-width: 0; overflow-wrap: anywhere; }
+.badge-made__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* 名字太長就刪節號，完整名字在滑過時顯示 */
+.badge-made .btn { flex: none; white-space: nowrap; }
 
 /* 修整日「特殊」分頁 */
 .special-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; margin-top: 6px; }
