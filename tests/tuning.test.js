@@ -1,7 +1,7 @@
 // 模擬戰的評價、策略與自動調整（GM 目標：2～3 回合、每場耗約一半資源）
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, penalty, autoTune, TARGET } from '../src/game/tuning.js';
+import { assess, penalty, autoTune, TARGET, PLANS } from '../src/game/tuning.js';
 import { simulateBattle, summarize } from '../src/game/simulate.js';
 import { blankCharacter } from '../src/game/importBot.js';
 import { moveFromCatalog } from '../src/game/skills.js';
@@ -69,4 +69,29 @@ test('扣分：幾乎每場都有人倒地、回合數顯示 3.0（內部 3.04�
   assert.equal(penalty({ ...base, avgRounds: 3.04 }), 0);
   assert.equal(assess({ ...base, avgRounds: 3.04 }).items[0].status, 'ok');
   assert.equal(assess({ ...base, avgRounds: 3.06 }).items[0].status, 'high');
+});
+
+test('保守版／激進版：都落在總目標內，各自偏向一邊；同一組數字對兩邊的罰分不同', () => {
+  for (const p of Object.values(PLANS)) {
+    assert.ok(p.roundsMin >= TARGET.roundsMin && p.roundsMax <= TARGET.roundsMax);
+    assert.ok(p.drain - p.drainTol >= TARGET.drain - TARGET.drainTol - 1e-9 && p.drain + p.drainTol <= TARGET.drain + TARGET.drainTol + 1e-9); // 小數誤差
+    assert.ok(p.winMin >= TARGET.winMin && p.downMax <= TARGET.downMax);
+  }
+  const slow = sum({ avgRounds: 2.9, avgDrain: 0.45, win: 0.97 }); // 偏輕鬆
+  assert.equal(penalty(slow, PLANS.conservative), 0);
+  assert.ok(penalty(slow, PLANS.aggressive) > 0);
+  const tight = sum({ avgRounds: 2.1, avgDrain: 0.55, win: 0.92, downRate: [{ name: 'a', rate: 0.5 }] }); // 偏緊繃
+  assert.equal(penalty(tight, PLANS.aggressive), 0);
+  assert.ok(penalty(tight, PLANS.conservative) > 0);
+  assert.equal(penalty(slow), 0); // 沒指定方案：照原本的總目標
+});
+
+test('自動調整：兩個方案找到的血量不同（保守回合長、激進回合短）', async () => {
+  const evaluate = (specs) => sum({ avgRounds: specs[0].hp / 400, avgDrain: Math.min(1, specs[0].atkPower / 200), win: 1 });
+  const run = (target) => autoTune({ specs: [{ kind: 'boss', count: 1, hp: 4000, atkPower: 20 }], evaluate, target, yieldFn: async () => {} });
+  const [c, a] = [await run(PLANS.conservative), await run(PLANS.aggressive)];
+  assert.equal(c.penalty, 0);
+  assert.equal(a.penalty, 0);
+  assert.ok(c.specs[0].hp > a.specs[0].hp);
+  assert.ok(c.specs[0].atkPower < a.specs[0].atkPower);
 });

@@ -124,7 +124,7 @@ export function buildEncounter(specs, rng = Math.random) {
 /** 固定敵人的複本：生命補滿（不影響原本的資料） */
 export function fixedEncounter(src) {
   const enc = newEncounter();
-  enc.monsters = structuredClone(src.monsters ?? []).map((m) => { const x = { ...m, hp: m.maxHp }; delete x.uses; delete x.charge; return x; });
+  enc.monsters = structuredClone(src.monsters ?? []).map((m) => { const x = { ...m, hp: m.maxHp }; delete x.uses; delete x.charge; delete x.usedC; return x; });
   return enc;
 }
 

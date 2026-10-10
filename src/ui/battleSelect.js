@@ -8,5 +8,6 @@ export const battleSel = {
   focusBoss: null, // 中間大立繪顯示哪一隻 BOSS（有好幾隻時）
   modes: {}, // 怪物 id → { atk, def }
   yuwai: false,
+  cover: '', // 這次承受攻擊要替哪位隊友擋（uid；空字串＝自己承受）
   dou: 0, // 這次出招要花幾點鬥氣加骰（出招後歸零）
 };

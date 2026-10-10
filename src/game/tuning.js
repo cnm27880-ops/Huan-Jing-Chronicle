@@ -13,17 +13,28 @@ export const TARGET = {
   battlesPerSession: 2,
 };
 
+/**
+ * 自動調整的兩個方案（使用者 2026-10-10 要求「激進版／保守版」；兩邊的定義是我訂的，需向 GM 確認）。
+ * 兩個方案都落在上面 TARGET 的範圍內，只是各自偏向一邊：
+ *   保守版：偏輕鬆——回合偏長（2.5～3）、每場耗約 45%、勝率至少 95%、倒地機率低。玩家有餘裕，適合新手團或想讓玩家放大招爽打。
+ *   激進版：偏緊繃——回合偏短（2～2.5）、每場耗約 55%、勝率至少 90%、倒地機率可以高一些。玩家要精打細算、藥水有存在感。
+ */
+export const PLANS = {
+  conservative: { key: 'conservative', label: '保守版', note: '偏輕鬆：回合 2.5～3、每場耗約 45%、勝率 95% 以上', roundsMin: 2.5, roundsMax: 3, drain: 0.45, drainTol: 0.05, winMin: 0.95, downMax: 0.4 },
+  aggressive: { key: 'aggressive', label: '激進版', note: '偏緊繃：回合 2～2.5、每場耗約 55%、勝率 90% 以上', roundsMin: 2, roundsMax: 2.5, drain: 0.55, drainTol: 0.05, winMin: 0.9, downMax: 0.6 },
+};
+
 const pct = (v) => `${Math.round(v * 100)}%`;
 const fmtN = (v) => Math.round(v).toLocaleString('zh-TW');
 
 /** 偏離目標的程度（0 = 三項都達標）；自動調整就是找讓它最小的敵人數值 */
-export function penalty(sum) {
+export function penalty(sum, t = TARGET) {
   const rounds = Math.round(sum.avgRounds * 10) / 10; // 和畫面顯示的一位小數一致
-  const pr = Math.max(0, TARGET.roundsMin - rounds, rounds - TARGET.roundsMax);
-  const pc = Math.max(0, Math.abs(sum.avgDrain - TARGET.drain) - TARGET.drainTol) / TARGET.drainTol;
-  const pw = Math.max(0, TARGET.winMin - sum.win) / 0.1;
+  const pr = Math.max(0, t.roundsMin - rounds, rounds - t.roundsMax);
+  const pc = Math.max(0, Math.abs(sum.avgDrain - t.drain) - t.drainTol) / t.drainTol;
+  const pw = Math.max(0, t.winMin - sum.win) / 0.1;
   const downMax = Math.max(0, ...(sum.downRate ?? []).map((d) => d.rate));
-  const pd = Math.max(0, downMax - TARGET.downMax) / 0.2; // 幾乎每場都有人倒地：太兇
+  const pd = Math.max(0, downMax - t.downMax) / 0.2; // 幾乎每場都有人倒地：太兇
   return pr + pc + pw + pd;
 }
 
@@ -77,15 +88,15 @@ export function assess(sum) {
 }
 
 /**
- * 自動調整：同時縮放全部敵人的血量與攻擊強度，找讓 penalty 最小的倍率。
+ * 自動調整：同時縮放全部敵人的血量與攻擊強度，找讓 penalty 最小的倍率（target 是 TARGET 或 PLANS 的其中一個方案）。
  * evaluate(specs) → summarize 的結果（呼叫端決定每次跑幾場）；specs 是自訂強度的敵人清單。
  * 回傳 { specs, hpScale, atkScale, summary, penalty }。每評估一次就 await 一下，畫面才不會卡住。
  */
-export async function autoTune({ specs, evaluate, onProgress = () => {}, yieldFn = () => new Promise((res) => setTimeout(res, 0)), maxIter = 12 }) {
+export async function autoTune({ specs, evaluate, target = TARGET, onProgress = () => {}, yieldFn = () => new Promise((res) => setTimeout(res, 0)), maxIter = 12 }) {
   const apply = (kh, ka) => specs.map((s) => ({ ...s, hp: Math.max(1, Math.round(s.hp * kh)), atkPower: Math.max(1, Math.round(s.atkPower * ka)) }));
   let best = { kh: 1, ka: 1 };
   let bestSum = evaluate(apply(1, 1));
-  let bestPen = penalty(bestSum);
+  let bestPen = penalty(bestSum, target);
   let step = 1.6;
   for (let iter = 0; iter < maxIter && bestPen > 0 && step > 1.06; iter++) {
     onProgress((iter + 1) / maxIter, bestPen);
@@ -97,7 +108,7 @@ export async function autoTune({ specs, evaluate, onProgress = () => {}, yieldFn
     for (const [kh, ka] of cands) {
       await yieldFn();
       const sum = evaluate(apply(kh, ka));
-      const pen = penalty(sum);
+      const pen = penalty(sum, target);
       if (pen < bestPen - 1e-9) { best = { kh, ka }; bestSum = sum; bestPen = pen; improved = true; }
     }
     if (!improved) step = Math.sqrt(step);

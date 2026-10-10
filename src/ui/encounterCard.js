@@ -22,6 +22,7 @@ import {
 } from '../state/rollLog.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { battleSel as sel } from './battleSelect.js';
+import { coverLeft, COVER_PER_ROUND } from '../game/cover.js';
 
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const pctOf = (cur, max) => (max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0);
@@ -305,8 +306,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const before = state.hp;
     // 敵人這回合還能打幾次（普通 1、菁英 2、BOSS 3）；A 技能蓄力過就多加骰。房間模式由伺服器扣次數
     let extraAtk = 0;
+    const coverUid = online() && !isGm() ? sel.cover : ''; // 替隊友擋：這一下仍然用自己的防禦結算，只是記一次「這回合擋過了」
+    const coverName = coverUid ? coverMates().find((x) => x.uid === coverUid)?.name ?? '隊友' : '';
     try {
-      if (online()) extraAtk = (await encounterAction({ t: 'encUse', id: m.id, use: 'atk' })).extraAtk ?? 0;
+      if (online()) extraAtk = (await encounterAction({ t: 'encUse', id: m.id, use: 'atk', ...(coverUid ? { cover: coverUid } : {}) })).extraAtk ?? 0;
       else {
         const spent = spendEnemyAttack(state.encounter, m.id);
         if (spent.error) return toast(spent.error);
@@ -319,11 +322,13 @@ export function createEncounterCard({ getState, commit, rerender }) {
       ({ r, draw } = await withRoomEncounter(state, () => rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng, { extraAtk }))));
     } catch (e) { return rollFailed(e); }
     if (r.error) return toast(r.error);
+    if (coverUid) sel.cover = ''; // 擋完回到「自己承受」，免得下一次忘了還在擋
     playFx(m.id, 'strike'); // 怪物撲過來
     publish({
       who: state.name, kind: 'defend', label: `${m.id} 攻擊${m.kind === 'boss' ? `（${BOSS_ATK_MODES[modes.atk]}）` : ''}`,
       big: r.result.total, tone: r.result.total > 0 ? 'fail' : 'ok',
       lines: [
+        coverUid ? `🛡️ ${state.name} 替 ${coverName} 擋下這一擊（本回合的擋人次數用完了）` : null,
         r.extraAtk ? `敵人 A 技能：這招每一軌各 +${r.extraAtk} 顆攻擊骰` : null,
         ...trackLines(r.result),
         r.potion ? `藥水加成：絕對防禦 +${r.potion} 骰（三軌）` : null,
@@ -429,7 +434,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
   const SKILL_TIPS = {
     A: '攻擊強化：用了之後，他的下一次攻擊每一軌各 +20 顆攻擊骰（一回合 1 次）',
     B: '防禦強化：用了之後，他下一次被打時絕對防禦多 20 顆（BOSS 30 顆）；普通 1 次、菁英與 BOSS 一回合 2 次',
-    C: '喝血：只能在他自己的回合用，回復 ND16 生命（普通 10、菁英 20、BOSS 30 顆）；一回合 1 次',
+    C: '喝血：只能在他自己的回合用，回復 ND16 生命（普通 10、菁英 20、BOSS 30 顆）；整場戰鬥只能 1 次（換回合不會恢復）',
   };
   /** 敵人用技能（GM；本機模式是自己）。房間模式由伺服器處理並寫紀錄 */
   function useSkill(state, m, skill) {
@@ -458,7 +463,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
         type: 'button', class: 'eskill num', title: SKILL_TIPS[k], dataset: { skill: k, ready: charged[k] ? '1' : '0' },
         disabled: !canUse || left[k] < 1, 'aria-label': `${m.id} 使用 ${k} 技能：${SKILL_NAMES[k]}，剩 ${left[k]} 次`,
         onclick: () => useSkill(state, m, k),
-      }, `${k}${k === 'C' ? '🩸' : k === 'A' ? '⚔' : '🛡'} ${left[k]}/${info[k].uses}${charged[k] ? ' ✓' : ''}`)));
+      }, `${k}${k === 'C' ? '🩸' : k === 'A' ? '⚔' : '🛡'} ${left[k]}/${info[k].uses}${k === 'C' ? '・每場' : ''}${charged[k] ? ' ✓' : ''}`)));
   }
 
   /** 戰鬥結果（GM；本機是自己）：只記錄到紀錄裡，獎勵由 GM 另外發 */
@@ -569,6 +574,33 @@ export function createEncounterCard({ getState, commit, rerender }) {
         h('strong', { class: 'num', text: `　已選 ${sel.targets.length}` })),
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: !enc.monsters.some((m) => !isDowned(m)), onclick: () => selectAllAlive(state) }, '全選存活'),
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: !sel.targets.length, onclick: () => { sel.targets = []; rerender(); } }, '清除選取'));
+  }
+
+  // ---------- 替隊友擋攻擊 ----------
+  /** 可以替他擋的隊友（房間裡、不是自己、不是 GM；名字用隊友回報的角色名） */
+  function coverMates() {
+    const r = getRoomStatus();
+    if (r.phase !== 'online') return [];
+    const gm = new Set(r.gm?.uids ?? []);
+    return r.members.filter((m) => m.uid !== r.me?.uid && !gm.has(m.uid)).map((m) => ({ uid: m.uid, name: r.vitals?.[m.uid]?.name || m.name }));
+  }
+
+  /** 「承受攻擊」之前先選要替誰擋：預設自己承受；每位玩家每回合 1 次 */
+  function coverRow(enc) {
+    const r = getRoomStatus();
+    const mates = coverMates();
+    if (!online() || isGm() || !mates.length || !enc.monsters.length) return null;
+    const left = coverLeft(enc, r.me?.uid);
+    if (sel.cover && (!left || !mates.some((x) => x.uid === sel.cover))) sel.cover = '';
+    return h('label', { class: 'cover extra' },
+      h('span', { text: `🛡️ 替隊友擋（本回合 ${left}/${COVER_PER_ROUND}）` }),
+      h('select', {
+        class: 'field', 'aria-label': '承受攻擊時替誰擋', disabled: left < 1 ? true : null,
+        onchange: (e) => { sel.cover = e.target.value; rerender(); },
+      },
+      h('option', { value: '', text: '自己承受' }),
+      mates.map((x) => h('option', { value: x.uid, selected: sel.cover === x.uid ? true : null, text: `替 ${x.name} 擋` }))),
+      h('small', { class: 'hint', text: sel.cover ? '下一次按「承受攻擊」就是替他擋，用你自己的防禦，擋完自動變回自己承受。' : '要替隊友擋時先選他，再按承受攻擊。' }));
   }
 
   // ---------- 我方隊伍 ----------
@@ -769,6 +801,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
             }, '清空')
           : null),
       initiativeBar(enc),
+      coverRow(enc),
       gmBar(enc),
       enc.monsters.length ? resultBox(state) : null,
       bosses.length ? bossHero(state, bosses) : null,

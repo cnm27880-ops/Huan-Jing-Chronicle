@@ -234,3 +234,22 @@ test('預組換上場：技能次數與蓄力清掉，菁英編號接得上', ()
   assert.equal(m.charge, undefined);
   assert.equal(encOf(send(core, GM, { t: 'encAdd', kind: 'elite', spec: { ...SPEC, count: 1 } })).monsters.at(-1).id, '菁英2');
 });
+
+test('替隊友擋：每位玩家每回合 1 次；對象要是房間裡的玩家；擋不了不扣敵人的攻擊次數；新回合恢復', () => {
+  const replyOf = (res) => res.out.find((o) => o.msg.t === 'encOk')?.msg;
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'boss', spec: { ...SPEC, count: 1 } }); // BOSS 一回合 3 次攻擊
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'a', id: 'BOSS1', use: 'atk', cover: P2.uid })).covered, P2.uid);
+  // 同一回合第二次：被擋下，而且敵人的攻擊次數沒有被扣（還剩 2 次）
+  assert.match(errorOf(send(core, P1, { t: 'encUse', id: 'BOSS1', use: 'atk', cover: P2.uid })).message, /已經替隊友擋過/);
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'b', id: 'BOSS1', use: 'atk' })).left, 1); // 自己承受不受擋人限制
+  // 別的玩家各有自己的 1 次
+  assert.ok(replyOf(send(core, P2, { t: 'encUse', rid: 'c', id: 'BOSS1', use: 'atk', cover: P1.uid })));
+  // 不能替自己、GM、不存在的人擋
+  assert.match(errorOf(send(core, P1, { t: 'encUse', id: 'BOSS1', use: 'atk', cover: P1.uid })).message, /不在房間/);
+  assert.match(errorOf(send(core, P1, { t: 'encUse', id: 'BOSS1', use: 'atk', cover: GM.uid })).message, /不在房間/);
+  assert.match(errorOf(send(core, P1, { t: 'encUse', id: 'BOSS1', use: 'atk', cover: '999' })).message, /不在房間/);
+  // 新回合：恢復
+  send(core, GM, { t: 'encRound' });
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'd', id: 'BOSS1', use: 'atk', cover: P2.uid })).covered, P2.uid);
+});
