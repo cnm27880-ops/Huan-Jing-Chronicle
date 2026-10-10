@@ -276,7 +276,11 @@ export async function autoTune({
     if (s.outWin != null && s.outWin < (target.outWinMin ?? 0)) notes.push(`第一名開場就倒時，隊伍勝率只有 ${pct(s.outWin)}（目標 ${pct(target.outWinMin ?? 0)}）：這場太依賴第一名的輸出。`);
     if (s.win < target.winMin) notes.push(`勝率只有 ${pct(s.win)}，攻擊已經壓到最低仍打不贏：怪物防禦或血量可能對這組玩家太高。`);
   }
-  return { specs: upon(base, final.kh, final.ka), hpScale: final.kh, atkScale: final.ka, summary: final.sum, penalty: final.pen, removed, notes };
+  // 結果不合理就不要推薦：血量被壓到搜尋下限（像 BOSS 只剩 21 血）、或拿掉的怪超過一半，通常是輸入有問題（玩家打不出傷害、怪物防禦太高）
+  const monsterTotal = (Array.isArray(specs) ? specs.reduce((a, x) => a + (x.count ?? 0), 0) : (specs.monsters ?? []).length) || 1;
+  const degenerate = final.kh <= KH[0] * 1.05 || removed > monsterTotal / 2;
+  if (degenerate) notes.push('這組結果不合理（血量被壓到下限，或拿掉太多怪），不建議套用：請先確認玩家的角色資料都填好了、怪物防禦不要比玩家攻擊高太多。');
+  return { specs: upon(base, final.kh, final.ka), hpScale: final.kh, atkScale: final.ka, summary: final.sum, penalty: final.pen, removed, notes, degenerate };
 }
 
 /**

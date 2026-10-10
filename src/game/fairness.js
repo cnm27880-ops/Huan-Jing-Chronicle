@@ -44,11 +44,11 @@ function dummyEncounter(source, rng) {
  */
 export function measureHits(players, source, { supply = null, runs = FAIR.probeRuns } = {}) {
   return players.map((src, i) => {
-    let per = 0; let tot = 0; let n = 0;
+    let per = 0; let tot = 0; let atk = 0; let def = 0; let n = 0;
     for (let k = 0; k < runs; k++) {
       const rng = seededRng(1000 + k * 31 + i);
       const enc = dummyEncounter(source, rng);
-      if (!enc) return { perTarget: 0, total: 0 };
+      if (!enc) return { perTarget: 0, total: 0, atk: 0, def: 0 };
       const p = prepPlayer(src, { supply });
       enc.round = 1;
       for (const m of enc.monsters) for (let u = 0; u < rankInfo(m).B.uses; u++) useEnemySkill(enc, m.id, 'B', rng);
@@ -56,10 +56,36 @@ export function measureHits(players, source, { supply = null, runs = FAIR.probeR
       if (!done) continue;
       per += done.r.hits[0]?.lost ?? 0;
       tot += done.r.hits.reduce((a, h) => a + h.lost, 0);
+      // 攻擊骰與敵人防禦骰（用到的軌道加總，含敵人防禦強化技能多出來的絕對防禦）：打不動時，拿來說明為什麼
+      const tracks = done.r.move?.tracks ?? [];
+      const sumOf = (d) => { const x = d?.dice ?? d; return typeof x === 'number' ? x : tracks.reduce((a, t) => a + (x?.[t] ?? 0), 0); };
+      atk += sumOf(done.r.atk);
+      def += sumOf(done.r.hits[0]?.def);
       n++;
     }
-    return { perTarget: n ? per / n : 0, total: n ? tot / n : 0 };
+    return { perTarget: n ? per / n : 0, total: n ? tot / n : 0, atk: n ? atk / n : 0, def: n ? def / n : 0 };
   });
+}
+
+/**
+ * 打不出傷害的玩家：{ index, name, empty, why }。atk 是 0＝沒有攻擊力（角色資料還沒填：技能與基礎數值是空的）；
+ * 有攻擊骰但打不穿＝攻擊骰比敵人防禦低。
+ */
+export function blockedPlayers(hits, names = []) {
+  return hits.map((h, index) => ({ index, h })).filter(({ h }) => h.perTarget < 1).map(({ index, h }) => ({
+    index, name: names[index] ?? `玩家${index + 1}`, empty: h.atk <= 0,
+    why: h.atk <= 0 ? '沒有攻擊力（角色資料可能還沒填：技能與基礎數值是空的）' : `攻擊骰約 ${Math.round(h.atk)} 顆，敵人防禦約 ${Math.round(h.def)} 顆（含防禦強化技能的絕對防禦），打不穿`,
+  }));
+}
+
+/** 把沒有攻擊力（資料還沒填）的玩家分出來：回傳 { players, names, skipped（被略過的 { name, why }） }；hits 是 measureHits 的結果 */
+export function splitBlank(players, names, hits) {
+  const blank = new Set(blockedPlayers(hits, names).filter((b) => b.empty).map((b) => b.index));
+  return {
+    players: players.filter((_, i) => !blank.has(i)),
+    names: names.filter((_, i) => !blank.has(i)),
+    skipped: [...blank].map((i) => ({ name: names[i] ?? `玩家${i + 1}`, why: '沒有攻擊力（角色資料可能還沒填）' })),
+  };
 }
 
 /** 強弱排序：依一次出手的總傷害（群攻算進去）。回傳 { strongest, weakest（玩家位置）, order（由強到弱）, hits（每人量到的）} */
