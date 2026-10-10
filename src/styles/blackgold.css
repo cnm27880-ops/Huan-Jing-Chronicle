@@ -1770,3 +1770,44 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .skillpanel .field-label, .skillpanel .hint, .skillpanel .section-title { margin: 0; }
 
 .simtune__plan { display: grid; gap: 6px; margin-top: 10px; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+
+/* ============================================================
+   電腦版緊湊排版（修整日、裝備、交易）：內容區加寬、格子變小，少往下滑。手機版面不動。
+   ============================================================ */
+@media (min-width: 901px) {
+  #view-rest .rest-root, #view-market .mk-root { max-width: 1800px; }
+  .page-wrap.gear-layout { max-width: 1800px; }
+
+  /* 修整日：採集／製作的選擇格縮小（圖示放左邊、文字放右邊），讓下方真正擲骰的區域早點出現 */
+  #view-rest .action-cards { gap: 6px; }
+  #view-rest .action-card {
+    grid-template-columns: auto minmax(0, 1fr); justify-items: start; align-items: center; column-gap: 8px;
+    min-height: 0; padding: 6px 28px 6px 8px; text-align: left;
+  }
+  #view-rest .action-card__icon { grid-row: 1 / span 2; width: 34px; height: 34px; margin: 0; font-size: 1.15rem; }
+  #view-rest .action-card__name { font-size: 0.88rem; }
+  #view-rest .action-card__sub { font-size: 0.7rem; }
+  #view-rest .action-card__mod { top: 4px; right: 6px; font-size: 0.74rem; }
+  #view-rest .diff-grid { gap: 6px; }
+  #view-rest .diff { gap: 2px; padding: 6px 8px; font-size: 0.78rem; }
+
+  /* 修整日「特殊」：材料格子上下縮窄、一排放更多張 */
+  .special-list { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 5px; margin-top: 4px; }
+  .special-card { gap: 4px; padding: 6px 8px; }
+  .special-card .hint { margin: 0; font-size: 0.72rem; }
+  .special-card .field { padding: 4px 6px; }
+
+  /* 裝備欄：四件一排 */
+  .gear-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* 交易：購買每排 3 個、販賣每排 2 個（左右兩欄 3:2），物品卡改成上下兩層（資訊在上、數量與按鈕在下） */
+@media (min-width: 1000px) {
+  #view-market .mk-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  #view-market .mk-grid > .card:nth-child(odd) .trade-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #view-market .mk-grid > .card:nth-child(even) .trade-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #view-market .trade-row { grid-template-columns: 40px minmax(0, 1fr); gap: 6px 10px; padding: 8px; }
+  #view-market .trade-row__act { grid-column: 1 / -1; justify-content: flex-end; }
+  #view-market .trade-row__qty { flex: 0 1 4.6rem; }
+  #view-market .trade-row__act .btn { min-width: 0; flex: 1; }
+}
