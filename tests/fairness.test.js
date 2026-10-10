@@ -78,3 +78,23 @@ test('縮放：有 BOSS 時小怪血量固定（菁英 2 倍）、BOSS 至少是
   const enc = { monsters: [{ id: 'BOSS1', kind: 'boss', maxHp: 1000, hp: 1000, atk: [{ A: 4, B: 0, C: 0 }] }, { id: '小怪1', kind: 'mob', maxHp: 100, hp: 100, atk: { A: 1, B: 1, C: 1 } }] };
   assert.deepEqual(scaleEncounter(enc, 3, 1, 150).monsters.map((m) => m.maxHp), [3000, 150]);
 });
+
+test('怪物攻擊分配：平均分散＝被打次數相差不超過 1；受傷占生命比例有記錄、評價會點名承受特別多的人', async () => {
+  const players = [hero(), hero(), hero(), hero()];
+  const boss = [{ kind: 'boss', count: 1, atkPower: 80, defPower: 80, hp: 30000 }]; // 打很久，BOSS 每回合 3 下
+  const spread = simulateBattle(players, boss, { rng: seededRng(5), focus: 'spread', maxRounds: 8 });
+  const hits = spread.perPlayer.map((p) => p.hit);
+  assert.ok(Math.max(...hits) - Math.min(...hits) <= 1, `被打次數 ${hits}`);
+  assert.ok(spread.perPlayer.every((p) => p.takenPct >= 0));
+  const rnd = Array.from({ length: 30 }, (_, i) => simulateBattle(players, boss, { rng: seededRng(i + 1), focus: 'random', maxRounds: 8 }));
+  const spreadRuns = Array.from({ length: 30 }, (_, i) => simulateBattle(players, boss, { rng: seededRng(i + 1), focus: 'spread', maxRounds: 8 }));
+  const gap = (runs) => runs.reduce((a, r) => a + (Math.max(...r.perPlayer.map((p) => p.hit)) - Math.min(...r.perPlayer.map((p) => p.hit))), 0) / runs.length;
+  assert.ok(gap(spreadRuns) < gap(rnd)); // 分散的差距比隨機小
+  const { assess } = await import('../src/game/tuning.js');
+  const base = { runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgRoundsWin: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [] };
+  const conc = assess({ ...base, perPlayer: [{ name: '甲', takenPct: 0.9 }, { name: '乙', takenPct: 0.1 }, { name: '丙', takenPct: 0.1 }] });
+  assert.equal(conc.items.find((i) => i.key === 'spread').status, 'high');
+  assert.match(conc.advice.join(' '), /甲 受的傷是全隊平均的/);
+  const even = assess({ ...base, perPlayer: [{ name: '甲', takenPct: 0.3 }, { name: '乙', takenPct: 0.3 }] });
+  assert.equal(even.items.find((i) => i.key === 'spread').status, 'ok');
+});

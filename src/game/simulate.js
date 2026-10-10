@@ -11,6 +11,8 @@
 // 2026/10 第二次更新（使用者 2026-10-10）：
 //   黃／綠藥水「需要才喝」（需驗證）：攻擊藥水只在「不喝打不死、喝了打得死」眼前這隻時才喝；防禦藥水在生命低於 60% 時才喝。
 //   血藥供應：假設每位玩家都備足血藥、毒性 15 都拿來喝血（opts.supply 指定哪一種；沒給就只用自己背包裡的）。
+//   怪物攻擊分配（opts.focus，需驗證）：'random' 每一下隨機挑一位；'spread' 平均分散——每一下打「這場被打次數最少」的人（同數隨機），
+//   等於 GM 輪流分配、不會一直打同一個人。每位玩家的被打次數與受傷占生命比例都記下來。
 //   每位玩家的貢獻與消耗都記下來（perPlayer），檢驗「第一名只出部分力、隊伍也要贏」（opts.caps，見 fairness.js）。
 // 2026/10 平衡更新（見 enemy.js）：
 //   敵人（需驗證）：每回合開始就把 B 技能（防禦強化）用滿，玩家每打他一下消耗一次蓄力；輪到他時，血量沒滿就喝血（C），
@@ -169,6 +171,14 @@ export function fixedEncounter(src) {
   return enc;
 }
 
+/** 怪物這一下打誰：random 隨機；spread 打「這場被打次數最少」的人，同數的隨機挑 */
+function pickVictim(victims, team, stat, focus, rng) {
+  if (focus !== 'spread') return victims[Math.floor(rng() * victims.length)];
+  const least = Math.min(...victims.map((p) => stat[team.indexOf(p)].hit));
+  const pool = victims.filter((p) => stat[team.indexOf(p)].hit === least);
+  return pool[Math.floor(rng() * pool.length)];
+}
+
 /**
  * 玩家出一次招：挑招式、花鬥氣加骰、付不起就退回普攻；魔女付不起就放棄行動回復魔力。
  * 回傳 { r, target }（r 是 playerAttack 的結果），沒得出招回傳 null。
@@ -207,19 +217,19 @@ function ownDrain(p) {
 /**
  * 模擬一場。players = 角色存檔陣列（不會被改動）；specs = [{ kind, count, atkPower, defPower, hp, atkMod?, defMod?, absDef? }]
  * opts.encounter：固定的敵人 { monsters }（給了就不用 specs，每場都是同一組 A/B/C）
- * opts.supply：假設每人備足這種血藥（毒性 15 喝滿）；opts.caps：每位玩家只出幾成力（陣列，1＝全力）
+ * opts.supply：假設每人備足這種血藥（毒性 15 喝滿）；opts.caps：每位玩家只出幾成力（陣列，1＝全力）；opts.focus：怪物怎麼挑目標（'random' 隨機｜'spread' 平均分散）
  * 回傳 { outcome: 'win' | 'lose' | 'timeout', rounds, damage, monsterHp, hpLeft, hpMax, downs: [每位玩家倒地幾次], potions,
  *        drain: { 靈氣: 0~1, 魔力: …, 毒性: … }（這場結束時，全隊平均用掉了多少比例；沒有這種資源的玩家不算）, drainAvg,
  *        perPlayer: [{ dmg 打出的傷害, kills 打倒幾隻, taken 承受的傷害, actions 出招次數, potions 喝掉的藥水, drain 自己的消耗, hpLeft 剩餘生命比例 }] }
  */
-export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS, rng = Math.random, encounter = null, supply = null, caps = [] } = {}) {
+export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS, rng = Math.random, encounter = null, supply = null, caps = [], focus = 'random' } = {}) {
   const team = players.map((src, i) => prepPlayer(src, { supply, cap: caps[i] ?? 1 }));
   // encounter：固定一組已經抽好 A/B/C 的敵人（場上的或預組），每場用全滿生命的複本；沒給就照 specs 每場重抽
   const enc = encounter ? fixedEncounter(encounter) : buildEncounter(specs, rng);
   const monsterHp = enc.monsters.reduce((a, m) => a + m.maxHp, 0);
   const downs = team.map(() => 0);
   const wasDown = team.map(() => false);
-  const stat = team.map(() => ({ dmg: 0, kills: 0, taken: 0, actions: 0, potions: 0 }));
+  const stat = team.map(() => ({ dmg: 0, kills: 0, taken: 0, actions: 0, potions: 0, hit: 0 }));
   let potions = 0;
   let healed = 0; // 敵人喝血回復的總量（算每回合傷害時要加回去）
   let rounds = 0;
@@ -251,8 +261,8 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
         if (!victims.length) break;
         const spent = spendEnemyAttack(enc, m.id);
         if (spent.error) break;
-        const vi = Math.floor(rng() * victims.length);
-        const victim = victims[vi];
+        const victim = pickVictim(victims, team, stat, focus, rng);
+        stat[team.indexOf(victim)].hit++;
         const before = victim.hp;
         monsterAttack(victim, enc, m.id, bestAtkMode(m, victim), rng, { extraAtk: spent.extraAtk });
         stat[team.indexOf(victim)].taken += before - victim.hp;
@@ -276,7 +286,7 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
     damage: monsterHp - enc.monsters.reduce((a, m) => a + m.hp, 0) + healed, healed,
     hpLeft: team.reduce((a, p) => a + p.hp, 0), hpMax: team.reduce((a, p) => a + maxHp(p), 0),
     downs, potions,
-    perPlayer: team.map((p, i) => ({ ...stat[i], drain: ownDrain(p), hpLeft: p.hp / maxHp(p) })),
+    perPlayer: team.map((p, i) => ({ ...stat[i], takenPct: stat[i].taken / maxHp(p), drain: ownDrain(p), hpLeft: p.hp / maxHp(p) })),
   };
 }
 
@@ -290,7 +300,7 @@ function perPlayerSummary(results, names) {
   return Array.from({ length: k }, (_, i) => ({
     name: names[i] ?? `玩家${i + 1}`,
     dmg: avg((r) => r.perPlayer[i].dmg), share: total > 0 ? avg((r) => r.perPlayer[i].dmg) / total : 0,
-    kills: avg((r) => r.perPlayer[i].kills), taken: avg((r) => r.perPlayer[i].taken), actions: avg((r) => r.perPlayer[i].actions),
+    kills: avg((r) => r.perPlayer[i].kills), taken: avg((r) => r.perPlayer[i].taken), takenPct: avg((r) => r.perPlayer[i].takenPct ?? 0), hit: avg((r) => r.perPlayer[i].hit ?? 0), actions: avg((r) => r.perPlayer[i].actions),
     potions: avg((r) => r.perPlayer[i].potions), drain: avg((r) => r.perPlayer[i].drain), hpLeft: avg((r) => r.perPlayer[i].hpLeft),
     downRate: n ? results.filter((r) => r.downs[i] > 0).length / n : 0,
   }));

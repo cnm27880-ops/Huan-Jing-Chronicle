@@ -14,6 +14,7 @@ export const TARGET = {
   capWinMin: 0.85, // 第一名只出六成力時，隊伍勝率至少（公平性，我訂的，需驗證）
   topDrainMax: 0.7, // 第一名自己的資源消耗上限（不要每次都被逼著全力，需驗證）
   weakKills: 0.5, // 最弱的玩家平均至少打倒幾隻（需驗證）
+  concentrationMax: 1.6, // 受傷占生命比例最高的人，不要超過全隊平均的這麼多倍（攻擊集中打少數人，需驗證）
   battlesPerSession: 2,
 };
 
@@ -117,6 +118,19 @@ export function assess(sum) {
       text: wStatus2 === 'ok' ? '有參與感' : '幾乎沒貢獻，小怪血量或防禦對他太高',
     });
     if (wStatus2 === 'low') advice.push(`最弱的 ${weak.name} 平均只打倒 ${weak.kills.toFixed(1)} 隻：小怪血量調到他一次出手能打倒的程度（自動調整會這樣做），或降低小怪防禦。`);
+  }
+
+  // 攻擊分散：誰承受特別多（受傷總量占自己生命上限的比例，比全隊平均高很多）
+  if (sum.perPlayer?.length > 1 && sum.perPlayer.some((p) => p.takenPct != null)) {
+    const avgPct = sum.perPlayer.reduce((a, p) => a + p.takenPct, 0) / sum.perPlayer.length;
+    const worst = sum.perPlayer.reduce((a, p) => (p.takenPct > a.takenPct ? p : a), sum.perPlayer[0]);
+    const mult = avgPct > 0 ? worst.takenPct / avgPct : 1;
+    const spreadStatus = mult > TARGET.concentrationMax ? 'high' : 'ok';
+    items.push({
+      key: 'spread', label: '受傷是否集中', value: `${worst.name} 受傷 ${pct(worst.takenPct)} 生命（全隊平均 ${pct(avgPct)}）`, target: `不超過平均的 ${TARGET.concentrationMax} 倍`, status: spreadStatus,
+      text: spreadStatus === 'ok' ? '壓力分散' : `${worst.name} 承受特別多（平均的 ${mult.toFixed(1)} 倍）`,
+    });
+    if (spreadStatus === 'high') advice.push(`${worst.name} 受的傷是全隊平均的 ${mult.toFixed(1)} 倍：攻擊集中在他身上（防禦偏低，或被打到的次數偏多）。跑團時讓怪物輪流打不同的人，或給他更多防禦／護盾。`);
   }
 
   const ok = items.every((i) => i.status === 'ok');
