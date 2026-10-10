@@ -38,7 +38,7 @@ export function badgeCard({ getState, commit }) {
         }
         // 試算表／機器人已經加過等級的玩家：只記起來，不再加等級（背包有徽章物品的不會走到這裡，會直接算做過）
         const owned = h('button', {
-          type: 'button', class: 'btn btn--ghost btn--small', title: '技能等級已經含這個徽章的 +1（例如在試算表自己加過）',
+          type: 'button', class: 'badge-link', title: '技能等級已經含這個徽章的 +1（例如在試算表自己加過）',
           onclick: () => {
             if (!confirm(`確定「${skill}」的${label.split('（')[0]}你已經做過、等級已經含它的 +1 嗎？\n按確定只會記成做過，不會再加等級，之後無法再製作這個徽章。`)) return;
             const r = markBadgeOwned(getState(), skill, b.kind);

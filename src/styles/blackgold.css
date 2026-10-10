@@ -1818,3 +1818,8 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .activate-cell { display: grid; gap: 4px; padding: 8px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .activate-cell strong { font-size: 0.88rem; overflow-wrap: anywhere; }
 .activate-cell .check { font-size: 0.76rem; color: var(--soft); }
+
+/* 徽章「我已經做過了」：小字連結（還是按鈕，鍵盤可以用），不佔一整排 */
+.badge-link { justify-self: start; padding: 0; margin: 0; color: var(--soft); font: inherit; font-size: 0.72rem; text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; cursor: pointer; }
+.badge-link:hover { color: var(--gold); }
+.badge-link:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
