@@ -1811,3 +1811,10 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
   #view-market .trade-row__qty { flex: 0 1 4.6rem; }
   #view-market .trade-row__act .btn { min-width: 0; flex: 1; }
 }
+
+/* 裝備頁「啟動型技能」：電腦版四個一排（名稱與等級在上、啟動勾選在下），手機兩個一排 */
+.activate-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+@media (min-width: 901px) { .activate-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.activate-cell { display: grid; gap: 4px; padding: 8px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.activate-cell strong { font-size: 0.88rem; overflow-wrap: anywhere; }
+.activate-cell .check { font-size: 0.76rem; color: var(--soft); }

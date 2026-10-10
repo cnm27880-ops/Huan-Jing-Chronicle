@@ -72,7 +72,7 @@ export function createGearView({ root, getState, commit }) {
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '啟動型技能' }),
       h('p', { class: 'hint', text: '勾選才會把效果算進數值面板，並扣除算力。其他技能到「修整日 → 學習」查看。' }),
-      h('ul', { class: 'skill-list' }, list.map(([name, lv]) => h('li', { class: 'skill-row' },
+      h('ul', { class: 'activate-grid' }, list.map(([name, lv]) => h('li', { class: 'activate-cell' },
         h('strong', { text: `${name}　${lv} 級` }),
         h('label', { class: 'check' },
           h('input', { type: 'checkbox', checked: state.skillOn?.[name] ? true : null, onchange: (e) => { state.skillOn = { ...state.skillOn, [name]: e.target.checked }; commit(); } }),
