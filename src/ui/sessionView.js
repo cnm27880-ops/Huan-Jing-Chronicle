@@ -133,7 +133,7 @@ export function createSessionView({ root, getState, commit }) {
   function skillPanel(state) {
     const prof = proficiency(state, 'session');
     const stomach = state.sessionStomach;
-    return h('section', { class: 'card' },
+    return h('section', { class: 'card skillpanel' },
       h('h2', { class: 'section-title', text: '技能檢定' }),
       h('p', { class: 'hint', text: '點一下直接擲 1D20 ＋ 加值，結果在右邊紀錄。' }),
       advantageItem(state)

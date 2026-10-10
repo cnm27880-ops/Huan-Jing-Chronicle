@@ -240,7 +240,22 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 .mailbox__item { display: grid; gap: 2px; padding-top: .4rem; border-top: 1px solid var(--line); }
 .mailbox__item strong { color: var(--gold); font-size: .9rem; }
 .mailbox__line { color: var(--ink2); font-size: .84rem; }
-.giftsheet { display: grid; gap: .6rem; }
-.gift-qty { width: 5.5rem; flex: none; }
+.giftsheet { display: flex; flex-direction: column; gap: .6rem; min-height: 100%; }
+.gift-head { position: sticky; top: 0; z-index: 2; display: grid; gap: .5rem; padding-bottom: .5rem; background: var(--paper2); }
+.gift-cats { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.gift-cats .chip { flex: none; white-space: nowrap; }
+.gift-cats .chip[aria-selected='true'] { color: var(--on-gold); background: var(--gold); border-color: var(--gold); }
+.gift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 8px; align-content: start; flex: 1; }
+.gift-grid .notice { grid-column: 1 / -1; }
+.gift-tile { display: grid; align-content: start; gap: 6px; padding: 8px; background: var(--card); border: 1.5px solid var(--line); border-radius: 10px; }
+.gift-tile[data-on='1'] { background: var(--goldbg); border-color: var(--gold); }
+.gift-tile__main { display: grid; gap: 2px; min-height: 44px; padding: 0; font: inherit; text-align: left; color: var(--ink); background: transparent; border: 0; cursor: pointer; }
+.gift-tile__name { overflow: hidden; font-size: .88rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.gift-tile__main small { color: var(--soft); }
+.gift-tile__qty { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.gift-step { min-width: 40px; min-height: 40px; padding: 0; font-size: 1.1rem; }
+.gift-foot { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; padding: .5rem 0 0; background: var(--paper2); border-top: 1px solid var(--line); }
+.gift-foot__n { flex: 1; min-width: 8rem; color: var(--ink2); font-size: .86rem; }
+.gift-qty { width: 3.6rem; flex: none; padding-inline: 4px; text-align: center; }
 .feedbox { margin-top: .8rem; display: grid; gap: .4rem; }
 .feedbox .row { flex-wrap: wrap; }

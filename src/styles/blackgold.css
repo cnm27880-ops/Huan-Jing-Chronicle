@@ -391,6 +391,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
    ============================================================ */
 @media (max-width: 759px) {
   :root { --nav-h: 58px; }
+  .topbar { z-index: auto; } /* 頁首自己是一層 z-index 30，裡面的「更多」選單會被跑團頁的抽屜（45）蓋住；讓選單直接跟抽屜比高低 */
   .page-wrap { grid-template-columns: minmax(0, 1fr); padding: 10px 12px; }
   .card { padding: 14px 16px; }
 
@@ -1414,6 +1415,7 @@ input[type='number'], .amount__input { text-align: center; }
 /* 小怪矩陣：雙排緊湊卡片；選中＝金色外發光並浮起 2px；倒下＝灰階 30% */
 .mobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .mob { position: relative; transition: transform 0.15s ease; }
+.mob__card { position: relative; }
 .mob__pick {
   display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; grid-template-areas: 'img name name' 'hp hp pct' 'def def def';
   align-items: center; gap: 4px 6px; width: 100%; padding: 8px; font: inherit; text-align: left; color: var(--ink);
@@ -1546,6 +1548,7 @@ input[type='number'], .amount__input { text-align: center; }
   .sx-bar__btn:hover { border-color: var(--gold2); }
   .sx-bar__btn[aria-expanded='true'] { color: var(--on-gold); background: var(--gold); border-color: var(--gold); }
   .sx-bar__btn[data-id='targets'] { display: none; }
+  .sx-tabs { display: none; } /* 底部已有招式／藥水／檢定切換，抽屜裡不再放第二排 */
 }
 @media (max-width: 900px) {
   .sx { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 8px 8px calc(var(--sx-bar-h) + var(--nav-h, 0px) + 8px + env(safe-area-inset-bottom, 0px)); }
@@ -1567,9 +1570,9 @@ input[type='number'], .amount__input { text-align: center; }
   .boss-mode .abc__cell { gap: 2px; padding: 2px 1px; font-size: 0.74rem; }
   .boss-mode .abc__cell b { font-size: 0.66rem; }
   .mobs { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .mob__pick { padding-right: 52px; }
+  .mob__pick { padding-right: 48px; }
   .mob__def { padding-right: 0; }
-  .mob__hit { top: 50%; bottom: auto; width: 44px; height: 44px; margin-top: -22px; }
+  .mob__hit { right: 4px; bottom: 4px; width: 40px; height: 40px; font-size: 1rem; }
   .sx-feedhead .hint { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1743,3 +1746,14 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .dou { display: grid; gap: 4px; margin: 6px 0; }
 .dou .row { align-items: center; gap: 6px; flex-wrap: wrap; }
 .dou__n { min-width: 2ch; text-align: center; color: var(--gold); }
+.dou__btn { min-width: 44px; min-height: 44px; font-size: 1.2rem; }
+.hold { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* 跑團頁「技能檢定」：各區塊之間留間距，優勢骰按鈕撐滿、胃袋格固定大小 */
+.skillpanel { display: flex; flex-direction: column; gap: 10px; }
+.skillpanel .keepsake { width: 100%; justify-content: space-between; }
+.skillpanel .tray__stomach { flex-wrap: wrap; margin: 0; }
+.skillpanel .mini-slots { display: flex; gap: 6px; margin: 0; }
+.skillpanel .mini-slot { flex: none; width: 36px; height: 36px; font-size: 1rem; }
+.skillpanel .btn { align-self: flex-start; }
+.skillpanel .field-label, .skillpanel .hint, .skillpanel .section-title { margin: 0; }

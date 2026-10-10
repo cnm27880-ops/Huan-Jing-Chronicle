@@ -538,6 +538,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const picked = sel.targets.includes(m.id);
     const abs = monsterAbs(m);
     return h('li', { class: `mob${downed ? ' is-downed' : ''}`, ...fxAttrs(m.id, { picked: picked ? '1' : '0' }) },
+      h('div', { class: 'mob__card' }, // 盾牌按鈕要貼在這張卡上，不能貼在整個 li（下面還有技能標籤，按鈕會跑到卡片外面）
       h('button', {
         type: 'button', class: 'mob__pick', 'aria-pressed': String(picked), disabled: downed,
         'aria-label': `${m.id}，生命 ${m.hp} / ${m.maxHp}${downed ? '，已倒下' : ''}，點一下${picked ? '取消選取' : '選為目標'}`,
@@ -554,7 +555,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
         title: ui.armed === m.id ? '再點一次確認' : `承受 ${m.id} 的攻擊（${formatAbc(m.atk)}），要點兩下`,
         'aria-label': ui.armed === m.id ? `再點一次確認承受 ${m.id} 的攻擊` : `承受 ${m.id} 的攻擊（要點兩下）`,
         onclick: () => confirmHit(m.id, () => doDefend(state, m)),
-      }, ui.armed === m.id ? '✔' : '🛡️'),
+      }, ui.armed === m.id ? '✔' : '🛡️')),
       skillBar(state, currentEnc(state), m));
   }
 

@@ -20,6 +20,7 @@ import {
 } from '../game/resources.js';
 import { countOf } from '../game/engine.js';
 import { iconOf } from './items.js';
+import { holdRepeat } from './holdRepeat.js';
 import { publish, rollWith } from '../state/rollLog.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
@@ -390,15 +391,31 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const have = resourceNow(state, '鬥氣');
     sel.dou = Math.max(0, Math.min(sel.dou, have));
     const mult = douMult(state);
-    const set = (n) => { sel.dou = Math.max(0, Math.min(have, n)); rerender(); };
+    const hintText = () => (sel.dou ? `下次出招：花 ${sel.dou} 鬥氣，真實傷害 +${fmt(sel.dou * mult)} 骰` : `每點鬥氣 +${mult} 顆真實傷害骰${mult > 1 ? '（冠軍勇士）' : ''}，只對下一次出招有效`);
+    const num = h('strong', { class: 'num dou__n', text: String(sel.dou) });
+    const hint = h('small', { class: 'hint', text: hintText() });
+    const minus = h('button', { type: 'button', class: 'btn btn--small btn--ghost dou__btn', 'aria-label': '少 1 點（按住連減）', disabled: sel.dou <= 0 }, '−');
+    const plus = h('button', { type: 'button', class: 'btn btn--small btn--ghost dou__btn', 'aria-label': '多 1 點（按住連加）', disabled: sel.dou >= have }, '＋');
+    let moved = false;
+    // 連按途中只改這一列的字，不重畫整個面板（按鈕被換掉就收不到「放開」）；放開才重畫一次
+    const step = (d) => () => {
+      const n = Math.max(0, Math.min(have, sel.dou + d));
+      if (n === sel.dou) return false;
+      sel.dou = n; moved = true;
+      num.textContent = String(n); hint.textContent = hintText();
+      minus.disabled = n <= 0; plus.disabled = n >= have;
+      return true;
+    };
+    const end = () => { if (moved) { moved = false; rerender(); } };
+    holdRepeat(minus, step(-1), { onEnd: end });
+    holdRepeat(plus, step(1), { onEnd: end });
     return h('div', { class: 'dou' },
-      h('span', { class: 'field-label', text: `🔥 鬥氣加骰（現有 ${fmt(have)}）` }),
+      h('span', { class: 'field-label', text: `🔥 鬥氣加骰（現有 ${fmt(have)}，按住＋／－可連加連減）` }),
       h('div', { class: 'row' },
-        h('button', { type: 'button', class: 'btn btn--small btn--ghost', 'aria-label': '少 1 點', disabled: sel.dou <= 0, onclick: () => set(sel.dou - 1) }, '−'),
-        h('strong', { class: 'num dou__n', text: String(sel.dou) }),
-        h('button', { type: 'button', class: 'btn btn--small btn--ghost', 'aria-label': '多 1 點', disabled: sel.dou >= have, onclick: () => set(sel.dou + 1) }, '＋'),
-        h('button', { type: 'button', class: 'btn btn--small btn--ghost', disabled: have < 1, onclick: () => set(have) }, '全部'),
-        h('small', { class: 'hint', text: sel.dou ? `下次出招：花 ${sel.dou} 鬥氣，真實傷害 +${fmt(sel.dou * mult)} 骰` : `每點鬥氣 +${mult} 顆真實傷害骰${mult > 1 ? '（冠軍勇士）' : ''}，只對下一次出招有效` })));
+        minus, num, plus,
+        h('button', { type: 'button', class: 'btn btn--small btn--ghost', disabled: have < 1, onclick: () => { sel.dou = have; rerender(); } }, '全部'),
+        h('button', { type: 'button', class: 'btn btn--small btn--ghost', disabled: sel.dou <= 0, onclick: () => { sel.dou = 0; rerender(); } }, '歸零'),
+        hint));
   }
 
   /** 資源轉換：靈氣 1 比 1 換生命；能量 1 比 1 換任意資源 */
