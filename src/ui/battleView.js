@@ -443,6 +443,27 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         }, '轉換')));
   }
 
+  /**
+   * 手機的「目標」抽屜底部固定的出招列：選招式（下拉）＋出招，免得在招式頁與目標頁之間來回切。
+   * 電腦版用 CSS 隱藏（左欄就有出招按鈕）。沒有可出的攻擊招式就不顯示。
+   */
+  function fireBar(state) {
+    const attacks = state.moves.filter((m) => m.kind !== 'heal' && m.kind !== 'shield');
+    if (!attacks.length) return null;
+    if (!attacks.some((m) => m.id === sel.moveId)) sel.moveId = attacks[0].id;
+    const cur = attacks.find((m) => m.id === sel.moveId);
+    const lack = shortfall(state, moveDetail(state, cur).cost);
+    const fire = fireInfo();
+    return h('div', { class: 'firebar' },
+      h('select', {
+        class: 'field firebar__move', 'aria-label': '選招式',
+        onchange: (e) => { sel.moveId = e.target.value; rerender(); },
+      }, attacks.map((m) => h('option', { value: m.id, selected: m.id === sel.moveId ? true : null, text: `${m.name}（${moveDetail(state, m).dice}）` }))),
+      h('button', {
+        type: 'button', class: 'btn btn--primary firebar__fire', disabled: Boolean(lack) || !fire.ready || isDowned(state), onclick: () => onFire(),
+      }, fire.ready ? `⚔️ 出招 → ${fire.text}` : `⚔️ 出招（${fire.text || '先選目標'}）`));
+  }
+
   function moveCard(state) {
     if (!state.moves.some((m) => m.id === sel.moveId)) sel.moveId = state.moves.find((m) => m.kind !== 'heal' && m.kind !== 'shield')?.id ?? state.moves[0]?.id ?? null;
     const f = ui.moveForm;
@@ -510,5 +531,5 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         h('small', { class: 'stat__detail', text: d.parts[t].map((p) => `${p.label} ${fmt(p.value)}`).join(' + ') })))));
   }
 
-  return { hud, miniHud, moveCard, potionCard, statusCard, defenseCard };
+  return { hud, miniHud, moveCard, fireBar, potionCard, statusCard, defenseCard };
 }

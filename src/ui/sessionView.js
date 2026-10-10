@@ -190,11 +190,12 @@ export function createSessionView({ root, getState, commit }) {
   // ---------- 中欄與手機頂部 ----------
   function renderCenter() {
     const y = center.scrollTop;
-    center.replaceChildren(
+    center.replaceChildren(...[
       h('div', { class: 'sx-sheethead' },
         h('span', { class: 'sx-sheethead__grip', 'aria-hidden': 'true' }),
         h('button', { type: 'button', class: 'sheet__close', onclick: () => setSheet('') }, '收起')),
-      stage.render());
+      stage.render(),
+      battle.fireBar(getState())].filter(Boolean)); // 手機：目標抽屜底部的「選招式＋出招」列
     center.scrollTop = y;
     const n = sel.targets.length;
     bar.querySelector('[data-id="targets"]').textContent = n ? `🎯 目標（${n}）` : '🎯 目標';

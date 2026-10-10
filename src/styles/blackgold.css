@@ -1575,6 +1575,16 @@ input[type='number'], .amount__input { text-align: center; }
   .mob__hit { right: 4px; bottom: 4px; width: 40px; height: 40px; font-size: 1rem; }
   .sx-feedhead .hint { display: none; }
 }
+/* 手機「目標」抽屜底部固定的選招式＋出招列（電腦版左欄就有出招按鈕，所以隱藏） */
+.firebar { display: none; }
+@media (max-width: 900px) {
+  .firebar {
+    position: sticky; bottom: 0; z-index: 2; display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 8px;
+    margin: auto -12px -14px; padding: 8px 12px; background: var(--paper2); border-top: 1px solid var(--line3);
+  }
+  .firebar__move { min-width: 0; }
+  .firebar__fire { min-height: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 @media (prefers-reduced-motion: reduce) {
   .sx-left, .sx-center, .mob, .boss__art, .lbar__fill, .mob__fill, .mate__fill { transition: none; }
 }
@@ -1758,7 +1768,4 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .skillpanel .btn { align-self: flex-start; }
 .skillpanel .field-label, .skillpanel .hint, .skillpanel .section-title { margin: 0; }
 
-/* 跑團頁「替隊友擋」：承受攻擊前先選要替誰擋 */
-.cover { display: grid; gap: 4px; margin: 0; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
-.cover .hint { margin: 0; }
 .simtune__plan { display: grid; gap: 6px; margin-top: 10px; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
