@@ -24,6 +24,16 @@
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Serif+TC:wght@400;600;900&display=swap" /></noscript>
   </head>
   <body>
+    <!-- 封面骨架直接寫在 HTML：網頁一開就先看到封面，不會在 JS 載入前閃出後面的地圖。按鈕與登入狀態由 src/ui/cover.js 補上 -->
+    <div class="cover" id="cover">
+      <div class="cover__fx" aria-hidden="true"></div>
+      <div class="cover__inner">
+        <p class="cover__kicker">網遊 · 跑團 · 編年史</p>
+        <h1 id="cover-title" class="cover__title">幻境編年史</h1>
+        <p class="cover__lead">踏入幻境，書寫屬於你的篇章。</p>
+        <div class="cover__load" aria-hidden="true"><span class="cover__load-text">幻境載入中…</span><span class="cover__load-bar"></span></div>
+      </div>
+    </div>
     <header class="topbar">
       <h1 class="brand">幻境編年史</h1>
       <nav class="tabs" aria-label="主選單">

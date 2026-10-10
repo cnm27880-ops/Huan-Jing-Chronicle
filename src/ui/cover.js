@@ -37,15 +37,49 @@ export function showCover({ onEnter, notice, onUserChange } = {}) {
       }));
   }
 
-  const root = h('div', { class: 'cover', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cover-title' },
-    h('div', { class: 'cover__inner' },
-      h('p', { class: 'cover__kicker', text: '網遊 · 跑團 · 編年史' }),
-      h('h1', { id: 'cover-title', class: 'cover__title', text: '幻境編年史' }),
-      h('p', { class: 'cover__lead', text: '踏入幻境，書寫屬於你的篇章。' }),
-      h('div', { class: 'cover__actions' }, userBox, enter, discord),
-      note));
+  // 封面骨架在 index.html（第一個畫面就是封面）；找不到時（例如測試）才自己建
+  const INTRO_MS = 2600; // 入場動畫時間：這段時間後按鈕才浮現（點一下或按任意鍵可跳過）
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const actions = h('div', { class: 'cover__actions is-wait' }, userBox, enter, discord);
+  let root = document.getElementById('cover');
+  if (root) {
+    root.querySelector('.cover__inner').append(actions, note);
+  } else {
+    root = h('div', { class: 'cover', id: 'cover' },
+      h('div', { class: 'cover__fx', 'aria-hidden': 'true' }),
+      h('div', { class: 'cover__inner' },
+        h('p', { class: 'cover__kicker', text: '網遊 · 跑團 · 編年史' }),
+        h('h1', { id: 'cover-title', class: 'cover__title', text: '幻境編年史' }),
+        h('p', { class: 'cover__lead', text: '踏入幻境，書寫屬於你的篇章。' }),
+        actions, note));
+    document.body.prepend(root);
+  }
+  root.setAttribute('role', 'dialog');
+  root.setAttribute('aria-modal', 'true');
+  root.setAttribute('aria-labelledby', 'cover-title');
+
+  // 飄升的金色光點（只是裝飾；減少動態時不放）
+  const fx = root.querySelector('.cover__fx');
+  if (fx && !reduced) {
+    for (let i = 0; i < 28; i++) {
+      fx.append(h('i', { class: 'cover__ember', style: `--x:${Math.round(Math.random() * 100)}%;--s:${(2 + Math.random() * 4).toFixed(1)}px;--d:${(5 + Math.random() * 6).toFixed(1)}s;--delay:${(-Math.random() * 8).toFixed(1)}s` }));
+    }
+  }
+
+  let revealed = false;
+  function reveal() {
+    if (revealed) return;
+    revealed = true;
+    clearTimeout(introTimer);
+    actions.classList.remove('is-wait');
+    root.classList.add('is-ready');
+    enter.focus();
+  }
+  const introTimer = setTimeout(reveal, reduced ? 0 : INTRO_MS);
+  root.addEventListener('pointerdown', reveal);
 
   function close() {
+    reveal();
     root.classList.add('is-leaving');
     setInert(false);
     setTimeout(() => root.remove(), 300);
@@ -53,8 +87,7 @@ export function showCover({ onEnter, notice, onUserChange } = {}) {
   }
 
   setInert(true);
-  document.body.append(root);
-  enter.focus();
-  root.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  root.addEventListener('keydown', (e) => { if (!revealed) return reveal(); if (e.key === 'Escape') close(); return undefined; });
+  document.addEventListener('keydown', reveal, { once: true }); // 還在播入場動畫時，按任意鍵跳過
   return { close, setUser };
 }
