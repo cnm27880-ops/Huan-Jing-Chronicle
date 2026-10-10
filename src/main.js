@@ -128,33 +128,59 @@ async function init() {
 
   createMailbox({ getState, commit }); // 別人送的東西、餵的藥：領取後直接放進自己的角色
 
-  // GM 不用示範角色：連上房間後，如果 GM 的角色還是示範角色（名字相同、或還在等匯入），強制換成空白角色（名字用 Discord 名稱）。
-  // 示範角色只留給還沒登入的單機試玩（網站開發用）。舊的示範存檔會備份在 localStorage 的 huanjing:character:demo-backup。
-  // 每台裝置只處理一次（之後 GM 愛怎麼改角色都不會再被換掉）。
-  const GM_BLANK_KEY = 'huanjing:gm-blank:v1';
+  // GM 不用示範角色：連上房間後，如果 GM 的角色看起來還是示範角色（名字相同、或還在等匯入），**先問**要不要換成空白角色（名字用 Discord 名稱）。
+  // 注意：示範角色就是照某位玩家的角色做的，名字會一樣——所以只用名字判斷不夠準，一定要讓人確認（2026/10/10 出過事：玩家自己的角色被誤換掉）。
+  // 暫代 GM（測試用）不處理。舊的存檔備份在 localStorage 的 huanjing:character:demo-backup（已經有備份就不覆蓋）；每台裝置只問一次。
+  const GM_BLANK_KEY = 'huanjing:gm-blank:v2';
+  const BACKUP_KEY = 'huanjing:character:demo-backup';
   let gmChecking = false;
+  let restoring = false; // 正在問「要不要還原備份」時，先不問「要不要換成空白角色」，免得連跳兩個對話框
   async function gmBlankCheck() {
     const status = getRoomStatus();
-    if (gmChecking || status.phase !== 'online' || !status.me?.isGm) return;
-    try { if (localStorage.getItem(GM_BLANK_KEY) === status.me.uid) return; } catch { /* 讀不到就當沒處理過 */ }
+    if (gmChecking || restoring || status.phase !== 'online' || !status.me?.isGm || status.gm?.override === status.me.uid) return;
+    try { if (localStorage.getItem(GM_BLANK_KEY)) return; } catch { return; } // 讀不到就不問（寧可不換）
     gmChecking = true;
     try {
       await sync.idle(); // 等連線後的比對做完，免得被它蓋掉
-      const uid = getRoomStatus().me?.uid;
-      if (!uid || !getRoomStatus().me?.isGm) return;
+      if (!getRoomStatus().me?.isGm) return;
       if (sync.isWaiting() || character.name === SAMPLE_CHARACTER.name) {
-        try { localStorage.setItem('huanjing:character:demo-backup', localStorage.getItem('huanjing:character:v1') ?? ''); } catch { /* 備份失敗也照做 */ }
-        character = importCharacter({ ...blankCharacter(status.me.name || 'GM'), statMode: 'skills' });
-        await sync.forceUpload();
-        vitals.changed();
-        views[currentView]?.render();
-        toast(`GM 不使用示範角色：已換成空白角色「${character.name}」（舊的示範存檔備份在這台裝置）。`);
+        const ok = window.confirm(`GM 帳號目前用的角色「${character.name}」看起來是示範角色。\n\n要換成空白角色嗎？（名字會用你的 Discord 名稱）\n按「確定」：換成空白角色，舊角色備份在這台裝置，之後可以還原。\n按「取消」：維持現在的角色，之後不會再問。`);
+        if (ok) {
+          try { if (!localStorage.getItem(BACKUP_KEY)) localStorage.setItem(BACKUP_KEY, localStorage.getItem('huanjing:character:v1') ?? ''); } catch { /* 備份失敗也照做 */ }
+          character = importCharacter({ ...blankCharacter(status.me.name || 'GM'), statMode: 'skills' });
+          await sync.forceUpload();
+          vitals.changed();
+          views[currentView]?.render();
+          toast(`已換成空白角色「${character.name}」（舊角色備份在這台裝置，重新整理後會問你要不要還原）。`);
+        }
       }
-      try { localStorage.setItem(GM_BLANK_KEY, uid); } catch { /* 忽略 */ }
+      try { localStorage.setItem(GM_BLANK_KEY, getRoomStatus().me?.uid ?? '1'); } catch { /* 忽略 */ }
     } finally { gmChecking = false; }
   }
-  subscribeRoom(() => { gmBlankCheck(); });
-  gmBlankCheck();
+
+  // 還原被換掉的角色：這台裝置有備份（gmBlankCheck 換角色前存的）時，連上房間後問一次要不要還原
+  let restoreAsked = false;
+  async function offerRestore() {
+    if (restoreAsked || getRoomStatus().phase !== 'online') return;
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(BACKUP_KEY) || 'null'); } catch { data = null; }
+    if (!data?.name) return;
+    restoreAsked = true;
+    restoring = true;
+    try {
+      await sync.idle();
+      const ok = window.confirm(`這台裝置有一份被換掉的角色備份：「${data.name}」（金幣 ${Number(data.gold ?? 0).toLocaleString('zh-TW')}）。\n\n要還原嗎？\n按「確定」：還原這個角色（目前的角色會被取代，並同步到伺服器）。\n按「取消」：先不要，下次開啟網站還會再問。`);
+      if (!ok) return;
+      character = importCharacter(data);
+      try { localStorage.removeItem(BACKUP_KEY); localStorage.setItem(GM_BLANK_KEY, getRoomStatus().me?.uid ?? '1'); } catch { /* 忽略 */ }
+      await sync.forceUpload();
+      vitals.changed();
+      views[currentView]?.render();
+      toast(`已還原角色「${character.name}」。`);
+    } finally { restoring = false; }
+  }
+  subscribeRoom(() => { offerRestore().then(gmBlankCheck); });
+  offerRestore().then(gmBlankCheck);
 
   let currentView = 'map';
   function showView() {
