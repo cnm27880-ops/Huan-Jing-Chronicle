@@ -1800,7 +1800,7 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
   /* 修整日「特殊」：材料格子上下縮窄、一排放更多張 */
   .special-list { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 5px; margin-top: 4px; }
   .special-card { gap: 4px; padding: 6px 8px; }
-  .special-card .hint { margin: 0; font-size: 0.72rem; }
+  .special-card__head { line-height: 1.25; }
   .special-card .field { padding: 4px 6px; }
 
   /* 裝備欄：四件一排 */
@@ -1824,3 +1824,6 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .activate-cell { display: grid; gap: 4px; padding: 8px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .activate-cell strong { font-size: 0.88rem; overflow-wrap: anywhere; }
 .activate-cell .check { font-size: 0.76rem; color: var(--soft); }
+
+/* 特殊材料卡：名稱與說明之間不留空（#view-rest .rest-step .hint 的上邊距會蓋掉一般規則，所以要寫得一樣具體） */
+#view-rest .special-card .hint { margin: 0; font-size: 0.74rem; line-height: 1.35; }
