@@ -1,10 +1,10 @@
 // ============================================================
 // 敵人的等級與技能（2026/10 平衡更新；純函式，伺服器與前端共用同一份）。
 // 等級：普通（不用特別準備）、菁英 2 打、BOSS 3 打。雜魚不用戰鬥扮演（秒殺），不在這裡。
-// 技能（每回合各有使用次數；回合數 enc.round 變了，次數與蓄力就自動清掉）：
+// 技能：A、B 每回合各有使用次數（回合數 enc.round 變了，次數與蓄力就自動清掉）；C 喝血是「每場戰鬥」一次（不隨回合歸零，使用者 2026-10-10）：
 //   A 攻擊強化：用一次＝下一次攻擊，這招用到的每一軌各加 20 顆攻擊骰（使用者 2026-10-10 確認）
 //   B 防禦強化：用一次＝下一次被打時，絕對防禦 +20 顆（BOSS +30），加在被打的那招用到的每一軌（和原本的絕對防禦一樣）
-//   C 喝血：只能在他自己的回合用，回復 ND16 生命（普通 10、菁英 20、BOSS 30 顆）
+//   C 喝血：只能在他自己的回合用，整場戰鬥只能用 1 次（記在 m.usedC），回復 ND16 生命（普通 10、菁英 20、BOSS 30 顆）
 // 每回合攻擊次數：普通 1、菁英 2、BOSS 3（使用者 2026-10-10 確認）。
 // 「A、B 蓄力」留到被用掉為止（同一回合內）是我的解讀，需驗證。
 // ============================================================
@@ -21,7 +21,7 @@ export const SKILL_NAMES = { A: '攻擊強化', B: '防禦強化', C: '喝血' }
 export const rankOf = (m) => (m?.kind === 'boss' ? 'boss' : m?.rank === 'elite' ? 'elite' : 'normal');
 export const rankInfo = (m) => ENEMY_RANKS[rankOf(m)];
 
-const NONE = { atk: 0, A: 0, B: 0, C: 0 };
+const NONE = { atk: 0, A: 0, B: 0 };
 /** 這一回合的使用次數與蓄力（不改動怪物）；回合數不同＝新的一回合，全部歸零 */
 function current(enc, m) {
   const round = enc.round ?? 0;
@@ -41,7 +41,7 @@ export function enemyLeft(enc, m) {
   const { uses, charge } = current(enc, m);
   return {
     rank: rankOf(m),
-    atk: Math.max(0, info.attacks - uses.atk), A: Math.max(0, info.A.uses - uses.A), B: Math.max(0, info.B.uses - uses.B), C: Math.max(0, info.C.uses - uses.C),
+    atk: Math.max(0, info.attacks - uses.atk), A: Math.max(0, info.A.uses - uses.A), B: Math.max(0, info.B.uses - uses.B), C: Math.max(0, info.C.uses - (m.usedC ?? 0)), // C 是整場戰鬥的次數
     chargeA: charge.A, chargeB: charge.B,
   };
 }
@@ -69,13 +69,15 @@ export function useEnemySkill(enc, id, skill, rng = Math.random) {
   const { m } = f;
   const info = rankInfo(m);
   touch(enc, m);
-  if (m.uses[skill] >= info[skill].uses) return { error: `${m.id} 這回合的${SKILL_NAMES[skill]}（${skill}）用完了（每回合 ${info[skill].uses} 次）。` };
+  if (skill === 'C' ? (m.usedC ?? 0) >= info.C.uses : m.uses[skill] >= info[skill].uses) {
+    return { error: skill === 'C' ? `${m.id} 這場戰鬥的${SKILL_NAMES.C}（C）用完了（每場 ${info.C.uses} 次）。` : `${m.id} 這回合的${SKILL_NAMES[skill]}（${skill}）用完了（每回合 ${info[skill].uses} 次）。` };
+  }
   if (skill === 'C') {
     if (!isEnemyTurn(enc, m)) return { error: `${m.id} 的喝血只能在他自己的回合使用。` };
     const rolled = rollSum(info.C.n, HEAL_SIDES, rng);
     const before = m.hp;
     m.hp = Math.min(m.maxHp, m.hp + rolled);
-    m.uses.C += 1;
+    m.usedC = (m.usedC ?? 0) + 1;
     return { ok: true, skill, dice: `${info.C.n}D${HEAL_SIDES}`, rolled, healed: m.hp - before };
   }
   m.uses[skill] += 1;

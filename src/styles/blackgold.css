@@ -1757,3 +1757,8 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .skillpanel .mini-slot { flex: none; width: 36px; height: 36px; font-size: 1rem; }
 .skillpanel .btn { align-self: flex-start; }
 .skillpanel .field-label, .skillpanel .hint, .skillpanel .section-title { margin: 0; }
+
+/* 跑團頁「替隊友擋」：承受攻擊前先選要替誰擋 */
+.cover { display: grid; gap: 4px; margin: 0; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.cover .hint { margin: 0; }
+.simtune__plan { display: grid; gap: 6px; margin-top: 10px; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }

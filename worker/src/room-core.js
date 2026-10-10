@@ -10,6 +10,7 @@ import { d20 } from '../../src/game/engine.js';
 import { diceEvent, checkEvent } from '../../src/game/events.js';
 import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/rules.js';
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
+import { coverLeft, spendCover } from '../../src/game/cover.js';
 import { useEnemySkill, spendEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
 import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
@@ -453,10 +454,17 @@ export class RoomCore {
     }
     if (msg.t === 'encUse' && msg.use === 'atk') { // 玩家承受敵人一次攻擊：扣這回合的攻擊次數，有 A 蓄力就多加骰
       if (typeof msg.id !== 'string') return err(rid, 'bad_enc', '缺少敵人編號。');
+      // 替隊友擋（選填 cover＝被擋的隊友 uid）：每位玩家每回合 1 次；先檢查，擋不了就不扣敵人的攻擊次數
+      const cover = msg.cover == null || msg.cover === '' ? null : String(msg.cover);
+      if (cover) {
+        if (cover === user.uid || this.isGm(cover) || !this.db.exec('SELECT 1 AS x FROM members WHERE uid = ?', cover).length) return err(rid, 'bad_enc', '要替擋的隊友不在房間裡。');
+        if (coverLeft(enc, user.uid) < 1) return err(rid, 'bad_enc', spendCover(enc, user.uid).error);
+      }
       const r = spendEnemyAttack(enc, msg.id);
       if (r.error) return err(rid, 'bad_enc', r.error);
+      if (cover) spendCover(enc, user.uid);
       this.saveEncounter(enc);
-      return this.encOk(enc, rid, user, undefined, { extraAtk: r.extraAtk, left: r.left });
+      return this.encOk(enc, rid, user, undefined, { extraAtk: r.extraAtk, left: r.left, ...(cover ? { covered: cover } : {}) });
     }
     if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以操作遭遇戰。');
 
@@ -587,7 +595,7 @@ export class RoomCore {
     if (!row) return err(rid, 'bad_preset', `沒有「${name}」這個預組。`);
     const monsters = JSON.parse(row.json).map((m) => {
       const x = { ...m, hp: m.maxHp };
-      delete x.uses; delete x.charge; // 技能次數與蓄力不帶進新的戰鬥
+      delete x.uses; delete x.charge; delete x.usedC; // 技能次數、蓄力與喝血次數不帶進新的戰鬥
       if (x.img && !this.hasImage(x.img)) delete x.img;
       return x;
     });
