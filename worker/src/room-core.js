@@ -21,7 +21,7 @@ import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
-  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
+  MAX_PENDING_MAIL, MAX_PENDING_TRADES, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -45,6 +45,18 @@ const VITAL_KEY = /^[\u4e00-\u9fff]{1,4}$/; // 資源名稱（靈氣、魔力…
 
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
 const cleanStr = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
+/** 物品清單（{ 名稱: 數量 }）驗證與整理：回傳 { items } 或 { error } */
+function parseItems(raw) {
+  const entries = raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.entries(raw) : [];
+  if (!entries.length || entries.length > MAX_MAIL_ITEM_KINDS) return { error: '請至少選一樣東西（最多 30 種）。' };
+  const items = {};
+  for (const [name, qty] of entries) {
+    const n = cleanStr(name, 40);
+    if (!n || !isInt(qty, 1, MAX_MAIL_ITEM_QTY)) return { error: '東西的名稱或數量錯誤。' };
+    items[n] = (items[n] ?? 0) + qty;
+  }
+  return { items };
+}
 
 /** 顯示用的角色名稱由前端送來（角色資料還在前端）；但「系統」保留給伺服器，不能冒用 */
 const whoOf = (raw, user) => { const w = cleanStr(raw, 40); return !w || w === '系統' ? user.name : w; };
@@ -219,6 +231,8 @@ export class RoomCore {
       case 'skillSet': case 'skillDel': return this.onSkillEdit(user, msg, rid);
       case 'mailSend': return this.onMailSend(user, msg, rid);
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
+      case 'tradeList': return this.onTradeList(user, rid);
+      case 'tradeRespond': return this.onTradeRespond(user, msg, rid);
       case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
       case 'encImg': return this.onEncImg(user, msg, rid);
       case 'imgPut': return this.onImgPut(user, msg, rid);
@@ -352,16 +366,16 @@ export class RoomCore {
     const out = [];
 
     if (msg.kind === 'gift') {
-      const items = {};
-      const entries = msg.items && typeof msg.items === 'object' && !Array.isArray(msg.items) ? Object.entries(msg.items) : [];
-      if (!entries.length || entries.length > MAX_MAIL_ITEM_KINDS) return err(rid, 'bad_mail', '請至少選一樣東西（最多 30 種）。');
-      for (const [name, qty] of entries) {
-        const n = cleanStr(name, 40);
-        if (!n || !isInt(qty, 1, MAX_MAIL_ITEM_QTY)) return err(rid, 'bad_mail', '東西的名稱或數量錯誤。');
-        items[n] = (items[n] ?? 0) + qty;
-      }
-      Object.assign(mail, { kind: 'gift', items });
+      const got = parseItems(msg.items);
+      if (got.error) return err(rid, 'bad_mail', got.error);
+      Object.assign(mail, { kind: 'gift', items: got.items });
       if (msg.bounced === true) mail.bounced = true; // 對方拒收的藥水退回
+    } else if (msg.kind === 'trade') { // 玩家交易：我給 give、要對方拿 want 來換；東西由寄的人先扣（押在這張單上），對方回覆前都留在伺服器
+      const give = parseItems(msg.give);
+      const want = parseItems(msg.want);
+      if (give.error || want.error) return err(rid, 'bad_mail', `交易單：${give.error ?? want.error}`);
+      if (this.tradeRows(user.uid).filter((o) => o.from === user.uid).length >= MAX_PENDING_TRADES) return err(rid, 'trade_full', `你還有 ${MAX_PENDING_TRADES} 筆交易沒有回覆，先取消或等對方處理。`);
+      Object.assign(mail, { kind: 'trade', to, toName, give: give.items, want: want.items });
     } else if (msg.kind === 'potion') {
       const def = POTIONS[msg.potion];
       if (!def?.heal) return err(rid, 'bad_mail', '只有回復藥水可以餵給別人。');
@@ -393,10 +407,53 @@ export class RoomCore {
     return { out, close: null };
   }
 
-  /** 領取：先刪先贏（兩個分頁同時收到，只有一個拿得到） */
+  /** 領取：先刪先贏（兩個分頁同時收到，只有一個拿得到）。交易單不能這樣領（要用 tradeRespond 回覆，否則寄件人的東西就消失了） */
   onMailClaim(user, msg, rid) {
-    const rows = typeof msg.id === 'string' ? this.db.exec('DELETE FROM mail WHERE id = ? AND to_uid = ? RETURNING json', msg.id, user.uid) : [];
+    const rows = typeof msg.id === 'string' ? this.db.exec("DELETE FROM mail WHERE id = ? AND to_uid = ? AND json_extract(json, '$.kind') != 'trade' RETURNING json", msg.id, user.uid) : [];
     return { out: [{ to: 'self', msg: { t: 'mailClaimed', rid, mail: rows.length ? JSON.parse(rows[0].json) : null } }], close: null };
+  }
+
+  // ---------- 玩家交易 ----------
+  // A 發交易單（我給 give、你拿 want 來換）→ A 的東西先從背包扣掉、押在伺服器 → B 在交易頁回覆：
+  //   接受：B 的瀏覽器先扣自己的 want，伺服器把 want 寄給 A、give 寄給 B（走一般信箱，不會漏領）
+  //   拒絕／東西不夠（失敗）／A 自己取消：伺服器把 give 退回給 A
+  // 回覆用「先刪先贏」，同一張單只會被處理一次。東西的增減仍然在各自的瀏覽器裡。
+  /** 跟這個人有關的交易單（收到的與發出的） */
+  tradeRows(uid) {
+    return this.db.exec("SELECT json FROM mail WHERE json_extract(json, '$.kind') = 'trade' AND (to_uid = ? OR json_extract(json, '$.from') = ?) ORDER BY t, id", uid, uid).map((r) => JSON.parse(r.json));
+  }
+
+  onTradeList(user, rid) {
+    return { out: [{ to: 'self', msg: { t: 'trades', rid, offers: this.tradeRows(user.uid) } }], close: null };
+  }
+
+  onTradeRespond(user, msg, rid) {
+    const id = typeof msg.id === 'string' ? msg.id : '';
+    const action = msg.action;
+    if (!['accept', 'reject', 'fail', 'cancel'].includes(action)) return err(rid, 'bad_trade', '不認得這個動作。');
+    const rows = action === 'cancel'
+      ? this.db.exec("DELETE FROM mail WHERE id = ? AND json_extract(json, '$.kind') = 'trade' AND json_extract(json, '$.from') = ? RETURNING json", id, user.uid)
+      : this.db.exec("DELETE FROM mail WHERE id = ? AND to_uid = ? AND json_extract(json, '$.kind') = 'trade' RETURNING json", id, user.uid);
+    if (!rows.length) return err(rid, 'bad_trade', '這筆交易已經不存在（對方可能已取消，或已經處理過了）。');
+    const offer = JSON.parse(rows[0].json);
+    const aName = offer.fromName;
+    const bName = this.memberName(offer.to) ?? offer.toName ?? '對方';
+    const out = [{ to: 'self', msg: { t: 'tradeOk', rid, action } }];
+    const put = (to, fields) => { // 直接放進信箱（不受信箱上限限制，退回的東西一定要送到）
+      const mail = { id: this.uuid(), t: this.now(), kind: 'gift', ...fields };
+      this.db.exec('INSERT INTO mail(id, to_uid, t, json) VALUES (?, ?, ?, ?)', mail.id, to, mail.t, JSON.stringify(mail));
+      out.push({ to: 'user', uid: to, msg: { t: 'mail', mails: [mail] } });
+    };
+    if (action === 'accept') {
+      put(offer.from, { from: offer.to, fromName: bName, items: offer.want, note: `${bName} 接受了你的交易` });
+      put(offer.to, { from: offer.from, fromName: aName, items: offer.give, note: `與 ${aName} 的交易成功` });
+    } else {
+      const note = { reject: `${bName} 拒絕了你的交易，東西已退回`, fail: `${bName} 的東西不夠，交易失敗，東西已退回`, cancel: `你取消了給 ${bName} 的交易，東西已退回` }[action];
+      put(offer.from, { from: action === 'cancel' ? offer.from : offer.to, fromName: action === 'cancel' ? aName : bName, items: offer.give, bounced: true, note });
+    }
+    const other = user.uid === offer.from ? offer.to : offer.from;
+    out.push({ to: 'user', uid: other, msg: { t: 'tradeChanged' } });
+    return { out, close: null };
   }
 
   // ---------- 遭遇戰（階段 C） ----------

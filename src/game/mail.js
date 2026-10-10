@@ -29,7 +29,7 @@ export function applyMail(state, mail) {
     const entries = Object.entries(mail.items ?? {}).filter(([name, n]) => typeof name === 'string' && Number.isInteger(n) && n > 0);
     for (const [name, n] of entries) addItem(state, name, n);
     return {
-      title: mail.bounced ? `${from} 退回了東西` : `${from} 送給你東西`,
+      title: typeof mail.note === 'string' && mail.note ? mail.note : mail.bounced ? `${from} 退回了東西` : `${from} 送給你東西`, // note：玩家交易的結果（伺服器寫的）
       lines: entries.map(([name, n]) => `${name} ×${n}`),
     };
   }

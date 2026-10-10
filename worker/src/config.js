@@ -18,6 +18,7 @@ export const MAX_CHAR_JSON_CHARS = 200_000; // 角色 JSON 本身的上限
 
 // 信箱（送東西、餵藥）：對方不用同意；不在線時留在伺服器，上線才送達
 export const MAX_PENDING_MAIL = 50; // 每人最多同時放幾封未領取的
+export const MAX_PENDING_TRADES = 10; // 每人最多同時發出幾筆還沒回覆的玩家交易
 export const MAX_MAIL_ITEM_KINDS = 30; // 一封最多幾種東西
 export const MAX_MAIL_ITEM_QTY = 9999; // 單一種東西的數量上限
 
