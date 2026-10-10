@@ -1172,6 +1172,14 @@ input[type='number'], .amount__input { text-align: center; }
 .draw-option { display: grid; gap: 4px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .draw-option .skill-info__text { margin: 0; font-size: 0.82rem; }
 @media (min-width: 640px) { .draw-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.badge-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 6px; }
+.badge-row { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.badge-row__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.badge-cell { display: flex; gap: 4px; align-items: stretch; }
+.badge-cell > .btn:first-child { flex: 1; min-width: 0; margin: 0; }
+.badge-owned { flex: none; width: 34px; margin: 0; padding: 0; }
+.badge-made { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; font-size: 0.8rem; color: var(--soft); }
+.badge-made__name { min-width: 0; overflow-wrap: anywhere; }
 
 /* 修整日「特殊」分頁 */
 .special-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; margin-top: 6px; }
@@ -1812,33 +1820,3 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .activate-cell { display: grid; gap: 4px; padding: 8px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .activate-cell strong { font-size: 0.88rem; overflow-wrap: anywhere; }
 .activate-cell .check { font-size: 0.76rem; color: var(--soft); }
-
-/* 生活徽章：每種生活技能一張卡，兩枚徽章（神級／500 次）各一格，用顏色與進度條表示狀態 */
-.badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
-.bcard { display: grid; gap: 8px; padding: 10px; background: var(--raise); border-radius: 12px; box-shadow: 0 0 0 1px var(--line); }
-.bcard__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.bcard__head strong { color: var(--ink); font-size: 0.95rem; }
-.bcard__head small { color: var(--gold); font-size: 0.78rem; }
-.bcard__slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.bslot { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 5px; align-content: start; padding: 7px 8px; background: var(--paper); border-radius: 9px; box-shadow: inset 0 0 0 1px var(--line3); }
-.bslot__top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
-.bslot__kind { color: var(--ink2); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; }
-.bslot__status { color: var(--faint); font-size: 0.72rem; }
-.bslot__bar { height: 5px; overflow: hidden; background: var(--line3); border-radius: var(--r-pill); }
-.bslot__bar span { display: block; height: 100%; background: var(--gold2); border-radius: inherit; }
-.bslot[data-state='ready'] { box-shadow: inset 0 0 0 1px var(--gold2); background: var(--goldbg); }
-.bslot[data-state='ready'] .bslot__status { color: var(--gold); font-weight: 700; }
-.bslot[data-state='made'] { box-shadow: inset 0 0 0 1px var(--gold-deep); }
-.bslot[data-state='made'] .bslot__status { color: var(--gold); }
-.bslot__act, .bslot__made { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 24px; }
-.bslot__act { flex-wrap: wrap; }
-.bslot__act .btn { flex: 1 1 100%; margin: 0; }
-.bslot__name { min-width: 0; overflow: hidden; color: var(--ink); font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
-.bslot__mini { padding: 1px 7px; color: var(--soft); font: inherit; font-size: 0.68rem; background: none; border: 1px solid var(--line3); border-radius: var(--r-pill); cursor: pointer; white-space: nowrap; }
-.bslot__mini:hover { color: var(--gold); border-color: var(--gold2); }
-.bslot__mini:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-/* 「記為已做過」很少用：電腦版平常淡淡的，滑過格子才明顯（手機沒有滑過，維持可見） */
-@media (hover: hover) {
-  .bslot__act .bslot__mini { opacity: 0.45; }
-  .bslot:hover .bslot__mini, .bslot__mini:focus-visible { opacity: 1; }
-}
