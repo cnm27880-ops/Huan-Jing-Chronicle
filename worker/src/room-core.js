@@ -10,6 +10,7 @@ import { d20 } from '../../src/game/engine.js';
 import { diceEvent, checkEvent } from '../../src/game/events.js';
 import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/rules.js';
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
+import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
 import { describeCharChange } from './audit.js';
@@ -19,7 +20,7 @@ import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
-  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS,
+  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -67,6 +68,8 @@ export class RoomCore {
     db.exec('CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, name TEXT NOT NULL, mime TEXT NOT NULL, data TEXT NOT NULL, t INTEGER NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS vitals (uid TEXT PRIMARY KEY, json TEXT NOT NULL, t INTEGER NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS presets (name TEXT PRIMARY KEY, json TEXT NOT NULL, t INTEGER NOT NULL)');
+    db.exec('CREATE TABLE IF NOT EXISTS activity (seq INTEGER PRIMARY KEY, uid TEXT NOT NULL, t INTEGER NOT NULL, json TEXT NOT NULL)');
+    db.exec('CREATE INDEX IF NOT EXISTS activity_uid ON activity(uid, seq)');
   }
 
   // ---------- 成員與權限 ----------
@@ -221,6 +224,8 @@ export class RoomCore {
       case 'imgDel': return this.onImgDel(user, msg, rid);
       case 'presetList': case 'presetSave': case 'presetDel': case 'presetLoad': return this.onPreset(user, msg, rid);
       case 'vitals': return this.onVitals(user, msg);
+      case 'actPost': return this.onActPost(user, msg);
+      case 'actList': return this.onActList(user, msg, rid);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
     }
   }
@@ -627,6 +632,52 @@ export class RoomCore {
     const out = {};
     for (const r of this.db.exec('SELECT uid, json FROM vitals')) { try { out[r.uid] = JSON.parse(r.json); } catch { /* 壞掉的略過 */ } }
     return out;
+  }
+
+  // ---------- 玩家日誌（修整、學習、物品）：前端回報、全員可查；每人只留最近 ACTIVITY_PER_USER 筆 ----------
+  onActPost(user, msg) {
+    const clean = cleanActivity(msg);
+    if (!clean) return err(undefined, 'bad_activity', '日誌格式錯誤。');
+    const entry = { id: this.uuid(), t: this.now(), uid: user.uid, name: user.name, who: cleanStr(msg.who, 40) || user.name, ...clean };
+    const [{ seq }] = this.db.exec('INSERT INTO activity(uid, t, json) VALUES (?, ?, ?) RETURNING seq', user.uid, entry.t, JSON.stringify(entry));
+    const old = this.db.exec('SELECT seq FROM activity WHERE uid = ? ORDER BY seq DESC LIMIT 1 OFFSET ?', user.uid, ACTIVITY_PER_USER);
+    if (old.length) this.db.exec('DELETE FROM activity WHERE uid = ? AND seq <= ?', user.uid, old[0].seq);
+    return { out: [{ to: 'all', msg: { t: 'act', entry: { ...entry, seq } } }], close: null };
+  }
+
+  /** 查日誌：msg.uid（只看某位）、msg.cat（只看某類）、msg.before（seq，往前翻頁）；最新的在前，一次最多 ACTIVITY_PAGE 筆 */
+  onActList(user, msg, rid) {
+    if (msg.uid != null && !UID.test(String(msg.uid))) return err(rid, 'bad_activity', '玩家編號錯誤。');
+    if (msg.before != null && !isInt(msg.before, 1, 1e12)) return err(rid, 'bad_activity', '頁碼錯誤。');
+    const cat = msg.cat == null ? null : String(msg.cat);
+    if (cat && !cleanActivity({ cat, text: 'x' })) return err(rid, 'bad_activity', '類別錯誤。');
+    const CHUNK = ACTIVITY_PAGE * 2;
+    const fetchRows = (before) => {
+      const conds = [];
+      const args = [];
+      if (msg.uid != null) { conds.push('uid = ?'); args.push(String(msg.uid)); }
+      if (before != null) { conds.push('seq < ?'); args.push(before); }
+      return this.db.exec(`SELECT seq, json FROM activity ${conds.length ? `WHERE ${conds.join(' AND ')}` : ''} ORDER BY seq DESC LIMIT ${CHUNK}`, ...args);
+    };
+    // 類別存在 JSON 裡，所以一批一批抓再濾；濾完不夠一頁就續抓（最多 8 批，免得掃整張表）
+    const entries = [];
+    let before = msg.before ?? null;
+    let more = false;
+    for (let round = 0; round < 8 && !more; round++) {
+      const rows = fetchRows(before);
+      for (const r of rows) {
+        let e = null;
+        try { e = JSON.parse(r.json); } catch { /* 壞掉的略過 */ }
+        if (e && (!cat || e.cat === cat)) {
+          if (entries.length >= ACTIVITY_PAGE) { more = true; break; }
+          entries.push({ ...e, seq: r.seq });
+        }
+        before = r.seq;
+      }
+      if (rows.length < CHUNK) break;
+      if (round === 7) more = true; // 抓滿 8 批還沒結束：讓前端用最後一筆的位置再按「載入更多」
+    }
+    return { out: [{ to: 'self', msg: { t: 'acts', rid, entries, more, next: before } }], close: null };
   }
 
   /** 隊友回報過的角色名稱（沒有就 null） */

@@ -9,6 +9,8 @@ import { statusBar } from './statusBar.js';
 import { itemTile, amountPicker, toast } from './controls.js';
 import { iconOf, TIERS } from './items.js';
 import { keepsakeTag } from '../game/keepsakes.js';
+import { logActivity } from '../state/activityLog.js';
+import { restEntry } from '../game/activity.js';
 import {
   GATHER_ACTIONS, CRAFT_ACTIONS, DIFFICULTIES, RECIPES,
   CRAFT_COST_AMOUNT, LIFE_SKILLS,
@@ -44,7 +46,8 @@ export function createRestView({ root, getState, commit }) {
   };
 
   const partsText = (list) => list.map((p) => `${p.label} +${p.value}`).join('　');
-  const pushResult = (r) => { ui.results.unshift(r); ui.results.length = Math.min(ui.results.length, 20); ui.fresh = true; commit(); };
+  /** cat：日誌分類，修整頁的結果預設算「修整」；使用特殊物品這類算「物品」 */
+  const pushResult = (r, cat = 'rest') => { logActivity(getState(), { ...restEntry(r), cat }); ui.results.unshift(r); ui.results.length = Math.min(ui.results.length, 20); ui.fresh = true; commit(); };
 
   /** 抽取的技能還沒選完就不能做其他事（RULES_OVERVIEW 5.1）：擋下並打開選擇面板 */
   function blockedByDraw() {
@@ -226,6 +229,7 @@ export function createRestView({ root, getState, commit }) {
       if (!r.ok) return toast(r.error);
       const swapText = r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`).join('；');
       toast(`${name} ${r.from ? `${r.from} 級升到` : '學會，升到'} ${r.level} 級${swapText ? `。${swapText}` : ''}`);
+      logActivity(state, { cat: 'learn', text: `${name}：${r.from ? `${r.from} 級 → ${r.level} 級` : `學會，升到 ${r.level} 級`}`, lines: [`消耗 ${fmt(plan.exp)} 經驗`, `技能書：${bookText || '無'}`, ...r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`)] });
       pick.target = null;
       commit();
       sheet.refresh();
@@ -285,6 +289,7 @@ export function createRestView({ root, getState, commit }) {
                 const r = chooseDraw(getState(), i, n);
                 if (!r.ok) return toast(r.error);
                 toast(`得到 ${n} 技能書 ×1`);
+                logActivity(getState(), { cat: 'learn', text: `從抽取的技能書選了「${n}」`, lines: [`得到 ${n} 技能書 ×1`] });
                 commit();
                 sheet.refresh();
               },
@@ -296,6 +301,7 @@ export function createRestView({ root, getState, commit }) {
   function doDraw(tier, times) {
     const r = drawBooks(getState(), tier, times);
     if (!r.ok) return toast(r.error);
+    logActivity(getState(), { cat: 'learn', text: `抽取 ${tier} 技能書 ×${times}`, lines: [] });
     commit();
     openDrawSheet();
   }
@@ -334,6 +340,7 @@ export function createRestView({ root, getState, commit }) {
                   const r = renameBadge(getState(), skill, b.kind, name);
                   if (!r.ok) return toast(r.error);
                   toast(`改名為 ${r.item}`);
+                  logActivity(getState(), { cat: 'learn', text: `徽章改名：${b.item} → ${r.item}`, lines: [] });
                   commit();
                 },
               }, '改名'));
@@ -346,6 +353,7 @@ export function createRestView({ root, getState, commit }) {
               const r = markBadgeOwned(getState(), skill, b.kind);
               if (!r.ok) return toast(r.error);
               toast('已記成做過，不會再加等級');
+              logActivity(getState(), { cat: 'learn', text: `記錄已做過的徽章：${b.item}（技能等級不變）`, lines: [] });
               commit();
             },
           }, '我已經做過了');
@@ -358,6 +366,7 @@ export function createRestView({ root, getState, commit }) {
                   const r = craftBadge(getState(), skill, b.kind, name);
                   if (!r.ok) return toast(r.error);
                   toast(`做出 ${r.item}，${skill}技能升到 ${r.level}`);
+                  logActivity(getState(), { cat: 'learn', text: `製作徽章：${r.item}，${skill}技能升到 ${r.level}`, lines: [] });
                   commit();
                 },
               }, `製作${label}`)
@@ -489,7 +498,7 @@ export function createRestView({ root, getState, commit }) {
           h('span', { class: 'hint', text: `使用 → ${Object.entries(USABLE_ITEMS[n].gives).map(([k, q]) => `${k} ×${q}`).join('、')}` })),
         h('button', {
           type: 'button', class: 'btn btn--primary btn--small',
-          onclick: () => { const x = useSpecialItem(getState(), n); if (!x.ok) return toast(x.error); pushResult({ kind: 'note', text: `使用 ${n}：${Object.entries(x.gives).map(([k, q]) => `${k} ×${q}`).join('、')}` }); },
+          onclick: () => { const x = useSpecialItem(getState(), n); if (!x.ok) return toast(x.error); pushResult({ kind: 'note', text: `使用 ${n}：${Object.entries(x.gives).map(([k, q]) => `${k} ×${q}`).join('、')}` }, 'item'); },
         }, '使用 1 個')))) : null,
     ];
   }

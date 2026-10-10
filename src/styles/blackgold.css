@@ -426,7 +426,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
     border: 0;
     border-top: 2px solid transparent;
   }
-  .tab[data-view-link='gear'], .tab[data-view-link='market'] { display: none; }
+  .tab[data-view-link='gear'], .tab[data-view-link='market'], .tab[data-view-link='logs'] { display: none; }
   .tab[aria-current='page'], .tab--more[data-active] { color: var(--gold); border-bottom: 0; border-top: 2px solid var(--gold); }
   .tab--more { display: flex; font: inherit; background: transparent; cursor: pointer; }
   .tab--more[aria-expanded='true'] { color: var(--gold); }
@@ -1706,3 +1706,21 @@ input[type='number'], .amount__input { text-align: center; }
   .cover__load { display: none; }
   .cover__actions { transition: none; }
 }
+
+/* ---------- 日誌頁 ---------- */
+.log-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.log-filters .field { width: auto; min-width: 9rem; }
+.log-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.log-entry { display: grid; gap: 4px; padding: 8px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); border-left: 3px solid var(--line3); }
+.log-entry[data-cat='rest'] { border-left-color: var(--sky); }
+.log-entry[data-cat='learn'] { border-left-color: var(--lilac); }
+.log-entry[data-cat='item'] { border-left-color: var(--gold); }
+.log-entry__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.log-entry__time { font-size: 0.74rem; color: var(--faint); }
+.log-entry__who { color: var(--gold); }
+.log-entry__player { color: var(--faint); }
+.log-entry__cat { margin-left: auto; }
+.log-entry__text { margin: 0; overflow-wrap: anywhere; }
+.log-entry__more { font-size: 0.82rem; color: var(--soft); }
+.log-entry__more summary { cursor: pointer; }
+.log-entry__more ul { margin: 4px 0 0; padding-left: 1.2rem; }

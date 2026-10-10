@@ -60,3 +60,12 @@ test('模擬戰：回報每場的資源與毒性消耗；沒有招式用的資�
   assert.ok(Math.abs(summary.avgDrain - r.drainAvg) < 1e-9);
   assert.equal(summary.avgMonsterHp, 100000);
 });
+
+test('扣分：幾乎每場都有人倒地、回合數顯示 3.0（內部 3.04）都不算超標', () => {
+  const base = { runs: 200, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [{ name: 'a', rate: 0.1 }] };
+  assert.equal(penalty(base), 0);
+  assert.ok(penalty({ ...base, downRate: [{ name: 'a', rate: 0.95 }] }) > 1);
+  assert.equal(penalty({ ...base, avgRounds: 3.04 }), 0);
+  assert.equal(assess({ ...base, avgRounds: 3.04 }).items[0].status, 'ok');
+  assert.equal(assess({ ...base, avgRounds: 3.06 }).items[0].status, 'high');
+});

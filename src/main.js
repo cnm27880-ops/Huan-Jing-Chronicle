@@ -20,6 +20,7 @@ import { createBagView } from './ui/bagView.js';
 import { createGearView } from './ui/gearView.js';
 import { createMarketView } from './ui/marketView.js';
 import { createSessionView } from './ui/sessionView.js';
+import { createLogsView } from './ui/logsView.js';
 import { createVitalsReporter } from './state/vitals.js';
 import { showCover } from './ui/cover.js';
 import { createUserChip } from './ui/userChip.js';
@@ -103,6 +104,7 @@ async function init() {
     gear: createGearView({ root: $('#view-gear'), getState, commit }),
     session: createSessionView({ root: $('#view-session'), getState, commit }),
     market: createMarketView({ root: $('#view-market'), getState, commit }),
+    logs: createLogsView({ root: $('#view-logs') }),
   };
   sync = createCharSync({
     getState,
@@ -130,7 +132,7 @@ async function init() {
     const raw = (location.hash || '#map').slice(1);
     const id = raw === 'battle' ? 'session' : raw; // 戰鬥頁已改成跑團頁裡的戰鬥面板（舊連結導到跑團頁）
     const previous = currentView;
-    currentView = ['map', 'rest', 'bag', 'gear', 'session', 'market'].includes(id) ? id : 'map';
+    currentView = ['map', 'rest', 'bag', 'gear', 'session', 'market', 'logs'].includes(id) ? id : 'map';
     if (previous !== currentView) views[previous]?.leave?.(); // 離開的頁面可以停掉背景更新（跑團頁的紀錄）
     document.querySelectorAll('[data-view]').forEach((el) => {
       el.hidden = el.dataset.view !== currentView;
@@ -139,7 +141,7 @@ async function init() {
       if (a.dataset.viewLink === currentView) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
-    moreBtn.toggleAttribute('data-active', currentView === 'gear' || currentView === 'market'); // 裝備、交易收在「更多」裡，手機版讓「更多」亮起
+    moreBtn.toggleAttribute('data-active', ['gear', 'market', 'logs'].includes(currentView)); // 裝備、交易、日誌收在「更多」裡，手機版讓「更多」亮起
     if (currentView === 'map') map.reset(false);
     else views[currentView].render();
     applyWait();
@@ -157,7 +159,7 @@ async function init() {
   });
   function applyWait() {
     const status = getRoomStatus();
-    const wait = currentView !== 'map' && Boolean(sync?.isWaiting()) && status.phase === 'online' && !status.me?.isGm;
+    const wait = currentView !== 'map' && currentView !== 'logs' && Boolean(sync?.isWaiting()) && status.phase === 'online' && !status.me?.isGm;
     waitView.hidden = !wait;
     const el = document.querySelector(`[data-view="${currentView}"]`);
     if (el && wait) el.hidden = true;

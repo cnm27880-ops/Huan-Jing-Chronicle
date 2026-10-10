@@ -8,6 +8,7 @@ import { openSheet } from './sheet.js';
 import { itemTile, toast } from './controls.js';
 import { FOODS, STOMACH_SLOTS, MAX_TIME } from '../game/rules.js';
 import { proficiency, newDay, eat, countOf } from '../game/engine.js';
+import { logActivity } from '../state/activityLog.js';
 
 export function openFoodSheet(state, ctx, commit) {
   const sheet = openSheet(ctx === 'rest' ? '修整時吃東西' : '跑團時吃東西', (close) => {
@@ -23,6 +24,7 @@ export function openFoodSheet(state, ctx, commit) {
                 const err = eat(state, f, ctx);
                 if (err) return toast(err);
                 toast(`吃下${f}`);
+                logActivity(state, { cat: 'item', text: `吃下 ${f}（${ctx === 'rest' ? '修整' : '跑團'}胃袋）`, lines: [] });
                 commit();
                 stomach.length + 0 >= STOMACH_SLOTS ? close() : sheet.refresh();
               },

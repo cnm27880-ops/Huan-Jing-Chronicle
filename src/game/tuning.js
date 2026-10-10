@@ -9,6 +9,7 @@ export const TARGET = {
   roundsMin: 2, roundsMax: 3, // 平均回合數
   drain: 0.5, drainTol: 0.1, // 每場資源與毒性消耗比例：0.4～0.6 算剛好
   winMin: 0.9, // 玩家勝率至少
+  downMax: 0.6, // 任何一位玩家「至少倒地一次」的機率上限（我補的，需驗證）
   battlesPerSession: 2,
 };
 
@@ -17,10 +18,13 @@ const fmtN = (v) => Math.round(v).toLocaleString('zh-TW');
 
 /** 偏離目標的程度（0 = 三項都達標）；自動調整就是找讓它最小的敵人數值 */
 export function penalty(sum) {
-  const pr = Math.max(0, TARGET.roundsMin - sum.avgRounds, sum.avgRounds - TARGET.roundsMax);
+  const rounds = Math.round(sum.avgRounds * 10) / 10; // 和畫面顯示的一位小數一致
+  const pr = Math.max(0, TARGET.roundsMin - rounds, rounds - TARGET.roundsMax);
   const pc = Math.max(0, Math.abs(sum.avgDrain - TARGET.drain) - TARGET.drainTol) / TARGET.drainTol;
   const pw = Math.max(0, TARGET.winMin - sum.win) / 0.1;
-  return pr + pc + pw;
+  const downMax = Math.max(0, ...(sum.downRate ?? []).map((d) => d.rate));
+  const pd = Math.max(0, downMax - TARGET.downMax) / 0.2; // 幾乎每場都有人倒地：太兇
+  return pr + pc + pw + pd;
 }
 
 /**
@@ -30,7 +34,7 @@ export function penalty(sum) {
 export function assess(sum) {
   const items = [];
   const advice = [];
-  const r = sum.avgRounds;
+  const r = Math.round(sum.avgRounds * 10) / 10; // 以畫面顯示的一位小數判斷
   const dmg = sum.avgDamagePerRound;
   const hp = sum.avgMonsterHp;
 
@@ -65,7 +69,7 @@ export function assess(sum) {
   if (wStatus === 'low') advice.push(`勝率只有 ${pct(w)}（敗 ${pct(sum.lose)}・平手 ${pct(sum.timeout)}）：怪物太強，降低攻擊強度或血量。`);
 
   const downMax = Math.max(0, ...(sum.downRate ?? []).map((d) => d.rate));
-  if (downMax > 0.6) advice.push(`有玩家 ${pct(downMax)} 的場次會倒地：防禦弱的角色壓力很大，可以調低攻擊強度，或準備更多回復藥水。`);
+  if (downMax > TARGET.downMax) advice.push(`有玩家 ${pct(downMax)} 的場次會倒地：防禦弱的角色壓力很大，可以調低攻擊強度，或準備更多回復藥水。`);
 
   const ok = items.every((i) => i.status === 'ok');
   if (ok) advice.unshift(`這組數值符合目標：${sum.avgRounds.toFixed(1)} 回合、每場耗 ${pct(c)} 資源、勝率 ${pct(w)}。`);
