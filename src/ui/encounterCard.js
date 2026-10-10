@@ -266,12 +266,13 @@ export function createEncounterCard({ getState, commit, rerender }) {
       ({ r, draw, befores, bosses } = await withRoomEncounter(state, async () => {
         const before = new Map(state.encounter.monsters.map((x) => [x.id, x.hp]));
         const boss = new Set(state.encounter.monsters.filter((x) => x.kind === 'boss').map((x) => x.id));
-        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, sel.moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai, targetIds, modes, dou, extraAbs, respOff: [...sel.respOff] }));
+        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, sel.moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai, targetIds, modes, dou, extraAbs, respOff: [...sel.respOff], mage: sel.mage }));
         return { ...res, befores: before, bosses: boss };
       }));
     } catch (e) { return rollFailed(e); }
     if (r.error) return toast(r.error);
     sel.dou = 0;
+    sel.mage = 0;
     if (!online()) Object.keys(extraAbs).forEach((id) => spendEnemyB(state.encounter, id)); // 本機模式：蓄力用掉了（房間模式由伺服器扣）
     r.hits.forEach((x) => playFx(x.target.id, x.result.total > 0 ? 'hit' : 'block')); // 打中＝晃動閃光；沒破防＝護盾擋下
     const multi = r.hits.length > 1;
@@ -295,7 +296,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       lines,
     }, { draw });
     if (online()) { // 怪物生命由伺服器改：回報這次打掉多少
-      const hits = r.hits.map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp), ...(extraAbs[x.target.id] ? { usedB: true } : {}) })).filter((x) => x.dmg > 0 || x.usedB);
+      const hits = r.hits.map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp), ...(extraAbs[x.target.id] ? { usedB: true } : {}), ...(x.absCut ? { absCut: x.absCut } : {}) })).filter((x) => x.dmg > 0 || x.usedB || x.absCut);
       if (hits.length) await act({ t: 'encHit', hits });
     }
     commit();

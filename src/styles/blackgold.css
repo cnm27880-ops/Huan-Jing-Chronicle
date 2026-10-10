@@ -1533,9 +1533,9 @@ input[type='number'], .amount__input { text-align: center; }
 .library__item .btn { margin-top: 0; }
 
 /* 右欄：房間、紀錄（新的在下）、快速擲骰 */
-.sx-room { flex-shrink: 0; padding: 8px 12px; background: var(--card); border-radius: var(--r-panel); box-shadow: var(--panel-shadow); }
-.sx-room__sum { cursor: pointer; font-size: 0.86rem; color: var(--soft); }
-.sx-room[open] .sx-room__sum { margin-bottom: 8px; color: var(--gold); }
+.sx-room { flex-shrink: 0; padding: 4px 12px; background: var(--card); border-radius: var(--r-panel); box-shadow: var(--panel-shadow); }
+.sx-room__sum { cursor: pointer; font-size: 0.82rem; line-height: 1.25; color: var(--soft); }
+.sx-room[open] .sx-room__sum { margin-bottom: 4px; color: var(--gold); }
 .sx-room__body .room { margin: 0; }
 .sx-feedhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex-shrink: 0; }
 .sx-feedhead[hidden] { display: none; }

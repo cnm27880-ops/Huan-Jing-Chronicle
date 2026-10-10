@@ -2,8 +2,8 @@
 // 響應：腦機協議／殘缺筆記等「消耗資源加骰」、龍（能量傷害累積）、賽博駭客（靈魂未破防反擊）
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newEncounter, playerAttack, monsterAttack, attackDice, endBattle } from '../src/game/combat.js';
-import { moveFromCatalog, attackResponses } from '../src/game/skills.js';
+import { newEncounter, playerAttack, monsterAttack, attackDice, endBattle, monsterAbs } from '../src/game/combat.js';
+import { moveFromCatalog, attackResponses, moveExtra } from '../src/game/skills.js';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 
 const fresh = () => JSON.parse(JSON.stringify(SAMPLE_CHARACTER));
@@ -114,4 +114,42 @@ test('賽博駭客：靈魂傷害未破防 → 攻擊方扣精神意志顆 D4；
   assert.equal(monsterAttack(t, enc3, '小怪1', 0, d4(1)).reflect, null);
   const enc4 = newEncounter(); enc4.monsters.push(dummy(1000, {}, { A: 5, B: 0, C: 0 }));
   assert.equal(monsterAttack(s, enc4, '小怪1', 0, d4(1)).reflect, null);
+});
+
+test('幽暗魔火陣：多目標 +2／4／6 骰，只打單一目標改成 +4／8／12；至尊術士每級 2 → 單一每級 3（不再 5）', () => {
+  const s = fresh();
+  s.skills = { 幽暗魔火陣: 5, 至尊術士: 3 };
+  const fire = moveFromCatalog('幽暗魔火陣');
+  assert.equal(moveExtra(s, fire).B, 4);
+  assert.equal(moveExtra(s, { ...fire, single: true }).B, 8);
+  const sup = moveFromCatalog('至尊術士');
+  assert.equal(moveExtra(s, sup).B, 6);
+  assert.equal(moveExtra(s, { ...sup, single: true }).B, 9);
+  // 出招：選 1 個目標 vs 2 個目標
+  s.moves.push(fire); s.resources.魔力 = 100;
+  const enc = newEncounter(); enc.monsters.push(dummy(1e6), { ...dummy(1e6), id: '小怪2' });
+  const one = playerAttack(s, enc, fire.id, '小怪1', 0, d4(1), { targetIds: ['小怪1'] });
+  const two = playerAttack(s, enc, fire.id, '小怪1', 0, d4(1), { targetIds: ['小怪1', '小怪2'] });
+  assert.equal(one.atk.dice.B - two.atk.dice.B, 4);
+});
+
+test('漆黑血刃：神秘招式花 16 生命，1／5／9 級 +4／6／8，加在招式用到的每一軌；大魔導師 5 魔力／顆加能量骰；泰坦永久減絕防', () => {
+  const s = fresh();
+  s.skills = { 漆黑血刃: 5, 大魔導師: 1, 泰坦: 5 };
+  s.hp = 200; s.resources.魔力 = 100;
+  const mv = { id: 'bm', name: '雙軌', school: '神秘', tracks: ['B', 'C'], extra: { A: 0, B: 0, C: 0 }, cost: {} };
+  s.moves.push(mv);
+  const enc = newEncounter(); enc.monsters.push({ ...dummy(1e7), abs: 20 });
+  const r = playerAttack(s, enc, 'bm', '小怪1', 0, d4(1), { mage: 20 });
+  assert.deepEqual([r.respDice.B, r.respDice.C], [6 + 12, 6]); // 大魔導師上限 12
+  assert.equal(r.cost.生命, 16);
+  assert.equal(r.cost.魔力, 60);
+  // 泰坦：物理傷害後絕防 −15；沒有物理就不扣
+  const phys = { id: 'ph', name: '物理', school: '西幻', tracks: ['A'], extra: { A: 0, B: 0, C: 0 }, cost: {} };
+  s.moves.push(phys);
+  assert.equal(monsterAbs(enc.monsters[0]), 20);
+  playerAttack(s, enc, 'ph', '小怪1', 0, d4(4));
+  assert.equal(monsterAbs(enc.monsters[0]), 5);
+  playerAttack(s, enc, 'ph', '小怪1', 0, d4(4)); // 不疊加
+  assert.equal(monsterAbs(enc.monsters[0]), 5);
 });

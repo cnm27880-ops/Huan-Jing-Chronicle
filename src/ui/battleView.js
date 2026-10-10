@@ -13,7 +13,7 @@ import {
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
-  SKILL_CATALOG, bindableSkills, attackResponses, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
+  SKILL_CATALOG, bindableSkills, attackResponses, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
 } from '../game/skills.js';
 import {
   OTHER_RESOURCES, resourceMax, resourceNow, setResource, restoreAllResources, actionCost, shortfall, costText, witchRest,
@@ -260,7 +260,8 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     }
     // 預覽含「會自動觸發的響應」（沒關掉、付得起的）；cost 仍是招式本身，用來判斷能不能出招
     const plan = planResponses(state, m, cost, [...sel.respOff]);
-    const a = pooled ? pooledAttack(state, m, 0, 0, plan.respDice) : attackDice(state, m, 0, 0, plan.respDice);
+    const mv = m.id === sel.moveId && sel.targets.length === 1 ? { ...m, single: true } : m; // 選中的招式只選 1 個目標＝單一目標加骰
+    const a = pooled ? pooledAttack(state, mv, 0, 0, plan.respDice) : attackDice(state, mv, 0, 0, plan.respDice);
     const dice = pooled ? `${fmt(a.dice)} 骰` : formatAbc(a.dice);
     const text = pooled
       ? `【${ATTACK_MODES[m.mode]}】 ${a.parts.map((p) => `${p.label} ${fmt(p.value)}`).join(' + ')}`
@@ -405,9 +406,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         const lacking = !off && !r.free && !usedNames.has(r.name);
         return h('button', {
           type: 'button', class: 'resp__chip', 'aria-pressed': String(!off && !lacking), disabled: r.free ? true : null, dataset: { state: off ? 'off' : lacking ? 'lack' : 'on' },
-          title: `${r.name}：造成${{ A: '物理', B: '能量', C: '靈魂' }[r.track]}傷害時${r.free ? '' : `，消耗 ${costText(r.cost)}`}，${r.track} 軌 +${r.dice} 顆傷害骰。${r.free ? '' : '點一下開／關。'}`,
+          title: `${r.name}：造成${{ A: '物理', B: '能量', C: '靈魂' }[r.track]}傷害時${r.free ? '' : `，消耗 ${costText(r.cost)}`}，${r.tracks.join('')} 軌 +${r.dice} 顆傷害骰。${r.free ? '' : '點一下開／關。'}`,
           onclick: () => { if (off) sel.respOff.delete(r.name); else sel.respOff.add(r.name); rerender(); },
-        }, `${r.name} ${r.track}+${r.dice}${r.free ? '' : `（${costText(r.cost)}）`}${lacking ? '・不足' : ''}`);
+        }, `${r.name} ${r.tracks.join('')}+${r.dice}${r.free ? '' : `（${costText(r.cost)}）`}${lacking ? '・不足' : ''}`);
       }));
   }
   const d2plan = (state, m) => planResponses(state, m, actionCost(state, m), [...sel.respOff]);
@@ -428,6 +429,26 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const field = h('label', { class: 'dou__field', dataset: { on: sel.dou > 0 ? '1' : '0' }, title: `每點鬥氣 +${mult} 顆真實傷害骰${mult > 1 ? '（冠軍勇士）' : ''}，只對下一次出招有效` },
       h('span', { class: 'dou__icon', 'aria-hidden': 'true', text: '🔥' }),
       h('span', { class: 'dou__label', text: '鬥氣加骰' }),
+      input);
+    return h('div', { class: 'dou' }, field);
+  }
+
+  /** 大魔導師加骰：造成能量傷害時每花 5 魔力多 1 顆能量傷害骰，上限 12 顆；只在選中的招式有能量軌時出現，出招後歸零 */
+  function mageRow(state) {
+    const cur = state.moves.find((m) => m.id === sel.moveId);
+    if (!mageApplies(state, cur)) { sel.mage = 0; return null; }
+    const cap = Math.min(MAGE.max, Math.floor(resourceNow(state, '魔力') / MAGE.cost));
+    sel.mage = Math.max(0, Math.min(sel.mage, cap));
+    const input = h('input', {
+      class: 'dou__input', type: 'number', inputmode: 'numeric', min: '0', max: String(cap), step: '1', value: String(sel.mage), placeholder: '0',
+      'aria-label': '大魔導師加骰（顆數）',
+      oninput: (e) => { sel.mage = Math.max(0, Math.min(cap, Math.floor(Number(e.target.value)) || 0)); field.dataset.on = sel.mage > 0 ? '1' : '0'; },
+      onchange: (e) => { e.target.value = String(sel.mage); rerender(); },
+      onfocus: (e) => e.target.select(),
+    });
+    const field = h('label', { class: 'dou__field', dataset: { on: sel.mage > 0 ? '1' : '0' }, title: `每顆花 ${MAGE.cost} 魔力 +1 顆能量傷害骰，上限 ${MAGE.max} 顆；只對下一次出招有效` },
+      h('span', { class: 'dou__icon', 'aria-hidden': 'true', text: '🔮' }),
+      h('span', { class: 'dou__label', text: `大魔導師加骰（${MAGE.cost} 魔力／顆，最多 ${cap}）` }),
       input);
     return h('div', { class: 'dou' }, field);
   }
@@ -503,6 +524,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           }, `放棄行動・回復 ${WITCH_EXTRA_COST} 魔力`)
         : null,
       douRow(state),
+      mageRow(state),
       state.moves.length
         ? h('ul', { class: 'move-list' }, state.moves.map((m) => moveRow(state, m)))
         : h('p', { class: 'notice', text: '還沒有自訂招式。下面綁定一個主動技能新增。' }),

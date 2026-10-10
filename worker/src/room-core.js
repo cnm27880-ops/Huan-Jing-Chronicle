@@ -501,6 +501,7 @@ export class RoomCore {
         const m = enc.monsters.find((x) => x.id === hit.id);
         if (!m) continue; // 怪物剛好被 GM 移除：略過
         m.hp = Math.max(0, m.hp - hit.dmg);
+        if (isInt(hit.absCut, 1, 100_000)) m.absCut = Math.max(m.absCut ?? 0, hit.absCut); // 泰坦：絕對防禦永久減少（不疊加，取最大）
         if (hit.usedB === true) spendEnemyB(enc, m.id); // 這一下用掉了敵人的 B 技能（防禦強化）蓄力
         applied++;
       }
