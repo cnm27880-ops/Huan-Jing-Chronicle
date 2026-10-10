@@ -367,9 +367,12 @@ export class RoomCore {
     const out = [];
 
     if (msg.kind === 'gift') {
-      const got = parseItems(msg.items);
+      const gold = msg.gold == null ? 0 : msg.gold; // 贈送也可以附金幣（只送金幣、不附物品也行）
+      if (!isInt(gold, 0, MAX_MAIL_GOLD)) return err(rid, 'bad_mail', '金幣要是 0 以上的整數。');
+      const got = parseItems(msg.items, gold > 0);
       if (got.error) return err(rid, 'bad_mail', got.error);
       Object.assign(mail, { kind: 'gift', items: got.items });
+      if (gold > 0) mail.gold = gold;
       if (msg.bounced === true) mail.bounced = true; // 對方拒收的藥水退回
     } else if (msg.kind === 'trade') { // 玩家交易：我給 give、要對方拿 want 來換；東西由寄的人先扣（押在這張單上），對方回覆前都留在伺服器
       const giveGold = msg.giveGold == null ? 0 : msg.giveGold;

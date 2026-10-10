@@ -31,7 +31,7 @@ export const teammates = () => {
  * mode 決定一開始停在哪個。東西（與金幣）先從自己的背包扣，寄失敗會還回來。
  */
 export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
-  const ui = { mode, to: '', picked: new Map(), wants: [{ name: '', qty: 1 }], giveGold: 0, wantGold: 0, busy: false }; // picked：物品名 → 要送的數量
+  const ui = { mode, to: '', picked: new Map(), wants: [{ name: '', qty: 1 }], giveGold: 0, wantGold: 0, giftGold: 0, busy: false }; // picked：物品名 → 要送的數量
   let sheet;
 
   /** 寄出前的共同步驟：先把東西（與金幣）從背包扣掉；寄失敗再還回來。mail = sendMail 的內容（不含 to） */
@@ -59,10 +59,11 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
     const give = Object.fromEntries(ui.picked);
     if (!ui.to) return toast(ui.mode === 'gift' ? '先選要送給誰。' : '先選要跟誰交易。');
     if (ui.mode === 'gift') {
-      if (!Object.keys(give).length) return toast('先點選要送的東西。');
-      return dispatch(sendBtn, '🎁 送出', give, 0, { kind: 'gift', items: give }, (state, who) => {
+      const gold = ui.giftGold;
+      if (!Object.keys(give).length && gold < 1) return toast('先點選要送的東西，或填要送的金幣。');
+      return dispatch(sendBtn, '🎁 送出', give, gold, { kind: 'gift', items: give, ...(gold > 0 ? { gold } : {}) }, (state, who) => {
         toast(`已送給 ${who}（對方不在線也會在上線時收到）。`);
-        logActivity(state, { cat: 'item', text: `送給 ${who}：${Object.keys(give).length} 種東西`, lines: Object.entries(give).map(([n, q]) => `${n} ×${q}`) });
+        logActivity(state, { cat: 'item', text: `送給 ${who}：${itemsText(give, gold)}`, lines: [] });
       });
     }
     const want = {};
@@ -113,13 +114,13 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
     const sendBtn = h('button', { type: 'button', class: 'btn btn--primary btn--go', onclick: () => send(sendBtn) }, idle);
     function renderFoot() { // 選取有變（挑選器每次更新都會呼叫）：更新底部的「已選幾件」與送出鈕
       const n = [...ui.picked.values()].reduce((a, b) => a + b, 0);
-      const gold = trade && ui.giveGold > 0 ? `${n ? '＋' : ''}金幣 ${fmt(ui.giveGold)}` : '';
+      const goldNow = trade ? ui.giveGold : ui.giftGold;
+      const gold = goldNow > 0 ? `${n ? '＋' : ''}金幣 ${fmt(goldNow)}` : '';
       total.textContent = ui.picked.size || gold ? `${trade ? '給出' : '已選'} ${ui.picked.size ? `${ui.picked.size} 種・共 ${fmt(n)} 件` : ''}${gold}` : '點物品就會選取';
       clear.hidden = !ui.picked.size;
-      sendBtn.disabled = ui.busy || !(n || (trade && ui.giveGold > 0));
+      sendBtn.disabled = ui.busy || !(n || goldNow > 0);
     }
     const picker = createItemPicker({ state, picked: ui.picked, onChange: renderFoot });
-    if (!trade && !picker.owned.length) return h('div', { class: 'giftsheet' }, h('div', { class: 'gift-head' }, modeToggle(incomingCount())), h('p', { class: 'notice', text: '背包裡沒有可以送的東西（紀念品不能送）。' }));
 
     const wantBox = h('div', { class: 'trade-wants' });
     function renderWants() {
@@ -138,7 +139,7 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
             h('option', { value: '', text: '選擇玩家…' }),
             mates.map((m) => h('option', { value: m.uid, selected: ui.to === m.uid ? true : null, text: `${m.name}${m.online ? '' : '（離線）'}` })))),
         trade ? h('p', { class: 'field-label', text: '① 我要給出（點物品選取、選好數量；也可以出金幣）' }) : null,
-        trade ? goldField(`我給出金幣（你有 ${fmt(state.gold)}）`, 'giveGold', renderFoot) : null,
+        trade ? goldField(`我給出金幣（你有 ${fmt(state.gold)}）`, 'giveGold', renderFoot) : goldField(`同時送金幣（你有 ${fmt(state.gold)}，可以只送金幣）`, 'giftGold', renderFoot),
         picker.head),
       picker.grid,
       trade

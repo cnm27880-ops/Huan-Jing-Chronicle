@@ -196,3 +196,17 @@ test('玩家交易加金幣：每一邊物品或金幣至少一樣；成交時�
   const toB2 = mailsTo(send(core, P2, { t: 'tradeRespond', id: noGold.id, action: 'accept' }), '400')[0];
   assert.equal('gold' in toB2, false); // 沒有金幣就不帶這個欄位
 });
+
+test('贈送也能附金幣：只送金幣也可以；金幣要是整數、不能是負的；沒有金幣就不帶欄位', () => {
+  const core = room();
+  const gift = (extra) => send(core, P1, { t: 'mailSend', rid: 'g', to: '400', kind: 'gift', ...extra });
+  assert.equal(pushed(gift({ items: {}, gold: 500 })).msg.mails[0].gold, 500); // 只送金幣
+  const both = pushed(gift({ items: { 鐵礦: 2 }, gold: 100 })).msg.mails[0];
+  assert.deepEqual([both.items, both.gold], [{ 鐵礦: 2 }, 100]);
+  assert.equal('gold' in pushed(gift({ items: { 鐵礦: 1 } })).msg.mails[0], false);
+  assert.equal(errorOf(gift({ items: {} }))?.code, 'bad_mail'); // 物品與金幣都沒有
+  assert.equal(errorOf(gift({ items: {}, gold: 0 }))?.code, 'bad_mail');
+  assert.equal(errorOf(gift({ items: { 鐵礦: 1 }, gold: -5 }))?.code, 'bad_mail');
+  assert.equal(errorOf(gift({ items: { 鐵礦: 1 }, gold: 1.5 }))?.code, 'bad_mail');
+  assert.equal(errorOf(gift({ items: {}, gold: 2_000_000_000 }))?.code, 'bad_mail');
+});
