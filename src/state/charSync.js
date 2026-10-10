@@ -163,6 +163,22 @@ export function createCharSync({
   return {
     /** 這台裝置正在等 GM 匯入角色（伺服器沒有存檔、本機只有示範角色） */
     isWaiting: () => readMeta().waiting,
+    /** 等目前排隊中的同步工作（連線後比對、上傳）都做完 */
+    idle: () => chain,
+    /**
+     * 強制用目前的角色覆蓋伺服器（不問、不管伺服器上是哪一份）：GM 把示範角色換成空白角色時用。
+     * 呼叫前要先把新角色存進本機並讓 getState() 回傳它。解除等待狀態。
+     */
+    async forceUpload() {
+      gen++;
+      await run(async () => {
+        if (!online()) { writeMeta({ uid: myUid(), version: 0, dirty: true, waiting: false }); notifyWaiting(); return; } // 沒連線：先標記待上傳，連上時再處理
+        const res = await request({ t: 'charGet' });
+        writeMeta({ uid: myUid(), version: res.data === null ? 0 : res.version, dirty: true, waiting: false });
+        notifyWaiting();
+        await push(res.data === null ? 0 : res.version);
+      });
+    },
     /** 等待狀態改變時呼叫 fn(是否等待中)；回傳取消訂閱的函式 */
     onWaitingChange(fn) { waitSubs.add(fn); return () => waitSubs.delete(fn); },
     /**

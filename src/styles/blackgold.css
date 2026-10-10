@@ -1090,11 +1090,11 @@ input[type='number'], .amount__input { text-align: center; }
 .import-adjust li { padding: 2px 10px; background: var(--raise); border-radius: var(--r-pill); font-size: 0.82rem; color: var(--ink); }
 .import-adjust li[data-neg='1'] { color: var(--rose); box-shadow: inset 0 0 0 1px var(--rose2); }
 
-/* 送給別人等「高」面板：手機佔畫面約三分之二，電腦也拉高 */
-.sheet__panel[data-size='tall'] { height: min(67dvh, 760px); max-height: none; }
+/* 贈送／交易等「高」面板：手機佔畫面約九成（至少三分之二），電腦也拉高 */
+.sheet__panel[data-size='tall'] { height: min(88dvh, 900px); max-height: none; }
 .sheet__panel[data-size='tall'] .sheet__body { flex: 1; min-height: 0; }
 @media (max-width: 640px) {
-  .sheet__panel[data-size='tall'] { height: 67dvh; max-height: 67dvh; }
+  .sheet__panel[data-size='tall'] { height: 88dvh; max-height: 88dvh; }
 }
 
 /* 技能方格（學習、裝備頁共用）：一格一行＝名稱、位階類型、（備註）、等級；啟動開關才換行 */
