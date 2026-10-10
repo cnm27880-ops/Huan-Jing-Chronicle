@@ -10,10 +10,10 @@
 //   （自由分配、愚者對調、還沒搬到網站的裝備都在裡面），GM 之後可以改。
 // ============================================================
 import { ALL_STATS, RESOURCE_STATS, LIFE_SKILLS, ART_SKILLS, FOODS, STOMACH_SLOTS } from './rules.js';
-import { SKILL_CATALOG, moveFromCatalog } from './skills.js';
 import { inCatalog, needsActivation, MAX_SKILL_LEVEL, markSwapsDone } from './skillTable.js';
 import { derivedStats } from './stats.js';
 import { blankCharacter } from './importBot.js';
+import { SAMPLE_CHARACTER } from '../data/sample/fude.js';
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const PANEL_STATS = ALL_STATS.filter((s) => !RESOURCE_STATS.includes(s)); // 真實傷害、物理傷害…絕對防禦…精神意志
@@ -128,7 +128,13 @@ export function parseSheet(text) {
 export function convertSheet(parsed, base = null, { activated = new Set() } = {}) {
   if (!parsed || parsed.error) return { error: parsed?.error ?? '沒有資料。' };
   const data = base ? clone(base) : blankCharacter(parsed.name);
-  if (!base) data.name = parsed.name;
+  if (!base) {
+    data.name = parsed.name;
+    // 示範角色（福德正神）的身上裝備、備用裝備是試算表讀不到的：重新匯入（含「取代」）時自動帶回並穿好
+    if (parsed.name === SAMPLE_CHARACTER.name) {
+      for (const k of ['equipment', 'gear', 'nextGearId', 'gems', 'nextGemId']) data[k] = clone(SAMPLE_CHARACTER[k]);
+    }
+  }
   const dropped = []; const zero = [];
   const skills = {};
   for (const { name, level } of parsed.learned) {
@@ -146,9 +152,6 @@ export function convertSheet(parsed, base = null, { activated = new Set() } = {}
   Object.assign(data.lifeSkills, parsed.lifeSkills);
   Object.assign(data.arts, parsed.arts);
   data.sessionStomach = parsed.foods.map((food) => ({ food })); // 面板已含這些食物，所以也放進胃袋，網站才會一起算
-  for (const n of Object.keys(skills)) { // 技能庫的招式（有等級才給）
-    if (skills[n] > 0 && SKILL_CATALOG[n] && !data.moves.some((m) => m.skill === n)) data.moves.push(moveFromCatalog(n));
-  }
   // 手動調整 = 試算表面板 − 網站用技能、裝備、食物算出來的值。
   // 暴徒（物理的一半）與啟動的算力扣除都會跟著調整後的數值變，所以反覆修正到面板完全吻合
   const target = { ...parsed.panel, ...Object.fromEntries(Object.entries(parsed.resources).map(([s, v]) => [s, v.max])) };

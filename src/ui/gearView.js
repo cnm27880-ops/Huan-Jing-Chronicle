@@ -14,7 +14,7 @@ import {
   identifiableGems, identifyGems, socketGem, socketTargets, gemDiceText, gemName,
 } from '../game/equipment.js';
 import { derivedStats } from '../game/stats.js';
-import { SKILL_CATALOG, RULE_SKILLS, moveFromCatalog } from '../game/skills.js';
+import { RULE_SKILLS } from '../game/skills.js';
 import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL } from '../game/skillTable.js';
 import { publish, rollWith } from '../state/rollLog.js';
 import { openReveal } from './reveal.js';
@@ -67,9 +67,6 @@ export function createGearView({ root, getState, commit }) {
   // ---------- 技能等級（原本在戰鬥頁，功能不變） ----------
   // ---------- 技能（新匯入的角色：技能目錄 + 自動加總） ----------
   const TIER_RANK = { 初階: 0, 進階: 1, 大師: 2, 傳說: 3, 神級: 4 };
-  const addMoveIfAny = (state, name) => {
-    if ((state.skills[name] ?? 0) > 0 && SKILL_CATALOG[name] && !state.moves.some((m) => m.skill === name)) state.moves.push(moveFromCatalog(name));
-  };
 
   function catalogSkillCard(state) {
     const rank = (n) => TIER_RANK[SKILL_TABLE[n]?.tier] ?? 9;
@@ -123,8 +120,6 @@ export function createGearView({ root, getState, commit }) {
             const n = ui.newSkill;
             if (!n) return toast('先選一個技能。');
             state.skills = { ...state.skills, [n]: ui.newSkillLv };
-            // 有招式的技能（技能庫）自動加進招式清單
-            if (SKILL_CATALOG[n] && !state.moves.some((m) => m.skill === n)) state.moves.push(moveFromCatalog(n));
             ui.newSkill = '';
             commit();
           },

@@ -24,7 +24,6 @@ import {
 } from '../game/special.js';
 import { openSheet } from './sheet.js';
 import { skillTile, skillInfoBlock, skillTag } from './skillTile.js';
-import { SKILL_CATALOG, moveFromCatalog } from '../game/skills.js';
 
 const ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -224,7 +223,6 @@ export function createRestView({ root, getState, commit }) {
       if (!confirm(`${name}：${plan.from ? `${plan.from} 級` : '學習'} → ${plan.to} 級\n將消耗 ${fmt(plan.exp)} 經驗、${bookText}。\n確定嗎？`)) return;
       const r = upgradeSkillTo(state, name, plan.to);
       if (!r.ok) return toast(r.error);
-      if (SKILL_CATALOG[name] && !state.moves.some((m) => m.skill === name)) state.moves.push(moveFromCatalog(name));
       const swapText = r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`).join('；');
       toast(`${name} ${r.from ? `${r.from} 級升到` : '學會，升到'} ${r.level} 級${swapText ? `。${swapText}` : ''}`);
       pick.target = null;
