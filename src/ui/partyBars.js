@@ -1,6 +1,6 @@
 // ============================================================
 // 隊友資源條（跑團頁右欄、房間上方）：每位隊友的生命、各資源「還剩多少」、毒性（還能喝多少藥）與「已動用 %」。
-// 折疊時只看摘要（有人倒地會變紅），所以不用展開也知道隊伍狀況。戰鬥中資源還很滿的人會被標 💤。
+// 折疊時只看摘要（有人倒地會變紅），所以不用展開也知道隊伍狀況。戰鬥中資源還很滿的人會被標 🔔。
 // GM 不顯示（使用者 2026-10-10：GM 不會特意去注意）。資料是房間廣播的 vitals（src/state/vitals.js），判斷在 src/game/nudge.js。
 // ============================================================
 import { h, fmt } from './dom.js';
@@ -17,7 +17,7 @@ export function mateCard(v, { online = true, inBattle = false } = {}) {
     h('div', { class: 'mate__head' },
       h('span', { class: 'mate__name', text: v.name }),
       v.downed ? h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒地' }) : null,
-      idle ? h('span', { class: 'mate__idle', title: '戰鬥中，資源幾乎沒動用', text: '💤 還很滿' }) : null,
+      idle ? h('span', { class: 'mate__idle', title: '戰鬥中，資源幾乎沒動用', text: '🔔 還很滿' }) : null,
       h('span', { class: 'mate__use num', title: '各項資源與毒性平均用掉的比例', text: `已動用 ${pct(use)}` })),
     h('span', { class: 'mate__bar', role: 'img', 'aria-label': `生命 ${v.hp} / ${v.maxHp}` }, h('span', { class: 'mate__fill', style: `width:${hpPct(v) * 100}%` })),
     h('span', { class: 'mate__hp num', text: `生命 ${fmt(v.hp)} / ${fmt(v.maxHp)}${v.shield ? `　🛡${fmt(v.shield)}` : ''}` }),
@@ -44,7 +44,7 @@ export function createPartyPanel() {
     const d = partyDigest(mates.map(([, v]) => v), { inBattle });
     node.dataset.level = d.level;
     summary.textContent = mates.length
-      ? `隊友 ${d.count} 人・最低生命 ${d.minPct}%${d.downed ? `・${d.downed} 人倒地` : ''}${d.idle.length ? `・💤 ${d.idle.join('、')} 資源還很滿` : ''}`
+      ? `隊友 ${d.count} 人・最低生命 ${d.minPct}%${d.downed ? `・${d.downed} 人倒地` : ''}${d.idle.length ? `・🔔 ${d.idle.join('、')} 資源還很滿` : ''}`
       : '隊友';
     body.replaceChildren(mates.length
       ? h('ul', { class: 'party__list' }, mates.map(([uid, v]) => mateCard(v, { online: onlineIds.has(uid), inBattle })))

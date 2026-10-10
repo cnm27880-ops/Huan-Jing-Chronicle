@@ -73,7 +73,7 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
           }, done ? `✓ 已餵 ${p.name}` : `餵 ${mate.name}：${p.name}（約 +${fmt(Math.round(p.avg))}・剩 ${fmt(p.qty)}）`);
         })));
       } else if (opts.heals.length) {
-        rows.push(h('p', { class: 'nudge__none', text: `${mate.name} 的毒性已滿，喝不下藥水。出招幫忙打倒敵人，或用輔助技能。` }));
+        rows.push(h('p', { class: 'nudge__none', text: `${mate.name} 的毒性已滿，喝不下藥水。` }));
       }
     }
     return h('section', { class: 'nudge__ev', dataset: { kind: ev.kind } }, h('h3', { class: 'nudge__evtitle', text: titleOf(ev) }), rows);
@@ -85,9 +85,9 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
     const opts = myOptions(state);
     const fresh = opts.fresh.map((r) => `${r.key} ${fmt(r.now)}/${fmt(r.max)}`);
     const tips = [];
-    if (fresh.length) tips.push(`你還沒動用：${fresh.join('、')}。放招式、花鬥氣加骰，快點結束戰鬥，隊友就少受一點傷。`);
-    if (opts.buffs.length) tips.push(`你有 ${opts.buffs.map((b) => `${b.name}×${fmt(b.qty)}`).join('、')}，攻擊／防禦藥水也可以用。`);
-    if (!opts.heals.length) tips.push('你手上沒有回復藥水可以餵，出招幫忙打倒敵人也是救人。');
+    if (fresh.length) tips.push(`你還有這些資源可以用：${fresh.join('、')}（招式與鬥氣加骰都會用到）。`);
+    if (opts.buffs.length) tips.push(`你還有 ${opts.buffs.map((b) => `${b.name}×${fmt(b.qty)}`).join('、')} 可以用（攻擊／防禦藥水）。`);
+    if (!opts.heals.length) tips.push('你手上沒有可以餵的回復藥水。');
     const onSession = location.hash === '#session';
     const dismiss = modal.dismiss;
     const covered = new Set();
