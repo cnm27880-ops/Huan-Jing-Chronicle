@@ -21,7 +21,6 @@ import {
 } from '../game/resources.js';
 import { countOf } from '../game/engine.js';
 import { iconOf } from './items.js';
-import { holdRepeat } from './holdRepeat.js';
 import { publish, rollWith } from '../state/rollLog.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
@@ -386,37 +385,24 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       }, '✕'));
   }
 
-  /** 鬥氣加骰：這次出招花幾點鬥氣，每點 +1 顆真實傷害骰（冠軍勇士每點 4 顆）；出招後歸零 */
+  /** 鬥氣加骰：直接輸入這次出招花幾點鬥氣（不能超過現有的），每點 +1 顆真實傷害骰（冠軍勇士每點 4 顆）；出招後歸零 */
   function douRow(state) {
     if (resourceMax(state, '鬥氣') <= 0) return null;
     const have = resourceNow(state, '鬥氣');
     sel.dou = Math.max(0, Math.min(sel.dou, have));
     const mult = douMult(state);
-    const hintText = () => (sel.dou ? `下次出招：花 ${sel.dou} 鬥氣，真實傷害 +${fmt(sel.dou * mult)} 骰` : `每點鬥氣 +${mult} 顆真實傷害骰${mult > 1 ? '（冠軍勇士）' : ''}，只對下一次出招有效`);
-    const num = h('strong', { class: 'num dou__n', text: String(sel.dou) });
-    const hint = h('small', { class: 'hint', text: hintText() });
-    const minus = h('button', { type: 'button', class: 'btn btn--small btn--ghost dou__btn', 'aria-label': '少 1 點（按住連減）', disabled: sel.dou <= 0 }, '−');
-    const plus = h('button', { type: 'button', class: 'btn btn--small btn--ghost dou__btn', 'aria-label': '多 1 點（按住連加）', disabled: sel.dou >= have }, '＋');
-    let moved = false;
-    // 連按途中只改這一列的字，不重畫整個面板（按鈕被換掉就收不到「放開」）；放開才重畫一次
-    const step = (d) => () => {
-      const n = Math.max(0, Math.min(have, sel.dou + d));
-      if (n === sel.dou) return false;
-      sel.dou = n; moved = true;
-      num.textContent = String(n); hint.textContent = hintText();
-      minus.disabled = n <= 0; plus.disabled = n >= have;
-      return true;
-    };
-    const end = () => { if (moved) { moved = false; rerender(); } };
-    holdRepeat(minus, step(-1), { onEnd: end });
-    holdRepeat(plus, step(1), { onEnd: end });
-    return h('div', { class: 'dou' },
-      h('span', { class: 'field-label', text: `🔥 鬥氣加骰（現有 ${fmt(have)}，按住＋／－可連加連減）` }),
-      h('div', { class: 'row' },
-        minus, num, plus,
-        h('button', { type: 'button', class: 'btn btn--small btn--ghost', disabled: have < 1, onclick: () => { sel.dou = have; rerender(); } }, '全部'),
-        h('button', { type: 'button', class: 'btn btn--small btn--ghost', disabled: sel.dou <= 0, onclick: () => { sel.dou = 0; rerender(); } }, '歸零'),
-        hint));
+    const input = h('input', {
+      class: 'dou__input', type: 'number', inputmode: 'numeric', min: '0', max: String(have), step: '1', value: String(sel.dou), placeholder: '0',
+      'aria-label': '鬥氣加骰（點數）',
+      oninput: (e) => { const n = Math.floor(Number(e.target.value)) || 0; sel.dou = Math.max(0, Math.min(have, n)); field.dataset.on = sel.dou > 0 ? '1' : '0'; }, // 打字途中不重畫，免得輸入框被換掉
+      onchange: (e) => { e.target.value = String(sel.dou); rerender(); },
+      onfocus: (e) => e.target.select(),
+    });
+    const field = h('label', { class: 'dou__field', dataset: { on: sel.dou > 0 ? '1' : '0' }, title: `每點鬥氣 +${mult} 顆真實傷害骰${mult > 1 ? '（冠軍勇士）' : ''}，只對下一次出招有效` },
+      h('span', { class: 'dou__icon', 'aria-hidden': 'true', text: '🔥' }),
+      h('span', { class: 'dou__label', text: '鬥氣加骰' }),
+      input);
+    return h('div', { class: 'dou' }, field);
   }
 
   /** 資源轉換：靈氣 1 比 1 換生命；能量 1 比 1 換任意資源 */
@@ -489,7 +475,6 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
             },
           }, `放棄行動・回復 ${WITCH_EXTRA_COST} 魔力`)
         : null,
-      h('p', { class: 'hint', text: '點招式選為目前招式（能選幾個目標照招式規定），再按「出招」打中間選好的目標；輔助技能點開後按檔位使用。消耗已含魔女的額外魔力，付不起的會變灰。' }),
       douRow(state),
       state.moves.length
         ? h('ul', { class: 'move-list' }, state.moves.map((m) => moveRow(state, m)))

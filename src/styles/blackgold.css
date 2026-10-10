@@ -1456,21 +1456,32 @@ input[type='number'], .amount__input { text-align: center; }
 .stage__targetinfo { flex: 1; min-width: 10rem; font-size: 0.84rem; color: var(--soft); }
 .stage__targetinfo strong { color: var(--gold); }
 
-/* 隊友資源條（右欄、房間上方；src/ui/partyBars.js）：圓環＝生命、膠囊＝每種資源「還剩多少」，顏色和自己的 HUD 一致 */
-.sx-party { flex-shrink: 0; padding: 10px 12px; background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.05), transparent 40%), var(--card); border-radius: var(--r-panel); box-shadow: var(--panel-shadow); }
+/* 隊友資源條＝懸浮面板（右欄、房間上方；src/ui/partyBars.js）：常駐一條精簡列，展開時浮在紀錄上方、不擠佔版面。圓環＝生命、膠囊＝每種資源「還剩多少」，顏色和自己的 HUD 一致 */
+.sx-party { position: relative; z-index: 20; flex-shrink: 0; }
 .sx-party[hidden] { display: none; }
-.sx-party__sum { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; cursor: pointer; list-style: none; }
-.sx-party__sum::-webkit-details-marker { display: none; }
-.sx-party__sum::before { content: '▸'; color: var(--gold2); font-size: 0.8rem; transition: transform 0.15s ease; }
-.sx-party[open] .sx-party__sum::before { transform: rotate(90deg); }
-.sx-party[open] .sx-party__sum { margin-bottom: 10px; }
-.sx-party__title { margin-right: 2px; font-size: 0.9rem; letter-spacing: 0.08em; color: var(--gold); }
+.sx-party__bar { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 6px 12px; text-align: left; color: var(--ink); background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.06), transparent 50%), var(--card); border: 0; border-radius: var(--r-panel); box-shadow: var(--panel-shadow); cursor: pointer; }
+.sx-party__bar:hover { background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.1), transparent 50%), var(--card); }
+.sx-party[data-level='bad'] .sx-party__bar { box-shadow: var(--panel-shadow), 0 0 0 1px var(--rose2); }
+.sx-party__label { flex: none; font-size: 0.88rem; font-weight: 700; letter-spacing: 0.08em; color: var(--gold); }
+.sx-party__dots { flex: 1; display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.sx-party__chips { flex: none; display: flex; gap: 4px; }
+.sx-party__chev { flex: none; width: 1em; font-size: 0.8rem; color: var(--gold2); }
+.sx-party__pop { position: absolute; left: 0; right: 0; top: calc(100% + 6px); max-height: min(62vh, 480px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 10px; background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.05), transparent 40%), var(--card); border-radius: var(--r-panel); box-shadow: 0 16px 40px rgba(var(--shadow-rgb), 0.6), 0 0 0 1px var(--gold2); animation: party-pop 0.15s ease; }
+.sx-party__pop[hidden] { display: none; }
+@keyframes party-pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .sx-chip { padding: 1px 9px; font-size: 0.72rem; border-radius: var(--r-pill); background: var(--paper); box-shadow: inset 0 0 0 1px var(--line3); color: var(--soft); overflow-wrap: anywhere; }
 .sx-chip[data-tone='warn'] { color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold2); }
 .sx-chip[data-tone='bad'] { color: var(--rose); background: var(--rosebg); box-shadow: inset 0 0 0 1px var(--rose2); }
-.sx-chip[data-tone='idle'] { color: var(--gold); background: var(--goldbg); box-shadow: inset 0 0 0 1px var(--gold2); }
-.sx-party[data-level='bad'] { box-shadow: var(--panel-shadow), 0 0 0 1px var(--rose2); }
-.sx-party__body { max-height: 42vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 2px; }
+
+/* 精簡列的小頭像：環＝生命 */
+.pdot { --ring: var(--sky); position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: conic-gradient(var(--ring) calc(var(--hp) * 1%), rgba(var(--ink-rgb), 0.14) 0); }
+.pdot[data-state='mid'] { --ring: var(--gold); }
+.pdot[data-state='low'] { --ring: var(--rose); box-shadow: 0 0 8px rgba(var(--rose-rgb), 0.45); }
+.pdot[data-state='down'] { --ring: var(--rose2); opacity: 0.8; }
+.pdot__initial { display: grid; place-items: center; width: 23px; height: 23px; font-size: 0.78rem; font-weight: 700; color: var(--ink); background: var(--paper); border-radius: 50%; }
+.pdot[data-state='down'] .pdot__initial { color: var(--rose); }
+.pdot__bell { position: absolute; right: -5px; top: -6px; font-size: 0.7rem; }
+
 .party__list { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 0; padding: 0; list-style: none; }
 
 .mate { --ring: var(--sky); display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 6px 10px; align-items: center; padding: 10px; background: var(--paper); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); }
@@ -1636,6 +1647,7 @@ input[type='number'], .amount__input { text-align: center; }
 }
 @media (prefers-reduced-motion: reduce) {
   .sx-left, .sx-center, .mob, .boss__art, .lbar__fill, .mob__fill, .mate__fill, .rpill__fill { transition: none; }
+  .sx-party__pop { animation: none; }
 }
 
 /* ============================================================
@@ -1802,10 +1814,16 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .stage__result { align-items: center; gap: 6px; }
 .stage__result [data-result='full'] { color: var(--gold); border-color: var(--gold2); }
 .stage__result [data-result='defeat'] { color: var(--rose); border-color: var(--rose2); }
-.dou { display: grid; gap: 4px; margin: 6px 0; }
-.dou .row { align-items: center; gap: 6px; flex-wrap: wrap; }
-.dou__n { min-width: 2ch; text-align: center; color: var(--gold); }
-.dou__btn { min-width: 44px; min-height: 44px; font-size: 1.2rem; }
+.dou { margin: 8px 0; }
+.dou__field { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 4px 8px 4px 12px; cursor: text; background: var(--paper); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line3); transition: box-shadow 0.15s ease, background 0.15s ease; }
+.dou__field:focus-within { box-shadow: inset 0 0 0 1px var(--gold), 0 0 0 3px rgba(var(--gold-rgb), 0.18); }
+.dou__field[data-on='1'] { background: linear-gradient(90deg, rgba(var(--res-fight-rgb), 0.16), transparent 70%), var(--paper); box-shadow: inset 0 0 0 1px var(--res-fight); }
+.dou__icon { font-size: 1.1rem; }
+.dou__label { flex: 1; font-size: 0.9rem; letter-spacing: 0.06em; color: var(--ink2); }
+.dou__input { width: 4.5rem; min-height: 40px; padding: 0 8px; text-align: center; font: inherit; font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--gold); background: var(--card); border: 0; border-radius: 9px; box-shadow: inset 0 0 0 1px var(--line); -moz-appearance: textfield; appearance: textfield; }
+.dou__input::-webkit-outer-spin-button, .dou__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.dou__input:focus { outline: none; box-shadow: inset 0 0 0 1px var(--gold); }
+.dou__field[data-on='1'] .dou__input { color: var(--res-fight); }
 .hold { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 
 /* 跑團頁「技能檢定」：各區塊之間留間距，優勢骰按鈕撐滿、胃袋格固定大小 */
