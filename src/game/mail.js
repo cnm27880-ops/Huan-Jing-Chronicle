@@ -28,9 +28,11 @@ export function applyMail(state, mail) {
   if (mail.kind === 'gift') {
     const entries = Object.entries(mail.items ?? {}).filter(([name, n]) => typeof name === 'string' && Number.isInteger(n) && n > 0);
     for (const [name, n] of entries) addItem(state, name, n);
+    const gold = Number.isInteger(mail.gold) && mail.gold > 0 ? mail.gold : 0; // 玩家交易的金幣
+    state.gold += gold;
     return {
-      title: mail.bounced ? `${from} 退回了東西` : `${from} 送給你東西`,
-      lines: entries.map(([name, n]) => `${name} ×${n}`),
+      title: typeof mail.note === 'string' && mail.note ? mail.note : mail.bounced ? `${from} 退回了東西` : `${from} 送給你東西`, // note：玩家交易的結果（伺服器寫的）
+      lines: [...entries.map(([name, n]) => `${name} ×${n}`), ...(gold ? [`金幣 +${gold.toLocaleString('zh-TW')}`] : [])],
     };
   }
   if (mail.kind === 'potion') {

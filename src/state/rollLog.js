@@ -174,6 +174,13 @@ export function setMailListener(fn) {
 }
 /** 寄東西或餵藥：msg = { to, kind: 'gift', items } 或 { to, kind: 'potion', potion }。失敗丟 RollError */
 export const sendMail = (msg) => request({ t: 'mailSend', ...msg });
+/** 玩家交易：查跟我有關的交易單 { offers }（收到的、發出的）；回覆：action = accept | reject | fail | cancel */
+export const tradeList = () => request({ t: 'tradeList' });
+export const tradeRespond = (id, action) => request({ t: 'tradeRespond', id, action });
+const tradeSubs = new Set();
+/** 交易單有變動（對方回覆、取消、或有新的交易單寄來）就呼叫 fn；回傳取消訂閱的函式 */
+export function onTradeChange(fn) { tradeSubs.add(fn); return () => tradeSubs.delete(fn); }
+export const notifyTradeChange = () => tradeSubs.forEach((fn) => fn());
 /** 領信：回傳 { mail }（已經被別的分頁領走就是 null） */
 export const claimMail = (id) => request({ t: 'mailClaim', id });
 
@@ -201,6 +208,9 @@ function onRoomMessage(msg) {
       break;
     case 'mail':
       deliverMail(msg.mails);
+      break;
+    case 'tradeChanged':
+      notifyTradeChange();
       break;
     case 'enc':
       room.encounter = msg.encounter ?? null;
@@ -230,7 +240,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': case 'presets': case 'acts': {
+    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'trades': case 'tradeOk': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': case 'presets': case 'acts': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;

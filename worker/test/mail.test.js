@@ -103,3 +103,110 @@ test('隊友補血／護盾技能：伺服器驗證、記一筆紀錄（用對�
   }
   assert.equal(errorOf(send(core, P1, { t: 'mailSend', to: '400', kind: 'support', support: 'heal', pct: 10 }))?.code, 'bad_mail'); // 沒有技能名稱
 });
+
+// ---------- 玩家交易 ----------
+const offerOf = (res) => pushed(res).msg.mails[0];
+const mailsTo = (res, uid) => res.out.filter((o) => o.to === 'user' && o.uid === uid && o.msg.t === 'mail').flatMap((o) => o.msg.mails);
+const tradeSend = (core, from = P1, to = '400', give = { 大師技能書: 10 }, want = { 豪華蓋飯: 10 }) => send(core, from, { t: 'mailSend', rid: 's', to, kind: 'trade', give, want });
+
+test('玩家交易：發單存進對方信箱（hello 也看得到）；一般領取（mailClaim）領不走交易單', () => {
+  const core = room();
+  const res = tradeSend(core);
+  const o = offerOf(res);
+  assert.deepEqual([o.kind, o.give, o.want, o.to, o.toName, o.fromName], ['trade', { 大師技能書: 10 }, { 豪華蓋飯: 10 }, '400', '玩家二', '玩家一']);
+  assert.equal(core.hello(P2).mail.length, 1);
+  assert.equal(send(core, P2, { t: 'mailClaim', rid: 'c', id: o.id }).out[0].msg.mail, null); // 領不走，不然寄件人的東西就憑空消失
+  assert.equal(core.hello(P2).mail.length, 1);
+});
+
+test('玩家交易：發單的驗證（要給與要換都至少一樣、不能寄給自己、未回覆上限）', () => {
+  const core = room();
+  const code = (res) => errorOf(res)?.code;
+  assert.equal(code(tradeSend(core, P1, '400', {}, { 豪華蓋飯: 1 })), 'bad_mail');
+  assert.equal(code(tradeSend(core, P1, '400', { 鐵礦: 1 }, {})), 'bad_mail');
+  assert.equal(code(tradeSend(core, P1, '400', { 鐵礦: 1 }, { 豪華蓋飯: 0 })), 'bad_mail');
+  assert.equal(code(tradeSend(core, P1, '300')), 'bad_mail');
+  for (let i = 0; i < 10; i++) assert.equal(code(tradeSend(core)), undefined);
+  assert.equal(code(tradeSend(core)), 'trade_full');
+});
+
+test('玩家交易：對方接受 → want 寄給 A、give 寄給 B（一般信箱），單子消失', () => {
+  const core = room();
+  const o = offerOf(tradeSend(core));
+  const res = send(core, P2, { t: 'tradeRespond', rid: 'r', id: o.id, action: 'accept' });
+  assert.equal(res.out.find((x) => x.to === 'self').msg.action, 'accept');
+  const toA = mailsTo(res, '300')[0];
+  const toB = mailsTo(res, '400')[0];
+  assert.deepEqual([toA.kind, toA.items, toA.note], ['gift', { 豪華蓋飯: 10 }, '玩家二 接受了你的交易']);
+  assert.deepEqual([toB.items, toB.note], [{ 大師技能書: 10 }, '與 玩家一 的交易成功']);
+  assert.ok(res.out.some((x) => x.uid === '300' && x.msg.t === 'tradeChanged'));
+  assert.equal(core.hello(P2).mail.filter((m) => m.kind === 'trade').length, 0);
+  assert.equal(errorOf(send(core, P2, { t: 'tradeRespond', id: o.id, action: 'accept' }))?.code, 'bad_trade'); // 同一張單只能處理一次
+});
+
+test('玩家交易：拒絕、東西不夠（失敗）、A 取消 → give 都退回 A', () => {
+  const core = room();
+  const run = (user, action, label) => {
+    const o = offerOf(tradeSend(core));
+    const res = send(core, user, { t: 'tradeRespond', rid: 'r', id: o.id, action });
+    const back = mailsTo(res, '300');
+    assert.equal(back.length, 1, label);
+    assert.deepEqual([back[0].items, back[0].bounced], [{ 大師技能書: 10 }, true], label);
+    return back[0].note;
+  };
+  assert.match(run(P2, 'reject', '拒絕'), /拒絕了你的交易/);
+  assert.match(run(P2, 'fail', '失敗'), /東西不夠，交易失敗/);
+  assert.match(run(P1, 'cancel', '取消'), /你取消了給 玩家二 的交易/);
+});
+
+test('玩家交易：只有收件人能接受／拒絕、只有發單的人能取消；名單 tradeList 只列自己相關的', () => {
+  const core = room();
+  const o = offerOf(tradeSend(core));
+  assert.equal(errorOf(send(core, P1, { t: 'tradeRespond', id: o.id, action: 'accept' }))?.code, 'bad_trade'); // 發單的人不能自己接受
+  assert.equal(errorOf(send(core, P2, { t: 'tradeRespond', id: o.id, action: 'cancel' }))?.code, 'bad_trade'); // 收件人不能取消
+  assert.equal(errorOf(send(core, P2, { t: 'tradeRespond', id: o.id, action: 'steal' }))?.code, 'bad_trade');
+  const list = (u) => send(core, u, { t: 'tradeList', rid: 'l' }).out[0].msg.offers;
+  assert.equal(list(P1).length, 1);
+  assert.equal(list(P2).length, 1);
+  assert.equal(send(core, { uid: '100', name: 'GM', avatar: null }, { t: 'tradeList', rid: 'l' }).out[0].msg.offers.length, 0);
+  assert.equal(send(core, P2, { t: 'tradeRespond', id: o.id, action: 'reject' }).out[0].msg.t, 'tradeOk');
+  assert.equal(list(P1).length, 0);
+});
+
+test('玩家交易加金幣：每一邊物品或金幣至少一樣；成交時金幣跟著信寄出；退回也帶金幣', () => {
+  const core = room();
+  const code = (res) => errorOf(res)?.code;
+  const send2 = (extra, from = P1) => send(core, from, { t: 'mailSend', rid: 's', to: '400', kind: 'trade', give: {}, want: {}, ...extra });
+  assert.equal(code(send2({})), 'bad_mail'); // 兩邊都空
+  assert.equal(code(send2({ giveGold: 100 })), 'bad_mail'); // 只有一邊有東西
+  assert.equal(code(send2({ giveGold: -1, wantGold: 5 })), 'bad_mail');
+  assert.equal(code(send2({ giveGold: 1.5, wantGold: 5 })), 'bad_mail');
+  assert.equal(code(send2({ giveGold: 2_000_000_000, wantGold: 5 })), 'bad_mail');
+  const o = pushed(send2({ giveGold: 500, wantGold: 300, want: { 豪華蓋飯: 2 } })).msg.mails[0]; // 用 500 金幣換 2 個豪華蓋飯再加 300 金幣
+  assert.deepEqual([o.give, o.giveGold, o.want, o.wantGold], [{}, 500, { 豪華蓋飯: 2 }, 300]);
+  const res = send(core, P2, { t: 'tradeRespond', rid: 'r', id: o.id, action: 'accept' });
+  const toA = mailsTo(res, '300')[0];
+  const toB = mailsTo(res, '400')[0];
+  assert.deepEqual([toA.items, toA.gold], [{ 豪華蓋飯: 2 }, 300]);
+  assert.deepEqual([toB.items, toB.gold], [{}, 500]);
+  const o2 = pushed(send2({ giveGold: 500, wantGold: 300, want: { 豪華蓋飯: 2 } })).msg.mails[0];
+  const back = mailsTo(send(core, P2, { t: 'tradeRespond', rid: 'r', id: o2.id, action: 'reject' }), '300')[0];
+  assert.deepEqual([back.gold, back.bounced], [500, true]); // 拒絕：A 押的金幣退回
+  const noGold = pushed(send2({ give: { 鐵礦: 1 }, want: { 豪華蓋飯: 1 } })).msg.mails[0];
+  const toB2 = mailsTo(send(core, P2, { t: 'tradeRespond', id: noGold.id, action: 'accept' }), '400')[0];
+  assert.equal('gold' in toB2, false); // 沒有金幣就不帶這個欄位
+});
+
+test('贈送也能附金幣：只送金幣也可以；金幣要是整數、不能是負的；沒有金幣就不帶欄位', () => {
+  const core = room();
+  const gift = (extra) => send(core, P1, { t: 'mailSend', rid: 'g', to: '400', kind: 'gift', ...extra });
+  assert.equal(pushed(gift({ items: {}, gold: 500 })).msg.mails[0].gold, 500); // 只送金幣
+  const both = pushed(gift({ items: { 鐵礦: 2 }, gold: 100 })).msg.mails[0];
+  assert.deepEqual([both.items, both.gold], [{ 鐵礦: 2 }, 100]);
+  assert.equal('gold' in pushed(gift({ items: { 鐵礦: 1 } })).msg.mails[0], false);
+  assert.equal(errorOf(gift({ items: {} }))?.code, 'bad_mail'); // 物品與金幣都沒有
+  assert.equal(errorOf(gift({ items: {}, gold: 0 }))?.code, 'bad_mail');
+  assert.equal(errorOf(gift({ items: { 鐵礦: 1 }, gold: -5 }))?.code, 'bad_mail');
+  assert.equal(errorOf(gift({ items: { 鐵礦: 1 }, gold: 1.5 }))?.code, 'bad_mail');
+  assert.equal(errorOf(gift({ items: {}, gold: 2_000_000_000 }))?.code, 'bad_mail');
+});

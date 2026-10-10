@@ -35,7 +35,10 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/state/mailbox.js` | 信箱：收到伺服器的信 → 領取（只有第一個分頁拿得到）→ 套用到自己的角色 → 存檔 → 跳通知；不在線寄來的上線才收到 |
 | `src/ui/mailNotice.js` | 「收到的東西」通知面板（右下角浮動，不需同意） |
 | `src/ui/holdRepeat.js` | 長按連加／連減（按住＋／－會越按越快；`onEnd` 放開才重畫）：鬥氣加骰與送東西數量共用 |
-| `src/ui/giftSheet.js` | 「送給別人」面板（背包頁按鈕）：選玩家、搜尋＋分類鈕＋格狀物品（點一下選取、長按調數量）；戰鬥面板的「餵給隊友」用同一個信箱機制 |
+| `src/ui/itemPicker.js` | 背包物品挑選器（搜尋＋分類鈕＋格狀物品，點一下選取、長按調數量）：送給別人與發起交易共用 |
+| `src/ui/giftSheet.js` | 「贈送／交易」面板（背包頁按鈕，唯一入口，原「送給別人」）：上方三個分頁——🎁 贈送（對方不用同意）、🤝 交易（物品與／或金幣互換，先扣押在交易單上）、📥 待回覆（清單在 playerTrade.js）；戰鬥面板的「餵給隊友」用同一個信箱機制 |
+| `src/game/trade.js` | 玩家交易的付款檢查（純函式，含金幣）：兩邊付不付得起、扣押與退回（不夠＝交易失敗，伺服器退回 A 押的） |
+| `src/ui/playerTrade.js` | 「📥 待回覆」清單（給 giftSheet 用）：收到的交易（接受／拒絕）、我發出的交易（取消）；交易單存在伺服器（`room-core.js` 的 `tradeList`／`tradeRespond`），A 的東西與金幣先扣押在單子上 |
 | `src/game/simulate.js` | 模擬戰（階段 D，純函式）：續航最長招式、怪物隨機打人、自動喝藥與隊友救人、勝率／回合數／傷害／剩餘生命統計；不碰真實存檔 |
 | `src/ui/simPanel.js` | GM 專用「模擬戰」面板（跑團頁房間區塊）：選玩家＋敵人來源（自訂強度每場重抽／場上的敵人／預組，後兩種固定 A/B/C）＋場數，畫回合分布與剩餘生命條狀圖 |
 | `src/game/enemy.js` | 敵人等級（普通／菁英 2 打／BOSS 3 打）與技能 A 攻擊強化、B 防禦強化（每回合歸零）、C 喝血（整場戰鬥 1 次）的次數與效果（伺服器與前端共用）（純函式） |
@@ -44,7 +47,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`，立繪與隊友狀態在 `worker/test/images.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
-| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏）、GM 寫入玩家角色時記「異動」事件（`worker/src/audit.js` 比對前後差異）、GM 新增的特殊配方與材料（`specialSet`／`specialDel`）與專屬技能（`skillSet`／`skillDel`），存在 meta、全員同步、每次改動記異動；怪物立繪（`imgPut`／`imgDel`／`encImg`，GM 上傳、存 SQLite、`room.js` 的 GET `/img/:id` 讀，網址由 `index.js` 驗登入）；隊友狀態（`vitals`，每人回報生命與資源、全員廣播）；敵人預組（`presetList`／`presetSave`／`presetDel`／`presetLoad`，只有 GM，回覆只送 GM 自己） |
+| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏）、玩家交易（交易單也放在信箱表，`tradeRespond` 處理接受／拒絕／失敗／取消，先刪先贏）、GM 寫入玩家角色時記「異動」事件（`worker/src/audit.js` 比對前後差異）、GM 新增的特殊配方與材料（`specialSet`／`specialDel`）與專屬技能（`skillSet`／`skillDel`），存在 meta、全員同步、每次改動記異動；怪物立繪（`imgPut`／`imgDel`／`encImg`，GM 上傳、存 SQLite、`room.js` 的 GET `/img/:id` 讀，網址由 `index.js` 驗登入）；隊友狀態（`vitals`，每人回報生命與資源、全員廣播）；敵人預組（`presetList`／`presetSave`／`presetDel`／`presetLoad`，只有 GM，回覆只送 GM 自己） |
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |

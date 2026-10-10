@@ -259,3 +259,20 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 .gift-qty { width: 3.6rem; flex: none; padding-inline: 4px; text-align: center; }
 .feedbox { margin-top: .8rem; display: grid; gap: .4rem; }
 .feedbox .row { flex-wrap: wrap; }
+
+/* 玩家交易（playerTrade.js）：發起交易面板與收到／發出的交易單 */
+.gift-picker-head { display: grid; gap: .5rem; }
+.trade-want-box { display: grid; gap: .5rem; padding: .6rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.trade-want-box .field-label, .trade-want-box .hint, .gift-head .field-label { margin: 0; }
+.trade-wants { display: grid; gap: .4rem; }
+.trade-want { display: flex; align-items: center; gap: .4rem; }
+.trade-want .field:first-child { flex: 1; min-width: 0; }
+.trade-offers { display: grid; gap: .8rem; }
+.trade-offers__list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.trade-offer { display: grid; gap: .3rem; padding: .7rem .8rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.trade-offer strong { color: var(--gold); }
+.trade-offer__line { display: grid; gap: 2px; margin: 0; }
+.trade-offer__line small { color: var(--soft); }
+.trade-offer__have { margin: 0; font-size: .84rem; color: var(--ink2); }
+.trade-offer__have.is-short { color: var(--rose); }
+.trade-offer__act { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .2rem; }
