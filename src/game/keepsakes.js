@@ -7,6 +7,7 @@
 //   diff    只在這些製作難度、而且是一般製作（不含特殊配方）時有效
 //   double  成功時產出的物品雙倍
 //   use     直接使用：{ gives: { 物品: 數量 } } 得到物品，或 { time: N } 轉成時間
+//   advantage 跑團技能檢定時消耗，該次檢定用優勢骰（兩顆 D20 取高）
 //   manual  效果要手動處理，網頁不自動計算
 // 玩家背包有同名物品時，存檔升級與放進背包都會把這裡的效果補上（engine.js addItem、store.js）。
 // ============================================================
@@ -23,7 +24,7 @@ export const KEEPSAKES = {
   掉毛喵的私人釣點: { desc: '釣魚時消耗 1 個，該次釣魚技能額外 +3，同項不能疊加。', scope: ['釣魚'], bonus: 3 },
   門門的採藥心得: { desc: '採藥時消耗 1 個，該次採藥技能額外 +5，同項不能疊加。', scope: ['採藥'], bonus: 5 },
   加爾姆的專屬時間: { desc: '消耗後可以轉化為 5 時間。', use: { time: 5 } },
-  張亮的驚人發現: { desc: '在語音跑團中，檢定投骰前消耗，可以為該檢定增加一個獎勵骰。（網頁不自動計算，請自己在跑團時處理並從背包取出 1 個）', manual: true },
+  張亮的驚人發現: { desc: '在語音跑團中，檢定投骰前消耗，可以為該檢定增加一個獎勵骰（優勢骰：擲兩顆 D20 取高）。在跑團頁「技能檢定」勾選後再點技能。', advantage: true },
 };
 
 /** 這個名字是不是目錄裡的紀念品 */
@@ -44,4 +45,4 @@ export function syncKeepsakes(state) {
 
 /** 效果的簡短標籤：「+5 雙倍」「直接使用」 */
 export const keepsakeTag = (def) =>
-  [def.bonus ? `+${def.bonus}` : '', def.double ? '產出雙倍' : '', def.use ? '直接使用' : '', def.manual ? '手動處理' : ''].filter(Boolean).join('　');
+  [def.bonus ? `+${def.bonus}` : '', def.double ? '產出雙倍' : '', def.use ? '直接使用' : '', def.advantage ? '優勢骰' : '', def.manual ? '手動處理' : ''].filter(Boolean).join('　');

@@ -892,17 +892,17 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 
 /* 次數、紀念品、加值 */
 #view-rest .keepsake-row { display: flex; flex-wrap: wrap; gap: 6px; }
-#view-rest .keepsake {
+#view-rest .keepsake, #view-session .keepsake {
   display: flex; align-items: center; gap: 8px; min-height: var(--touch); padding: 4px 10px;
   font: inherit; color: var(--ink); text-align: left; cursor: pointer;
   background: var(--raise); border: 1px solid var(--line); border-radius: 10px;
 }
-#view-rest .keepsake:hover { box-shadow: var(--hover-ring); }
-#view-rest .keepsake__text { display: grid; line-height: 1.3; }
-#view-rest .keepsake__text small { color: var(--soft); font-size: 0.72rem; }
-#view-rest .keepsake__check { display: grid; place-items: center; width: 20px; height: 20px; color: var(--on-gold); font-size: 0.75rem; border: 1.5px solid var(--line3); border-radius: 50%; }
-#view-rest .keepsake[aria-pressed='true'] { background: var(--goldbg); border-color: var(--gold2); }
-#view-rest .keepsake[aria-pressed='true'] .keepsake__check { background: var(--gold); border-color: var(--gold); }
+#view-rest .keepsake:hover, #view-session .keepsake:hover { box-shadow: var(--hover-ring); }
+#view-rest .keepsake__text, #view-session .keepsake__text { display: grid; line-height: 1.3; }
+#view-rest .keepsake__text small, #view-session .keepsake__text small { color: var(--soft); font-size: 0.72rem; }
+#view-rest .keepsake__check, #view-session .keepsake__check { display: grid; place-items: center; width: 20px; height: 20px; color: var(--on-gold); font-size: 0.75rem; border: 1.5px solid var(--line3); border-radius: 50%; }
+#view-rest .keepsake[aria-pressed='true'], #view-session .keepsake[aria-pressed='true'] { background: var(--goldbg); border-color: var(--gold2); }
+#view-rest .keepsake[aria-pressed='true'] .keepsake__check, #view-session .keepsake[aria-pressed='true'] .keepsake__check { background: var(--gold); border-color: var(--gold); }
 #view-rest .mod-line {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
   padding: 10px 12px; background: var(--paper); border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line);

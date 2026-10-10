@@ -14,7 +14,7 @@ import { mountFeed, readFaces } from './rollFeed.js';
 import { playDiceFx } from './diceFx.js';
 import { openFoodSheet } from './statusBar.js';
 import { LIFE_SKILLS, ART_SKILLS, STOMACH_SLOTS } from '../game/rules.js';
-import { modifier, proficiency, endSession } from '../game/engine.js';
+import { modifier, proficiency, endSession, countOf, removeItem } from '../game/engine.js';
 import { parseDiceExpr, MAX_DICE } from '../game/dice.js';
 import { rollDice, rollCheck, clearLog, getRoomStatus, subscribeRoom, getEncounter } from '../state/rollLog.js';
 import { iconOf } from './items.js';
@@ -48,6 +48,7 @@ export function createSessionView({ root, getState, commit }) {
     sheet: '', // 手機／平板目前打開的抽屜：'' | 'left' | 'center'
     hudOpen: false, // 手機膠囊 HUD 是否展開
     sides: 20, count: 1, mod: 0, text: '',
+    adv: false, // 下一次技能檢定用優勢骰（會消耗一個「張亮的驚人發現」這類紀念品）
   };
   const stage = createEncounterCard({ getState, commit, rerender: () => render() });
   const battle = createBattleView({
@@ -107,11 +108,16 @@ export function createSessionView({ root, getState, commit }) {
   const onKey = (e) => { if (e.key === 'Escape' && ui.sheet) setSheet(''); };
 
   // ---------- 左欄：技能檢定 ----------
+  /** 有「優勢骰」效果、背包還有的紀念品名稱（沒有就 null） */
+  const advantageItem = (state) => Object.entries(state.keepsakes ?? {}).find(([n, d]) => d.advantage && countOf(state, n) > 0)?.[0] ?? null;
+
   async function checkSkill(skill) {
     const state = getState();
+    const item = ui.adv ? advantageItem(state) : null;
     try {
-      const r = await rollCheck(state.name, state, skill);
-      playDiceFx({ faces: [r.roll], sides: 20, total: r.total, label: `${skill}檢定` });
+      const r = await rollCheck(state.name, state, skill, Boolean(item));
+      if (item && removeItem(state, item)) { ui.adv = false; commit(); } // 擲成功才消耗
+      playDiceFx({ faces: r.rolls ?? [r.roll], sides: 20, total: r.total, label: `${skill}檢定` });
     } catch (e) { rollFailed(e); }
   }
 
@@ -130,6 +136,14 @@ export function createSessionView({ root, getState, commit }) {
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '技能檢定' }),
       h('p', { class: 'hint', text: '點一下直接擲 1D20 ＋ 加值，結果在右邊紀錄。' }),
+      advantageItem(state)
+        ? h('button', {
+            type: 'button', class: 'keepsake', 'aria-pressed': String(ui.adv), title: state.keepsakes[advantageItem(state)].desc,
+            onclick: () => { ui.adv = !ui.adv; renderLeft(); },
+          },
+          h('span', { class: 'keepsake__text' }, h('strong', { text: `${advantageItem(state)}（優勢骰）` }), h('small', { text: `下一次檢定擲兩顆 D20 取高　剩 ${countOf(state, advantageItem(state))}` })),
+          h('span', { class: 'keepsake__check', 'aria-hidden': 'true', text: ui.adv ? '✓' : '' }))
+        : null,
       h('div', { class: 'tray__stomach' },
         h('span', { class: 'field-label', text: '跑團熟練' }),
         h('strong', { text: String(prof.total) }),

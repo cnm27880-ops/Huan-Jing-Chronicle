@@ -202,8 +202,10 @@ export function craft(state, action, diff, times, keepsakes = [], rng = Math.ran
 
 // ---------- 跑團檢定 ----------
 /** 跑團時的技能檢定：1D20 + 加值（用跑團胃袋，不扣修整次數） */
-export function sessionCheck(state, skill, rng = Math.random) {
+/** advantage：優勢骰（擲兩顆 D20 取高），rolls 是兩顆的點數 */
+export function sessionCheck(state, skill, rng = Math.random, advantage = false) {
   const mod = modifier(state, skill, 'session');
-  const roll = d20(rng);
-  return { skill, roll, mod: mod.total, parts: mod.parts, total: roll + mod.total, isLife: mod.isLife };
+  const rolls = advantage ? [d20(rng), d20(rng)] : null;
+  const roll = rolls ? Math.max(...rolls) : d20(rng);
+  return { skill, roll, mod: mod.total, parts: mod.parts, total: roll + mod.total, isLife: mod.isLife, ...(rolls ? { rolls } : {}) };
 }

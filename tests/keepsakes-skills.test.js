@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { blankCharacter } from '../src/game/importBot.js';
 import { KEEPSAKES, syncKeepsakes } from '../src/game/keepsakes.js';
-import { gather, craft, addItem, countOf, modifier, useKeepsake } from '../src/game/engine.js';
+import { gather, craft, addItem, countOf, modifier, useKeepsake, sessionCheck } from '../src/game/engine.js';
 import { craftSpecial } from '../src/game/special.js';
 import { generatedAttack, bindableSkills, moveFromCatalog, moveExtra } from '../src/game/skills.js';
 import { badgeStatus, craftBadge, markBadgeOwned, renameBadge, syncBadgeMade } from '../src/game/badges.js';
@@ -42,6 +42,7 @@ test('紀念品：非配方的困難鑄造 +5 且產出雙倍；其他難度與�
 test('紀念品：微光只讓史詩製作產出雙倍（沒有加值）；技能不符不能用', () => {
   const s = mk({ inventory: { 傳說肉: 6, 微光的不定型擴容陣列: 1 } });
   syncKeepsakes(s);
+  s.lifeSkills.烹飪 = 10; // 史詩 DC 25，擲 20 + 10 + 熟練 才過
   const r = craft(s, '烹飪', '史詩', 1, ['微光的不定型擴容陣列'], hi);
   assert.equal(r.rolls[0].doubled, true);
   assert.equal(Object.values(r.loot).reduce((a, b) => a + b, 0), 4); // 烹飪一次 2 個 → 4 個
@@ -57,7 +58,7 @@ test('紀念品：採集用的（繃繃狗 +5 挖礦、掉毛喵 +3 釣魚）只
   assert.equal(countOf(s, '繃繃狗的爪爪'), 1);
 });
 
-test('紀念品：旅行青蛙的禮物給三種材料、加爾姆的專屬時間 +5 時間；張亮是手動處理', () => {
+test('紀念品：旅行青蛙的禮物給三種材料、加爾姆的專屬時間 +5 時間；張亮不能直接使用', () => {
   const s = mk({ time: 2, inventory: { 旅行青蛙的禮物: 1, 加爾姆的專屬時間: 1, 張亮的驚人發現: 1 } });
   syncKeepsakes(s);
   assert.equal(useKeepsake(s, '旅行青蛙的禮物').ok, true);
@@ -119,4 +120,17 @@ test('徽章：試算表自己加過等級、背包沒有物品 → 「我已經
   assert.equal(markBadgeOwned(s, '書寫', '500次').ok, false); // 重複標記
   assert.equal(markBadgeOwned(s, '書寫', '神級').ok, true); // 沒達標也能標記
   assert.equal(s.lifeSkills.書寫, 14);
+});
+
+test('紀念品：張亮的驚人發現＝跑團檢定優勢骰（兩顆 D20 取高）', () => {
+  const s = mk({ inventory: { 張亮的驚人發現: 1 } });
+  syncKeepsakes(s);
+  assert.equal(s.keepsakes.張亮的驚人發現.advantage, true);
+  const seqRng = (...v) => { let i = 0; return () => v[i++]; };
+  const adv = sessionCheck(s, '運動', seqRng(0.0, 0.95), true); // 擲出 1 與 20
+  assert.deepEqual(adv.rolls, [1, 20]);
+  assert.equal(adv.roll, 20);
+  assert.equal(adv.total, 20 + adv.mod);
+  const normal = sessionCheck(s, '運動', seqRng(0.0), false);
+  assert.equal(normal.rolls, undefined);
 });
