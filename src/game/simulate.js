@@ -223,18 +223,19 @@ function ownDrain(p) {
 /**
  * 模擬一場。players = 角色存檔陣列（不會被改動）；specs = [{ kind, count, atkPower, defPower, hp, atkMod?, defMod?, absDef? }]
  * opts.encounter：固定的敵人 { monsters }（給了就不用 specs，每場都是同一組 A/B/C）
- * opts.supply：假設每人備足這種血藥（毒性 15 喝滿）；opts.caps：每位玩家只出幾成力（陣列，1＝全力）；opts.focus：怪物怎麼挑目標（'random' 隨機｜'spread' 平均分散｜'strongest' 集火第一名，要配 opts.focusOrder）
+ * opts.supply：假設每人備足這種血藥（毒性 15 喝滿）；opts.caps：每位玩家只出幾成力（陣列，1＝全力）；opts.downed：一開場就倒地的玩家位置（隊友仍可以餵藥拉起來；檢驗「第一名倒了，隊伍還贏不贏」）；opts.focus：怪物怎麼挑目標（'random' 隨機｜'spread' 平均分散｜'strongest' 集火第一名，要配 opts.focusOrder）
  * 回傳 { outcome: 'win' | 'lose' | 'timeout', rounds, damage, monsterHp, hpLeft, hpMax, downs: [每位玩家倒地幾次], potions,
  *        drain: { 靈氣: 0~1, 魔力: …, 毒性: … }（這場結束時，全隊平均用掉了多少比例；沒有這種資源的玩家不算）, drainAvg,
  *        perPlayer: [{ dmg 打出的傷害, kills 打倒幾隻, taken 承受的傷害, actions 出招次數, potions 喝掉的藥水, drain 自己的消耗, hpLeft 剩餘生命比例 }] }
  */
-export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS, rng = Math.random, encounter = null, supply = null, caps = [], focus = 'random', focusOrder = [] } = {}) {
+export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS, rng = Math.random, encounter = null, supply = null, caps = [], focus = 'random', focusOrder = [], downed = [] } = {}) {
   const team = players.map((src, i) => prepPlayer(src, { supply, cap: caps[i] ?? 1 }));
   // encounter：固定一組已經抽好 A/B/C 的敵人（場上的或預組），每場用全滿生命的複本；沒給就照 specs 每場重抽
   const enc = encounter ? fixedEncounter(encounter) : buildEncounter(specs, rng);
   const monsterHp = enc.monsters.reduce((a, m) => a + m.maxHp, 0);
   const downs = team.map(() => 0);
-  const wasDown = team.map(() => false);
+  for (const i of downed) if (team[i]) team[i].hp = 0; // 開場就倒：不算「被打倒」的次數
+  const wasDown = team.map((p) => isDowned(p));
   const stat = team.map(() => ({ dmg: 0, kills: 0, taken: 0, actions: 0, potions: 0, hit: 0, firstDown: 0 }));
   let potions = 0;
   let healed = 0; // 敵人喝血回復的總量（算每回合傷害時要加回去）

@@ -117,3 +117,22 @@ test('集火第一名：怪物先打最強的人，他倒了才打下一個；�
   assert.ok(penalty(focused) > 0); // 倒太早要扣分
   assert.equal(penalty({ ...focused, perPlayer: [perPlayer[0], { ...perPlayer[1], downRound: 2.6 }] }), 0); // 第一名一定倒地，但撐得夠久：不算「太兇」
 });
+
+test('第一名開場就倒：隊伍勝率檢查（評價、扣分、模擬的 downed 選項）', async () => {
+  const players = [hero(1.6), hero(0.7), hero(0.7)];
+  const boss = [{ kind: 'boss', count: 1, atkPower: 300, defPower: 100, hp: 4000 }];
+  const r = simulateBattle(players, boss, { rng: seededRng(4), downed: [0], maxRounds: 1 });
+  assert.equal(r.downs[0], 0); // 開場就倒不算「被打倒」
+  assert.equal(r.perPlayer[0].actions, 0); // 倒地的人沒有出招
+  const win = (downed) => summarize(Array.from({ length: 30 }, (_, i) => simulateBattle(players, boss, { rng: seededRng(i + 1), downed })), []).win;
+  assert.ok(win([0]) <= win([]));
+  const { assess, penalty } = await import('../src/game/tuning.js');
+  const base = { runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgRoundsWin: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [{ name: '甲', rate: 0 }, { name: '乙', rate: 0 }], focus: 'strongest', rank: { strongest: 0, weakest: 1 },
+    perPlayer: [{ name: '甲', takenPct: 0.2, downRound: 0, downRate: 0, share: 0.4, drain: 0.3 }, { name: '乙', takenPct: 0.2, downRound: 0, downRate: 0, share: 0.6, drain: 0.3 }] };
+  assert.equal(penalty({ ...base, outWin: 0.7 }), 0);
+  assert.ok(penalty({ ...base, outWin: 0.1 }) > 3);
+  const low = assess({ ...base, outWin: 0.1 });
+  assert.equal(low.items.find((i) => i.key === 'outWin').status, 'low');
+  assert.match(low.advice.join(' '), /太依賴他的輸出/);
+  assert.equal(assess({ ...base, outWin: 0.7 }).items.find((i) => i.key === 'outWin').status, 'ok');
+});

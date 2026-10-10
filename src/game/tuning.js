@@ -15,6 +15,7 @@ export const TARGET = {
   topDrainMax: 0.7, // 第一名自己的資源消耗上限（不要每次都被逼著全力，需驗證）
   weakKills: 0.5, // 最弱的玩家平均至少打倒幾隻（需驗證）
   topDownRoundMin: 2, // 怪物集火第一名時，他平均至少要撐到第幾回合才倒（太早倒，團隊就少了最大的輸出；需驗證）
+  outWinMin: 0.5, // 集火第一名時，第一名開場就倒，隊伍至少還要有這麼高的勝率（不要完全靠他；需驗證）
   concentrationMax: 1.6, // 受傷占生命比例最高的人，不要超過全隊平均的這麼多倍（攻擊集中打少數人，需驗證）
   battlesPerSession: 2,
 };
@@ -26,8 +27,8 @@ export const TARGET = {
  *   激進版：偏緊繃（快攻戰）——回合偏短（2～2.5）、勝率 90% 以上、怪物攻擊兇、倒地機率可以高一些，血藥有存在感。
  */
 export const PLANS = {
-  conservative: { key: 'conservative', label: '保守版', note: '偏輕鬆：回合 2.5～3、勝率 95% 以上、第一名只出六成力也穩贏', roundsMin: 2.5, roundsMax: 3, drain: 0.4, drainTol: 0.15, winMin: 0.95, downMax: 0.4, capWinMin: 0.9, topDrainMax: 0.6, weakKills: 0.5 },
-  aggressive: { key: 'aggressive', label: '激進版', note: '偏緊繃（快攻）：回合 2～2.5、勝率 90% 以上、怪物攻擊兇、血藥有存在感', roundsMin: 2, roundsMax: 2.5, drain: 0.6, drainTol: 0.15, winMin: 0.9, downMax: 0.6, capWinMin: 0.8, topDrainMax: 0.7, weakKills: 0.5 },
+  conservative: { key: 'conservative', label: '保守版', note: '偏輕鬆：回合 2.5～3、勝率 95% 以上、第一名只出六成力也穩贏', roundsMin: 2.5, roundsMax: 3, drain: 0.4, drainTol: 0.15, winMin: 0.95, downMax: 0.4, capWinMin: 0.9, topDrainMax: 0.6, weakKills: 0.5, outWinMin: 0.6 },
+  aggressive: { key: 'aggressive', label: '激進版', note: '偏緊繃（快攻）：回合 2～2.5、勝率 90% 以上、怪物攻擊兇、血藥有存在感', roundsMin: 2, roundsMax: 2.5, drain: 0.6, drainTol: 0.15, winMin: 0.9, downMax: 0.6, capWinMin: 0.8, topDrainMax: 0.7, weakKills: 0.5, outWinMin: 0.4 },
 };
 
 /** 判斷回合數用「打贏的場次」（沒有這欄位就用全部）；一位小數，和畫面顯示一致 */
@@ -57,7 +58,8 @@ export function penalty(sum, t = TARGET) {
   const pd = Math.max(0, downMax - t.downMax) / 0.2; // 幾乎每場都有人倒地：太兇
   const topP = focusTop ? sum.perPlayer?.[sum.rank.strongest] : null;
   const ps = topP && topP.downRound > 0 ? Math.max(0, (t.topDownRoundMin ?? TARGET.topDownRoundMin) - topP.downRound) / 1 : 0;
-  return pr + pc + pw + pd + pf + pt + ps;
+  const po = sum.outWin == null ? 0 : Math.max(0, (t.outWinMin ?? TARGET.outWinMin) - sum.outWin) / 0.1; // 第一名倒了隊伍就贏不了：太依賴他
+  return pr + pc + pw + pd + pf + pt + ps + po;
 }
 
 /**
@@ -139,6 +141,14 @@ export function assess(sum) {
       key: 'topSurvive', label: `集火第一名（${top.name}）撐到`, value: round > 0 ? `第 ${round.toFixed(1)} 回合倒地（倒地機率 ${pct(top.downRate)}）・輸出占 ${pct(top.share)}` : '整場沒倒地', target: `至少第 ${TARGET.topDownRoundMin} 回合`, status: sStatus,
       text: sStatus === 'ok' ? '輸出打得出來' : '太早被集火打倒，團隊少了最大的輸出',
     });
+    if (sum.outWin != null) {
+      const oStatus = sum.outWin < TARGET.outWinMin ? 'low' : 'ok';
+      items.push({
+        key: 'outWin', label: `${top.name} 開場就倒時的勝率`, value: pct(sum.outWin), target: `至少 ${pct(TARGET.outWinMin)}`, status: oStatus,
+        text: oStatus === 'ok' ? '不完全靠他' : '他一倒，隊伍就贏不了',
+      });
+      if (oStatus === 'low') advice.push(`${top.name} 一旦倒地，隊伍勝率只剩 ${pct(sum.outWin)}：戰鬥太依賴他的輸出。降低怪物血量或攻擊強度，或讓隊友有辦法把他拉起來（先餵藥）。`);
+    }
     if (sStatus === 'low') advice.push(`怪物集火 ${top.name}：他平均第 ${round.toFixed(1)} 回合就倒，只打出全隊 ${pct(top.share)} 的輸出。降低怪物攻擊強度，或讓隊友有餘裕先餵藥／上護盾；GM 也可以別一開場就集火他。`);
   }
 
@@ -253,7 +263,7 @@ export async function autoTune({
     const downMax = downMaxOf(sum);
     const topEarly = sum.focus === 'strongest' && sum.rank && sum.perPlayer?.[sum.rank.strongest]?.downRound > 0 && sum.perPlayer[sum.rank.strongest].downRound < (target.topDownRoundMin ?? TARGET.topDownRoundMin);
     const topD = sum.rank ? sum.perPlayer?.[sum.rank.strongest]?.drain ?? 0 : 0;
-    const tooHard = topEarly || topD > (target.topDrainMax ?? 1) || sum.win < target.winMin || (sum.capWin != null && sum.capWin < (target.capWinMin ?? 0)) || downMax > target.downMax || sum.avgDrain > target.drain + target.drainTol;
+    const tooHard = (sum.outWin != null && sum.outWin < (target.outWinMin ?? 0)) || topEarly || topD > (target.topDrainMax ?? 1) || sum.win < target.winMin || (sum.capWin != null && sum.capWin < (target.capWinMin ?? 0)) || downMax > target.downMax || sum.avgDrain > target.drain + target.drainTol;
     if (tooHard) hi = ka; else if (sum.avgDrain < target.drain - target.drainTol) lo = ka; else break; // 消耗落在範圍內就收工
   }
 
@@ -263,6 +273,7 @@ export async function autoTune({
     if (roundsOf(s) > target.roundsMax || roundsOf(s) < target.roundsMin) notes.push(`回合數只能調到 ${roundsOf(s).toFixed(1)}（目標 ${target.roundsMin}～${target.roundsMax}）。`);
     if (s.avgDrain < target.drain - target.drainTol) notes.push(`資源消耗只能到 ${pct(s.avgDrain)}：怪物再兇就會輸、或有人頻繁倒地；要多耗資源，得靠更多／更難的戰鬥，不是怪物數值能解決的。`);
     if (s.avgDrain > target.drain + target.drainTol) notes.push(`資源消耗降不到 ${pct(target.drain + target.drainTol)} 以下（現在 ${pct(s.avgDrain)}）：玩家自己打出招式就會花掉這些資源，和怪物攻擊無關。`);
+    if (s.outWin != null && s.outWin < (target.outWinMin ?? 0)) notes.push(`第一名開場就倒時，隊伍勝率只有 ${pct(s.outWin)}（目標 ${pct(target.outWinMin ?? 0)}）：這場太依賴第一名的輸出。`);
     if (s.win < target.winMin) notes.push(`勝率只有 ${pct(s.win)}，攻擊已經壓到最低仍打不贏：怪物防禦或血量可能對這組玩家太高。`);
   }
   return { specs: upon(base, final.kh, final.ka), hpScale: final.kh, atkScale: final.ka, summary: final.sum, penalty: final.pen, removed, notes };

@@ -84,9 +84,9 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
    * 回傳的結果帶 rank（強弱）、capWin、capBudget，評價與自動調整都靠這些判斷公平性。
    */
   function makeEvaluate(players, names, rank, fixed, runs) {
-    const once = (input, caps, n) => summarize(Array.from({ length: n }, (_, i) => (fixed
-      ? simulateBattle(players, [], { encounter: input, rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps })
-      : simulateBattle(players, input.map((s) => ({ ...s })), { rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps }))), names);
+    const once = (input, caps, n, downed = []) => summarize(Array.from({ length: n }, (_, i) => (fixed
+      ? simulateBattle(players, [], { encounter: input, rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps, downed })
+      : simulateBattle(players, input.map((s) => ({ ...s })), { rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps, downed }))), names);
     return (input, full = true) => {
       const sum = once(input, [], runs);
       sum.rank = rank;
@@ -95,6 +95,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         sum.capWin = once(input, capsFor(players.length, rank.strongest), Math.max(20, Math.round(runs * 0.6))).win;
         sum.capBudget = FAIR.topBudget;
       }
+      if (full && players.length > 1 && ui.focus === 'strongest') sum.outWin = once(input, [], Math.max(20, Math.round(runs * 0.6)), [rank.strongest]).win; // 第一名開場就倒，隊伍還贏不贏
       return sum;
     };
   }
@@ -130,6 +131,10 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         const capRuns = Array.from({ length: Math.round(RUNS / 2) }, () => (fixed ? simulateBattle(players, [], { encounter: fixed, supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps }) : simulateBattle(players, ui.specs.map((s) => ({ ...s })), { supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps })));
         ui.result.capWin = summarize(capRuns, ui.names).win;
         ui.result.capBudget = FAIR.topBudget;
+        if (ui.focus === 'strongest') { // 第一名開場就倒，隊伍還贏不贏
+          const outRuns = Array.from({ length: Math.round(RUNS / 2) }, () => (fixed ? simulateBattle(players, [], { encounter: fixed, supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, downed: [rank.strongest] }) : simulateBattle(players, ui.specs.map((s) => ({ ...s })), { supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, downed: [rank.strongest] })));
+          ui.result.outWin = summarize(outRuns, ui.names).win;
+        }
       }
     } catch (e) { toast(e.message || '模擬失敗。'); }
     ui.running = false; ui.progress = 1;
