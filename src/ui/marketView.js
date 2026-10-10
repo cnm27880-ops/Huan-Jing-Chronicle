@@ -32,7 +32,7 @@ async function doBlackBuy(state, item, qty, commit) {
   try { ({ r, draw } = await rollWith(state, (st, rng) => blackBuy(st, item, qty, rng))); } catch (e) { return rollFailed(e); }
   if (r.error) return toast(r.error);
   publish({
-    who: state.name, kind: 'note', label: `黑市購買 ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 金幣`,
+    who: state.name, kind: 'deal', label: `黑市購買 ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 金幣`,
     tone: r.labor ? 'fail' : undefined,
     lines: [
       `${diceText(BLACK_BUY_DICE)} → ${r.roll}（溢價 ×${r.rate}）`,
@@ -51,7 +51,7 @@ async function doBlackSell(state, item, qty, commit, gearIds = null) {
   try { ({ r, draw } = await rollWith(state, (st, rng) => blackSell(st, item, qty, rng, gearIds))); } catch (e) { return rollFailed(e); }
   if (r.error) return toast(r.error);
   publish({
-    who: state.name, kind: 'note', label: `黑市販賣 ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 代金券`,
+    who: state.name, kind: 'deal', label: `黑市販賣 ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 代金券`,
     lines: [`${diceText(BLACK_SELL_DICE)} → ${r.roll}（壓價 ×${r.rate}）`, `${fmt(r.unit)} × ${fmt(qty)} × ${r.rate} = ${fmt(r.total)} 代金券`],
   }, { draw });
   toast(`得到 ${fmt(r.total)} 代金券`);

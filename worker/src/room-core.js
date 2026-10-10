@@ -25,7 +25,10 @@ import {
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
-const POST_KINDS = new Set(['note', 'skill', 'attack', 'defend', 'potion', 'identify']);
+const POST_KINDS = new Set(['note', 'skill', 'attack', 'defend', 'potion', 'identify', 'deal']);
+// 不屬於跑團的事件（鑑定、黑市交易、GM 異動）：不存進 200 筆的紀錄歷史（才不會擠掉檢定與戰鬥），
+// 玩家看的是「日誌」頁（activity）。deal／identify 只用來消耗伺服器骰點；audit 只即時廣播（charSync 靠它通知等待中的玩家）
+const SIDE_KINDS = new Set(['identify', 'deal', 'audit']);
 const TONES = new Set(['ok', 'fail', 'crit', 'warn']);
 const SKILLS = new Set([...LIFE_SKILLS, ...ART_SKILLS]);
 const RID = /^[A-Za-z0-9_-]{1,40}$/;
@@ -178,6 +181,7 @@ export class RoomCore {
     if (fields.srv) ev.srv = true; // 骰點由伺服器擲出
     if (fields.target) ev.target = fields.target; // 異動紀錄：被修改的玩家 uid
     if (fields.battleNo != null) ev.battleNo = fields.battleNo;
+    if (SIDE_KINDS.has(ev.kind)) return ev; // 不存歷史
     this.db.tx(() => {
       const [{ seq }] = this.db.exec('INSERT INTO events(id, t, json) VALUES (?, ?, ?) RETURNING seq', ev.id, ev.t, JSON.stringify(ev));
       this.db.exec('DELETE FROM events WHERE seq <= ?', seq - HISTORY_LIMIT); // 只留最近 200 筆
@@ -311,6 +315,7 @@ export class RoomCore {
       const d = this.draws.get(msg.draw);
       if (d && d.uid === user.uid && this.now() - d.t <= DRAW_TTL_MS) { srv = true; this.draws.delete(msg.draw); }
     }
+    if (SIDE_KINDS.has(e.kind)) return { out: [{ to: 'self', msg: { t: 'posted', rid } }], close: null }; // 骰點已消耗；內容由前端另外記到日誌
     const ev = this.record({
       who: whoOf(e.who, user), kind: e.kind, label, big, lines, srv,
       tone: TONES.has(e.tone) ? e.tone : undefined,
