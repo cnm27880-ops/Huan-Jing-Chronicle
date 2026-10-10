@@ -117,7 +117,7 @@ export function createSessionView({ root, getState, commit }) {
     try {
       const r = await rollCheck(state.name, state, skill, Boolean(item));
       if (item && removeItem(state, item)) { ui.adv = false; commit(); } // 擲成功才消耗
-      playDiceFx({ faces: r.rolls ?? [r.roll], sides: 20, total: r.total, label: `${skill}檢定` });
+      playDiceFx({ faces: r.rolls ?? [r.roll], kept: r.rolls ? r.roll : undefined, sides: 20, total: r.total, label: `${skill}檢定` });
     } catch (e) { rollFailed(e); }
   }
 
