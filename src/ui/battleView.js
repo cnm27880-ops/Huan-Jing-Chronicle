@@ -127,7 +127,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       h('div', { class: 'bt-hud__top' },
         h('h2', { class: 'bt-hud__name', text: state.name }),
         h('span', { class: 'bt-hud__def', 'aria-label': `防禦骰 A ${d.A}、B ${d.B}、C ${d.C}` },
-          TRACKS.map((t) => h('span', { class: 'bt-hud__trk', dataset: { track: t } }, h('b', { text: t }), h('span', { class: 'num', text: fmt(d[t]) }))))),
+          TRACKS.map((t) => h('span', { class: 'bt-hud__trk', dataset: { track: t } }, h('b', { text: `${t}防` }), h('span', { class: 'num', text: fmt(d[t]) }))))),
       meter(state, keys[0]),
       h('div', { class: 'bt-hud__res' }, keys.slice(1).map((k) => meter(state, k))),
       tags.length ? h('div', { class: 'chip-row chip-row--info bt-hud__tags' }, tags) : null);

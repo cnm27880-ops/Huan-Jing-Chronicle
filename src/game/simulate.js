@@ -113,13 +113,22 @@ export function buildEncounter(specs, rng = Math.random) {
   return enc;
 }
 
+/** 固定敵人的複本：生命補滿（不影響原本的資料） */
+export function fixedEncounter(src) {
+  const enc = newEncounter();
+  enc.monsters = structuredClone(src.monsters ?? []).map((m) => ({ ...m, hp: m.maxHp }));
+  return enc;
+}
+
 /**
  * 模擬一場。players = 角色存檔陣列（不會被改動）；specs = [{ kind, count, atkPower, defPower, hp, atkMod?, defMod?, absDef? }]
+ * opts.encounter：固定的敵人 { monsters }（給了就不用 specs，每場都是同一組 A/B/C）
  * 回傳 { outcome: 'win' | 'lose' | 'timeout', rounds, damage, monsterHp, hpLeft, hpMax, downs: [每位玩家倒地幾次], potions }
  */
-export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS, rng = Math.random } = {}) {
+export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS, rng = Math.random, encounter = null } = {}) {
   const team = players.map(prepPlayer);
-  const enc = buildEncounter(specs, rng);
+  // encounter：固定一組已經抽好 A/B/C 的敵人（場上的或預組），每場用全滿生命的複本；沒給就照 specs 每場重抽
+  const enc = encounter ? fixedEncounter(encounter) : buildEncounter(specs, rng);
   const monsterHp = enc.monsters.reduce((a, m) => a + m.maxHp, 0);
   const downs = team.map(() => 0);
   const wasDown = team.map(() => false);

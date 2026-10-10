@@ -1122,7 +1122,14 @@ input[type='number'], .amount__input { text-align: center; }
 .skill-tile__tag { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-tile__note { order: 2; flex: none; }
 .skill-tile__lv { order: 3; flex: none; }
-.skill-tile > :not(.skill-tile__name):not(.skill-tile__tag):not(.skill-tile__note):not(.skill-tile__lv) { order: 4; flex-basis: 100%; }
+.skill-tile > :not(.skill-tile__name):not(.skill-tile__tag):not(.skill-tile__note):not(.skill-tile__lv):not(.skill-tile__on) { order: 5; flex-basis: 100%; }
+/* 啟動開關（武裝類，扣算力上限）：做成同一行最右邊的小膠囊，不另起一行 */
+.skill-tile > .skill-tile__on {
+  order: 4; flex: none; flex-basis: auto; align-self: center; gap: 4px; margin: 0; min-height: 0; padding: 1px 8px 1px 4px;
+  font-size: 0.72rem; color: var(--soft); background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill); white-space: nowrap;
+}
+.skill-tile > .skill-tile__on input { width: 14px; height: 14px; margin: 0; }
+.skill-tile > .skill-tile__on:has(input:checked) { color: var(--res-calc); border-color: var(--res-calc); }
 @media (max-width: 420px) { .skill-tile { padding: 6px 8px; } .skill-tile__name { font-size: 0.82rem; } }
 
 /* 電腦滑鼠移上技能時浮動顯示效果 */
@@ -1151,9 +1158,14 @@ input[type='number'], .amount__input { text-align: center; }
 
 
 /* 抽取技能書、生活徽章 */
-.draw-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.draw-card { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
-.draw-card .row { display: flex; flex-wrap: wrap; gap: 6px; }
+.draw-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 759px) { .draw-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 一張：第一行「書名　有 N」，第二行兩顆按鈕 */
+.draw-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px 8px; padding: 8px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.draw-card > strong { overflow: hidden; font-size: 0.9rem; text-overflow: ellipsis; white-space: nowrap; }
+.draw-card > .num { color: var(--soft); font-size: 0.82rem; }
+.draw-card .row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.draw-card .row .btn { flex: 1; margin: 0; padding-inline: 6px; }
 .draw-set { display: grid; gap: 6px; }
 .draw-options { display: grid; gap: 6px; }
 .draw-option { display: grid; gap: 4px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
@@ -1231,6 +1243,13 @@ input[type='number'], .amount__input { text-align: center; }
 /* 左欄：HUD（不再黏在頂部，整欄自己捲） */
 .sx .bt-hud { position: static; margin: 0; padding: 12px; background: var(--card); border: 0; border-radius: var(--r-panel); box-shadow: var(--panel-shadow); }
 .bt-hud__def { display: flex; gap: 4px; margin-left: auto; }
+/* 名字與 A防／B防／C防 固定同一排：名字太長時縮成「…」，膠囊不換行、不被擠開 */
+.sx .bt-hud__top { flex-wrap: nowrap; gap: 6px; }
+.sx .bt-hud__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: 0.04em; }
+.sx .bt-hud__def { flex: none; gap: 3px; }
+.sx .bt-hud__trk { padding: 1px 6px; font-size: 0.74rem; }
+.sx .bt-hud__trk b { font-size: 0.68rem; }
+.bt-hud__trk { white-space: nowrap; }
 .bt-hud__trk { display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 7px; font-size: 0.78rem; background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill); }
 .bt-hud__trk b { font-size: 0.72rem; }
 .bt-hud__trk[data-track='A'] b { color: var(--gold); }
@@ -1335,6 +1354,9 @@ input[type='number'], .amount__input { text-align: center; }
 .boss-mode[data-kind='def']:hover { border-color: var(--sky2); }
 .boss-mode[data-kind='def'][aria-checked='true'] { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 14px rgba(var(--gold-rgb), 0.4); }
 .boss-mode[data-kind='def'][aria-checked='true'] .boss-mode__name { color: var(--gold); }
+/* 還沒選它當目標：只用藍框標出目前的防禦模式，金色發光留給「已選為目標」 */
+.boss[data-picked='0'] .boss-mode[data-kind='def'][aria-checked='true'] { border-color: var(--sky2); box-shadow: none; }
+.boss[data-picked='0'] .boss-mode[data-kind='def'][aria-checked='true'] .boss-mode__name { color: var(--sky); }
 .boss-mode[data-kind='atk'] .boss-mode__name { color: var(--rose); }
 .boss-mode[data-kind='atk']:hover:not(:disabled) { border-color: var(--rose); box-shadow: 0 0 12px rgba(var(--rose-rgb), 0.35); transform: translateY(-1px); }
 .boss-mode[data-kind='atk']:active:not(:disabled) { transform: translateY(1px); }
@@ -1607,3 +1629,13 @@ input[type='number'], .amount__input { text-align: center; }
 #view-gear .stat-group .field-label { margin: 0 0 3px; }
 .stat-food { margin-top: 12px; }
 @media (max-width: 759px) { #view-gear .stat-grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); } #view-gear .stat { padding: 4px 6px; } }
+
+/* 新增敵人：攻擊／防禦的強度分配（類型＋集中軌道） */
+.split-row { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.split-pick { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 6px; }
+.preset-save { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.preset-save .field { flex: 1 1 200px; min-width: 0; }
+.preset-save .btn, .manage__row .btn { margin: 0; }
+.hud-meter__name { white-space: nowrap; }
+.sx .bt-hud__res .hud-meter { padding: 6px 7px; column-gap: 4px; }
+.sx .bt-hud__res .hud-meter__val { font-size: 0.78rem; }

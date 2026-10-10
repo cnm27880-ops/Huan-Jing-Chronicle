@@ -218,7 +218,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': {
+    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': case 'presets': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;
@@ -366,6 +366,10 @@ export const imageUrl = (id) => `${API_BASE}/rooms/${room.roomId}/img/${id}`;
 export const uploadImage = (msg) => request({ t: 'imgPut', ...msg });
 /** GM 刪除立繪（用到它的怪物會一起拿掉） */
 export const deleteImage = (id) => request({ t: 'imgDel', id });
+
+// ---------- 敵人預組（GM 備團；只有 GM 收得到） ----------
+/** msg = { t: 'presetList' } | { t: 'presetSave', name } | { t: 'presetDel', name } | { t: 'presetLoad', name }。回傳最新清單 [{ name, t, monsters }] */
+export const presetAction = async (msg) => (await request(msg)).list ?? [];
 
 // ---------- 隊友狀態 ----------
 /** 回報自己的生命與資源（不用等回覆；沒連上房間就不送） */

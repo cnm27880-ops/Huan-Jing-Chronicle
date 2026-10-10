@@ -162,7 +162,7 @@ export function createSessionView({ root, getState, commit }) {
     const panel = ui.leftTab === 'skills'
       ? skillPanel(state)
       : ui.leftTab === 'items'
-        ? h('div', { class: 'sx-stack' }, battle.potionCard(state), battle.statusCard(state), battle.defenseCard(state))
+        ? h('div', { class: 'sx-stack' }, battle.potionCard(state), battle.statusCard(state))
         : battle.moveCard(state);
     left.replaceChildren(
       h('div', { class: 'sx-left__hud' }, battle.hud(state)),
@@ -201,14 +201,14 @@ export function createSessionView({ root, getState, commit }) {
   }
 
   function renderFeedHead() {
-    feedHead.replaceChildren(
+    feedHead.replaceChildren(...[ // replaceChildren 會把 null 變成文字「null」，要先濾掉
       h('div', { class: 'tabs-seg', role: 'tablist', 'aria-label': '紀錄類型' }, LOG_FILTERS.map(([id, label, tip]) => h('button', {
         type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.logFilter === id), title: tip,
         onclick: () => { ui.logFilter = id; renderFeedHead(); mountLog(); },
       }, label))),
       getRoomStatus().phase === 'online'
         ? null
-        : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空'));
+        : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')].filter(Boolean));
   }
 
   function expression() {

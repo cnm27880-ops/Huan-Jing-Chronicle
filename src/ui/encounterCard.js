@@ -7,15 +7,15 @@
 // ============================================================
 import { h, fmt } from './dom.js';
 import { toast, rollFailed } from './controls.js';
-import { TRACKS } from '../game/rules.js';
+import { TRACKS, TRACK_ATK_STAT, TRACK_DEF_STAT } from '../game/rules.js';
 import {
   formatAbc, monsterAbs, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
-  isDowned, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES,
+  isDowned, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES, SPLIT_FOCUS,
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import { costText } from '../game/resources.js';
 import {
-  publish, rollWith, getEncounter, encounterAction, getRoomStatus, imageUrl, uploadImage, deleteImage,
+  publish, rollWith, getEncounter, encounterAction, getRoomStatus, imageUrl, uploadImage, deleteImage, presetAction,
 } from '../state/rollLog.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { battleSel as sel } from './battleSelect.js';
@@ -78,10 +78,12 @@ async function shrinkImage(file, longest) {
 export function createEncounterCard({ getState, commit, rerender }) {
   const ui = {
     swapFrom: null, // 先攻換位置：已選的第一個位置
-    form: { kind: 'mob', count: 1, atk: 10, def: 10, hp: 100, atkMod: '', defMod: '', absDef: 0, img: '' },
+    form: { kind: 'mob', count: 1, atk: 10, def: 10, hp: 100, atkMod: '', defMod: '', absDef: 0, img: '', atkType: '', atkFocus: '', defType: '', defFocus: '' },
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
     uploading: false,
     armed: null, // 承受攻擊的二次確認：第一次點只「待命」，3 秒內再點同一個才真的承受
+    presets: null, // GM 的敵人預組清單（第一次打開 GM 工具時向伺服器要）
+    presetName: '',
   };
   let armTimer = null;
   /** 承受攻擊要點兩次：第一次點亮「再點一次確認」，3 秒內再點同一個才執行，點別的或逾時就取消 */
@@ -145,6 +147,12 @@ export function createEncounterCard({ getState, commit, rerender }) {
     else if (cap === 1) sel.targets = [m.id];
     else if (sel.targets.length >= cap) return toast(`「${currentMove(state)?.name ?? '這招'}」最多選 ${cap} 個目標。`);
     else sel.targets = [...sel.targets, m.id];
+    return rerender();
+  }
+
+  /** 確保這隻被選為目標（已選就不動；招式只能打 1 個就換成它；滿了就提示） */
+  function pickTarget(state, m) {
+    if (!isDowned(m) && !sel.targets.includes(m.id)) return toggleTarget(state, m);
     return rerender();
   }
 
@@ -331,7 +339,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const downed = isDowned(m);
     const modes = sel.modes[m.id] ?? (sel.modes[m.id] = { atk: 0, def: 0 });
     const picked = sel.targets.includes(m.id);
-    return h('section', { class: `boss${downed ? ' is-downed' : ''}`, 'aria-label': `BOSS ${m.id}` },
+    return h('section', { class: `boss${downed ? ' is-downed' : ''}`, 'aria-label': `BOSS ${m.id}`, dataset: { picked: picked ? '1' : '0' } },
       bosses.length > 1
         ? h('div', { class: 'boss__tabs', role: 'tablist', 'aria-label': '切換 BOSS' }, bosses.map((b) => h('button', {
             type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(b.id === m.id), dataset: { down: isDowned(b) ? '1' : '0' },
@@ -350,11 +358,11 @@ export function createEncounterCard({ getState, commit, rerender }) {
         h('div', { class: 'boss__group' },
           h('p', { class: 'boss__k' },
             h('span', { text: '🛡️ 防禦' }),
-            h('small', { text: '選一種：你打它時用哪一組' }),
+            h('small', { text: '點一種＝選它當目標，打它時用這一組' }),
             monsterAbs(m) ? h('span', { class: 'boss__abs num', text: `絕防 ${fmt(monsterAbs(m))}` }) : null),
           h('div', { class: 'boss__modes', role: 'radiogroup', 'aria-label': `${m.id} 的防禦模式` }, BOSS_DEF_MODES.map((name, i) => h('button', {
             type: 'button', class: 'boss-mode', role: 'radio', 'aria-checked': String(modes.def === i), dataset: { kind: 'def' },
-            onclick: () => { modes.def = i; rerender(); },
+            onclick: () => { modes.def = i; pickTarget(state, m); }, // 選防禦＝也把它選為目標（之前只換模式，出招會說還沒選目標）
           }, h('span', { class: 'boss-mode__name', text: name }), abcCells(monsterDef(m, i)))))),
         h('div', { class: 'boss__group' },
           h('p', { class: 'boss__k' },
@@ -434,6 +442,27 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('input', { class: 'field', type: 'number', min, value: ui.form[key], onchange: (e) => { ui.form[key] = num(e.target.value, min); } }));
   }
 
+  /** 強度分配：類型（隨機／單軌集中／雙軌／平均）＋集中在哪一軌或哪兩軌（選了類型才出現） */
+  const SPLIT_LABELS = [['', '隨機'], ['extreme', '單軌集中'], ['dual', '雙軌'], ['balanced', '平均']];
+  function splitPicker(side) {
+    const f = ui.form;
+    const names = side === 'atk' ? TRACK_ATK_STAT : TRACK_DEF_STAT;
+    const type = f[`${side}Type`];
+    const focusLabel = (k) => k.split('').map((t) => `${t}（${names[t].slice(0, 2)}）`).join('＋');
+    return h('div', { class: 'split-pick' },
+      h('label', { class: 'extra' }, h('span', { text: side === 'atk' ? '攻擊分配' : '防禦分配' }),
+        h('select', {
+          class: 'field', 'aria-label': side === 'atk' ? '攻擊強度的分配方式' : '防禦強度的分配方式',
+          onchange: (e) => { f[`${side}Type`] = e.target.value; f[`${side}Focus`] = ''; rerender(); },
+        }, SPLIT_LABELS.map(([v, label]) => h('option', { value: v, selected: v === type ? true : null, text: label })))),
+      SPLIT_FOCUS[type]
+        ? h('label', { class: 'extra' }, h('span', { text: type === 'extreme' ? '集中在' : '集中在這兩軌' }),
+            h('select', { class: 'field', 'aria-label': '集中在哪', onchange: (e) => { f[`${side}Focus`] = e.target.value; } },
+              h('option', { value: '', text: '隨機' }),
+              SPLIT_FOCUS[type].map((k) => h('option', { value: k, selected: k === f[`${side}Focus`] ? true : null, text: focusLabel(k) }))))
+        : null);
+  }
+
   function enemyForm(state) {
     const f = ui.form;
     return h('section', { class: 'gm-tools__sec' },
@@ -443,7 +472,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
           type: 'button', class: 'toggle', 'aria-pressed': String(f.kind === id), onclick: () => { f.kind = id; rerender(); },
         }, label))),
       h('div', { class: 'extra-row' }, numField('數量', 'count', 1), numField('攻擊強度', 'atk'), numField('防禦強度', 'def'), numField('血量', 'hp', 1), numField('絕對防禦（選填）', 'absDef')),
-      h('p', { class: 'hint', text: '強度會隨機分配到 A/B/C 三軌（照機器人）。區域補正選填，例如 5A 3C，會加在每隻身上。' }),
+      h('p', { class: 'hint', text: '強度分配：隨機＝照機器人三種隨機抽；單軌集中＝一軌 50～70%；雙軌＝兩軌高、一軌 0～25%；平均＝三軌各 1/3。可以再選集中在哪（BOSS 的三組都套用同一種，比例各自隨機）。區域補正選填，例如 5A 3C，會加在每隻身上。' }),
+      h('div', { class: 'extra-row split-row' }, splitPicker('atk'), splitPicker('def')),
       h('div', { class: 'extra-row' },
         h('label', { class: 'extra' }, h('span', { text: '攻擊補正（選填）' }),
           h('input', { class: 'field', type: 'text', placeholder: '5A 3C', value: f.atkMod, onchange: (e) => { f.atkMod = e.target.value; } })),
@@ -457,6 +487,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
         onclick: () => {
           if (f.count > 20) return toast('一次最多 20 隻。');
           const spec = { count: f.count, atkPower: f.atk, defPower: f.def, hp: f.hp, atkMod: f.atkMod, defMod: f.defMod, absDef: f.absDef };
+          for (const side of ['atk', 'def']) { // 指定的分配方式（沒選＝隨機，不送）
+            if (f[`${side}Type`]) spec[`${side}Type`] = f[`${side}Type`];
+            if (f[`${side}Type`] && f[`${side}Focus`]) spec[`${side}Focus`] = f[`${side}Focus`];
+          }
           if (online()) return act({ t: 'encAdd', kind: f.kind, spec, ...(f.img ? { img: f.img } : {}) });
           const added = (f.kind === 'boss' ? addBosses : addMobs)(state.encounter, spec);
           publish({ who: state.name, kind: 'note', label: `遭遇：新增 ${added.map((m) => m.id).join('、')}`, lines: [] });
@@ -482,6 +516,55 @@ export function createEncounterCard({ getState, commit, rerender }) {
         gmOnline ? imageSelect(m.img ?? '', (v) => act({ t: 'encImg', id: m.id, img: v || null }), `${m.id} 的立繪`) : null,
         gmOnline ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.uploading, onclick: () => pickAndUpload(m.id, m.kind === 'boss' ? 768 : 256) }, '上傳立繪') : null,
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => removeEnemy(state, m) }, '移除')))));
+  }
+
+  // ---------- 敵人預組（GM 備團）：把場上抽好的整團存起來，跑團時一鍵換上；模擬戰也能選 ----------
+  async function presetDo(msg, done) {
+    try { ui.presets = await presetAction(msg); if (done) toast(done); } catch (e) { toast(e.message || '操作失敗。'); }
+    rerender();
+  }
+  const presetSummary = (p) => {
+    const boss = p.monsters.filter((m) => m.kind === 'boss').length;
+    const mob = p.monsters.length - boss;
+    return [boss ? `👹×${boss}` : '', mob ? `👾×${mob}` : ''].filter(Boolean).join(' ');
+  };
+
+  function presetBox(enc) {
+    if (!online() || !isGm()) return null;
+    if (ui.presets === null) { ui.presets = []; presetDo({ t: 'presetList' }); }
+    const save = () => {
+      const name = ui.presetName.trim();
+      if (!name) return toast('先幫這團取個名字。');
+      if (ui.presets.some((p) => p.name === name) && !confirm(`已經有「${name}」，要用場上的敵人覆蓋嗎？`)) return undefined;
+      ui.presetName = '';
+      return presetDo({ t: 'presetSave', name }, `已存成預組「${name}」。`);
+    };
+    return h('section', { class: 'gm-tools__sec' },
+      h('h3', { class: 'tray__title', text: `敵人預組（${ui.presets.length}）` }),
+      h('p', { class: 'hint', text: '把場上抽好的整團敵人（A/B/C 不會再變）存起來：跑團時一鍵換上，模擬戰也能選它當固定敵人。只有 GM 看得到。' }),
+      h('div', { class: 'row preset-save' },
+        h('input', {
+          class: 'field', type: 'text', maxlength: 40, placeholder: '預組名稱，例如：第三章魔王戰', value: ui.presetName, 'aria-label': '預組名稱',
+          oninput: (e) => { ui.presetName = e.target.value; }, onkeydown: (e) => { if (e.key === 'Enter') save(); },
+        }),
+        h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.monsters.length, onclick: save }, '把場上的敵人存成預組')),
+      ui.presets.length
+        ? h('ul', { class: 'manage' }, ui.presets.map((p) => h('li', { class: 'manage__row' },
+            h('span', { class: 'manage__name', text: p.name }),
+            h('small', { class: 'hint', text: presetSummary(p) }),
+            h('button', {
+              type: 'button', class: 'btn btn--primary btn--small',
+              onclick: () => {
+                if (getEncounter()?.monsters.length && !confirm(`用「${p.name}」取代場上目前的敵人？（先攻會清空）`)) return;
+                sel.targets = []; sel.modes = {};
+                presetDo({ t: 'presetLoad', name: p.name }, `已換上「${p.name}」。`);
+              },
+            }, '換上場'),
+            h('button', {
+              type: 'button', class: 'btn btn--ghost btn--small',
+              onclick: () => { if (confirm(`刪除預組「${p.name}」？`)) presetDo({ t: 'presetDel', name: p.name }); },
+            }, '刪除'))))
+        : null);
   }
 
   /** 立繪庫（GM）：上傳、刪除 */
@@ -544,7 +627,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
         : null,
       partyRow(),
       canEdit
-        ? addBox('gm', online() ? '⚙️ 敵人與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), manageBox(state, enc), libraryBox()))
+        ? addBox('gm', online() ? '⚙️ 敵人與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), manageBox(state, enc), presetBox(enc), libraryBox()))
         : null);
   }
 

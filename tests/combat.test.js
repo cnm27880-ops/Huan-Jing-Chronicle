@@ -71,6 +71,32 @@ test('怪物強度分配：總和不變，加上區域補正', () => {
   assert.deepEqual(generateAbcSplit(0, { A: 1, B: 0, C: 0 }), { A: 1, B: 0, C: 0 });
 });
 
+test('怪物強度分配：最集中的一軌不超過 70%（極端型 50%～70%，使用者 2026-10-09）', () => {
+  // rng 依序：選類型（0 → 極端）、比例（0.999 → 接近上限）、之後洗牌
+  const seq = [0, 0.999, 0.5, 0.5, 0.5];
+  let i = 0;
+  const v = generateAbcSplit(1000, undefined, () => seq[i++ % seq.length]);
+  assert.equal(Math.max(v.A, v.B, v.C), 699);
+  i = 0; seq[1] = 0;
+  assert.equal(Math.max(...Object.values(generateAbcSplit(1000, undefined, () => seq[i++ % seq.length]))), 500);
+  for (let k = 0; k < 300; k++) {
+    const w = generateAbcSplit(1000);
+    assert.ok(Math.max(w.A, w.B, w.C) <= 700);
+  }
+});
+
+test('怪物強度分配：GM 指定類型與集中軌道', () => {
+  for (let k = 0; k < 100; k++) {
+    const e = generateAbcSplit(1000, undefined, Math.random, { type: 'extreme', focus: 'C' });
+    assert.ok(e.C >= 500 && e.C <= 700 && e.A + e.B + e.C === 1000);
+    const d = generateAbcSplit(1000, undefined, Math.random, { type: 'dual', focus: 'AB' });
+    assert.ok(d.C <= 250 && d.A >= 375 && d.B >= 375);
+    const r = generateAbcSplit(1000, undefined, Math.random, { type: 'extreme' }); // 只指定類型：集中軌隨機
+    assert.ok(Math.max(r.A, r.B, r.C) >= 500);
+  }
+  assert.deepEqual(generateAbcSplit(9, { A: 1, B: 0, C: 0 }, Math.random, { type: 'balanced', focus: 'A' }), { A: 4, B: 3, C: 3 });
+});
+
 test('小怪與 BOSS 命名、數量、BOSS 三組攻防', () => {
   const enc = newEncounter();
   addMobs(enc, { count: 2, atkPower: 6, defPower: 6, hp: 20 });
