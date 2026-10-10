@@ -7,6 +7,18 @@
 import { countOf } from './engine.js';
 import { giftable, takeItems, refundItems } from './mail.js';
 
+/** 物品挑選器與交易單的「要換什麼」裡，金幣用這個名字當成一種物品（同名的物品不存在）；送出前用 splitGold 拆開 */
+export const GOLD_NAME = '金幣';
+/** 把 { 名稱: 數量 }（可能含「金幣」）拆成 { items: 不含金幣的物品, gold: 金幣數 } */
+export function splitGold(picked) {
+  const items = {};
+  let gold = 0;
+  for (const [name, n] of picked instanceof Map ? picked : Object.entries(picked ?? {})) {
+    if (name === GOLD_NAME) gold += n; else items[name] = (items[name] ?? 0) + n;
+  }
+  return { items, gold };
+}
+
 /** 寫成文字：「豪華蓋飯 ×10、鐵礦 ×5、金幣 500」 */
 export const itemsText = (items, gold = 0) => [
   ...Object.entries(items ?? {}).map(([name, n]) => `${name} ×${n}`),

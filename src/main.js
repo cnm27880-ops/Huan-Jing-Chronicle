@@ -28,6 +28,7 @@ import { getCurrentUser, consumeLoginResult } from './api/auth.js';
 import { startRoom, stopRoom, getRoomStatus, subscribeRoom } from './state/rollLog.js';
 import { mountWaitNotice } from './ui/waitNotice.js';
 import { blankCharacter } from './game/importBot.js';
+import { SAMPLE_CHARACTER } from './data/sample/fude.js';
 import { setCustomSpecial } from './game/special.js';
 import { setCustomSkills } from './game/skillTable.js';
 import { loadCachedCustomSkills, saveCachedCustomSkills } from './state/customSkills.js';
@@ -126,6 +127,34 @@ async function init() {
   vitals = createVitalsReporter({ getState, skip: () => sync.isWaiting() }); // 等 GM 匯入期間不回報示範角色
 
   createMailbox({ getState, commit }); // 別人送的東西、餵的藥：領取後直接放進自己的角色
+
+  // GM 不用示範角色：連上房間後，如果 GM 的角色還是示範角色（名字相同、或還在等匯入），強制換成空白角色（名字用 Discord 名稱）。
+  // 示範角色只留給還沒登入的單機試玩（網站開發用）。舊的示範存檔會備份在 localStorage 的 huanjing:character:demo-backup。
+  // 每台裝置只處理一次（之後 GM 愛怎麼改角色都不會再被換掉）。
+  const GM_BLANK_KEY = 'huanjing:gm-blank:v1';
+  let gmChecking = false;
+  async function gmBlankCheck() {
+    const status = getRoomStatus();
+    if (gmChecking || status.phase !== 'online' || !status.me?.isGm) return;
+    try { if (localStorage.getItem(GM_BLANK_KEY) === status.me.uid) return; } catch { /* 讀不到就當沒處理過 */ }
+    gmChecking = true;
+    try {
+      await sync.idle(); // 等連線後的比對做完，免得被它蓋掉
+      const uid = getRoomStatus().me?.uid;
+      if (!uid || !getRoomStatus().me?.isGm) return;
+      if (sync.isWaiting() || character.name === SAMPLE_CHARACTER.name) {
+        try { localStorage.setItem('huanjing:character:demo-backup', localStorage.getItem('huanjing:character:v1') ?? ''); } catch { /* 備份失敗也照做 */ }
+        character = importCharacter({ ...blankCharacter(status.me.name || 'GM'), statMode: 'skills' });
+        await sync.forceUpload();
+        vitals.changed();
+        views[currentView]?.render();
+        toast(`GM 不使用示範角色：已換成空白角色「${character.name}」（舊的示範存檔備份在這台裝置）。`);
+      }
+      try { localStorage.setItem(GM_BLANK_KEY, uid); } catch { /* 忽略 */ }
+    } finally { gmChecking = false; }
+  }
+  subscribeRoom(() => { gmBlankCheck(); });
+  gmBlankCheck();
 
   let currentView = 'map';
   function showView() {

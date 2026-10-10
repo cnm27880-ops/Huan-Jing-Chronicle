@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { blankCharacter } from '../src/game/importBot.js';
 import { addItem, countOf } from '../src/game/engine.js';
 import { applyMail } from '../src/game/mail.js';
-import { payOffer, shortages, itemsText, takeOffer, refundOffer } from '../src/game/trade.js';
+import { payOffer, shortages, itemsText, takeOffer, refundOffer, splitGold, GOLD_NAME } from '../src/game/trade.js';
 
 const player = (items) => { const s = blankCharacter('乙'); for (const [n, q] of Object.entries(items)) addItem(s, n, q); return s; };
 const offer = { want: { 豪華蓋飯: 10, 鐵礦: 2 }, give: { 大師技能書: 10 } };
@@ -72,4 +72,12 @@ test('交易的金幣收到：信裡的 gold 加進錢包並寫在通知裡（�
   assert.deepEqual(r.lines, ['金幣 +400']);
   assert.equal(applyMail(s, { kind: 'gift', items: { 鐵礦: 1 }, gold: -5, fromName: '甲' }).lines.length, 1); // 負數、亂寫的不理
   assert.equal(s.gold, 500);
+});
+
+test('金幣當成物品格：splitGold 把「金幣」從物品清單拆出來（Map 或物件都行，重複的加總）', () => {
+  assert.equal(GOLD_NAME, '金幣');
+  assert.deepEqual(splitGold(new Map([['鐵礦', 2], ['金幣', 500]])), { items: { 鐵礦: 2 }, gold: 500 });
+  assert.deepEqual(splitGold({ 金幣: 100 }), { items: {}, gold: 100 });
+  assert.deepEqual(splitGold({ 豪華蓋飯: 10 }), { items: { 豪華蓋飯: 10 }, gold: 0 });
+  assert.deepEqual(splitGold(undefined), { items: {}, gold: 0 });
 });

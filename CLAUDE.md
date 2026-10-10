@@ -20,7 +20,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | 檔案 | 用途 |
 |---|---|
 | `index.html` | 頁面骨架（頂部列、地圖、面板容器） |
-| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #session / #market（舊的 #battle 導到 #session））、角色存檔串接 |
+| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #session / #market（舊的 #battle 導到 #session））、角色存檔串接、GM 強制換成空白角色（`gmBlankCheck`，示範角色只給單機試玩） |
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
 | `DESIGN.md` | 視覺設計規格（黑金主題） |
 | `RULES_OVERVIEW.md` | 規則原文整理（創角、每日養成、技能學習升級、資源、寶石、配方、特殊材料）；階段 2 的依據，含待確認清單 |
@@ -35,7 +35,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/state/mailbox.js` | 信箱：收到伺服器的信 → 領取（只有第一個分頁拿得到）→ 套用到自己的角色 → 存檔 → 跳通知；不在線寄來的上線才收到 |
 | `src/ui/mailNotice.js` | 「收到的東西」通知面板（右下角浮動，不需同意） |
 | `src/ui/holdRepeat.js` | 長按連加／連減（按住＋／－會越按越快；`onEnd` 放開才重畫）：鬥氣加骰與送東西數量共用 |
-| `src/ui/itemPicker.js` | 背包物品挑選器（搜尋＋分類鈕＋格狀物品，點一下選取、長按調數量）：送給別人與發起交易共用 |
+| `src/ui/itemPicker.js` | 背包物品挑選器（分類鈕＋格狀物品，沒有搜尋欄；金幣是其中一格；點一下選取、長按調數量）：贈送與交易共用 |
 | `src/ui/giftSheet.js` | 「贈送／交易」面板（背包頁按鈕，唯一入口，原「送給別人」）：上方三個分頁——🎁 贈送（對方不用同意）、🤝 交易（物品與／或金幣互換，先扣押在交易單上）、📥 待回覆（清單在 playerTrade.js）；戰鬥面板的「餵給隊友」用同一個信箱機制 |
 | `src/game/trade.js` | 玩家交易的付款檢查（純函式，含金幣）：兩邊付不付得起、扣押與退回（不夠＝交易失敗，伺服器退回 A 押的） |
 | `src/ui/playerTrade.js` | 「📥 待回覆」清單（給 giftSheet 用）：收到的交易（接受／拒絕）、我發出的交易（取消）；交易單存在伺服器（`room-core.js` 的 `tradeList`／`tradeRespond`），A 的東西與金幣先扣押在單子上 |

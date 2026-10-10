@@ -377,6 +377,26 @@ test('角色同步：全新裝置、伺服器也沒有存檔 → 不上傳示範
   stopAll(m2);
 });
 
+test('角色同步：forceUpload 強制用目前的角色覆蓋伺服器（GM 換成空白角色用），解除等待、不問', async () => {
+  resetHub(); store.clear();
+  hub.core.onCharPut(P1, { base: 0, data: { name: '伺服器上的示範角色', hp: 9 } });
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t2f');
+  const state = { name: '空白角色', hp: 0 };
+  let asked = 0;
+  const sync = createCharSync({ getState: () => state, adopt: () => {}, hasLocalSave: () => true, confirmFn: () => { asked++; return true; }, room: m });
+  await flush();
+  await sync.idle();
+  asked = 0; // 連線時的比對可能問過一次（本機與伺服器各有一份）；forceUpload 本身不該再問
+  await sync.forceUpload();
+  await flush();
+  assert.equal(JSON.parse(hub.core.charRow('300').json).name, '空白角色');
+  assert.equal(hub.core.charRow('300').version, 2);
+  assert.equal(sync.isWaiting(), false);
+  assert.equal(asked, 0);
+  stopAll(m);
+});
+
 test('角色同步：等 GM 匯入的玩家，GM 一匯入就自動採用（不用重新整理），等待狀態解除並通知畫面', async () => {
   resetHub(); store.clear();
   const m = await browser(P1);
