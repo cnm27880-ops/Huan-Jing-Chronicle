@@ -1041,6 +1041,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .trade-row.rarity { border-left-color: var(--t); }
 .trade-row__icon { display: grid; place-items: center; width: 40px; height: 40px; font-size: 1.3rem; background: var(--paper); border-radius: 10px; }
 .trade-row__info { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+.trade-row__head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; flex-basis: 100%; min-width: 0; }
 .trade-row__have { color: var(--soft); font-size: 0.75rem; }
 .trade-row__price { flex-basis: 100%; color: var(--ink2); font-size: 0.82rem; }
 .trade-row__sub { flex-basis: 100%; color: var(--gold); font-size: 0.78rem; }
@@ -1831,15 +1832,19 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 /* ============================================================
    手機緊湊排版（交易、修整日）：觸控目標維持 44px 以上，只縮卡片的留白與圖示
    ============================================================ */
-/* 交易：每排 2 個，物品卡上下堆疊（圖示＋名稱、價格、數量與按鈕） */
+/* 交易：每排 2 個。上面「圖示＋名稱」，價格與小計從圖示的左邊開始、橫跨整張卡（一行放得下），最下面是數量與按鈕 */
 @media (max-width: 999px) {
   #view-market .trade-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-  #view-market .trade-row { grid-template-columns: 34px minmax(0, 1fr); gap: 4px 8px; padding: 8px; align-items: start; }
-  #view-market .trade-row__icon { width: 34px; height: 34px; font-size: 1.1rem; border-radius: 8px; }
-  #view-market .trade-row__info { gap: 1px 6px; }
-  #view-market .trade-row__price { font-size: 0.76rem; }
-  #view-market .trade-row__sub { font-size: 0.72rem; }
-  #view-market .trade-row__act { grid-column: 1 / -1; justify-content: stretch; gap: 4px; }
+  #view-market .trade-row {
+    grid-template-columns: 34px minmax(0, 1fr); grid-template-areas: 'icon head' 'price price' 'sub sub' 'act act';
+    gap: 3px 8px; padding: 8px; align-items: start;
+  }
+  #view-market .trade-row__info { display: contents; }
+  #view-market .trade-row__icon { grid-area: icon; width: 34px; height: 34px; font-size: 1.1rem; border-radius: 8px; }
+  #view-market .trade-row__head { grid-area: head; gap: 1px 6px; }
+  #view-market .trade-row__price { grid-area: price; font-size: 0.72rem; white-space: nowrap; }
+  #view-market .trade-row__sub { grid-area: sub; font-size: 0.7rem; }
+  #view-market .trade-row__act { grid-area: act; justify-content: stretch; gap: 4px; margin-top: 2px; }
   #view-market .trade-row__qty { flex: 0 0 3.2rem; width: 3.2rem; min-height: 44px; padding: 0 4px; }
   #view-market .trade-row__act .btn { flex: 1; min-width: 0; min-height: 44px; padding: 0 6px; font-size: 0.8rem; white-space: nowrap; }
 }
