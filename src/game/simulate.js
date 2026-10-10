@@ -15,7 +15,7 @@ import {
 } from './combat.js';
 import { POTIONS, TOXICITY_MAX, TRACKS } from './rules.js';
 import { maxHp } from './stats.js';
-import { actionCost, restoreAllResources, resourceNow, witchRest } from './resources.js';
+import { actionCost, restoreAllResources, resourceNow, resourceMax, witchRest, OTHER_RESOURCES } from './resources.js';
 import { passivesOf } from './skills.js';
 import { countOf } from './engine.js';
 
@@ -123,7 +123,8 @@ export function fixedEncounter(src) {
 /**
  * 模擬一場。players = 角色存檔陣列（不會被改動）；specs = [{ kind, count, atkPower, defPower, hp, atkMod?, defMod?, absDef? }]
  * opts.encounter：固定的敵人 { monsters }（給了就不用 specs，每場都是同一組 A/B/C）
- * 回傳 { outcome: 'win' | 'lose' | 'timeout', rounds, damage, monsterHp, hpLeft, hpMax, downs: [每位玩家倒地幾次], potions }
+ * 回傳 { outcome: 'win' | 'lose' | 'timeout', rounds, damage, monsterHp, hpLeft, hpMax, downs: [每位玩家倒地幾次], potions,
+ *        drain: { 靈氣: 0~1, 魔力: …, 毒性: … }（這場結束時，全隊平均用掉了多少比例；沒有這種資源的玩家不算）, drainAvg }
  */
 export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS, rng = Math.random, encounter = null } = {}) {
   const team = players.map(prepPlayer);
@@ -166,8 +167,18 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
     }
     if (team.every(isDowned)) { outcome = 'lose'; break; }
   }
+  // 資源消耗：每種資源（只算這位玩家的招式真的會花到的；沒有任何招式用的資源不算，不然永遠是 0）＋毒性（占上限 15 的比例），全隊平均；
+  // drainAvg = 各項平均（毒性算一項）
+  const drain = {};
+  for (const r of OTHER_RESOURCES) {
+    const owners = team.filter((p) => resourceMax(p, r) > 0 && p.moves.some((m) => (actionCost(p, m)[r] ?? 0) > 0));
+    if (owners.length) drain[r] = owners.reduce((a, p) => a + (1 - resourceNow(p, r) / resourceMax(p, r)), 0) / owners.length;
+  }
+  drain.毒性 = team.reduce((a, p) => a + Math.min(1, p.toxicity / TOXICITY_MAX), 0) / (team.length || 1);
+  const drainVals = Object.values(drain);
   return {
     outcome, rounds, monsterHp,
+    drain, drainAvg: drainVals.reduce((a, v) => a + v, 0) / (drainVals.length || 1),
     damage: monsterHp - enc.monsters.reduce((a, m) => a + m.hp, 0),
     hpLeft: team.reduce((a, p) => a + p.hp, 0), hpMax: team.reduce((a, p) => a + maxHp(p), 0),
     downs, potions,
@@ -188,6 +199,8 @@ export function summarize(results, names = []) {
     runs: n, win: count('win') / (n || 1), lose: count('lose') / (n || 1), timeout: count('timeout') / (n || 1),
     avgRounds: avg((r) => r.rounds), avgDamagePerRound: avg((r) => r.damage / r.rounds), avgPotions: avg((r) => r.potions),
     avgHpLeft: avg((r) => r.hpLeft / r.hpMax),
+    avgMonsterHp: avg((r) => r.monsterHp), avgDrain: avg((r) => r.drainAvg ?? 0),
+    drainBy: Object.fromEntries([...new Set(results.flatMap((r) => Object.keys(r.drain ?? {})))].map((k) => [k, avg((r) => r.drain?.[k] ?? 0)])),
     roundHist, hpHist,
     downRate: (names.length ? names : (results[0]?.downs ?? []).map((_, i) => `玩家${i + 1}`)).map((name, i) => ({ name, rate: results.filter((r) => r.downs[i] > 0).length / (n || 1) })),
   };

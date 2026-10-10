@@ -1,0 +1,62 @@
+// 模擬戰的評價、策略與自動調整（GM 目標：2～3 回合、每場耗約一半資源）
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { assess, penalty, autoTune, TARGET } from '../src/game/tuning.js';
+import { simulateBattle, summarize } from '../src/game/simulate.js';
+import { blankCharacter } from '../src/game/importBot.js';
+import { moveFromCatalog } from '../src/game/skills.js';
+
+const sum = (o = {}) => ({
+  runs: 200, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5,
+  drainBy: { 魔力: 0.5, 毒性: 0.5 }, downRate: [{ name: 'a', rate: 0.1 }], ...o,
+});
+
+test('評價：2～3 回合、每場耗約一半、勝率夠高 → 全部達標', () => {
+  const a = assess(sum());
+  assert.equal(a.ok, true);
+  assert.equal(penalty(sum()), 0);
+  assert.match(a.advice[0], /符合目標/);
+  assert.match(a.items.find((i) => i.key === 'drain').text, /2 場約耗 100%/);
+});
+
+test('評價：回合太長／太短都會給血量建議，數字依每回合傷害計算', () => {
+  const slow = assess(sum({ avgRounds: 5, avgDamagePerRound: 400, avgMonsterHp: 2000 }));
+  assert.equal(slow.items[0].status, 'high');
+  assert.match(slow.advice.join(' '), /800～1,200/);
+  const fast = assess(sum({ avgRounds: 1, avgDamagePerRound: 1000, avgMonsterHp: 1000 }));
+  assert.equal(fast.items[0].status, 'low');
+  assert.match(fast.advice.join(' '), /實際更高/);
+});
+
+test('評價：資源消耗太低／太高、勝率太低各有對應的建議', () => {
+  assert.equal(assess(sum({ avgDrain: 0.1 })).items[1].status, 'low');
+  assert.match(assess(sum({ avgDrain: 0.1 })).advice.join(' '), /攻擊強度/);
+  assert.equal(assess(sum({ avgDrain: 0.9 })).items[1].status, 'high');
+  const lose = assess(sum({ win: 0.5, lose: 0.5 }));
+  assert.equal(lose.items[2].status, 'low');
+  assert.match(lose.advice.join(' '), /降低/);
+  assert.ok(penalty(sum({ avgRounds: 6, avgDrain: 0.1, win: 0.5 })) > 3);
+});
+
+test('自動調整：找到讓回合數與資源消耗都達標的血量與攻擊倍率', async () => {
+  // 假的評估：回合數 = 血量 / 400；消耗 = 攻擊強度 / 200（上限 1）；勝率永遠 100%
+  const evaluate = (specs) => sum({ avgRounds: specs[0].hp / 400, avgDrain: Math.min(1, specs[0].atkPower / 200), win: 1 });
+  const out = await autoTune({ specs: [{ kind: 'boss', count: 1, hp: 4000, atkPower: 20 }], evaluate, yieldFn: async () => {} });
+  assert.equal(out.penalty, 0);
+  assert.ok(out.specs[0].hp >= TARGET.roundsMin * 400 && out.specs[0].hp <= TARGET.roundsMax * 400);
+  assert.ok(Math.abs(out.specs[0].atkPower / 200 - TARGET.drain) <= TARGET.drainTol);
+  assert.equal(out.specs.length, 1);
+});
+
+test('模擬戰：回報每場的資源與毒性消耗；沒有招式用的資源不算進去', () => {
+  const s = { ...blankCharacter('甲'), skills: { 爆裂火球: 5 } };
+  s.baseStats = { ...s.baseStats, 生命: 500, 魔力: 100, 鬥氣: 50 };
+  s.moves.push({ ...moveFromCatalog('爆裂火球'), id: 'fb' });
+  const r = simulateBattle([s], [{ kind: 'mob', count: 1, atkPower: 10, defPower: 10, hp: 100000 }], { maxRounds: 3 });
+  assert.ok(r.drain.魔力 > 0 && r.drain.魔力 <= 1);
+  assert.equal('鬥氣' in r.drain, false); // 沒有任何招式會花鬥氣
+  assert.ok('毒性' in r.drain);
+  const summary = summarize([r, r]);
+  assert.ok(Math.abs(summary.avgDrain - r.drainAvg) < 1e-9);
+  assert.equal(summary.avgMonsterHp, 100000);
+});
