@@ -5,14 +5,14 @@
 // ============================================================
 import { h, fmt } from './dom.js';
 import { toast, rollFailed } from './controls.js';
-import { TRACKS, TRACK_ATK_STAT, POTIONS, TOXICITY_MAX } from '../game/rules.js';
+import { TRACKS, POTIONS, TOXICITY_MAX } from '../game/rules.js';
 import {
   attackDice, pooledAttack, endBattle, monsterAbs, ATTACK_MODES, defenseDice, formatAbc, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
   drinkPotion, useSupport, isDowned, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES,
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
-  SKILL_CATALOG, passivesOf, skillLevel, globalCost, addCost, WITCH_EXTRA_COST,
+  SKILL_CATALOG, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST,
 } from '../game/skills.js';
 import {
   OTHER_RESOURCES, resourceMax, resourceNow, setResource, restoreAllResources, actionCost, shortfall, costText, witchRest,
@@ -32,7 +32,6 @@ const BATTLE_KINDS = new Set(['attack', 'defend', 'potion', 'skill', 'divider'])
 const BATTLE_NOTE = /^(調整|戰鬥結束|魔女|遭遇)/;
 export const isBattleEvent = (ev) => BATTLE_KINDS.has(ev.kind) || (ev.kind === 'note' && BATTLE_NOTE.test(ev.label ?? ''));
 
-const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const potionText = (p) => [
   p.heal ? `回復 ${p.heal.n}D${p.heal.sides} 生命` : null,
   ...Object.entries(p.restore ?? {}).map(([res, pct]) => `回復 ${pct}% ${res}`),
@@ -47,7 +46,7 @@ const potionText = (p) => [
  */
 export function createBattleView({ getState, commit, rerender, onFire = () => {}, fireInfo = () => ({ text: '', ready: false }) }) {
   const ui = {
-    moveForm: { name: '', mode: 'normal', school: '', tracks: ['C'], extra: { A: 0, B: 0, C: 0 }, cost: {}, global: true },
+    moveForm: { name: '', skill: '' }, // 自訂招式 = 名稱 + 綁定的主動技能
     feedTo: '', // 餵藥給誰（uid）
     openMoves: new Set(), // 展開檔位按鈕的輔助技能 id
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
@@ -338,10 +337,12 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   function moveCard(state) {
     if (!state.moves.some((m) => m.id === sel.moveId)) sel.moveId = state.moves.find((m) => m.kind !== 'heal' && m.kind !== 'shield')?.id ?? state.moves[0]?.id ?? null;
     const f = ui.moveForm;
-    const trackToggle = (t) => h('button', {
-      type: 'button', class: 'toggle', 'aria-pressed': String(f.tracks.includes(t)),
-      onclick: () => { f.tracks = f.tracks.includes(t) ? f.tracks.filter((x) => x !== t) : [...f.tracks, t].sort(); rerender(); },
-    }, `${t} ${TRACK_ATK_STAT[t]}`);
+    const learned = Object.keys(SKILL_CATALOG).filter((n) => skillLevel(state, n) > 0);
+    const skillSummary = (n) => {
+      const m = moveFromCatalog(n);
+      if (m.kind === 'heal' || m.kind === 'shield') return `輔助技能（${m.kind === 'heal' ? '回復' : '護盾'}），照技能的檔位使用。`;
+      return `傷害軌道 ${(m.mode === 'all' ? TRACKS : m.tracks).join('、')}；${m.targets} 目標；消耗：${costText(m.cost)}`;
+    };
     // 魔女：魔力不夠付額外的 30 魔力時，在最上方給一顆醒目的「放棄行動」按鈕
     const witchStuck = passivesOf(state).witch && resourceNow(state, '魔力') < WITCH_EXTRA_COST;
     return h('section', { class: 'card' },
@@ -360,52 +361,30 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       h('p', { class: 'hint', text: '點招式選為目前招式（能選幾個目標照招式規定），再按「出招」打中間選好的目標；輔助技能點開後按檔位使用。消耗已含魔女的額外魔力，付不起的會變灰。' }),
       state.moves.length
         ? h('ul', { class: 'move-list' }, state.moves.map((m) => moveRow(state, m)))
-        : h('p', { class: 'notice', text: '還沒有招式。下面新增一個。' }),
+        : h('p', { class: 'notice', text: '還沒有自訂招式。下面綁定一個主動技能新增。' }),
       addBox('move', '＋ 新增自訂招式',
-        h('div', { class: 'row' },
-          h('input', {
-            class: 'field', type: 'text', placeholder: '招式名稱', value: f.name, maxlength: 200, 'aria-label': '招式名稱',
-            oninput: (e) => { f.name = e.target.value; },
-          }),
-          h('select', { class: 'field', 'aria-label': '招式系別', onchange: (e) => { f.school = e.target.value; } },
-            ['', '西幻', '修仙', '科技', '神秘'].map((n) => h('option', { value: n, selected: f.school === n ? true : null, text: n || '系別（選填）' })))),
-        h('p', { class: 'field-label', text: '攻擊方式' }),
-        h('div', { class: 'toggle-row' }, Object.entries(ATTACK_MODES).map(([id, label]) => h('button', {
-          type: 'button', class: 'toggle', 'aria-pressed': String((f.mode ?? 'normal') === id), onclick: () => { f.mode = id; rerender(); },
-        }, label))),
-        h('p', { class: 'field-label', text: f.mode === 'all' ? '傷害軌道（萬物歸一固定用全部，這裡不影響）' : '傷害軌道' }),
-        h('div', { class: 'toggle-row' }, TRACKS.map(trackToggle)),
-        f.tracks.length
-          ? h('div', { class: 'extra-row' }, f.tracks.map((t) => h('label', { class: 'extra' },
-              h('span', { text: `${t} 招式加成` }),
+        h('p', { class: 'hint', text: '招式要綁定一個已學會的主動技能；傷害軌道、目標數、消耗（含全域響應耗用）、每級加成都照技能，只要取個自己的招式名稱。' }),
+        learned.length
+          ? h('div', {},
               h('input', {
-                class: 'field', type: 'number', min: 0, value: f.extra[t], onchange: (e) => { f.extra[t] = num(e.target.value); },
-              }))))
-          : null,
-        h('label', { class: 'extra' },
-          h('span', { text: '目標數（照技能規定）' }),
-          h('input', { class: 'field', type: 'number', min: 1, max: 10, value: f.targets ?? 1, onchange: (e) => { f.targets = Math.min(10, num(e.target.value, 1)); } })),
-        h('p', { class: 'field-label', text: '消耗資源（試算表「消耗資源」欄）' }),
-        h('div', { class: 'extra-row' }, ['生命', ...OTHER_RESOURCES].map((r) => h('label', { class: 'extra' },
-          h('span', { text: r }),
-          h('input', { class: 'field', type: 'number', min: 0, value: f.cost[r] ?? 0, onchange: (e) => { f.cost[r] = num(e.target.value); } })))),
-        h('label', { class: 'check' },
-          h('input', { type: 'checkbox', checked: f.global ? true : null, onchange: (e) => { f.global = e.target.checked; } }),
-          h('span', { text: '另外加上全域響應耗用（含 C 軌的招式 +2 生命 +3 算力；試算表各招式的消耗欄已含這一份，所以照抄試算表時請取消勾選）' })),
-        h('button', {
-          type: 'button', class: 'btn btn--primary btn--small',
-          onclick: () => {
-            const name = f.name.trim();
-            if (!name) return toast('請輸入招式名稱。');
-            if (!f.tracks.length) return toast('至少選一條傷害軌道。');
-            const tracks = f.mode === 'all' ? ['A', 'B', 'C'] : [...f.tracks];
-            const cost = addCost(Object.fromEntries(Object.entries(f.cost).filter(([, v]) => v > 0)), f.global ? globalCost(tracks) : {});
-            const targets = Math.min(10, Math.max(1, f.targets ?? 1));
-            state.moves.push({ id: `m${Date.now().toString(36)}`, name, school: f.school, tracks, mode: f.mode ?? 'normal', extra: { A: 0, B: 0, C: 0, ...f.extra }, cost, ...(targets > 1 ? { targets } : {}) });
-            ui.moveForm = { name: '', mode: 'normal', school: '', tracks: ['C'], extra: { A: 0, B: 0, C: 0 }, cost: {}, global: true };
-            commit();
-          },
-        }, '新增')));
+                class: 'field', type: 'text', placeholder: '招式名稱（留空＝用技能名稱）', value: f.name, maxlength: 200, 'aria-label': '招式名稱',
+                oninput: (e) => { f.name = e.target.value; },
+              }),
+              h('select', { class: 'field', 'aria-label': '綁定的主動技能', onchange: (e) => { f.skill = e.target.value; rerender(); } },
+                h('option', { value: '', text: '綁定主動技能…' }),
+                learned.map((n) => h('option', { value: n, selected: f.skill === n ? true : null, text: `${n} Lv${skillLevel(state, n)}` }))),
+              f.skill ? h('p', { class: 'hint', text: skillSummary(f.skill) }) : null,
+              h('button', {
+                type: 'button', class: 'btn btn--primary btn--small',
+                onclick: () => {
+                  if (!f.skill) return toast('請先綁定一個主動技能。');
+                  const base = moveFromCatalog(f.skill);
+                  state.moves.push({ ...base, id: `m${Date.now().toString(36)}`, name: f.name.trim() || f.skill });
+                  ui.moveForm = { name: '', skill: '' };
+                  commit();
+                },
+              }, '新增'))
+          : h('p', { class: 'notice', text: '還沒有學會可綁定的主動技能（到修整日學習，或請 GM 匯入角色卡）。' })));
   }
 
 

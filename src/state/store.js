@@ -3,7 +3,7 @@
 // 之後接上 Cloudflare 時，只要改這個檔案，其他程式不用動
 // ============================================================
 import { SAMPLE_CHARACTER } from '../data/sample/fude.js';
-import { moveFromCatalog, basicMove } from '../game/skills.js';
+import { basicMove } from '../game/skills.js';
 import { maxHp, derivedStats } from '../game/stats.js';
 import { syncBadgeMade } from '../game/badges.js';
 
@@ -39,17 +39,7 @@ function upgrade(state) {
   // 普攻：每人固定有一個（見 skills.js 的 basicMove）
   if (!state.moves.some((m) => m.id === 'basic')) state.moves.push(basicMove());
   state.migrated = state.migrated ?? {};
-  if (firstTime) {
-    for (const m of SAMPLE_CHARACTER.moves.filter((x) => x.skill)) {
-      if (!state.moves.some((x) => x.id === m.id)) state.moves.push(clone(m));
-    }
-    state.migrated.brute = true;
-  }
-  // 暴徒的主動招式（技能庫）後來才加：已學暴徒的舊存檔補一次
-  if (!state.migrated.brute) {
-    state.migrated.brute = true;
-    if (state.skills.暴徒 && !state.moves.some((x) => x.skill === '暴徒')) state.moves.push(moveFromCatalog('暴徒'));
-  }
+  state.migrated.brute = true; // 技能庫的招式不再自動加進招式清單（玩家自己綁定技能建立）
   const stats = derivedStats(state); // 面板不看目前資源量，算一次就好
   for (const r of Object.keys(state.resources)) {
     state.resources[r] = Math.max(0, Math.min(state.resources[r], stats[r]?.total ?? Infinity));

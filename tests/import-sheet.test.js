@@ -107,12 +107,17 @@ test('調整為負的屬性會被標出來（網站算出的比試算表面板�
   assert.ok(data.adjust.物理傷害 < 0);
 });
 
-test('技能庫的招式：有等級才給，不重複', () => {
-  const { data } = convertSheet(parsed({ learned: [['暴徒', 1], ['萬物歸一', 0]] }));
-  assert.ok(data.moves.some((m) => m.skill === '暴徒'));
-  assert.ok(!data.moves.some((m) => m.skill === '萬物歸一'));
-  const again = convertSheet(parsed({ learned: [['暴徒', 1]] }), data);
-  assert.equal(again.data.moves.filter((m) => m.skill === '暴徒').length, 1);
+test('匯入不會自動產生招式（招式由玩家自己綁定技能建立）', () => {
+  const { data } = convertSheet(parsed({ learned: [['暴徒', 1], ['萬物歸一', 5]] }));
+  assert.deepEqual(data.moves.map((m) => m.id), ['basic']);
+});
+
+test('示範角色（福德正神）重新匯入：自動帶回身上裝備，面板仍對得上', () => {
+  const p = parsed({ name: SAMPLE_CHARACTER.name, learned: [['引氣訣', 4]] });
+  const { data } = convertSheet(p, null);
+  assert.equal(data.equipment.weapon.id, SAMPLE_CHARACTER.equipment.weapon.id);
+  assert.ok(data.gear.length > 0);
+  assert.equal(derivedStats(data).真實傷害.total, p.panel.真實傷害);
 });
 
 test('合併進既有角色：背包、裝備、金幣保留；技能與手動調整以角色卡為準；不改傳入物件', () => {
