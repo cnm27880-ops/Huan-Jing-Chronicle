@@ -1,103 +1,18 @@
 // ============================================================
 // 玩家交易（交易頁「玩家交易」分頁）：A 指定一位玩家，用自己的東西換對方指定的東西。
-//   發起：A 挑要給的東西（先從背包扣、押在伺服器的交易單上）＋填對方要拿出的東西 → 對方在這個分頁看到
+//   發起：在「送給別人」面板（src/ui/giftSheet.js）切到「交易」：A 挑要給的東西（先從背包扣、押在伺服器的交易單上）＋填對方要拿出的東西 → 對方在這個分頁看到
 //   對方回覆：接受（他的東西夠才成交）／拒絕；接受時東西不夠＝交易失敗，A 的東西退回；A 也可以自己取消
 //   成交或退回的東西都走一般信箱（src/state/mailbox.js），上線就會收到。規則細節見 src/game/trade.js、GAME_RULES.md。
 // ============================================================
 import { h, fmt } from './dom.js';
-import { openSheet, closeSheet } from './sheet.js';
 import { toast } from './controls.js';
-import { createItemPicker } from './itemPicker.js';
-import { KNOWN_ITEMS } from './items.js';
-import { teammates } from './giftSheet.js';
-import { getRoomStatus, sendMail, tradeList, tradeRespond, onTradeChange, notifyTradeChange } from '../state/rollLog.js';
-import { takeItems, refundItems } from '../game/mail.js';
+import { openGiftSheet } from './giftSheet.js';
+import { getRoomStatus, tradeList, tradeRespond, onTradeChange, notifyTradeChange } from '../state/rollLog.js';
+import { refundItems } from '../game/mail.js';
 import { payOffer, shortages, itemsText } from '../game/trade.js';
 import { logActivity } from '../state/activityLog.js';
 
-const KNOWN = new Set(KNOWN_ITEMS);
 let cache = []; // 上一次查到的交易單（換分頁重畫時先用它，免得畫面空一下）
-
-// ---------- 發起交易 ----------
-export function openTradeSheet(getState, commit) {
-  const ui = { to: '', picked: new Map(), wants: [{ name: '', qty: 1 }], busy: false };
-
-  async function send(sendBtn) {
-    const state = getState();
-    const give = Object.fromEntries(ui.picked);
-    const want = {};
-    for (const w of ui.wants) {
-      const name = w.name.trim();
-      if (!name) continue;
-      if (!Number.isInteger(w.qty) || w.qty < 1) return toast(`「${name}」的數量要是 1 以上的整數。`);
-      want[name] = (want[name] ?? 0) + w.qty;
-    }
-    if (!ui.to) return toast('先選要跟誰交易。');
-    if (!Object.keys(give).length) return toast('先點選你要給出的東西。');
-    if (!Object.keys(want).length) return toast('請填你要對方拿什麼來換。');
-    const odd = Object.keys(want).filter((n) => !KNOWN.has(n));
-    if (odd.length && !confirm(`「${odd.join('、')}」不是已知的物品名稱，對方可能永遠湊不出來。仍要送出？`)) return undefined;
-    if (!takeItems(state, give)) return toast('背包裡的數量不夠，請重新選。');
-    ui.busy = true; sendBtn.disabled = true; sendBtn.textContent = '送出中…';
-    commit();
-    try {
-      await sendMail({ to: ui.to, kind: 'trade', give, want });
-      const who = teammates().find((m) => m.uid === ui.to)?.name ?? '對方';
-      toast(`交易單已送給 ${who}，等對方回覆（你的東西已先押在單子上，隨時可以取消）。`);
-      logActivity(state, { cat: 'item', text: `發起交易給 ${who}`, lines: [`給出：${itemsText(give)}`, `要換：${itemsText(want)}`] });
-      closeSheet();
-      notifyTradeChange();
-    } catch (e) {
-      refundItems(state, give); // 寄失敗：還回背包
-      commit();
-      ui.busy = false;
-      toast(`沒有送出：${e.message}`);
-      sendBtn.disabled = false; sendBtn.textContent = '🤝 送出交易單';
-    }
-    return undefined;
-  }
-
-  function body() {
-    const state = getState();
-    const mates = teammates();
-    if (!mates.length) return h('p', { class: 'notice', text: '要登入並加入房間，而且房間裡有其他玩家，才能交易。' });
-    const total = h('span', { class: 'gift-foot__n' });
-    const sendBtn = h('button', { type: 'button', class: 'btn btn--primary btn--go', onclick: () => send(sendBtn) }, '🤝 送出交易單');
-    const wantBox = h('div', { class: 'trade-wants' });
-    function renderFoot() {
-      const n = [...ui.picked.values()].reduce((a, b) => a + b, 0);
-      total.textContent = ui.picked.size ? `給出 ${ui.picked.size} 種・共 ${fmt(n)} 件` : '先點選要給出的東西';
-      sendBtn.disabled = ui.busy || !n;
-    }
-    function renderWants() {
-      wantBox.replaceChildren(...ui.wants.map((w, i) => h('div', { class: 'trade-want' },
-        h('input', { class: 'field', type: 'text', list: 'trade-known-items', placeholder: '物品名稱，例如 豪華蓋飯', value: w.name, 'aria-label': '對方要拿出的物品', oninput: (e) => { w.name = e.target.value; } }),
-        h('input', { class: 'field gift-qty', type: 'number', min: 1, inputmode: 'numeric', value: w.qty, 'aria-label': '數量', onchange: (e) => { w.qty = Math.floor(Number(e.target.value)) || 0; } }),
-        ui.wants.length > 1 ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', 'aria-label': '移除這一項', onclick: () => { ui.wants.splice(i, 1); renderWants(); } }, '✕') : null)));
-    }
-    const picker = createItemPicker({ state, picked: ui.picked, onChange: renderFoot });
-    if (!picker.owned.length) return h('p', { class: 'notice', text: '背包裡沒有可以拿來交易的東西（紀念品不能交易）。' });
-    renderWants();
-    return h('div', { class: 'giftsheet' },
-      h('div', { class: 'gift-head' },
-        h('label', { class: 'extra' }, h('span', { text: '交易對象' }),
-          h('select', { class: 'field', 'aria-label': '跟誰交易', onchange: (e) => { ui.to = e.target.value; } },
-            h('option', { value: '', text: '選擇玩家…' }),
-            mates.map((m) => h('option', { value: m.uid, selected: ui.to === m.uid ? true : null, text: `${m.name}${m.online ? '' : '（離線）'}` })))),
-        h('p', { class: 'field-label', text: '① 我要給出（點物品選取，選好數量）' }),
-        picker.head),
-      picker.grid,
-      h('div', { class: 'trade-want-box' },
-        h('p', { class: 'field-label', text: '② 我要對方拿出來換（名稱要和背包裡的一模一樣）' }),
-        wantBox,
-        h('datalist', { id: 'trade-known-items' }, KNOWN_ITEMS.map((n) => h('option', { value: n }))),
-        h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { ui.wants.push({ name: '', qty: 1 }); renderWants(); } }, '＋ 再加一項'),
-        h('p', { class: 'hint', text: '你的東西送出時就先扣掉、押在交易單上。對方接受但東西不夠＝交易失敗，東西退回給你；對方拒絕或你取消也會退回。' })),
-      h('div', { class: 'gift-foot' }, total, sendBtn));
-  }
-
-  openSheet('發起玩家交易', body, { tall: true });
-}
 
 // ---------- 交易頁的「玩家交易」分頁 ----------
 export function createPlayerTradePanel({ getState, commit }) {
@@ -192,7 +107,7 @@ export function createPlayerTradePanel({ getState, commit }) {
       h('section', { class: 'card' },
         h('h2', { class: 'section-title', text: '玩家交易' }),
         h('p', { class: 'hint', text: '指定一位玩家，用你的東西換他指定的東西。對方可以接受或拒絕；接受時他的東西不夠，交易失敗、你的東西退回。' }),
-        h('button', { type: 'button', class: 'btn btn--primary', onclick: () => openTradeSheet(getState, commit) }, '＋ 發起交易')),
+        h('button', { type: 'button', class: 'btn btn--primary', onclick: () => openGiftSheet(getState, commit, { mode: 'trade' }) }, '＋ 發起交易')),
       h('section', { class: 'card' },
         h('h2', { class: 'section-title', text: `收到的交易（${ins.length}）` }),
         ins.length ? h('ul', { class: 'trade-offers__list' }, ins.map(incoming)) : h('p', { class: 'empty', text: '目前沒有人向你提出交易。' })),

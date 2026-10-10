@@ -47,7 +47,7 @@ export function createBagView({ root, getState, commit, onReset }) {
           h('span', { text: `${fmt(names.length)} 種　金幣 ${fmt(state.gold)}` })),
         h('div', { class: 'bag-bar__tools' },
           search,
-          h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openGiftSheet(getState, commit) }, '🎁 送給別人'),
+          h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openGiftSheet(getState, commit) }, '🎁 贈送／交易'),
           h('button', { type: 'button', class: 'btn btn--primary', onclick: () => openAddSheet(state, commit) }, '＋ 放進背包'))),
       h('div', { class: 'bag' },
         groups.filter((g) => g.items.length).map((g) => {
