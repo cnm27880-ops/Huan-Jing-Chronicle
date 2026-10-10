@@ -1827,3 +1827,32 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 
 /* 特殊材料卡：名稱與說明之間不留空（#view-rest .rest-step .hint 的上邊距會蓋掉一般規則，所以要寫得一樣具體） */
 #view-rest .special-card .hint { margin: 0; font-size: 0.74rem; line-height: 1.35; }
+
+/* ============================================================
+   手機緊湊排版（交易、修整日）：觸控目標維持 44px 以上，只縮卡片的留白與圖示
+   ============================================================ */
+/* 交易：每排 2 個，物品卡上下堆疊（圖示＋名稱、價格、數量與按鈕） */
+@media (max-width: 999px) {
+  #view-market .trade-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  #view-market .trade-row { grid-template-columns: 34px minmax(0, 1fr); gap: 4px 8px; padding: 8px; align-items: start; }
+  #view-market .trade-row__icon { width: 34px; height: 34px; font-size: 1.1rem; border-radius: 8px; }
+  #view-market .trade-row__info { gap: 1px 6px; }
+  #view-market .trade-row__price { font-size: 0.76rem; }
+  #view-market .trade-row__sub { font-size: 0.72rem; }
+  #view-market .trade-row__act { grid-column: 1 / -1; justify-content: stretch; gap: 4px; }
+  #view-market .trade-row__qty { flex: 0 0 3.2rem; width: 3.2rem; min-height: 44px; padding: 0 4px; }
+  #view-market .trade-row__act .btn { flex: 1; min-width: 0; min-height: 44px; padding: 0 6px; font-size: 0.8rem; white-space: nowrap; }
+}
+/* 修整日：行動卡與難度卡矮一點、特殊材料卡留白縮小 */
+@media (max-width: 900px) {
+  #view-rest .action-cards { gap: 5px; }
+  #view-rest .action-card { min-height: 0; padding: 7px 2px 6px; gap: 0; }
+  #view-rest .action-card__icon { width: 34px; height: 34px; margin-bottom: 2px; font-size: 1.1rem; }
+  #view-rest .action-card__name { font-size: 0.82rem; }
+  #view-rest .action-card__sub { font-size: 0.68rem; }
+  #view-rest .diff-grid { gap: 5px; }
+  #view-rest .diff { gap: 2px; padding: 6px 7px; }
+  .special-list { gap: 5px; margin-top: 4px; }
+  .special-card { gap: 4px; padding: 7px 9px; }
+  .special-card__head { line-height: 1.25; }
+}
