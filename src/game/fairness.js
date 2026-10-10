@@ -62,14 +62,15 @@ export function measureHits(players, source, { supply = null, runs = FAIR.probeR
   });
 }
 
-/** 強弱排序：依一次出手的總傷害（群攻算進去）。回傳 { strongest, weakest（玩家位置）, hits（每人量到的）} */
+/** 強弱排序：依一次出手的總傷害（群攻算進去）。回傳 { strongest, weakest（玩家位置）, order（由強到弱）, hits（每人量到的）} */
 export function rankPlayers(hits) {
   let strongest = 0; let weakest = 0;
   hits.forEach((h, i) => {
     if (h.total > hits[strongest].total) strongest = i;
     if (h.total < hits[weakest].total) weakest = i;
   });
-  return { strongest, weakest, hits };
+  const order = hits.map((_, i) => i).sort((a, b) => hits[b].total - hits[a].total); // 由強到弱的玩家位置（集火用）
+  return { strongest, weakest, order, hits };
 }
 
 /**

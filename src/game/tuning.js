@@ -14,6 +14,7 @@ export const TARGET = {
   capWinMin: 0.85, // 第一名只出六成力時，隊伍勝率至少（公平性，我訂的，需驗證）
   topDrainMax: 0.7, // 第一名自己的資源消耗上限（不要每次都被逼著全力，需驗證）
   weakKills: 0.5, // 最弱的玩家平均至少打倒幾隻（需驗證）
+  topDownRoundMin: 2, // 怪物集火第一名時，他平均至少要撐到第幾回合才倒（太早倒，團隊就少了最大的輸出；需驗證）
   concentrationMax: 1.6, // 受傷占生命比例最高的人，不要超過全隊平均的這麼多倍（攻擊集中打少數人，需驗證）
   battlesPerSession: 2,
 };
@@ -32,6 +33,12 @@ export const PLANS = {
 /** 判斷回合數用「打贏的場次」（沒有這欄位就用全部）；一位小數，和畫面顯示一致 */
 const roundsOf = (sum) => Math.round((sum.avgRoundsWin ?? sum.avgRounds) * 10) / 10;
 
+/** 倒地機率的最高值；怪物集火第一名時，第一名一定會倒，不算在內 */
+const downMaxOf = (sum) => {
+  const f = sum.focus === 'strongest' && sum.rank;
+  return Math.max(0, ...(sum.downRate ?? []).filter((_, i) => !(f && i === sum.rank.strongest)).map((d) => d.rate));
+};
+
 const pct = (v) => `${Math.round(v * 100)}%`;
 const fmtN = (v) => Math.round(v).toLocaleString('zh-TW');
 
@@ -44,10 +51,13 @@ export function penalty(sum, t = TARGET) {
   // 公平性（有跑「第一名只出部分力」的情境才算）：第一名省力隊伍也要贏、第一名自己不要被逼到見底
   const pf = sum.capWin == null ? 0 : Math.max(0, (t.capWinMin ?? TARGET.capWinMin) - sum.capWin) / 0.1;
   const top = sum.rank ? sum.perPlayer?.[sum.rank.strongest] : null;
-  const pt = top ? Math.max(0, top.drain - (t.topDrainMax ?? TARGET.topDrainMax)) / 0.1 : 0;
-  const downMax = Math.max(0, ...(sum.downRate ?? []).map((d) => d.rate));
+  const pt = top ? Math.max(0, (top.drain ?? 0) - (t.topDrainMax ?? TARGET.topDrainMax)) / 0.1 : 0;
+  const focusTop = sum.focus === 'strongest' && sum.rank; // 集火第一名：他一定會倒，不算「太兇」；改看他撐到第幾回合
+  const downMax = downMaxOf(sum);
   const pd = Math.max(0, downMax - t.downMax) / 0.2; // 幾乎每場都有人倒地：太兇
-  return pr + pc + pw + pd + pf + pt;
+  const topP = focusTop ? sum.perPlayer?.[sum.rank.strongest] : null;
+  const ps = topP && topP.downRound > 0 ? Math.max(0, (t.topDownRoundMin ?? TARGET.topDownRoundMin) - topP.downRound) / 1 : 0;
+  return pr + pc + pw + pd + pf + pt + ps;
 }
 
 /**
@@ -96,7 +106,7 @@ export function assess(sum) {
   });
   if (wStatus === 'low') advice.push(`勝率只有 ${pct(w)}（敗 ${pct(sum.lose)}・平手 ${pct(sum.timeout)}）：怪物太強，降低攻擊強度或血量。`);
 
-  const downMax = Math.max(0, ...(sum.downRate ?? []).map((d) => d.rate));
+  const downMax = downMaxOf(sum);
   if (downMax > TARGET.downMax) advice.push(`有玩家 ${pct(downMax)} 的場次會倒地：防禦弱的角色壓力很大，可以調低攻擊強度，或準備更多回復藥水。`);
 
   // 公平性：第一名不用全力、最弱的玩家也有貢獻
@@ -118,6 +128,18 @@ export function assess(sum) {
       text: wStatus2 === 'ok' ? '有參與感' : '幾乎沒貢獻，小怪血量或防禦對他太高',
     });
     if (wStatus2 === 'low') advice.push(`最弱的 ${weak.name} 平均只打倒 ${weak.kills.toFixed(1)} 隻：小怪血量調到他一次出手能打倒的程度（自動調整會這樣做），或降低小怪防禦。`);
+  }
+
+  // 集火第一名（GM 現在的打法）：他撐到第幾回合、倒地前打出多少輸出
+  if (sum.focus === 'strongest' && sum.rank && sum.perPlayer?.[sum.rank.strongest]) {
+    const top = sum.perPlayer[sum.rank.strongest];
+    const round = top.downRound;
+    const sStatus = round > 0 && round < TARGET.topDownRoundMin ? 'low' : 'ok';
+    items.push({
+      key: 'topSurvive', label: `集火第一名（${top.name}）撐到`, value: round > 0 ? `第 ${round.toFixed(1)} 回合倒地（倒地機率 ${pct(top.downRate)}）・輸出占 ${pct(top.share)}` : '整場沒倒地', target: `至少第 ${TARGET.topDownRoundMin} 回合`, status: sStatus,
+      text: sStatus === 'ok' ? '輸出打得出來' : '太早被集火打倒，團隊少了最大的輸出',
+    });
+    if (sStatus === 'low') advice.push(`怪物集火 ${top.name}：他平均第 ${round.toFixed(1)} 回合就倒，只打出全隊 ${pct(top.share)} 的輸出。降低怪物攻擊強度，或讓隊友有餘裕先餵藥／上護盾；GM 也可以別一開場就集火他。`);
   }
 
   // 攻擊分散：誰承受特別多（受傷總量占自己生命上限的比例，比全隊平均高很多）
@@ -228,9 +250,10 @@ export async function autoTune({
     const { kh, sum } = await fitHp(ka);
     const pen = penalty(sum, target);
     if (!bestPick || pen < bestPick.pen - 1e-9) bestPick = { kh, ka, sum, pen };
-    const downMax = Math.max(0, ...(sum.downRate ?? []).map((d) => d.rate));
+    const downMax = downMaxOf(sum);
+    const topEarly = sum.focus === 'strongest' && sum.rank && sum.perPlayer?.[sum.rank.strongest]?.downRound > 0 && sum.perPlayer[sum.rank.strongest].downRound < (target.topDownRoundMin ?? TARGET.topDownRoundMin);
     const topD = sum.rank ? sum.perPlayer?.[sum.rank.strongest]?.drain ?? 0 : 0;
-    const tooHard = topD > (target.topDrainMax ?? 1) || sum.win < target.winMin || (sum.capWin != null && sum.capWin < (target.capWinMin ?? 0)) || downMax > target.downMax || sum.avgDrain > target.drain + target.drainTol;
+    const tooHard = topEarly || topD > (target.topDrainMax ?? 1) || sum.win < target.winMin || (sum.capWin != null && sum.capWin < (target.capWinMin ?? 0)) || downMax > target.downMax || sum.avgDrain > target.drain + target.drainTol;
     if (tooHard) hi = ka; else if (sum.avgDrain < target.drain - target.drainTol) lo = ka; else break; // 消耗落在範圍內就收工
   }
 

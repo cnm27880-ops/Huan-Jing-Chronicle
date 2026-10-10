@@ -85,11 +85,12 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
    */
   function makeEvaluate(players, names, rank, fixed, runs) {
     const once = (input, caps, n) => summarize(Array.from({ length: n }, (_, i) => (fixed
-      ? simulateBattle(players, [], { encounter: input, rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, caps })
-      : simulateBattle(players, input.map((s) => ({ ...s })), { rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, caps }))), names);
+      ? simulateBattle(players, [], { encounter: input, rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps })
+      : simulateBattle(players, input.map((s) => ({ ...s })), { rng: seededRng(i + 1), supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps }))), names);
     return (input, full = true) => {
       const sum = once(input, [], runs);
       sum.rank = rank;
+      sum.focus = ui.focus;
       if (full && players.length > 1) {
         sum.capWin = once(input, capsFor(players.length, rank.strongest), Math.max(20, Math.round(runs * 0.6))).win;
         sum.capBudget = FAIR.topBudget;
@@ -112,7 +113,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       const rank = rankPlayers(measureHits(players, source, { supply: ui.supply || null }));
       const results = [];
       for (let i = 0; i < RUNS; i++) {
-        const opts = { supply: ui.supply || null, focus: ui.focus };
+        const opts = { supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order };
         results.push(fixed ? simulateBattle(players, [], { encounter: fixed, ...opts }) : simulateBattle(players, ui.specs.map((s) => ({ ...s })), opts));
         if ((i + 1) % BATCH === 0) {
           ui.progress = (i + 1) / RUNS;
@@ -122,10 +123,11 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       }
       ui.result = summarize(results, ui.names);
       ui.result.rank = rank;
+      ui.result.focus = ui.focus;
       ui.result.hits = rank.hits;
       if (players.length > 1) { // 第一名只出部分力的情境（場數少一點，只看勝率）
         const caps = capsFor(players.length, rank.strongest);
-        const capRuns = Array.from({ length: Math.round(RUNS / 2) }, () => (fixed ? simulateBattle(players, [], { encounter: fixed, supply: ui.supply || null, focus: ui.focus, caps }) : simulateBattle(players, ui.specs.map((s) => ({ ...s })), { supply: ui.supply || null, focus: ui.focus, caps })));
+        const capRuns = Array.from({ length: Math.round(RUNS / 2) }, () => (fixed ? simulateBattle(players, [], { encounter: fixed, supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps }) : simulateBattle(players, ui.specs.map((s) => ({ ...s })), { supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order, caps })));
         ui.result.capWin = summarize(capRuns, ui.names).win;
         ui.result.capBudget = FAIR.topBudget;
       }
@@ -310,7 +312,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
   function focusCard() {
     return h('label', { class: 'extra' }, h('span', { text: '怪物攻擊分配' }),
       h('select', { class: 'field', disabled: ui.running ? true : null, onchange: (e) => { ui.focus = e.target.value; ui.result = null; ui.tuneResults = null; sheet.refresh(); } },
-        [['spread', '平均分散（輪流打每個人）'], ['random', '隨機（可能集中在同一人）']].map(([v, label]) => h('option', { value: v, selected: v === ui.focus ? true : null, text: label }))));
+        [['spread', '平均分散（輪流打每個人）'], ['strongest', '集火第一名（先打倒他，再打下一個）'], ['random', '隨機（可能集中在同一人）']].map(([v, label]) => h('option', { value: v, selected: v === ui.focus ? true : null, text: label }))));
   }
 
   function resultView() {

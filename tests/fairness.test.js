@@ -98,3 +98,22 @@ test('怪物攻擊分配：平均分散＝被打次數相差不超過 1；受傷
   const even = assess({ ...base, perPlayer: [{ name: '甲', takenPct: 0.3 }, { name: '乙', takenPct: 0.3 }] });
   assert.equal(even.items.find((i) => i.key === 'spread').status, 'ok');
 });
+
+test('集火第一名：怪物先打最強的人，他倒了才打下一個；記下第一次倒地的回合', async () => {
+  const players = [hero(0.7), hero(1.6), hero(1)]; // 第 2 位最強、第 3 位次之
+  const boss = [{ kind: 'boss', count: 1, atkPower: 500, defPower: 80, hp: 40000 }];
+  const rank = rankPlayers(measureHits(players, boss));
+  assert.deepEqual(rank.order, [1, 2, 0]);
+  const r = simulateBattle(players, boss, { rng: seededRng(9), focus: 'strongest', focusOrder: rank.order, maxRounds: 4 });
+  assert.ok(r.perPlayer[1].hit > 0 && r.perPlayer[1].hit >= r.perPlayer[2].hit && r.perPlayer[2].hit >= r.perPlayer[0].hit);
+  if (r.perPlayer[1].firstDown) assert.ok(r.perPlayer[1].firstDown >= 1 && r.perPlayer[1].firstDown <= 4);
+  const { assess, penalty } = await import('../src/game/tuning.js');
+  const base = { runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgRoundsWin: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [{ name: '甲', rate: 0.1 }, { name: '乙', rate: 1 }] };
+  const perPlayer = [{ name: '甲', takenPct: 0.1, downRound: 0, downRate: 0.1, share: 0.3 }, { name: '乙', takenPct: 0.6, downRound: 1, downRate: 1, share: 0.1 }];
+  const focused = { ...base, focus: 'strongest', rank: { strongest: 1, weakest: 0 }, perPlayer };
+  assert.equal(assess(focused).items.find((i) => i.key === 'topSurvive').status, 'low'); // 第 1 回合就倒
+  assert.match(assess(focused).advice.join(' '), /集火 乙/);
+  assert.equal(assess({ ...focused, perPlayer: [perPlayer[0], { ...perPlayer[1], downRound: 2.6 }] }).items.find((i) => i.key === 'topSurvive').status, 'ok');
+  assert.ok(penalty(focused) > 0); // 倒太早要扣分
+  assert.equal(penalty({ ...focused, perPlayer: [perPlayer[0], { ...perPlayer[1], downRound: 2.6 }] }), 0); // 第一名一定倒地，但撐得夠久：不算「太兇」
+});
