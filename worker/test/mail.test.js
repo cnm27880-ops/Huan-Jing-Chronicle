@@ -87,3 +87,19 @@ test('餵藥：對方存在伺服器的毒性已滿就不能餵', () => {
   assert.match(e.message, /毒性是 14/);
   assert.equal(core.pendingMail('400').length, 0); // 失敗不留信
 });
+
+test('隊友補血／護盾技能：伺服器驗證、記一筆紀錄（用對方的角色名）、對方領信時才套用', () => {
+  const core = room();
+  core.db.exec('INSERT INTO vitals(uid, json, t) VALUES (?, ?, 1)', '400', JSON.stringify({ name: '乙角色', hp: 10, maxHp: 100, downed: false, res: {} }));
+  const res = send(core, P1, { t: 'mailSend', rid: 's1', to: '400', kind: 'support', skill: '納米醫療蜂', support: 'heal', pct: 20 });
+  const ev = res.out.find((o) => o.msg.t === 'event').msg.event;
+  assert.match(ev.label, /玩家一 對 乙角色 施放 納米醫療蜂/);
+  assert.equal(pushed(res).msg.mails[0].kind, 'support');
+  assert.equal(pushed(res).msg.mails[0].pct, 20);
+  const shield = send(core, P1, { t: 'mailSend', to: '400', kind: 'support', skill: '生生造化印', support: 'shield', pct: 15, res: 6 });
+  assert.equal(pushed(shield).msg.mails[0].res, 6);
+  for (const bad of [{ support: 'x', pct: 10 }, { support: 'heal', pct: 0 }, { support: 'heal', pct: 101 }, { support: 'heal', pct: 1.5 }, { support: 'heal' }]) {
+    assert.equal(errorOf(send(core, P1, { t: 'mailSend', to: '400', kind: 'support', skill: '納米醫療蜂', ...bad }))?.code, 'bad_mail', JSON.stringify(bad));
+  }
+  assert.equal(errorOf(send(core, P1, { t: 'mailSend', to: '400', kind: 'support', support: 'heal', pct: 10 }))?.code, 'bad_mail'); // 沒有技能名稱
+});

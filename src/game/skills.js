@@ -20,6 +20,9 @@ export function passivesOf(state) {
 
 export const WITCH_EXTRA_COST = 30;
 
+/** 鬥氣的基礎用法：攻擊時每花 1 點，額外增加 1 顆真實傷害攻擊骰（2026/10 平衡更新）；冠軍勇士（大師）改成每點 4 顆 */
+export const douMult = (state) => (skillLevel(state, '冠軍勇士') > 0 ? 4 : 1);
+
 /** 試算表「全域條件響應耗用」：A、B 無；含 C 軌（C／BC／ABC）的攻擊招式 2 生命 + 3 算力。各招式的「消耗資源」已含這一份 */
 export const GLOBAL_C_COST = { 生命: 2, 算力: 3 };
 export const globalCost = (tracks) => (tracks.includes('C') ? { ...GLOBAL_C_COST } : {});
@@ -135,4 +138,4 @@ export function moveExtra(state, move) {
 }
 
 /** 可在「已學會技能」登錄等級的技能（會被程式規則用到的） */
-export const RULE_SKILLS = [...new Set(['暴徒', '魔女', '終焉武裝', '域外魔祖', '不可名狀', ...Object.keys(SKILL_CATALOG)])];
+export const RULE_SKILLS = [...new Set(['暴徒', '魔女', '終焉武裝', '域外魔祖', '不可名狀', '冠軍勇士', ...Object.keys(SKILL_CATALOG)])];

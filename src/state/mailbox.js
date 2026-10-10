@@ -4,6 +4,7 @@
 // ============================================================
 import { setMailListener, claimMail, sendMail } from './rollLog.js';
 import { applyMail } from '../game/mail.js';
+import { logActivity } from './activityLog.js';
 import { showMailNotice } from '../ui/mailNotice.js';
 import { toast } from '../ui/controls.js';
 
@@ -17,6 +18,7 @@ export function createMailbox({ getState, commit }) {
       const { mail: got } = await claimMail(mail.id);
       if (!got) return; // 已經被別的分頁領走
       const result = applyMail(getState(), got);
+      logActivity(getState(), { cat: 'item', text: result.title, lines: result.lines ?? [] });
       commit();
       showMailNotice(result);
       if (result.bounce) { // 不能收（例如毒性已滿）：退回給寄件人

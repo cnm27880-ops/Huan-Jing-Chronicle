@@ -12,10 +12,11 @@ import {
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
-  SKILL_CATALOG, bindableSkills, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST,
+  SKILL_CATALOG, bindableSkills, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
 } from '../game/skills.js';
 import {
   OTHER_RESOURCES, resourceMax, resourceNow, setResource, restoreAllResources, actionCost, shortfall, costText, witchRest,
+  convertResource, CONVERT_TARGETS,
 } from '../game/resources.js';
 import { countOf } from '../game/engine.js';
 import { iconOf } from './items.js';
@@ -48,8 +49,10 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   const ui = {
     moveForm: { name: '', skill: '' }, // 自訂招式 = 名稱 + 綁定的主動技能
     feedTo: '', // 餵藥給誰（uid）
+    supportTargets: new Set(['self']), // 補血／護盾技能的目標：'self' 或隊友 uid
     openMoves: new Set(), // 展開檔位按鈕的輔助技能 id
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
+    convert: { from: '靈氣', to: '生命', n: 1 }, // 資源轉換的表單
   };
 
   /** 可收合的「＋新增」區塊。記住展開狀態，按裡面的按鈕重畫後不會自己收起來 */
@@ -262,32 +265,79 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     return { dice, text: [...bits, text].join('・'), cost };
   }
 
+  /** 補血／護盾的目標選擇：自己＋房間裡的隊友（補血技能可選的目標數照技能等級，護盾只能選 1 個） */
+  function supportTargetPicker(state, m) {
+    const c = SKILL_CATALOG[m.skill];
+    const cap = c.kind === 'heal' ? c.targetsAt(skillLevel(state, m.skill)) : 1;
+    const picked = ui.supportTargets;
+    const mates = teammates();
+    for (const x of [...picked]) if (x !== 'self' && !mates.some((mm) => mm.uid === x)) picked.delete(x); // 隊友不見了就拿掉
+    if (!picked.size) picked.add('self');
+    const toggle = (id) => {
+      if (picked.has(id)) { if (picked.size > 1) picked.delete(id); } // 至少留一個目標
+      else if (cap === 1) { picked.clear(); picked.add(id); }
+      else if (picked.size >= cap) return toast(`「${m.name}」這個等級最多 ${cap} 個目標。`);
+      else picked.add(id);
+      return rerender();
+    };
+    const chip = (id, label) => h('button', { type: 'button', class: 'toggle', 'aria-pressed': String(picked.has(id)), onclick: () => toggle(id) }, label);
+    return h('div', { class: 'support-targets' },
+      h('p', { class: 'field-label', text: `目標（最多 ${cap} 個，已選 ${picked.size}）` }),
+      h('div', { class: 'toggle-row' },
+        chip('self', '自己'),
+        mates.map((mm) => chip(mm.uid, `${mm.name}${mm.online ? '' : '（離線）'}`))),
+      mates.length ? null : h('p', { class: 'hint', text: '沒有加入房間，或房間裡沒有其他玩家，所以只能對自己使用。' }));
+  }
+
+  /** 施放補血／護盾：隊友的效果用信箱送出（對方上線時自動套用、不用同意），自己的立刻生效；花費只付一次 */
+  async function castSupport(state, m, tier, t) {
+    const c = SKILL_CATALOG[m.skill];
+    const lv = skillLevel(state, m.skill);
+    if (isDowned(state)) return toast('你已經倒地，無法行動。');
+    const lack = shortfall(state, actionCost(state, m, t.cost));
+    if (lack) return toast(`資源不足：${lack}`);
+    const mates = teammates();
+    const sendTo = [...ui.supportTargets].filter((x) => x !== 'self');
+    const self = ui.supportTargets.has('self');
+    const sent = [];
+    let failed = '';
+    for (const uid of sendTo) {
+      try { await sendMail({ to: uid, kind: 'support', skill: m.skill, support: c.kind, pct: t.pct, res: c.kind === 'shield' ? c.resAt(lv) : 0 }); sent.push(uid); } catch (e) { failed = e.message; }
+    }
+    if (!self && !sent.length) return toast(`沒有施放出去：${failed || '送不出去'}`);
+    if (failed) toast(`有人沒送到：${failed}`);
+    const before = state.hp;
+    const r = useSupport(state, m.id, tier, { self });
+    if (r.error) return toast(r.error);
+    if (self) { // 隊友那邊的紀錄由伺服器寫；自己的這筆由這裡發布
+      publish({
+        who: state.name, kind: 'skill', label: `${m.name}（${t.pct}%）`,
+        big: r.kind === 'heal' ? `+${r.healed}` : `盾 ${r.amount}`,
+        tone: 'ok',
+        lines: [
+          r.kind === 'heal'
+            ? `自己：最大生命 ${t.pct}% = ${r.amount}，生命 ${before} → ${state.hp} / ${maxHp(state)}`
+            : `自己：護盾 = 最大生命 ${t.pct}% = ${r.amount}${r.res ? `，抗性免疫 +${r.res}（護盾破了才消失）` : ''}`,
+          sent.length ? `同時施放給：${sent.map((u) => mates.find((mm) => mm.uid === u)?.name ?? u).join('、')}` : null,
+          `花費：${costText(r.cost)}`,
+        ].filter(Boolean),
+      });
+    } else toast(`已對 ${sent.length} 位隊友施放${m.name}（花費 ${costText(r.cost)}）。`);
+    commit();
+  }
+
   function supportButtons(state, m) {
     const c = SKILL_CATALOG[m.skill];
-    return h('div', { class: 'row support-btns' }, c.tiers.map((t, i) => {
-      const cost = actionCost(state, m, t.cost);
-      const lack = shortfall(state, cost);
-      return h('button', {
-        type: 'button', class: 'btn btn--small', disabled: isDowned(state) || Boolean(lack), title: lack ?? '',
-        onclick: () => {
-          const before = state.hp;
-          const r = useSupport(state, m.id, i);
-          if (r.error) return toast(r.error);
-          publish({
-            who: state.name, kind: 'skill', label: `${m.name}（${t.pct}%）`,
-            big: r.kind === 'heal' ? `+${r.healed}` : `盾 ${r.amount}`,
-            tone: 'ok',
-            lines: [
-              r.kind === 'heal'
-                ? `目標最大生命 ${t.pct}% = ${r.amount}，生命 ${before} → ${state.hp} / ${maxHp(state)}（可回復 ${r.targets} 個目標；目前單人試玩只算自己）`
-                : `護盾 = 最大生命 ${t.pct}% = ${r.amount}${r.res ? `，抗性免疫 +${r.res}（護盾破了才消失）` : ''}`,
-              `花費：${costText(r.cost)}`,
-            ],
-          });
-          commit();
-        },
-      }, `${t.pct}%（${costText(actionCost(state, m, t.cost))}）`);
-    }));
+    return h('div', { class: 'support-box' },
+      supportTargetPicker(state, m),
+      h('div', { class: 'row support-btns' }, c.tiers.map((t, i) => {
+        const cost = actionCost(state, m, t.cost);
+        const lack = shortfall(state, cost);
+        return h('button', {
+          type: 'button', class: 'btn btn--small', disabled: isDowned(state) || Boolean(lack), title: lack ?? '',
+          onclick: () => castSupport(state, m, i, t),
+        }, `${t.pct}%（${costText(cost)}）`);
+      })));
   }
 
   const trackTag = (t) => h('span', { class: 'trk', dataset: { track: t }, text: t });
@@ -334,6 +384,48 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       }, '✕'));
   }
 
+  /** 鬥氣加骰：這次出招花幾點鬥氣，每點 +1 顆真實傷害骰（冠軍勇士每點 4 顆）；出招後歸零 */
+  function douRow(state) {
+    if (resourceMax(state, '鬥氣') <= 0) return null;
+    const have = resourceNow(state, '鬥氣');
+    sel.dou = Math.max(0, Math.min(sel.dou, have));
+    const mult = douMult(state);
+    const set = (n) => { sel.dou = Math.max(0, Math.min(have, n)); rerender(); };
+    return h('div', { class: 'dou' },
+      h('span', { class: 'field-label', text: `🔥 鬥氣加骰（現有 ${fmt(have)}）` }),
+      h('div', { class: 'row' },
+        h('button', { type: 'button', class: 'btn btn--small btn--ghost', 'aria-label': '少 1 點', disabled: sel.dou <= 0, onclick: () => set(sel.dou - 1) }, '−'),
+        h('strong', { class: 'num dou__n', text: String(sel.dou) }),
+        h('button', { type: 'button', class: 'btn btn--small btn--ghost', 'aria-label': '多 1 點', disabled: sel.dou >= have, onclick: () => set(sel.dou + 1) }, '＋'),
+        h('button', { type: 'button', class: 'btn btn--small btn--ghost', disabled: have < 1, onclick: () => set(have) }, '全部'),
+        h('small', { class: 'hint', text: sel.dou ? `下次出招：花 ${sel.dou} 鬥氣，真實傷害 +${fmt(sel.dou * mult)} 骰` : `每點鬥氣 +${mult} 顆真實傷害骰${mult > 1 ? '（冠軍勇士）' : ''}，只對下一次出招有效` })));
+  }
+
+  /** 資源轉換：靈氣 1 比 1 換生命；能量 1 比 1 換任意資源 */
+  function convertBox(state) {
+    const f = ui.convert;
+    const targets = CONVERT_TARGETS[f.from];
+    if (!targets.includes(f.to)) f.to = targets[0];
+    return addBox('convert', '🔄 資源轉換（靈氣→生命、能量→任意資源）',
+      h('p', { class: 'hint', text: '靈氣可以 1 比 1 換成生命；能量可以 1 比 1 換成任意資源；魔力、算力沒有基礎用法。換到的量不會超過上限。' }),
+      h('div', { class: 'row' },
+        h('select', { class: 'field', 'aria-label': '用哪種資源換', onchange: (e) => { f.from = e.target.value; rerender(); } },
+          Object.keys(CONVERT_TARGETS).map((r) => h('option', { value: r, selected: f.from === r ? true : null, text: `${r}（${fmt(resourceNow(state, r))}）` }))),
+        h('span', { text: '→' }),
+        h('select', { class: 'field', 'aria-label': '換成什麼', onchange: (e) => { f.to = e.target.value; } },
+          targets.map((r) => h('option', { value: r, selected: f.to === r ? true : null, text: `${r}（${fmt(resourceNow(state, r))}）` }))),
+        h('input', { class: 'field', type: 'number', min: 1, value: f.n, 'aria-label': '換多少', onchange: (e) => { f.n = Math.max(1, Math.floor(Number(e.target.value)) || 1); } }),
+        h('button', {
+          type: 'button', class: 'btn btn--small',
+          onclick: () => {
+            const r = convertResource(state, f.from, f.to, f.n);
+            if (r.error) return toast(r.error);
+            publish({ who: state.name, kind: 'note', label: '調整：資源轉換', lines: [`${r.from} −${r.spent} → ${r.to} +${r.gained}`] });
+            commit();
+          },
+        }, '轉換')));
+  }
+
   function moveCard(state) {
     if (!state.moves.some((m) => m.id === sel.moveId)) sel.moveId = state.moves.find((m) => m.kind !== 'heal' && m.kind !== 'shield')?.id ?? state.moves[0]?.id ?? null;
     const f = ui.moveForm;
@@ -359,9 +451,11 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           }, `放棄行動・回復 ${WITCH_EXTRA_COST} 魔力`)
         : null,
       h('p', { class: 'hint', text: '點招式選為目前招式（能選幾個目標照招式規定），再按「出招」打中間選好的目標；輔助技能點開後按檔位使用。消耗已含魔女的額外魔力，付不起的會變灰。' }),
+      douRow(state),
       state.moves.length
         ? h('ul', { class: 'move-list' }, state.moves.map((m) => moveRow(state, m)))
         : h('p', { class: 'notice', text: '還沒有自訂招式。下面綁定一個主動技能新增。' }),
+      convertBox(state),
       addBox('move', '＋ 新增自訂招式',
         h('p', { class: 'hint', text: '招式要綁定一個已學會的主動技能；傷害軌道、目標數、消耗（含全域響應耗用）、每級加成都照技能，只要取個自己的招式名稱。' }),
         learned.length

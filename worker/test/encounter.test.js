@@ -174,3 +174,63 @@ test('敵人預組：只有 GM 能用；存下場上的敵人（生命全滿）�
   assert.equal(presetsOf(send(core, GM, { t: 'presetDel', name: '第三章魔王' })).msg.list.length, 0);
   assert.ok(!('presets' in core.hello(P1)));
 });
+
+// ---------- 2026/10 平衡更新：敵人等級與技能 ----------
+const replyOf = (res) => res.out.find((o) => o.msg.t === 'encOk' && o.to === 'self')?.msg;
+
+test('菁英：GM 用 kind: elite 新增，編號是「菁英N」，存 rank', () => {
+  const core = room();
+  const enc = encOf(send(core, GM, { t: 'encAdd', kind: 'elite', spec: { ...SPEC, count: 2 } }));
+  assert.deepEqual(enc.monsters.map((m) => [m.id, m.rank, m.kind]), [['菁英1', 'elite', 'mob'], ['菁英2', 'elite', 'mob']]);
+  assert.equal(encOf(send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 1 } })).monsters.at(-1).id, '小怪1');
+  assert.equal(errorOf(send(core, GM, { t: 'encAdd', kind: 'zzz', spec: SPEC }))?.code, 'bad_enc');
+});
+
+test('承受攻擊（encUse atk）：任何玩家都能用，每回合有次數上限；GM 進下一回合後恢復', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'elite', spec: { ...SPEC, count: 1 } });
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'a', id: '菁英1', use: 'atk' })).left, 1);
+  assert.equal(replyOf(send(core, P2, { t: 'encUse', rid: 'b', id: '菁英1', use: 'atk' })).left, 0);
+  assert.match(errorOf(send(core, P1, { t: 'encUse', rid: 'c', id: '菁英1', use: 'atk' })).message, /已經攻擊 2 次/);
+  assert.equal(errorOf(send(core, P1, { t: 'encRound' }))?.code, 'forbidden'); // 只有 GM 能進下一回合
+  assert.equal(encOf(send(core, GM, { t: 'encRound' })).round, 1);
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'd', id: '菁英1', use: 'atk' })).left, 1);
+});
+
+test('敵人技能：只有 GM 能用；A 蓄力讓下一次承受攻擊多 20 顆；B 蓄力在 encHit 帶 usedB 時消耗；C 喝血由伺服器擲並寫紀錄', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'boss', spec: { ...SPEC, count: 1 } });
+  assert.equal(errorOf(send(core, P1, { t: 'encUse', id: 'BOSS1', use: 'A' }))?.code, 'forbidden');
+  const a = send(core, GM, { t: 'encUse', rid: 'a', id: 'BOSS1', use: 'A' });
+  assert.match(a.out.find((o) => o.msg.t === 'event').msg.event.label, /BOSS1 使用 A 技能/);
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'x', id: 'BOSS1', use: 'atk' })).extraAtk, 20);
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'y', id: 'BOSS1', use: 'atk' })).extraAtk, 0); // 蓄力用掉了
+  assert.match(errorOf(send(core, GM, { t: 'encUse', id: 'BOSS1', use: 'A' })).message, /用完了/);
+  // B：蓄力兩次（BOSS 一回合 2 次），玩家打中時回報 usedB 才會扣
+  send(core, GM, { t: 'encUse', id: 'BOSS1', use: 'B' });
+  send(core, GM, { t: 'encUse', id: 'BOSS1', use: 'B' });
+  assert.equal(core.encounter().monsters[0].charge.B, 2);
+  send(core, P1, { t: 'encHit', hits: [{ id: 'BOSS1', dmg: 10, usedB: true }] });
+  assert.equal(core.encounter().monsters[0].charge.B, 1);
+  send(core, P1, { t: 'encHit', hits: [{ id: 'BOSS1', dmg: 10 }] }); // 沒帶 usedB：不扣
+  assert.equal(core.encounter().monsters[0].charge.B, 1);
+  // C：先受點傷才看得到回血
+  send(core, P1, { t: 'encHit', hits: [{ id: 'BOSS1', dmg: 50 }] });
+  const c = send(core, GM, { t: 'encUse', rid: 'c', id: 'BOSS1', use: 'C' });
+  const ev = c.out.find((o) => o.msg.t === 'event').msg.event;
+  assert.match(ev.label, /BOSS1 喝血（30D16）/);
+  assert.equal(core.encounter().monsters[0].hp, 60); // 剩 30 血；測試的骰子每顆都擲 1，30D16 = 30，回到 60
+  assert.match(errorOf(send(core, GM, { t: 'encUse', id: 'BOSS1', use: 'C' })).message, /用完了/);
+});
+
+test('預組換上場：技能次數與蓄力清掉，菁英編號接得上', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'elite', spec: { ...SPEC, count: 1 } });
+  send(core, GM, { t: 'encUse', id: '菁英1', use: 'A' });
+  send(core, GM, { t: 'presetSave', rid: 's', name: '測試' });
+  send(core, GM, { t: 'presetLoad', rid: 'l', name: '測試' });
+  const m = core.encounter().monsters[0];
+  assert.equal(m.uses, undefined);
+  assert.equal(m.charge, undefined);
+  assert.equal(encOf(send(core, GM, { t: 'encAdd', kind: 'elite', spec: { ...SPEC, count: 1 } })).monsters.at(-1).id, '菁英2');
+});

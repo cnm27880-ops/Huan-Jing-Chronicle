@@ -8,6 +8,7 @@ import { itemTile, amountPicker, toast, rarityTag } from './controls.js';
 import { KNOWN_ITEMS, rarityOf, iconOf, plainName } from './items.js';
 import { FOODS, STOMACH_SLOTS } from '../game/rules.js';
 import { addItem, removeItem, countOf, eat, useKeepsake } from '../game/engine.js';
+import { logActivity } from '../state/activityLog.js';
 
 export function openItemSheet(state, name, commit) {
   let amount = 1;
@@ -20,6 +21,7 @@ export function openItemSheet(state, name, commit) {
       const err = eat(state, name, ctx);
       if (err) return toast(err);
       toast(`吃下${name}（${ctx === 'rest' ? '修整' : '跑團'}）`);
+      logActivity(state, { cat: 'item', text: `吃下 ${name}（${ctx === 'rest' ? '修整' : '跑團'}胃袋）`, lines: [] });
       commit();
       sheet.refresh();
     };
@@ -28,6 +30,7 @@ export function openItemSheet(state, name, commit) {
       if (!r.ok) return toast(r.error);
       const got = [...Object.entries(r.gives ?? {}).map(([k, q]) => `${k} ×${q}`), r.time ? `時間 +${r.time}` : ''].filter(Boolean).join('、');
       toast(`使用 ${name}：${got}`);
+      logActivity(state, { cat: 'item', text: `使用紀念品 ${name}`, lines: [got] });
       commit();
       countOf(state, name) ? sheet.refresh() : close();
     };
@@ -58,6 +61,7 @@ export function openItemSheet(state, name, commit) {
             const n = Math.min(amount, have);
             removeItem(state, name, n);
             toast(`取出 ${name} ×${fmt(n)}`);
+            logActivity(state, { cat: 'item', text: `手動取出 ${name} ×${fmt(n)}`, lines: [] });
             commit();
             countOf(state, name) ? sheet.refresh() : close();
           },
@@ -67,6 +71,7 @@ export function openItemSheet(state, name, commit) {
           onclick: () => {
             addItem(state, name, amount);
             toast(`放入 ${name} ×${fmt(amount)}`);
+            logActivity(state, { cat: 'item', text: `手動放入 ${name} ×${fmt(amount)}`, lines: [] });
             commit();
             sheet.refresh();
           },

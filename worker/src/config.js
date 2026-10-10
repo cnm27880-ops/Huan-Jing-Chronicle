@@ -27,3 +27,5 @@ export const MAX_IMAGE_B64_CHARS = 240_000; // 單張 base64 字數上限（約 
 
 // 敵人預組（GM 備團）：把場上抽好的整團敵人存起來，跑團時一鍵載入、模擬戰當固定敵人
 export const MAX_PRESETS = 30;
+export const ACTIVITY_PER_USER = 500; // 玩家日誌：每人最多留最近幾筆
+export const ACTIVITY_PAGE = 60; // 日誌一次回傳幾筆

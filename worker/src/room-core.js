@@ -10,6 +10,8 @@ import { d20 } from '../../src/game/engine.js';
 import { diceEvent, checkEvent } from '../../src/game/events.js';
 import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/rules.js';
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
+import { useEnemySkill, spendEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
+import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
 import { describeCharChange } from './audit.js';
@@ -19,7 +21,7 @@ import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
-  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS,
+  MAX_PENDING_MAIL, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -67,6 +69,8 @@ export class RoomCore {
     db.exec('CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, name TEXT NOT NULL, mime TEXT NOT NULL, data TEXT NOT NULL, t INTEGER NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS vitals (uid TEXT PRIMARY KEY, json TEXT NOT NULL, t INTEGER NOT NULL)');
     db.exec('CREATE TABLE IF NOT EXISTS presets (name TEXT PRIMARY KEY, json TEXT NOT NULL, t INTEGER NOT NULL)');
+    db.exec('CREATE TABLE IF NOT EXISTS activity (seq INTEGER PRIMARY KEY, uid TEXT NOT NULL, t INTEGER NOT NULL, json TEXT NOT NULL)');
+    db.exec('CREATE INDEX IF NOT EXISTS activity_uid ON activity(uid, seq)');
   }
 
   // ---------- 成員與權限 ----------
@@ -215,12 +219,14 @@ export class RoomCore {
       case 'skillSet': case 'skillDel': return this.onSkillEdit(user, msg, rid);
       case 'mailSend': return this.onMailSend(user, msg, rid);
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
-      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': return this.onEncounter(user, msg, rid, online);
+      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
       case 'encImg': return this.onEncImg(user, msg, rid);
       case 'imgPut': return this.onImgPut(user, msg, rid);
       case 'imgDel': return this.onImgDel(user, msg, rid);
       case 'presetList': case 'presetSave': case 'presetDel': case 'presetLoad': return this.onPreset(user, msg, rid);
       case 'vitals': return this.onVitals(user, msg);
+      case 'actPost': return this.onActPost(user, msg);
+      case 'actList': return this.onActList(user, msg, rid);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
     }
   }
@@ -369,6 +375,17 @@ export class RoomCore {
         lines: [`回復 ${def.heal.n}D${def.heal.sides} = ${heal} 生命`, `毒性算在 ${toName} 身上（+${def.toxicity}）`],
       }, user);
       out.push({ to: 'all', msg: { t: 'event', event: ev } });
+    } else if (msg.kind === 'support') { // 隊友施放補血／護盾：伺服器只驗證與記錄，百分比由對方領取時依自己的最大生命計算
+      const skill = cleanStr(msg.skill, 20);
+      if (!skill || (msg.support !== 'heal' && msg.support !== 'shield') || !isInt(msg.pct, 1, 100)) return err(rid, 'bad_mail', '技能資料錯誤。');
+      const res = msg.support === 'shield' && isInt(msg.res, 1, 100) ? msg.res : 0;
+      Object.assign(mail, { kind: 'support', skill, support: msg.support, pct: msg.pct, res });
+      const who = this.vitalName(to) ?? toName;
+      const ev = this.record({
+        who: user.name, kind: 'skill', label: `${user.name} 對 ${who} 施放 ${skill}`, big: `${msg.pct}%`, srv: true,
+        lines: [msg.support === 'heal' ? `回復對方最大生命 ${msg.pct}%` : `護盾 = 對方最大生命 ${msg.pct}%${res ? `，抗性免疫 +${res}` : ''}`, '對方領取時自動套用'],
+      }, user);
+      out.push({ to: 'all', msg: { t: 'event', event: ev } });
     } else return err(rid, 'bad_mail', '不認得這種寄送方式。');
 
     this.db.exec('INSERT INTO mail(id, to_uid, t, json) VALUES (?, ?, ?, ?)', mail.id, to, mail.t, JSON.stringify(mail));
@@ -394,8 +411,8 @@ export class RoomCore {
 
   saveEncounter(enc) { this.setMeta('encounter', JSON.stringify(enc)); }
 
-  encOk(enc, rid, user, note) {
-    const extra = [{ to: 'self', msg: { t: 'encOk', rid } }];
+  encOk(enc, rid, user, note, reply = {}) {
+    const extra = [{ to: 'self', msg: { t: 'encOk', rid, ...reply } }];
     const out = [{ to: 'all', msg: { t: 'enc', encounter: enc } }, ...extra];
     if (note) {
       const ev = this.record({ who: '系統', kind: 'note', label: note.label, lines: note.lines ?? [] }, user);
@@ -415,6 +432,7 @@ export class RoomCore {
         const m = enc.monsters.find((x) => x.id === hit.id);
         if (!m) continue; // 怪物剛好被 GM 移除：略過
         m.hp = Math.max(0, m.hp - hit.dmg);
+        if (hit.usedB === true) spendEnemyB(enc, m.id); // 這一下用掉了敵人的 B 技能（防禦強化）蓄力
         applied++;
       }
       if (!applied) return err(rid, 'bad_enc', '找不到這些怪物，可能已被移除。');
@@ -433,11 +451,35 @@ export class RoomCore {
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user);
     }
+    if (msg.t === 'encUse' && msg.use === 'atk') { // 玩家承受敵人一次攻擊：扣這回合的攻擊次數，有 A 蓄力就多加骰
+      if (typeof msg.id !== 'string') return err(rid, 'bad_enc', '缺少敵人編號。');
+      const r = spendEnemyAttack(enc, msg.id);
+      if (r.error) return err(rid, 'bad_enc', r.error);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, undefined, { extraAtk: r.extraAtk, left: r.left });
+    }
     if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以操作遭遇戰。');
+
+    if (msg.t === 'encUse') { // 敵人技能（GM）：A、B 蓄力；C 喝血由伺服器擲 ND16
+      if (typeof msg.id !== 'string') return err(rid, 'bad_enc', '缺少敵人編號。');
+      const r = useEnemySkill(enc, msg.id, msg.use, this.rng);
+      if (r.error) return err(rid, 'bad_enc', r.error);
+      this.saveEncounter(enc);
+      const name = SKILL_NAMES[r.skill];
+      const note = r.skill === 'C'
+        ? { label: `遭遇：${msg.id} 喝血（${r.dice}）`, lines: [`${r.dice} = ${r.rolled}，回復 ${r.healed} 生命`] }
+        : { label: `遭遇：${msg.id} 使用 ${r.skill} 技能（${name}）`, lines: [r.skill === 'A' ? `下一次攻擊，每一軌各 +${r.dice} 顆攻擊骰` : `下一次被打，絕對防禦 +${r.dice} 顆`] };
+      return this.encOk(enc, rid, user, note);
+    }
+    if (msg.t === 'encRound') { // 進下一回合（沒有用先攻順序時）：回合數 +1，敵人的技能次數與蓄力自動歸零
+      nextRound(enc);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：第 ${enc.round} 回合` });
+    }
 
     if (msg.t === 'encAdd') {
       const sp = msg.spec;
-      if (!sp || typeof sp !== 'object' || (msg.kind !== 'mob' && msg.kind !== 'boss')) return err(rid, 'bad_enc', '敵人資料格式錯誤。');
+      if (!sp || typeof sp !== 'object' || !['mob', 'elite', 'boss'].includes(msg.kind)) return err(rid, 'bad_enc', '敵人資料格式錯誤。');
       if (!isInt(sp.count, 1, 20) || !isInt(sp.atkPower, 0, 100_000) || !isInt(sp.defPower, 0, 100_000) || !isInt(sp.hp, 1, 10_000_000) || !isInt(sp.absDef ?? 0, 0, 100_000)) {
         return err(rid, 'bad_enc', '敵人的數量、強度或血量超出範圍。');
       }
@@ -451,7 +493,7 @@ export class RoomCore {
         spec[`${side}Type`] = type;
         if (focus != null) spec[`${side}Focus`] = focus;
       }
-      const added = (msg.kind === 'boss' ? addBosses : addMobs)(enc, spec, this.rng);
+      const added = msg.kind === 'boss' ? addBosses(enc, spec, this.rng) : addMobs(enc, { ...spec, ...(msg.kind === 'elite' ? { rank: 'elite' } : {}) }, this.rng);
       if (this.hasImage(msg.img)) added.forEach((m) => { m.img = msg.img; }); // 建立時就指定立繪（選填）
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user, { label: `遭遇：新增 ${added.map((m) => m.id).join('、')}` });
@@ -545,11 +587,13 @@ export class RoomCore {
     if (!row) return err(rid, 'bad_preset', `沒有「${name}」這個預組。`);
     const monsters = JSON.parse(row.json).map((m) => {
       const x = { ...m, hp: m.maxHp };
+      delete x.uses; delete x.charge; // 技能次數與蓄力不帶進新的戰鬥
       if (x.img && !this.hasImage(x.img)) delete x.img;
       return x;
     });
     const maxNo = (kind) => Math.max(0, ...monsters.filter((m) => m.kind === kind).map((m) => Number(String(m.id).replace(/\D/g, '')) || 0));
-    const enc = { monsters, next: { mob: maxNo('mob') + 1, boss: maxNo('boss') + 1 }, round: 0, order: [], turn: 0, locked: false };
+    const maxElite = Math.max(0, ...monsters.filter((m) => m.rank === 'elite').map((m) => Number(String(m.id).replace(/\D/g, '')) || 0));
+    const enc = { monsters, next: { mob: maxNo('mob') + 1, boss: maxNo('boss') + 1, elite: maxElite + 1 }, round: 0, order: [], turn: 0, locked: false };
     this.saveEncounter(enc);
     // 紀錄只寫登場的敵人，不寫預組名稱（名稱可能劇透）
     const ok = this.encOk(enc, rid, user, { label: `遭遇：敵人登場 ${monsters.map((m) => m.id).join('、')}` });
@@ -616,6 +660,58 @@ export class RoomCore {
     const out = {};
     for (const r of this.db.exec('SELECT uid, json FROM vitals')) { try { out[r.uid] = JSON.parse(r.json); } catch { /* 壞掉的略過 */ } }
     return out;
+  }
+
+  // ---------- 玩家日誌（修整、學習、物品）：前端回報、全員可查；每人只留最近 ACTIVITY_PER_USER 筆 ----------
+  onActPost(user, msg) {
+    const clean = cleanActivity(msg);
+    if (!clean) return err(undefined, 'bad_activity', '日誌格式錯誤。');
+    const entry = { id: this.uuid(), t: this.now(), uid: user.uid, name: user.name, who: cleanStr(msg.who, 40) || user.name, ...clean };
+    const [{ seq }] = this.db.exec('INSERT INTO activity(uid, t, json) VALUES (?, ?, ?) RETURNING seq', user.uid, entry.t, JSON.stringify(entry));
+    const old = this.db.exec('SELECT seq FROM activity WHERE uid = ? ORDER BY seq DESC LIMIT 1 OFFSET ?', user.uid, ACTIVITY_PER_USER);
+    if (old.length) this.db.exec('DELETE FROM activity WHERE uid = ? AND seq <= ?', user.uid, old[0].seq);
+    return { out: [{ to: 'all', msg: { t: 'act', entry: { ...entry, seq } } }], close: null };
+  }
+
+  /** 查日誌：msg.uid（只看某位）、msg.cat（只看某類）、msg.before（seq，往前翻頁）；最新的在前，一次最多 ACTIVITY_PAGE 筆 */
+  onActList(user, msg, rid) {
+    if (msg.uid != null && !UID.test(String(msg.uid))) return err(rid, 'bad_activity', '玩家編號錯誤。');
+    if (msg.before != null && !isInt(msg.before, 1, 1e12)) return err(rid, 'bad_activity', '頁碼錯誤。');
+    const cat = msg.cat == null ? null : String(msg.cat);
+    if (cat && !cleanActivity({ cat, text: 'x' })) return err(rid, 'bad_activity', '類別錯誤。');
+    const CHUNK = ACTIVITY_PAGE * 2;
+    const fetchRows = (before) => {
+      const conds = [];
+      const args = [];
+      if (msg.uid != null) { conds.push('uid = ?'); args.push(String(msg.uid)); }
+      if (before != null) { conds.push('seq < ?'); args.push(before); }
+      return this.db.exec(`SELECT seq, json FROM activity ${conds.length ? `WHERE ${conds.join(' AND ')}` : ''} ORDER BY seq DESC LIMIT ${CHUNK}`, ...args);
+    };
+    // 類別存在 JSON 裡，所以一批一批抓再濾；濾完不夠一頁就續抓（最多 8 批，免得掃整張表）
+    const entries = [];
+    let before = msg.before ?? null;
+    let more = false;
+    for (let round = 0; round < 8 && !more; round++) {
+      const rows = fetchRows(before);
+      for (const r of rows) {
+        let e = null;
+        try { e = JSON.parse(r.json); } catch { /* 壞掉的略過 */ }
+        if (e && (!cat || e.cat === cat)) {
+          if (entries.length >= ACTIVITY_PAGE) { more = true; break; }
+          entries.push({ ...e, seq: r.seq });
+        }
+        before = r.seq;
+      }
+      if (rows.length < CHUNK) break;
+      if (round === 7) more = true; // 抓滿 8 批還沒結束：讓前端用最後一筆的位置再按「載入更多」
+    }
+    return { out: [{ to: 'self', msg: { t: 'acts', rid, entries, more, next: before } }], close: null };
+  }
+
+  /** 隊友回報過的角色名稱（沒有就 null） */
+  vitalName(uid) {
+    const rows = this.db.exec('SELECT json FROM vitals WHERE uid = ?', uid);
+    try { return rows.length ? JSON.parse(rows[0].json).name || null : null; } catch { return null; }
   }
 
   onVitals(user, msg) {

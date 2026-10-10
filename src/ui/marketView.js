@@ -17,6 +17,7 @@ import {
   exchangeVouchers, setBlackSession, specialTrade, gearPriceName,
 } from '../game/market.js';
 import { publish, rollWith } from '../state/rollLog.js';
+import { logActivity } from '../state/activityLog.js';
 
 const diceText = (d) => `${d.n}D${d.sides}+${d.add}`;
 const BUY_MIN = (BLACK_BUY_DICE.n + BLACK_BUY_DICE.add + 10) / 10; // ×1.3
@@ -40,6 +41,7 @@ async function doBlackBuy(state, item, qty, commit) {
     ].filter(Boolean),
   }, { draw });
   toast(r.labor ? `金幣不夠，勞動抵債 ${r.labor} 時間` : `花了 ${fmt(r.total)} 金幣`);
+  logActivity(state, { cat: 'item', text: `黑市購買 ${item} ×${fmt(qty)}，${fmt(r.total)} 金幣`, lines: [`溢價 ×${r.rate}`, r.labor ? `付不起，勞動抵債 ${r.labor} 時間` : ''].filter(Boolean) });
   commit();
 }
 
@@ -53,6 +55,7 @@ async function doBlackSell(state, item, qty, commit, gearIds = null) {
     lines: [`${diceText(BLACK_SELL_DICE)} → ${r.roll}（壓價 ×${r.rate}）`, `${fmt(r.unit)} × ${fmt(qty)} × ${r.rate} = ${fmt(r.total)} 代金券`],
   }, { draw });
   toast(`得到 ${fmt(r.total)} 代金券`);
+  logActivity(state, { cat: 'item', text: `黑市販賣 ${item} ×${fmt(qty)}，${fmt(r.total)} 代金券`, lines: [`壓價 ×${r.rate}`] });
   commit();
 }
 
@@ -60,6 +63,7 @@ function doHall(state, side, item, qty, commit, gearIds = null) {
   const r = hallTrade(state, side, item, qty, gearIds);
   if (r.error) return toast(r.error);
   toast(`${side === 'buy' ? '花了' : '得到'} ${fmt(r.total)} 金幣${r.black ? `（其中 ${r.black} 個黑心價）` : ''}`);
+  logActivity(state, { cat: 'item', text: `交易大廳${side === 'buy' ? '購買' : '賣出'} ${item} ×${fmt(qty)}，${fmt(r.total)} 金幣`, lines: r.black ? [`其中 ${r.black} 個黑心價`] : [] });
   commit();
 }
 
@@ -68,6 +72,7 @@ function doSpecial(state, side, item, qty, commit, gearIds = null) {
   if (r.error) return toast(r.error);
   publish({ who: state.name, kind: 'note', label: `特殊黑市${side === 'buy' ? '購買' : '販賣'} ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 代金券`, lines: [`本次黑市團還能交易 ${specialLeft(state)} 個`] });
   toast(`${side === 'buy' ? '花了' : '得到'} ${fmt(r.total)} 代金券`);
+  logActivity(state, { cat: 'item', text: `特殊黑市${side === 'buy' ? '購買' : '販賣'} ${item} ×${fmt(qty)}，${fmt(r.total)} 代金券`, lines: [] });
   commit();
 }
 
@@ -182,7 +187,7 @@ export function createMarketView({ root, getState, commit }) {
         h('ul', { class: 'trade-list' }, row(state, {
           key: 'ex', item: VOUCHER, have: vouchers, max: canEx, price: '1 張 = 1 金幣',
           button: (q) => `換 ${fmt(q)}`, disabled: canEx < 1,
-          onGo: (q) => { const r = exchangeVouchers(state, q); if (r.error) return toast(r.error); toast(`換到 ${fmt(q)} 金幣`); commit(); },
+          onGo: (q) => { const r = exchangeVouchers(state, q); if (r.error) return toast(r.error); toast(`換到 ${fmt(q)} 金幣`); logActivity(state, { cat: 'item', text: `代金券換金幣：${fmt(q)} 張`, lines: [] }); commit(); },
         }))),
     ];
   }

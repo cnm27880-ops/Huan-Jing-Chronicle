@@ -9,10 +9,14 @@ import { iconOf } from './items.js';
 import { getRoomStatus, sendMail } from '../state/rollLog.js';
 import { giftable, takeItems, refundItems } from '../game/mail.js';
 import { countOf } from '../game/engine.js';
+import { logActivity } from '../state/activityLog.js';
 
+/** 房間裡的隊友。name 是「角色名」（隊友回報的狀態裡有；還沒回報過才用 Discord 名稱），playerName 是 Discord 名稱 */
 export const teammates = () => {
   const r = getRoomStatus();
-  return r.phase === 'online' ? r.members.filter((m) => m.uid !== r.me?.uid) : [];
+  if (r.phase !== 'online') return [];
+  return r.members.filter((m) => m.uid !== r.me?.uid)
+    .map((m) => ({ ...m, playerName: m.name, name: r.vitals?.[m.uid]?.name || m.name }));
 };
 
 export function openGiftSheet(getState, commit) {
@@ -31,6 +35,7 @@ export function openGiftSheet(getState, commit) {
       await sendMail({ to: ui.to, kind: 'gift', items });
       const who = teammates().find((m) => m.uid === ui.to)?.name ?? '對方';
       toast(`已送給 ${who}（對方不在線也會在上線時收到）。`);
+      logActivity(state, { cat: 'item', text: `送給 ${who}：${Object.keys(items).length} 種東西`, lines: Object.entries(items).map(([n, q]) => `${n} ×${q}`) });
       closeSheet();
     } catch (e) {
       refundItems(state, items); // 寄失敗：還回背包

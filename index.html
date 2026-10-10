@@ -43,12 +43,14 @@
         <a class="tab" href="#gear" data-view-link="gear">裝備</a>
         <a class="tab" href="#session" data-view-link="session">跑團</a>
         <a class="tab" href="#market" data-view-link="market">交易</a>
+        <a class="tab" href="#logs" data-view-link="logs">日誌</a>
         <!-- 手機底部導覽列的「更多」：裝備、交易收在這裡（電腦版不顯示） -->
         <button id="more-toggle" class="tab tab--more" type="button" aria-expanded="false" aria-controls="more-menu">更多</button>
       </nav>
       <div id="more-menu" class="more-menu" hidden>
         <a class="more-menu__item" href="#gear" data-view-link="gear">裝備</a>
         <a class="more-menu__item" href="#market" data-view-link="market">交易</a>
+        <a class="more-menu__item" href="#logs" data-view-link="logs">日誌</a>
       </div>
     </header>
 
@@ -76,6 +78,7 @@
     <main class="view view--page" id="view-gear" data-view="gear" hidden></main>
     <main class="view view--page" id="view-session" data-view="session" hidden></main>
     <main class="view view--page" id="view-market" data-view="market" hidden></main>
+    <main class="view view--page" id="view-logs" data-view="logs" hidden></main>
     <main class="view view--page" id="view-wait" hidden></main>
 
     <script type="module" src="/src/main.js"></script>

@@ -5,6 +5,7 @@
 import { addItem, removeItem, countOf } from './engine.js';
 import { POTIONS, TOXICITY_MAX } from './rules.js';
 import { healPlayer, isDowned } from './combat.js';
+import { maxHp } from './stats.js';
 
 /** 可以送的東西：背包裡有的；紀念品是玩家自己的特色（有專屬說明），不送 */
 export const giftable = (state, name) => countOf(state, name) > 0 && !state.keepsakes?.[name];
@@ -53,6 +54,21 @@ export function applyMail(state, mail) {
         `毒性 ${state.toxicity} / ${TOXICITY_MAX}`,
       ],
     };
+  }
+  if (mail.kind === 'support') { // 隊友對你施放補血／護盾技能：照「你自己的最大生命」算百分比
+    const pct = Number(mail.pct);
+    if (!['heal', 'shield'].includes(mail.support) || !Number.isFinite(pct) || pct <= 0 || pct > 100) return { title: `${from} 的技能無法使用`, lines: [] };
+    const amount = Math.floor((maxHp(state) * pct) / 100);
+    const skill = String(mail.skill ?? '技能');
+    if (mail.support === 'heal') {
+      const wasDowned = isDowned(state);
+      const before = state.hp;
+      healPlayer(state, amount);
+      return { title: `${from} 對你施放了 ${skill}`, lines: [`回復 ${state.hp - before} 生命（最大生命 ${pct}%）${wasDowned && !isDowned(state) ? '，你站起來了！' : ''}`] };
+    }
+    const res = Number.isInteger(mail.res) && mail.res > 0 ? mail.res : 0;
+    state.shield = { hp: amount, res }; // 不可疊加：取代舊護盾
+    return { title: `${from} 對你施放了 ${skill}`, lines: [`獲得護盾 ${amount}（最大生命 ${pct}%）${res ? `，抗性免疫 +${res}（護盾破了才消失）` : ''}`] };
   }
   return { title: `${from} 寄來不明的東西`, lines: [] };
 }
