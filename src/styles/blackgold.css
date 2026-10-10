@@ -1479,6 +1479,7 @@ input[type='number'], .amount__input { text-align: center; }
 .sx-room[open] .sx-room__sum { margin-bottom: 8px; color: var(--gold); }
 .sx-room__body .room { margin: 0; }
 .sx-feedhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex-shrink: 0; }
+.sx-feedhead[hidden] { display: none; }
 .sx-feedhead .tabs-seg { display: flex; flex-wrap: wrap; flex: 1; min-width: 0; margin: 0; padding: 3px; }
 .sx-feedhead .seg { flex: 1 1 auto; padding: 0 8px; min-height: 32px; font-size: 0.78rem; white-space: nowrap; }
 .sx-feedhead .hint { margin: 0 0 0 auto; font-size: 0.72rem; }

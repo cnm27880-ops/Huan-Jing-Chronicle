@@ -17,6 +17,7 @@ import { derivedStats } from '../game/stats.js';
 import { RULE_SKILLS } from '../game/skills.js';
 import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL } from '../game/skillTable.js';
 import { publish, rollWith } from '../state/rollLog.js';
+import { logActivity } from '../state/activityLog.js';
 import { openReveal } from './reveal.js';
 import { openGearSellSheet } from './marketView.js';
 import { openSheet } from './sheet.js';
@@ -190,6 +191,10 @@ export function createGearView({ root, getState, commit }) {
         made.length > 5 ? `…共 ${made.length} 件，其中 ${upgrades} 件比身上好` : null,
       ].filter(Boolean),
     }, { draw });
+    logActivity(state, {
+      cat: 'item', text: `鑑定 ${name} ×${made.length}，最高 ${effectText(best)}`,
+      lines: made.slice(0, 8).map((g) => `${gearName(g)}：${effectText(g)}`),
+    });
     commit();
     // 開獎動畫（只是畫面；數值上面已經擲好存好）
     // 超過 12 件時只翻數值最高的 12 件（保持鑑定順序，最好的一定在裡面）
@@ -263,6 +268,10 @@ export function createGearView({ root, getState, commit }) {
         made.length > 5 ? `…共 ${made.length} 顆` : null,
       ].filter(Boolean),
     }, { draw });
+    logActivity(state, {
+      cat: 'item', text: `鑑定 ${name} ×${made.length}，最高 ${best.stat}+${best.value}`,
+      lines: made.slice(0, 8).map((g) => `${gemName(g)}：${g.stat}+${g.value}`),
+    });
     commit();
     const top = new Set([...made].sort((a, b) => b.value - a.value).slice(0, 12).map((g) => g.id));
     const picked = made.filter((g) => top.has(g.id));
@@ -308,7 +317,7 @@ export function createGearView({ root, getState, commit }) {
                     const err = socketGem(state, gem.id, target.id);
                     if (err) return toast(err);
                     delete ui.gemTarget[gem.id];
-                    publish({ who: state.name, kind: 'note', label: `鑲嵌 ${gemName(gem)}`, lines: [`${gem.stat} +${gem.value} → ${gearName(target)}`] });
+                    logActivity(state, { cat: 'item', text: `鑲嵌 ${gemName(gem)}`, lines: [`${gem.stat} +${gem.value} → ${gearName(target)}`] });
                     toast(`已鑲進${gearName(target)}`);
                     commit();
                   },

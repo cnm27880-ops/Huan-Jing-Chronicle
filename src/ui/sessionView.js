@@ -24,27 +24,13 @@ import { battleSel as sel } from './battleSelect.js';
 
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
 const LEFT_TABS = [['moves', '⚔️ 招式'], ['items', '🧪 藥水與狀態'], ['skills', '🎲 技能檢定']];
-// 紀錄篩選：[id, 按鈕文字, 滑過時的說明]
-const LOG_FILTERS = [
-  ['all', '全部', '所有紀錄（房間共用，保存最近 200 筆）'],
-  ['roll', '🎲 擲骰', '技能檢定、自訂骰，以及鑑定、黑市等其他結果'],
-  ['battle', '⚔️ 戰鬥', '出招、承受攻擊、喝藥水、遭遇戰（新增敵人、先攻）'],
-];
-const LOG_FILTER_FN = {
-  all: null,
-  roll: (e) => e.kind !== 'audit' && !isBattleEvent(e),
-  battle: isBattleEvent,
-};
-const LOG_EMPTY = {
-  all: '按下任何一顆骰子，結果會出現在這裡。',
-  roll: '還沒有檢定或擲骰。左邊「技能檢定」或下面的骰子都可以擲。',
-  battle: '出招、承受攻擊或喝藥水後，戰鬥紀錄會出現在這裡。',
-};
+// 跑團紀錄只放「檢定、自訂骰、戰鬥」；鑑定、黑市、鑲嵌、GM 異動等都在「日誌」頁
+const sessionEvent = (e) => e.kind === 'check' || e.kind === 'dice' || isBattleEvent(e);
+const LOG_EMPTY = '按下任何一顆骰子，或出招、承受攻擊，結果會出現在這裡。';
 
 export function createSessionView({ root, getState, commit }) {
   const ui = {
     leftTab: 'moves',
-    logFilter: 'all',
     sheet: '', // 手機／平板目前打開的抽屜：'' | 'left' | 'center'
     hudOpen: false, // 手機膠囊 HUD 是否展開
     sides: 20, count: 1, mod: 0, text: '',
@@ -212,18 +198,16 @@ export function createSessionView({ root, getState, commit }) {
   // ---------- 右欄：紀錄與快速擲骰 ----------
   function mountLog() {
     feed?.destroy();
-    feed = mountFeed(feedBox, { limit: 60, oldestFirst: true, filter: LOG_FILTER_FN[ui.logFilter], empty: LOG_EMPTY[ui.logFilter] });
+    feed = mountFeed(feedBox, { limit: 60, oldestFirst: true, filter: sessionEvent, empty: LOG_EMPTY });
   }
 
+  /** 只剩本機模式的「清空」按鈕；房間模式沒有東西，整列收起來把位置留給紀錄 */
   function renderFeedHead() {
-    feedHead.replaceChildren(...[ // replaceChildren 會把 null 變成文字「null」，要先濾掉
-      h('div', { class: 'tabs-seg', role: 'tablist', 'aria-label': '紀錄類型' }, LOG_FILTERS.map(([id, label, tip]) => h('button', {
-        type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.logFilter === id), title: tip,
-        onclick: () => { ui.logFilter = id; renderFeedHead(); mountLog(); },
-      }, label))),
-      getRoomStatus().phase === 'online'
-        ? null
-        : h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')].filter(Boolean));
+    const local = getRoomStatus().phase !== 'online';
+    feedHead.hidden = !local;
+    feedHead.replaceChildren(...(local
+      ? [h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { if (confirm('清空這台裝置上的擲骰紀錄？')) clearLog(); } }, '清空')]
+      : []));
   }
 
   function expression() {

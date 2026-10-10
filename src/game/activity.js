@@ -1,8 +1,9 @@
 // ============================================================
 // 玩家日誌（修整、學習、物品）的內容格式與整理（純函式；前後端共用）。
-// 一筆日誌：{ cat: 'rest' | 'learn' | 'item', text, lines[] }。伺服器另外加上 id、時間、玩家與角色名稱。
+// 一筆日誌：{ cat: 'rest' | 'learn' | 'item' | 'sys', text, lines[] }。伺服器另外加上 id、時間、玩家與角色名稱。
+// sys ＝ 系統：GM 改玩家角色、新增專屬技能／特殊配方等（伺服器自己寫入）。
 // ============================================================
-export const ACTIVITY_CATS = { rest: '修整', learn: '學習', item: '物品' };
+export const ACTIVITY_CATS = { rest: '修整', learn: '學習', item: '物品', sys: '系統' };
 export const ACT_TEXT_MAX = 120;
 export const ACT_LINE_MAX = 80;
 export const ACT_LINES_MAX = 10;

@@ -70,9 +70,8 @@ function doHall(state, side, item, qty, commit, gearIds = null) {
 function doSpecial(state, side, item, qty, commit, gearIds = null) {
   const r = specialTrade(state, side, item, qty, gearIds);
   if (r.error) return toast(r.error);
-  publish({ who: state.name, kind: 'note', label: `特殊黑市${side === 'buy' ? '購買' : '販賣'} ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 代金券`, lines: [`本次黑市團還能交易 ${specialLeft(state)} 個`] });
   toast(`${side === 'buy' ? '花了' : '得到'} ${fmt(r.total)} 代金券`);
-  logActivity(state, { cat: 'item', text: `特殊黑市${side === 'buy' ? '購買' : '販賣'} ${item} ×${fmt(qty)}，${fmt(r.total)} 代金券`, lines: [] });
+  logActivity(state, { cat: 'item', text: `特殊黑市${side === 'buy' ? '購買' : '販賣'} ${item} ×${fmt(qty)}，${fmt(r.total)} 代金券`, lines: [`本次黑市團還能交易 ${specialLeft(state)} 個`] });
   commit();
 }
 

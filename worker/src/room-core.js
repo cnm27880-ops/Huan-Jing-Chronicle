@@ -730,11 +730,22 @@ export class RoomCore {
   onActPost(user, msg) {
     const clean = cleanActivity(msg);
     if (!clean) return err(undefined, 'bad_activity', '日誌格式錯誤。');
-    const entry = { id: this.uuid(), t: this.now(), uid: user.uid, name: user.name, who: cleanStr(msg.who, 40) || user.name, ...clean };
+    return { out: [this.addActivity(user, clean, cleanStr(msg.who, 40))], close: null };
+  }
+
+  /** 寫一筆日誌（clean 是 cleanActivity 整理過的），回傳要廣播給所有人的 out 項目 */
+  addActivity(user, clean, who) {
+    const entry = { id: this.uuid(), t: this.now(), uid: user.uid, name: user.name, who: who || user.name, ...clean };
     const [{ seq }] = this.db.exec('INSERT INTO activity(uid, t, json) VALUES (?, ?, ?) RETURNING seq', user.uid, entry.t, JSON.stringify(entry));
     const old = this.db.exec('SELECT seq FROM activity WHERE uid = ? ORDER BY seq DESC LIMIT 1 OFFSET ?', user.uid, ACTIVITY_PER_USER);
     if (old.length) this.db.exec('DELETE FROM activity WHERE uid = ? AND seq <= ?', user.uid, old[0].seq);
-    return { out: [{ to: 'all', msg: { t: 'act', entry: { ...entry, seq } } }], close: null };
+    return { to: 'all', msg: { t: 'act', entry: { ...entry, seq } } };
+  }
+
+  /** 系統異動（GM 改角色、專屬技能、特殊配方）：同步寫進日誌頁，跑團頁的紀錄不顯示 */
+  sysActivity(user, label, lines) {
+    const clean = cleanActivity({ cat: 'sys', text: label, lines });
+    return clean ? [this.addActivity(user, clean, '系統')] : [];
   }
 
   /** 查日誌：msg.uid（只看某位）、msg.cat（只看某類）、msg.before（seq，往前翻頁）；最新的在前，一次最多 ACTIVITY_PAGE 筆 */
@@ -830,7 +841,7 @@ export class RoomCore {
     }
     this.setMeta('special', JSON.stringify(sp));
     const ev = this.record({ who: '系統', kind: 'audit', label, lines: lines.filter(Boolean) }, user);
-    return { out: [{ to: 'self', msg: { t: 'specialOk', rid } }, ...this.broadcastEvent(ev).out, { to: 'all', msg: { t: 'special', special: sp } }], close: null };
+    return { out: [{ to: 'self', msg: { t: 'specialOk', rid } }, ...this.broadcastEvent(ev).out, ...this.sysActivity(user, label, lines.filter(Boolean)), { to: 'all', msg: { t: 'special', special: sp } }], close: null };
   }
 
   // ---------- 專屬技能（GM 新增的；內建的技能目錄在 src/data/skills.js，不能改） ----------
@@ -861,7 +872,7 @@ export class RoomCore {
     }
     this.setMeta('custom_skills', JSON.stringify(all));
     const ev = this.record({ who: '系統', kind: 'audit', label, lines }, user);
-    return { out: [{ to: 'self', msg: { t: 'skillOk', rid } }, ...this.broadcastEvent(ev).out, { to: 'all', msg: { t: 'skills', skills: all } }], close: null };
+    return { out: [{ to: 'self', msg: { t: 'skillOk', rid } }, ...this.broadcastEvent(ev).out, ...this.sysActivity(user, label, lines), { to: 'all', msg: { t: 'skills', skills: all } }], close: null };
   }
 
   // ---------- 角色存檔（階段 2） ----------
@@ -922,8 +933,9 @@ export class RoomCore {
     // 異動紀錄：誰、何時、改了什麼（GM 替玩家改角色），所有人都看得到，和擲骰紀錄放在同一條時間軸
     const member = this.db.exec('SELECT name FROM members WHERE uid = ?', uid)[0]?.name ?? uid;
     const { lines } = describeCharChange(before ? JSON.parse(before.json) : null, msg.data);
-    const ev = this.record({ who: '系統', kind: 'audit', target: uid, label: `${user.name} 修改了「${cleanStr(msg.data.name, 80)}」（${member}）的角色`, lines }, user);
-    return { out: [...saved, ...this.broadcastEvent(ev).out], close: null };
+    const label = `${user.name} 修改了「${cleanStr(msg.data.name, 80)}」（${member}）的角色`;
+    const ev = this.record({ who: '系統', kind: 'audit', target: uid, label, lines }, user);
+    return { out: [...saved, ...this.broadcastEvent(ev).out, ...this.sysActivity(user, label, lines)], close: null };
   }
 
   /** GM：所有已存檔玩家的清單（不含角色內容），模擬戰挑人用 */
