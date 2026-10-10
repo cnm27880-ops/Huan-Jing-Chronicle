@@ -7,14 +7,14 @@ import { openSheet } from './sheet.js';
 import { toast } from './controls.js';
 import { listCharacters, fetchCharacter } from '../state/charSync.js';
 import { normalizeCharacter } from '../state/store.js';
-import { simulateBattle, summarize, DEFAULT_MAX_ROUNDS } from '../game/simulate.js';
-import { assess, autoTune, penalty, scaleEncounter, PLANS, TARGET } from '../game/tuning.js';
+import { simulateBattle, summarize, seededRng, DEFAULT_MAX_ROUNDS } from '../game/simulate.js';
+import { assess, autoTune, penalty, scaleEncounter, shrinkEncounter, PLANS, TARGET } from '../game/tuning.js';
 import { getEncounter, presetAction } from '../state/rollLog.js';
 import { formatAbc } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 
 const RUNS = 200; // 每次模擬的場數（固定）
-const TUNE_RUNS = 40; // 自動調整時，每組候選數值只跑這麼多場（要試很多組，跑 200 場太慢）
+const TUNE_RUNS = 40; // 自動調整時，每組候選數值只跑這麼多場（要試很多組，跑 200 場太慢）；每次都用同一批種子，結果才不會被運氣干擾
 const BATCH = 25; // 每算幾場讓畫面喘口氣，進度才會動
 const pct = (v) => `${(v * 100).toFixed(v > 0 && v < 0.1 ? 1 : 0)}%`;
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
@@ -115,14 +115,14 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     try {
       const { players, names } = await loadPlayers();
       const evaluate = fixed
-        ? (enc) => summarize(Array.from({ length: TUNE_RUNS }, () => simulateBattle(players, [], { encounter: enc })), names)
-        : (specs) => summarize(Array.from({ length: TUNE_RUNS }, () => simulateBattle(players, specs.map((s) => ({ ...s })))), names);
+        ? (enc) => summarize(Array.from({ length: TUNE_RUNS }, (_, i) => simulateBattle(players, [], { encounter: enc, rng: seededRng(i + 1) })), names)
+        : (specs) => summarize(Array.from({ length: TUNE_RUNS }, (_, i) => simulateBattle(players, specs.map((s) => ({ ...s })), { rng: seededRng(i + 1) })), names);
       const plans = [PLANS.conservative, PLANS.aggressive];
       const out = [];
       for (const [i, plan] of plans.entries()) {
         const r = await autoTune({
-          specs: ui.specs, evaluate, target: plan,
-          build: fixed ? (kh, ka) => scaleEncounter(fixed, kh, ka) : null,
+          specs: fixed ?? ui.specs, evaluate, target: plan,
+          ...(fixed ? { scale: scaleEncounter, shrink: shrinkEncounter } : {}),
           onProgress: (p) => { ui.tuneProgress = (i + p) / plans.length; sheet.refresh(); },
         });
         out.push({ plan, ...r });
@@ -139,7 +139,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     const t = ui.tuneResults?.find((x) => x.plan.key === plan.key);
     if (!t) return;
     if (ui.tuneFrom) ui.override = t.specs; // 固定敵人：之後的模擬都用調整後的版本
-    else ui.specs = t.specs.map((s) => ({ ...s }));
+    else ui.specs = t.specs.filter((s) => s.count > 0).map((s) => ({ ...s }));
     ui.tuneResults = null;
     run(); // 套用後馬上用 200 場確認
   }
@@ -235,18 +235,20 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         return h('section', { class: 'simtune__plan' },
           h('h4', { class: 'field-label', text: `${t.plan.key === 'aggressive' ? '🔥' : '🛡️'} ${t.plan.label}：${t.plan.note}` }),
           ui.tuneFrom
-            ? h('ul', { class: 'import-list' }, t.specs.monsters.map((m, i) => {
-                const o = ui.tuneFrom.monsters[i];
+            ? h('ul', { class: 'import-list' }, ui.tuneFrom.monsters.map((o) => {
+                const m = t.specs.monsters.find((x) => x.id === o.id);
                 const atk = (x) => (Array.isArray(x.atk) ? x.atk.map(formatAbc).join('／') : formatAbc(x.atk));
+                const icon = o.kind === 'boss' ? '👹' : o.rank === 'elite' ? '👺' : '👾';
                 return h('li', { class: 'import-row' },
-                  h('span', { text: `${m.kind === 'boss' ? '👹' : m.rank === 'elite' ? '👺' : '👾'} ${m.id}　血量 ${fmt(o.maxHp)} → ${fmt(m.maxHp)}　攻擊 ${atk(o)} → ${atk(m)}` }));
+                  h('span', { text: m ? `${icon} ${o.id}　血量 ${fmt(o.maxHp)} → ${fmt(m.maxHp)}　攻擊 ${atk(o)} → ${atk(m)}` : `${icon} ${o.id}　拿掉（怪物太多）` }));
               }))
             : h('ul', { class: 'import-list' }, t.specs.map((s, i) => {
                 const o = ui.specs[i];
                 return h('li', { class: 'import-row' },
-                  h('span', { text: `${{ boss: '👹 BOSS', elite: '👺 菁英' }[s.kind] ?? '👾 小怪'} ×${s.count}　血量 ${fmt(o.hp)} → ${fmt(s.hp)}　攻擊強度 ${fmt(o.atkPower)} → ${fmt(s.atkPower)}` }));
+                  h('span', { text: `${{ boss: '👹 BOSS', elite: '👺 菁英' }[s.kind] ?? '👾 小怪'} ×${o.count === s.count ? s.count : `${o.count} → ${s.count}`}　血量 ${fmt(o.hp)} → ${fmt(s.hp)}　攻擊強度 ${fmt(o.atkPower)} → ${fmt(s.atkPower)}` }));
               })),
-          h('p', { class: 'hint', text: `預估：${t.summary.avgRounds.toFixed(1)} 回合、資源消耗 ${pct(t.summary.avgDrain)}、勝率 ${pct(t.summary.win)}（${exact ? '符合這個方案' : '找不到完全符合的，這是最接近的'}${a.ok ? '' : '；還有項目沒達標'}）` }),
+          t.notes?.length ? h('ul', { class: 'simassess__advice' }, t.notes.map((n) => h('li', { text: n }))) : null,
+          h('p', { class: 'hint', text: `預估：${(t.summary.avgRoundsWin ?? t.summary.avgRounds).toFixed(1)} 回合、資源消耗 ${pct(t.summary.avgDrain)}、勝率 ${pct(t.summary.win)}（${exact ? '符合這個方案' : '找不到完全符合的，這是最接近的'}${a.ok ? '' : '；還有項目沒達標'}）` }),
           h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => applyTune(t.plan) }, `套用${t.plan.label}${ui.tuneFrom ? '（只用在模擬）' : ''}，並用 ${RUNS} 場重新模擬`));
       }));
   }
@@ -260,7 +262,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       h('h3', { class: 'section-title', text: `結果（${fmt(r.runs)} 場）` }),
       h('div', { class: 'stat-grid' },
         stat('勝率', pct(r.win), `敗 ${pct(r.lose)}・平手 ${pct(r.timeout)}`),
-        stat('平均回合', r.avgRounds.toFixed(1), `上限 ${DEFAULT_MAX_ROUNDS} 回合`),
+        stat('平均回合', r.avgRoundsWin.toFixed(1), `打贏的場次；全部 ${r.avgRounds.toFixed(1)}・上限 ${DEFAULT_MAX_ROUNDS}`),
         stat('每回合傷害', fmt(Math.round(r.avgDamagePerRound)), '全隊對怪物'),
         stat('剩餘生命', pct(r.avgHpLeft), '每場結束時全隊平均'),
         stat('資源消耗', pct(r.avgDrain), `目標約 ${pct(TARGET.drain)}（每人的資源與毒性）`),
