@@ -369,6 +369,17 @@ export class RoomCore {
         lines: [`回復 ${def.heal.n}D${def.heal.sides} = ${heal} 生命`, `毒性算在 ${toName} 身上（+${def.toxicity}）`],
       }, user);
       out.push({ to: 'all', msg: { t: 'event', event: ev } });
+    } else if (msg.kind === 'support') { // 隊友施放補血／護盾：伺服器只驗證與記錄，百分比由對方領取時依自己的最大生命計算
+      const skill = cleanStr(msg.skill, 20);
+      if (!skill || (msg.support !== 'heal' && msg.support !== 'shield') || !isInt(msg.pct, 1, 100)) return err(rid, 'bad_mail', '技能資料錯誤。');
+      const res = msg.support === 'shield' && isInt(msg.res, 1, 100) ? msg.res : 0;
+      Object.assign(mail, { kind: 'support', skill, support: msg.support, pct: msg.pct, res });
+      const who = this.vitalName(to) ?? toName;
+      const ev = this.record({
+        who: user.name, kind: 'skill', label: `${user.name} 對 ${who} 施放 ${skill}`, big: `${msg.pct}%`, srv: true,
+        lines: [msg.support === 'heal' ? `回復對方最大生命 ${msg.pct}%` : `護盾 = 對方最大生命 ${msg.pct}%${res ? `，抗性免疫 +${res}` : ''}`, '對方領取時自動套用'],
+      }, user);
+      out.push({ to: 'all', msg: { t: 'event', event: ev } });
     } else return err(rid, 'bad_mail', '不認得這種寄送方式。');
 
     this.db.exec('INSERT INTO mail(id, to_uid, t, json) VALUES (?, ?, ?, ?)', mail.id, to, mail.t, JSON.stringify(mail));
@@ -616,6 +627,12 @@ export class RoomCore {
     const out = {};
     for (const r of this.db.exec('SELECT uid, json FROM vitals')) { try { out[r.uid] = JSON.parse(r.json); } catch { /* 壞掉的略過 */ } }
     return out;
+  }
+
+  /** 隊友回報過的角色名稱（沒有就 null） */
+  vitalName(uid) {
+    const rows = this.db.exec('SELECT json FROM vitals WHERE uid = ?', uid);
+    try { return rows.length ? JSON.parse(rows[0].json).name || null : null; } catch { return null; }
   }
 
   onVitals(user, msg) {

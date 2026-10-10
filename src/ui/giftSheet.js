@@ -10,9 +10,12 @@ import { getRoomStatus, sendMail } from '../state/rollLog.js';
 import { giftable, takeItems, refundItems } from '../game/mail.js';
 import { countOf } from '../game/engine.js';
 
+/** 房間裡的隊友。name 是「角色名」（隊友回報的狀態裡有；還沒回報過才用 Discord 名稱），playerName 是 Discord 名稱 */
 export const teammates = () => {
   const r = getRoomStatus();
-  return r.phase === 'online' ? r.members.filter((m) => m.uid !== r.me?.uid) : [];
+  if (r.phase !== 'online') return [];
+  return r.members.filter((m) => m.uid !== r.me?.uid)
+    .map((m) => ({ ...m, playerName: m.name, name: r.vitals?.[m.uid]?.name || m.name }));
 };
 
 export function openGiftSheet(getState, commit) {

@@ -350,8 +350,11 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   };
 }
 
-/** 輔助技能（納米醫療蜂、生生造化印）。目前單人試玩只能對自己使用；tier = 花費檔位（0~2） */
-export function useSupport(state, moveId, tier = 0) {
+/**
+ * 輔助技能（納米醫療蜂、生生造化印）。tier = 花費檔位（0~2）。
+ * self = false：這次只對隊友施放（效果由信箱送給對方，見 mail.js），自己只付花費、不回血也不上盾。
+ */
+export function useSupport(state, moveId, tier = 0, { self = true } = {}) {
   const move = state.moves.find((m) => m.id === moveId);
   const cat = move?.skill ? SKILL_CATALOG[move.skill] : null;
   if (!move || !cat?.tiers) return { error: '這不是輔助技能。' };
@@ -366,11 +369,11 @@ export function useSupport(state, moveId, tier = 0) {
   const amount = Math.floor((maxHp(state) * t.pct) / 100);
   if (cat.kind === 'heal') {
     const before = state.hp;
-    healPlayer(state, amount);
+    if (self) healPlayer(state, amount);
     return { move, cost, pct: t.pct, amount, healed: state.hp - before, targets: cat.targetsAt(lv), kind: 'heal' };
   }
   const res = cat.resAt(lv);
-  state.shield = { hp: amount, res }; // 重新施放會直接取代舊護盾（不可疊加）
+  if (self) state.shield = { hp: amount, res }; // 重新施放會直接取代舊護盾（不可疊加）
   return { move, cost, pct: t.pct, amount, res, kind: 'shield' };
 }
 

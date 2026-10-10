@@ -48,6 +48,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   const ui = {
     moveForm: { name: '', skill: '' }, // 自訂招式 = 名稱 + 綁定的主動技能
     feedTo: '', // 餵藥給誰（uid）
+    supportTargets: new Set(['self']), // 補血／護盾技能的目標：'self' 或隊友 uid
     openMoves: new Set(), // 展開檔位按鈕的輔助技能 id
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
   };
@@ -262,32 +263,79 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     return { dice, text: [...bits, text].join('・'), cost };
   }
 
+  /** 補血／護盾的目標選擇：自己＋房間裡的隊友（補血技能可選的目標數照技能等級，護盾只能選 1 個） */
+  function supportTargetPicker(state, m) {
+    const c = SKILL_CATALOG[m.skill];
+    const cap = c.kind === 'heal' ? c.targetsAt(skillLevel(state, m.skill)) : 1;
+    const picked = ui.supportTargets;
+    const mates = teammates();
+    for (const x of [...picked]) if (x !== 'self' && !mates.some((mm) => mm.uid === x)) picked.delete(x); // 隊友不見了就拿掉
+    if (!picked.size) picked.add('self');
+    const toggle = (id) => {
+      if (picked.has(id)) { if (picked.size > 1) picked.delete(id); } // 至少留一個目標
+      else if (cap === 1) { picked.clear(); picked.add(id); }
+      else if (picked.size >= cap) return toast(`「${m.name}」這個等級最多 ${cap} 個目標。`);
+      else picked.add(id);
+      return rerender();
+    };
+    const chip = (id, label) => h('button', { type: 'button', class: 'toggle', 'aria-pressed': String(picked.has(id)), onclick: () => toggle(id) }, label);
+    return h('div', { class: 'support-targets' },
+      h('p', { class: 'field-label', text: `目標（最多 ${cap} 個，已選 ${picked.size}）` }),
+      h('div', { class: 'toggle-row' },
+        chip('self', '自己'),
+        mates.map((mm) => chip(mm.uid, `${mm.name}${mm.online ? '' : '（離線）'}`))),
+      mates.length ? null : h('p', { class: 'hint', text: '沒有加入房間，或房間裡沒有其他玩家，所以只能對自己使用。' }));
+  }
+
+  /** 施放補血／護盾：隊友的效果用信箱送出（對方上線時自動套用、不用同意），自己的立刻生效；花費只付一次 */
+  async function castSupport(state, m, tier, t) {
+    const c = SKILL_CATALOG[m.skill];
+    const lv = skillLevel(state, m.skill);
+    if (isDowned(state)) return toast('你已經倒地，無法行動。');
+    const lack = shortfall(state, actionCost(state, m, t.cost));
+    if (lack) return toast(`資源不足：${lack}`);
+    const mates = teammates();
+    const sendTo = [...ui.supportTargets].filter((x) => x !== 'self');
+    const self = ui.supportTargets.has('self');
+    const sent = [];
+    let failed = '';
+    for (const uid of sendTo) {
+      try { await sendMail({ to: uid, kind: 'support', skill: m.skill, support: c.kind, pct: t.pct, res: c.kind === 'shield' ? c.resAt(lv) : 0 }); sent.push(uid); } catch (e) { failed = e.message; }
+    }
+    if (!self && !sent.length) return toast(`沒有施放出去：${failed || '送不出去'}`);
+    if (failed) toast(`有人沒送到：${failed}`);
+    const before = state.hp;
+    const r = useSupport(state, m.id, tier, { self });
+    if (r.error) return toast(r.error);
+    if (self) { // 隊友那邊的紀錄由伺服器寫；自己的這筆由這裡發布
+      publish({
+        who: state.name, kind: 'skill', label: `${m.name}（${t.pct}%）`,
+        big: r.kind === 'heal' ? `+${r.healed}` : `盾 ${r.amount}`,
+        tone: 'ok',
+        lines: [
+          r.kind === 'heal'
+            ? `自己：最大生命 ${t.pct}% = ${r.amount}，生命 ${before} → ${state.hp} / ${maxHp(state)}`
+            : `自己：護盾 = 最大生命 ${t.pct}% = ${r.amount}${r.res ? `，抗性免疫 +${r.res}（護盾破了才消失）` : ''}`,
+          sent.length ? `同時施放給：${sent.map((u) => mates.find((mm) => mm.uid === u)?.name ?? u).join('、')}` : null,
+          `花費：${costText(r.cost)}`,
+        ].filter(Boolean),
+      });
+    } else toast(`已對 ${sent.length} 位隊友施放${m.name}（花費 ${costText(r.cost)}）。`);
+    commit();
+  }
+
   function supportButtons(state, m) {
     const c = SKILL_CATALOG[m.skill];
-    return h('div', { class: 'row support-btns' }, c.tiers.map((t, i) => {
-      const cost = actionCost(state, m, t.cost);
-      const lack = shortfall(state, cost);
-      return h('button', {
-        type: 'button', class: 'btn btn--small', disabled: isDowned(state) || Boolean(lack), title: lack ?? '',
-        onclick: () => {
-          const before = state.hp;
-          const r = useSupport(state, m.id, i);
-          if (r.error) return toast(r.error);
-          publish({
-            who: state.name, kind: 'skill', label: `${m.name}（${t.pct}%）`,
-            big: r.kind === 'heal' ? `+${r.healed}` : `盾 ${r.amount}`,
-            tone: 'ok',
-            lines: [
-              r.kind === 'heal'
-                ? `目標最大生命 ${t.pct}% = ${r.amount}，生命 ${before} → ${state.hp} / ${maxHp(state)}（可回復 ${r.targets} 個目標；目前單人試玩只算自己）`
-                : `護盾 = 最大生命 ${t.pct}% = ${r.amount}${r.res ? `，抗性免疫 +${r.res}（護盾破了才消失）` : ''}`,
-              `花費：${costText(r.cost)}`,
-            ],
-          });
-          commit();
-        },
-      }, `${t.pct}%（${costText(actionCost(state, m, t.cost))}）`);
-    }));
+    return h('div', { class: 'support-box' },
+      supportTargetPicker(state, m),
+      h('div', { class: 'row support-btns' }, c.tiers.map((t, i) => {
+        const cost = actionCost(state, m, t.cost);
+        const lack = shortfall(state, cost);
+        return h('button', {
+          type: 'button', class: 'btn btn--small', disabled: isDowned(state) || Boolean(lack), title: lack ?? '',
+          onclick: () => castSupport(state, m, i, t),
+        }, `${t.pct}%（${costText(cost)}）`);
+      })));
   }
 
   const trackTag = (t) => h('span', { class: 'trk', dataset: { track: t }, text: t });

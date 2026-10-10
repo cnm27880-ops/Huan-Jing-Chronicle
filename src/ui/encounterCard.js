@@ -31,21 +31,85 @@ function hpBar(cur, max, downed) {
     h('span', { class: 'bar__text', text: `${fmt(cur)} / ${fmt(max)}` }));
 }
 
-/** BOSS 的多段血條：例如 300 血畫成 3 條 100，打完一條換下一條顏色 */
-function layeredBar(cur, max) {
+// ---------- 血條與出招動畫的「記憶」：畫面會整個重畫，動畫狀態要放在外面，重畫時才接得上 ----------
+const HP_SLIDE_MS = 450; // 血條滑到新數值的時間
+const GHOST_DELAY_MS = 350; // 殘影（扣掉的那一段）等多久才開始縮
+const GHOST_SLIDE_MS = 700;
+const FX_MS = 650; // 出招／承受攻擊的動畫長度
+const hpTrack = new Map(); // 怪物編號 → { from, to, t0 }（血量從 from 滑到 to，t0 是開始時間）
+const fxTrack = new Map(); // 怪物編號 → { kind: 'hit'|'block'|'strike', t0 }
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+/** 記下這隻怪物的血量變化，回傳目前的動畫狀態 { from, to, elapsed }；沒有變化 elapsed 就是很大的數字 */
+function trackHp(m) {
+  const now = Date.now();
+  let e = hpTrack.get(m.id);
+  if (!e) { e = { from: m.hp, to: m.hp, t0: 0 }; hpTrack.set(m.id, e); }
+  else if (e.to !== m.hp) {
+    const shown = e.from + (e.to - e.from) * clamp01((now - e.t0) / HP_SLIDE_MS);
+    e = { from: shown, to: m.hp, t0: now };
+    hpTrack.set(m.id, e);
+  }
+  return { from: e.from, to: e.to, elapsed: now - e.t0 };
+}
+
+/** 出招／承受攻擊的動畫：回傳 { kind, elapsed }，過期就是 null（用負的 animation-delay 接上重畫前已經播的部分） */
+function fxOf(id) {
+  const f = fxTrack.get(id);
+  const elapsed = f ? Date.now() - f.t0 : Infinity;
+  return elapsed < FX_MS ? { kind: f.kind, elapsed } : null;
+}
+const playFx = (id, kind) => fxTrack.set(id, { kind, t0: Date.now() });
+/** 元素要加的屬性：data-fx 讓 CSS 播動畫，負的 animation-delay 讓重畫後從中途接著播 */
+const fxAttrs = (id, data = {}) => {
+  const f = fxOf(id);
+  return { dataset: { ...data, ...(f ? { fx: f.kind } : {}) }, ...(f ? { style: `--fx-delay:-${Math.round(f.elapsed)}ms` } : {}) };
+};
+
+/** 把元素的寬度從 fromFrac 滑到 toFrac；已經過了 elapsed 毫秒就從中途接著滑 */
+function slideWidth(el, fromFrac, toFrac, elapsed, delay, dur) {
+  const t = clamp01((elapsed - delay) / dur);
+  if (fromFrac === toFrac || t >= 1) { el.style.width = `${toFrac * 100}%`; return; }
+  el.style.transition = 'none';
+  el.style.width = `${(fromFrac + (toFrac - fromFrac) * t) * 100}%`;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.style.transition = `width ${Math.round((1 - t) * dur)}ms ease-out ${Math.max(0, Math.round(delay - elapsed))}ms`;
+    el.style.width = `${toFrac * 100}%`;
+  }));
+}
+
+/**
+ * BOSS 的多段血條：三條各自獨立，第 3 條（最上面）先被打掉。
+ * 血量變少時：血條滑下去、後面留一段淡色殘影慢慢縮、浮出傷害數字；打掉一整條時閃一下。
+ */
+function layeredBar(m, downed) {
+  const { from, to, elapsed } = trackHp(m);
+  const max = m.maxHp;
   const per = max / BOSS_LAYERS;
-  const left = cur <= 0 ? 0 : Math.min(BOSS_LAYERS, Math.ceil(cur / per - 1e-9));
-  // 三條各自獨立：第 3 條（最上面）先被打掉，第 1 條最後
+  const layersOf = (v) => (v <= 0 ? 0 : Math.min(BOSS_LAYERS, Math.ceil(v / per - 1e-9)));
+  const left = layersOf(to);
+  const frac = (v, layer) => clamp01((v - (layer - 1) * per) / per);
+  const lost = from - to;
+  const animating = elapsed < GHOST_DELAY_MS + GHOST_SLIDE_MS && from !== to;
   const bars = Array.from({ length: BOSS_LAYERS }, (_, i) => BOSS_LAYERS - i).map((layer) => {
-    const part = Math.max(0, Math.min(1, (cur - (layer - 1) * per) / per));
-    return h('div', { class: 'lbar__track', dataset: { layer: String(layer), state: part >= 1 ? 'full' : part > 0 ? 'part' : 'empty' } },
-      h('div', { class: 'lbar__fill', style: `width:${part * 100}%` }));
+    const fill = h('div', { class: 'lbar__fill' });
+    const ghost = h('div', { class: 'lbar__ghost' });
+    slideWidth(fill, frac(from, layer), frac(to, layer), elapsed, 0, HP_SLIDE_MS);
+    slideWidth(ghost, frac(from, layer), frac(to, layer), elapsed, GHOST_DELAY_MS, GHOST_SLIDE_MS);
+    if (!animating || lost < 0) ghost.style.width = `${frac(to, layer) * 100}%`; // 回血或沒在動：殘影跟著血條，不留尾巴
+    const part = frac(to, layer);
+    return h('div', { class: 'lbar__track', dataset: { layer: String(layer), state: part >= 1 ? 'full' : part > 0 ? 'part' : 'empty' } }, ghost, fill);
   });
-  return h('div', { class: 'lbar', dataset: { layer: String(left) }, role: 'img', 'aria-label': `生命 ${cur} / ${max}，剩 ${left} 條` },
-    h('div', { class: 'lbar__bars' }, bars),
+  const broke = animating && lost > 0 && layersOf(from) > left;
+  return h('div', { class: 'lbar', dataset: { layer: String(left), broke: broke ? '1' : '0' }, role: 'img', 'aria-label': `生命 ${to} / ${max}，剩 ${left} 條` },
+    h('div', { class: 'lbar__bars', style: broke ? `animation-delay:-${Math.round(elapsed)}ms` : null }, bars),
     h('div', { class: 'lbar__info' },
-      h('span', { class: 'lbar__text num', text: `${fmt(cur)} / ${fmt(max)}` }),
-      h('span', { class: 'lbar__count num', text: `×${left}` })));
+      downed ? h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒下' }) : null,
+      h('span', { class: 'lbar__text num', text: `${fmt(to)} / ${fmt(max)}` }),
+      h('span', { class: 'lbar__count num', text: `×${left}` })),
+    animating && lost > 0
+      ? h('span', { class: 'lbar__pop num', style: `animation-delay:-${Math.round(elapsed)}ms`, text: `−${fmt(Math.round(lost))}` })
+      : null);
 }
 
 const trackLines = (result) => result.tracks.filter((t) => t.atkDice > 0).map(trackLine);
@@ -199,6 +263,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       }));
     } catch (e) { return rollFailed(e); }
     if (r.error) return toast(r.error);
+    r.hits.forEach((x) => playFx(x.target.id, x.result.total > 0 ? 'hit' : 'block')); // 打中＝晃動閃光；沒破防＝護盾擋下
     const multi = r.hits.length > 1;
     const lines = [];
     r.hits.forEach((h2) => {
@@ -234,6 +299,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       ({ r, draw } = await withRoomEncounter(state, () => rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng))));
     } catch (e) { return rollFailed(e); }
     if (r.error) return toast(r.error);
+    playFx(m.id, 'strike'); // 怪物撲過來
     publish({
       who: state.name, kind: 'defend', label: `${m.id} 攻擊${m.kind === 'boss' ? `（${BOSS_ATK_MODES[modes.atk]}）` : ''}`,
       big: r.result.total, tone: r.result.total > 0 ? 'fail' : 'ok',
@@ -351,10 +417,9 @@ export function createEncounterCard({ getState, commit, rerender }) {
             onclick: () => { sel.focusBoss = b.id; rerender(); },
           }, b.id, sel.targets.includes(b.id) ? ` ・${sel.targets.indexOf(b.id) + 1}` : '')))
         : null,
-      downed ? h('div', { class: 'boss__head' }, h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒下' })) : null,
-      layeredBar(m.hp, m.maxHp),
+      layeredBar(m, downed),
       h('button', {
-        type: 'button', class: 'boss__art', 'aria-pressed': String(picked), disabled: downed,
+        type: 'button', class: 'boss__art', 'aria-pressed': String(picked), disabled: downed, ...fxAttrs(m.id),
         'aria-label': `${picked ? '取消選取' : '選取'} ${m.id} 為目標`, onclick: () => toggleTarget(state, m),
       }, portrait(m, 'boss__img'), orderBadge(m.id)),
       h('div', { class: 'boss__stats' },
@@ -386,7 +451,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const downed = isDowned(m);
     const picked = sel.targets.includes(m.id);
     const abs = monsterAbs(m);
-    return h('li', { class: `mob${downed ? ' is-downed' : ''}`, dataset: { picked: picked ? '1' : '0' } },
+    return h('li', { class: `mob${downed ? ' is-downed' : ''}`, ...fxAttrs(m.id, { picked: picked ? '1' : '0' }) },
       h('button', {
         type: 'button', class: 'mob__pick', 'aria-pressed': String(picked), disabled: downed,
         'aria-label': `${m.id}，生命 ${m.hp} / ${m.maxHp}${downed ? '，已倒下' : ''}，點一下${picked ? '取消選取' : '選為目標'}`,
