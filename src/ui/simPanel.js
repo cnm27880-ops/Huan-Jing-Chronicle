@@ -148,7 +148,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         ? enemiesCard()
         : fixed
           ? h('ul', { class: 'import-list' }, fixed.monsters.map((m) => h('li', { class: 'import-row' },
-              h('span', { text: `${m.kind === 'boss' ? '👹' : '👾'} ${m.id}　血 ${fmt(m.maxHp)}${m.abs ? `・絕防 ${fmt(m.abs)}` : ''}` }),
+              h('span', { text: `${m.kind === 'boss' ? '👹' : m.rank === 'elite' ? '👺' : '👾'} ${m.id}　血 ${fmt(m.maxHp)}${m.abs ? `・絕防 ${fmt(m.abs)}` : ''}` }),
               h('small', { class: 'hint', text: m.kind === 'boss' ? `攻 ${m.atk.map(formatAbc).join('／')}` : `攻 ${formatAbc(m.atk)}・防 ${formatAbc(m.def)}` }))))
           : h('p', { class: 'notice', text: '場上沒有敵人。先在跑團頁新增，或改選預組／自訂強度。' }));
   }
@@ -158,10 +158,10 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     return h('div', {},
       ui.specs.length
         ? h('ul', { class: 'import-list' }, ui.specs.map((s, i) => h('li', { class: 'import-row' },
-            h('span', { text: `${s.kind === 'boss' ? '👹 BOSS' : '👾 小怪'} ×${s.count}　攻 ${fmt(s.atkPower)}・防 ${fmt(s.defPower)}・血 ${fmt(s.hp)}${s.absDef ? `・絕防 ${fmt(s.absDef)}` : ''}${s.atkMod || s.defMod ? `（補正 ${s.atkMod || '—'} / ${s.defMod || '—'}）` : ''}` }),
+            h('span', { text: `${{ boss: '👹 BOSS', elite: '👺 菁英' }[s.kind] ?? '👾 小怪'} ×${s.count}　攻 ${fmt(s.atkPower)}・防 ${fmt(s.defPower)}・血 ${fmt(s.hp)}${s.absDef ? `・絕防 ${fmt(s.absDef)}` : ''}${s.atkMod || s.defMod ? `（補正 ${s.atkMod || '—'} / ${s.defMod || '—'}）` : ''}` }),
             h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.running ? true : null, onclick: () => { ui.specs.splice(i, 1); sheet.refresh(); } }, '移除'))))
         : h('p', { class: 'hint', text: '還沒有敵人。從下面加一組。' }),
-      h('div', { class: 'toggle-row' }, [['mob', '小怪'], ['boss', 'BOSS']].map(([id, label]) => h('button', {
+      h('div', { class: 'toggle-row' }, [['mob', '小怪（普通）'], ['elite', '菁英（2 打）'], ['boss', 'BOSS（3 打）']].map(([id, label]) => h('button', {
         type: 'button', class: 'toggle', 'aria-pressed': String(f.kind === id), onclick: () => { f.kind = id; sheet.refresh(); },
       }, label))),
       h('div', { class: 'extra-row' }, field('數量', 'count', 1), field('攻擊強度', 'atkPower'), field('防禦強度', 'defPower'), field('血量', 'hp', 1), field('絕對防禦', 'absDef')),

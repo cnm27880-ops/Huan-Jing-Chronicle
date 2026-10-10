@@ -10,6 +10,7 @@ import { d20 } from '../../src/game/engine.js';
 import { diceEvent, checkEvent } from '../../src/game/events.js';
 import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/rules.js';
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
+import { useEnemySkill, spendEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
 import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
@@ -218,7 +219,7 @@ export class RoomCore {
       case 'skillSet': case 'skillDel': return this.onSkillEdit(user, msg, rid);
       case 'mailSend': return this.onMailSend(user, msg, rid);
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
-      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': return this.onEncounter(user, msg, rid, online);
+      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
       case 'encImg': return this.onEncImg(user, msg, rid);
       case 'imgPut': return this.onImgPut(user, msg, rid);
       case 'imgDel': return this.onImgDel(user, msg, rid);
@@ -410,8 +411,8 @@ export class RoomCore {
 
   saveEncounter(enc) { this.setMeta('encounter', JSON.stringify(enc)); }
 
-  encOk(enc, rid, user, note) {
-    const extra = [{ to: 'self', msg: { t: 'encOk', rid } }];
+  encOk(enc, rid, user, note, reply = {}) {
+    const extra = [{ to: 'self', msg: { t: 'encOk', rid, ...reply } }];
     const out = [{ to: 'all', msg: { t: 'enc', encounter: enc } }, ...extra];
     if (note) {
       const ev = this.record({ who: '系統', kind: 'note', label: note.label, lines: note.lines ?? [] }, user);
@@ -431,6 +432,7 @@ export class RoomCore {
         const m = enc.monsters.find((x) => x.id === hit.id);
         if (!m) continue; // 怪物剛好被 GM 移除：略過
         m.hp = Math.max(0, m.hp - hit.dmg);
+        if (hit.usedB === true) spendEnemyB(enc, m.id); // 這一下用掉了敵人的 B 技能（防禦強化）蓄力
         applied++;
       }
       if (!applied) return err(rid, 'bad_enc', '找不到這些怪物，可能已被移除。');
@@ -449,11 +451,35 @@ export class RoomCore {
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user);
     }
+    if (msg.t === 'encUse' && msg.use === 'atk') { // 玩家承受敵人一次攻擊：扣這回合的攻擊次數，有 A 蓄力就多加骰
+      if (typeof msg.id !== 'string') return err(rid, 'bad_enc', '缺少敵人編號。');
+      const r = spendEnemyAttack(enc, msg.id);
+      if (r.error) return err(rid, 'bad_enc', r.error);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, undefined, { extraAtk: r.extraAtk, left: r.left });
+    }
     if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以操作遭遇戰。');
+
+    if (msg.t === 'encUse') { // 敵人技能（GM）：A、B 蓄力；C 喝血由伺服器擲 ND16
+      if (typeof msg.id !== 'string') return err(rid, 'bad_enc', '缺少敵人編號。');
+      const r = useEnemySkill(enc, msg.id, msg.use, this.rng);
+      if (r.error) return err(rid, 'bad_enc', r.error);
+      this.saveEncounter(enc);
+      const name = SKILL_NAMES[r.skill];
+      const note = r.skill === 'C'
+        ? { label: `遭遇：${msg.id} 喝血（${r.dice}）`, lines: [`${r.dice} = ${r.rolled}，回復 ${r.healed} 生命`] }
+        : { label: `遭遇：${msg.id} 使用 ${r.skill} 技能（${name}）`, lines: [r.skill === 'A' ? `下一次攻擊，每一軌各 +${r.dice} 顆攻擊骰` : `下一次被打，絕對防禦 +${r.dice} 顆`] };
+      return this.encOk(enc, rid, user, note);
+    }
+    if (msg.t === 'encRound') { // 進下一回合（沒有用先攻順序時）：回合數 +1，敵人的技能次數與蓄力自動歸零
+      nextRound(enc);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：第 ${enc.round} 回合` });
+    }
 
     if (msg.t === 'encAdd') {
       const sp = msg.spec;
-      if (!sp || typeof sp !== 'object' || (msg.kind !== 'mob' && msg.kind !== 'boss')) return err(rid, 'bad_enc', '敵人資料格式錯誤。');
+      if (!sp || typeof sp !== 'object' || !['mob', 'elite', 'boss'].includes(msg.kind)) return err(rid, 'bad_enc', '敵人資料格式錯誤。');
       if (!isInt(sp.count, 1, 20) || !isInt(sp.atkPower, 0, 100_000) || !isInt(sp.defPower, 0, 100_000) || !isInt(sp.hp, 1, 10_000_000) || !isInt(sp.absDef ?? 0, 0, 100_000)) {
         return err(rid, 'bad_enc', '敵人的數量、強度或血量超出範圍。');
       }
@@ -467,7 +493,7 @@ export class RoomCore {
         spec[`${side}Type`] = type;
         if (focus != null) spec[`${side}Focus`] = focus;
       }
-      const added = (msg.kind === 'boss' ? addBosses : addMobs)(enc, spec, this.rng);
+      const added = msg.kind === 'boss' ? addBosses(enc, spec, this.rng) : addMobs(enc, { ...spec, ...(msg.kind === 'elite' ? { rank: 'elite' } : {}) }, this.rng);
       if (this.hasImage(msg.img)) added.forEach((m) => { m.img = msg.img; }); // 建立時就指定立繪（選填）
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user, { label: `遭遇：新增 ${added.map((m) => m.id).join('、')}` });
@@ -561,11 +587,13 @@ export class RoomCore {
     if (!row) return err(rid, 'bad_preset', `沒有「${name}」這個預組。`);
     const monsters = JSON.parse(row.json).map((m) => {
       const x = { ...m, hp: m.maxHp };
+      delete x.uses; delete x.charge; // 技能次數與蓄力不帶進新的戰鬥
       if (x.img && !this.hasImage(x.img)) delete x.img;
       return x;
     });
     const maxNo = (kind) => Math.max(0, ...monsters.filter((m) => m.kind === kind).map((m) => Number(String(m.id).replace(/\D/g, '')) || 0));
-    const enc = { monsters, next: { mob: maxNo('mob') + 1, boss: maxNo('boss') + 1 }, round: 0, order: [], turn: 0, locked: false };
+    const maxElite = Math.max(0, ...monsters.filter((m) => m.rank === 'elite').map((m) => Number(String(m.id).replace(/\D/g, '')) || 0));
+    const enc = { monsters, next: { mob: maxNo('mob') + 1, boss: maxNo('boss') + 1, elite: maxElite + 1 }, round: 0, order: [], turn: 0, locked: false };
     this.saveEncounter(enc);
     // 紀錄只寫登場的敵人，不寫預組名稱（名稱可能劇透）
     const ok = this.encOk(enc, rid, user, { label: `遭遇：敵人登場 ${monsters.map((m) => m.id).join('、')}` });

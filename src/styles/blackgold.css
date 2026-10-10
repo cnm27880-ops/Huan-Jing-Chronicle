@@ -1724,3 +1724,22 @@ input[type='number'], .amount__input { text-align: center; }
 .log-entry__more { font-size: 0.82rem; color: var(--soft); }
 .log-entry__more summary { cursor: pointer; }
 .log-entry__more ul { margin: 4px 0 0; padding-left: 1.2rem; }
+
+/* ---------- 敵人技能列（2026/10 平衡更新） ---------- */
+.eskills { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+.boss .eskills { margin-top: 2px; }
+.eskills__rank { font-size: 0.7rem; }
+.eskills[data-rank='elite'] .eskills__rank { color: var(--lilac); border-color: var(--lilac); }
+.eskills[data-rank='boss'] .eskills__rank { color: var(--rose); border-color: var(--rose2); }
+.eskill { padding: 2px 8px; font: inherit; font-size: 0.74rem; color: var(--soft); background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill); }
+button.eskill { cursor: pointer; }
+button.eskill:hover:not(:disabled) { color: var(--ink); border-color: var(--gold2); }
+button.eskill:disabled { cursor: default; opacity: 0.55; }
+.eskill[data-ready='1'] { color: var(--on-gold); background: var(--gold); border-color: var(--gold); box-shadow: 0 0 10px rgba(var(--gold-rgb), 0.5); } /* 已蓄力：下一次攻擊／被打時生效 */
+.eskill[data-skill='C']:not(:disabled) { color: var(--rose); }
+.stage__result { align-items: center; gap: 6px; }
+.stage__result [data-result='full'] { color: var(--gold); border-color: var(--gold2); }
+.stage__result [data-result='defeat'] { color: var(--rose); border-color: var(--rose2); }
+.dou { display: grid; gap: 4px; margin: 6px 0; }
+.dou .row { align-items: center; gap: 6px; flex-wrap: wrap; }
+.dou__n { min-width: 2ch; text-align: center; color: var(--gold); }

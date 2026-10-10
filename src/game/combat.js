@@ -16,7 +16,7 @@ import {
 import { rollSum } from './dice.js';
 import { derivedStats, maxHp } from './stats.js';
 import { removeItem } from './engine.js';
-import { passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS } from './skills.js';
+import { passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS, douMult } from './skills.js';
 import { actionCost, shortfall, pay, costText } from './resources.js';
 
 /** 每 1 點 = 1 顆 D4 */
@@ -40,7 +40,7 @@ export function formatAbc(dice) {
  * 每條軌道 = 該軌道傷害 + 真實傷害 + 招式加成 + 藥水加成
  * 回傳 { dice:{A,B,C}, parts:{ C:[{label,value}] } }
  */
-export function attackDice(state, move, potionBonus = 0) {
+export function attackDice(state, move, potionBonus = 0, douBonus = 0) {
   const p = derivedStats(state);
   const brute = passivesOf(state).brute;
   const extra = moveExtra(state, move);
@@ -53,6 +53,7 @@ export function attackDice(state, move, potionBonus = 0) {
       { label: TRUE_ATK, value: p[TRUE_ATK].total },
       { label: '招式加成', value: extra[t] ?? 0 },
       { label: '藥水', value: potionBonus },
+      { label: '鬥氣', value: douBonus }, // 花鬥氣換來的真實傷害骰（每條用到的軌道都加）
     ];
     parts[t] = list.filter((x, i) => i < 2 || x.value !== 0);
     dice[t] = list.reduce((a, x) => a + x.value, 0);
@@ -71,7 +72,7 @@ export const ATTACK_MODES = {
  * 萬物歸一 = 物+能+魂+真傷；大羅真仙 = 招式選定軌道 + 真傷（真傷只算一次）。
  * 回傳 { dice, parts } 其中 dice = 總骰數
  */
-export function pooledAttack(state, move, potionBonus = 0) {
+export function pooledAttack(state, move, potionBonus = 0, douBonus = 0) {
   const p = derivedStats(state);
   const brute = passivesOf(state).brute;
   const extra = moveExtra(state, move);
@@ -81,6 +82,7 @@ export function pooledAttack(state, move, potionBonus = 0) {
     { label: TRUE_ATK, value: p[TRUE_ATK].total },
     { label: '招式加成', value: tracks.reduce((a, t) => a + (extra[t] ?? 0), 0) },
     { label: '藥水', value: potionBonus },
+    { label: '鬥氣', value: douBonus },
   ];
   const parts = list.filter((x, i) => i <= tracks.length || x.value !== 0);
   return { dice: list.reduce((a, x) => a + x.value, 0), parts };
@@ -196,17 +198,19 @@ export function generateAbcSplit(total, bonus = { A: 0, B: 0, C: 0 }, rng = Math
 export const BOSS_ATK_MODES = ['輕擊', '重擊', '絕殺'];
 export const BOSS_DEF_MODES = ['常規', '變換', '極限'];
 
-export const newEncounter = () => ({ monsters: [], next: { mob: 1, boss: 1 } });
+export const newEncounter = () => ({ monsters: [], next: { mob: 1, boss: 1, elite: 1 }, round: 0 });
 
 /** 新增小怪：power 是機器人的「強度」（會隨機分配到三軌） */
 /** GM 指定的分配方式：{ atkType, atkFocus, defType, defFocus }（都可以不給＝隨機） */
 const splitOpts = (spec, side) => ({ type: spec[`${side}Type`], focus: spec[`${side}Focus`] });
 
-export function addMobs(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, ...split }, rng = Math.random) {
+export function addMobs(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, rank, ...split }, rng = Math.random) {
   const added = [];
+  const elite = rank === 'elite'; // 菁英：2 打（見 enemy.js）；沒給就是普通
   for (let i = 0; i < count; i++) {
+    enc.next.elite ??= 1;
     const m = {
-      id: `小怪${enc.next.mob++}`, kind: 'mob', hp, maxHp: hp, abs: absDef,
+      id: elite ? `菁英${enc.next.elite++}` : `小怪${enc.next.mob++}`, kind: 'mob', ...(elite ? { rank: 'elite' } : {}), hp, maxHp: hp, abs: absDef,
       atk: generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk')),
       def: generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def')),
     };
@@ -240,10 +244,10 @@ export const monsterDef = (m, mode = 0) => (m.kind === 'boss' ? m.def[mode] : m.
 
 // ---------- 一次出招／承受攻擊 ----------
 /** 單一目標的出招結算（不含花費與回復），回傳該目標的結果 */
-function resolveHit(state, move, target, mode, atkPlan, rng) {
+function resolveHit(state, move, target, mode, atkPlan, rng, extraAbs = 0) {
   const potion = state.buffs.atk;
   const ignoreAbs = passivesOf(state).ignoreAbs;
-  const abs = ignoreAbs ? 0 : monsterAbs(target);
+  const abs = ignoreAbs ? 0 : monsterAbs(target) + extraAbs; // extraAbs：敵人 B 技能（防禦強化）多出來的絕對防禦骰
   const base = monsterDef(target, mode);
   let def;
   let result;
@@ -260,7 +264,7 @@ function resolveHit(state, move, target, mode, atkPlan, rng) {
   }
   const before = target.hp;
   target.hp = Math.max(0, target.hp - result.total);
-  return { target, def, result, potion, abs, ignoreAbs, lost: before - target.hp, extraLines: [] };
+  return { target, def, result, potion, abs, ignoreAbs, extraAbs: ignoreAbs ? 0 : extraAbs, lost: before - target.hp, extraLines: [] };
 }
 
 /**
@@ -269,6 +273,8 @@ function resolveHit(state, move, target, mode, atkPlan, rng) {
  * opts.targetIds：玩家手動選的目標（依點選順序）。最多選「招式的目標數」個，選太多回傳錯誤、選比較少就只打選到的。
  *   沒給時照舊：monsterId 加上後面還活著的怪物，補到招式的目標數。
  * opts.modes：每隻 BOSS 各自的防禦模式（怪物 id → 模式）；沒寫的用 mode。
+ * opts.dou：這次攻擊花多少鬥氣（每點 +1 顆真實傷害骰，冠軍勇士每點 +4 顆）。
+ * opts.extraAbs：敵人 B 技能多出來的絕對防禦骰（怪物 id → 骰數）。
  * 回傳 { move, target, hits[], cost, heal, ... }；失敗回傳 { error }。第一個目標的欄位也放在最外層，方便畫面使用。
  */
 export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math.random, opts = {}) {
@@ -291,7 +297,9 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
     targets = [first, ...enc.monsters.filter((m) => m !== first && !isDowned(m))].slice(0, maxTargets);
   }
   const yuwai = Boolean(opts.yuwai) && skillLevel(state, '域外魔祖') > 0 && move.school === '修仙';
-  const extraCost = yuwai ? PASSIVE_RIDERS.域外魔祖.cost : {};
+  const dou = Math.max(0, Math.floor(Number(opts.dou) || 0));
+  const douDice = dou * douMult(state);
+  const extraCost = { ...(yuwai ? PASSIVE_RIDERS.域外魔祖.cost : {}), ...(dou ? { 鬥氣: dou } : {}) };
   const cost = actionCost(state, move, extraCost);
   const lack = shortfall(state, cost);
   if (lack) return { error: `資源不足：${lack}（需要 ${costText(cost)}）` };
@@ -299,8 +307,8 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
 
   const potion = state.buffs.atk;
   const pooled = move.mode === 'all' || move.mode === 'abs';
-  const atk = pooled ? pooledAttack(state, move, potion) : attackDice(state, move, potion);
-  const hits = targets.map((t) => resolveHit(state, move, t, opts.modes?.[t.id] ?? mode, atk, rng));
+  const atk = pooled ? pooledAttack(state, move, potion, douDice) : attackDice(state, move, potion, douDice);
+  const hits = targets.map((t) => resolveHit(state, move, t, opts.modes?.[t.id] ?? mode, atk, rng, opts.extraAbs?.[t.id] ?? 0));
   const notes = [];
 
   // 響應：萬物歸一破防時，額外扣目標現有生命 %
@@ -346,7 +354,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   const h0 = hits[0];
   return {
     move, target: h0.target, mode, atk, def: h0.def, result: h0.result, potion, ignoreAbs: h0.ignoreAbs, abs: h0.abs,
-    hits, cost, healed, notes, downed: isDowned(h0.target),
+    hits, cost, healed, notes, dou, douDice, downed: isDowned(h0.target),
   };
 }
 
@@ -378,18 +386,21 @@ export function useSupport(state, moveId, tier = 0, { self = true } = {}) {
 }
 
 /** 怪物攻擊玩家：玩家用三軌防禦 + 絕對防禦；會消耗「下次防禦」藥水加成並扣玩家 HP */
-export function monsterAttack(state, enc, monsterId, mode = 0, rng = Math.random) {
+export function monsterAttack(state, enc, monsterId, mode = 0, rng = Math.random, opts = {}) {
   const monster = enc.monsters.find((m) => m.id === monsterId);
   if (!monster) return { error: '找不到這隻怪物。' };
   if (isDowned(monster)) return { error: `${monster.id} 已經倒下。` };
   const potion = state.buffs.def;
   const def = defenseDice(state, potion);
-  const atk = monsterAtk(monster, mode);
+  // 敵人 A 技能（攻擊強化）：這招用到的每一軌各加 extraAtk 顆攻擊骰（沒有攻擊骰的軌道不加）
+  const extraAtk = Math.max(0, Math.floor(Number(opts.extraAtk) || 0));
+  const base = monsterAtk(monster, mode);
+  const atk = extraAtk ? Object.fromEntries(TRACKS.map((t) => [t, base[t] > 0 ? base[t] + extraAtk : base[t]])) : base;
   const result = clash(atk, def.dice, rng);
   state.buffs.def = 0;
   const wasDowned = isDowned(state);
   const absorbed = damagePlayer(state, result.total);
-  return { monster, mode, atk, def, result, potion, absorbed, downed: isDowned(state), newlyDowned: !wasDowned && isDowned(state) };
+  return { monster, mode, atk, def, result, potion, extraAtk, absorbed, downed: isDowned(state), newlyDowned: !wasDowned && isDowned(state) };
 }
 
 // ---------- 藥水 ----------

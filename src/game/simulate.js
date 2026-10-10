@@ -8,6 +8,10 @@
 //   藥水：自動喝，毒性滿了就不能喝；隊友倒地時，有回復藥水的隊友會餵（毒性算被救的人）；喝藥水不佔用行動；攻擊／防禦加成藥水只要身上沒有加成就喝（需驗證）
 //   勝負：怪物全倒＝勝；玩家全員倒地＝敗；超過回合上限＝平手
 //   每回合順序：玩家依序行動，再輪到怪物（沒有模擬先攻；需驗證）
+// 2026/10 平衡更新（見 enemy.js）：
+//   敵人（需驗證）：每回合開始就把 B 技能（防禦強化）用滿，玩家每打他一下消耗一次蓄力；輪到他時，血量沒滿就喝血（C），
+//   再用 A 技能（攻擊強化），然後打出這一等級每回合的攻擊次數（普通 1、菁英 2、BOSS 3），每一下各隨機挑一位還沒倒地的玩家
+//   玩家（需驗證）：出招時花「現有鬥氣的 1/3（進位）」加骰（付不起就不加）；生命低於 40% 時把靈氣換成生命（最多補到滿）；不用能量轉換
 // ============================================================
 import {
   newEncounter, addMobs, addBosses, playerAttack, monsterAttack, defenseDice, attackDice, isDowned,
@@ -15,9 +19,10 @@ import {
 } from './combat.js';
 import { POTIONS, TOXICITY_MAX, TRACKS } from './rules.js';
 import { maxHp } from './stats.js';
-import { actionCost, restoreAllResources, resourceNow, resourceMax, witchRest, OTHER_RESOURCES } from './resources.js';
+import { actionCost, restoreAllResources, resourceNow, resourceMax, witchRest, OTHER_RESOURCES, convertResource } from './resources.js';
 import { passivesOf } from './skills.js';
 import { countOf } from './engine.js';
+import { rankInfo, useEnemySkill, spendEnemyAttack, spendEnemyB, pendingEnemyB } from './enemy.js';
 
 export const DEFAULT_MAX_ROUNDS = 60;
 const isSupport = (m) => m.kind === 'heal' || m.kind === 'shield';
@@ -109,14 +114,17 @@ export function prepPlayer(src) {
 /** 依敵人設定產生一組怪物（每場各自隨機分配 A/B/C，和遊戲裡一樣） */
 export function buildEncounter(specs, rng = Math.random) {
   const enc = newEncounter();
-  for (const { kind, ...spec } of specs) (kind === 'boss' ? addBosses : addMobs)(enc, spec, rng);
+  for (const { kind, ...spec } of specs) {
+    if (kind === 'boss') addBosses(enc, spec, rng);
+    else addMobs(enc, kind === 'elite' ? { ...spec, rank: 'elite' } : spec, rng); // 'mob' 普通、'elite' 菁英
+  }
   return enc;
 }
 
 /** 固定敵人的複本：生命補滿（不影響原本的資料） */
 export function fixedEncounter(src) {
   const enc = newEncounter();
-  enc.monsters = structuredClone(src.monsters ?? []).map((m) => ({ ...m, hp: m.maxHp }));
+  enc.monsters = structuredClone(src.monsters ?? []).map((m) => { const x = { ...m, hp: m.maxHp }; delete x.uses; delete x.charge; return x; });
   return enc;
 }
 
@@ -134,6 +142,7 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
   const downs = team.map(() => 0);
   const wasDown = team.map(() => false);
   let potions = 0;
+  let healed = 0; // 敵人喝血回復的總量（算每回合傷害時要加回去）
   let rounds = 0;
   let outcome = 'timeout';
   const alive = () => enc.monsters.filter((m) => !isDowned(m));
@@ -141,37 +150,50 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
 
   while (rounds < maxRounds) {
     rounds++;
+    enc.round = rounds; // 回合數一變，敵人的技能次數與蓄力就自動歸零
+    for (const m of alive()) for (let i = 0; i < rankInfo(m).B.uses; i++) useEnemySkill(enc, m.id, 'B', rng); // B 技能：每回合開始就蓄滿
     for (const p of team) {
       if (isDowned(p) || !alive().length) continue;
       potions += usePotions(p, team, rng);
+      if (p.hp < maxHp(p) * 0.4 && resourceNow(p, '靈氣') > 0) convertResource(p, '靈氣', '生命', resourceNow(p, '靈氣')); // 基礎用法：靈氣 1 比 1 換生命
       const target = alive()[0];
       let move = pickMove(p);
       if (move && castsAffordable(p, move) < 1) { // 連普攻都付不起（魔女每次行動多花 30 魔力）：魔女放棄行動回復魔力，其他人只能略過
         if (passivesOf(p).witch) witchRest(p);
         continue;
       }
-      let r = move ? playerAttack(p, enc, move.id, target.id, bestDefMode(target, move), rng) : { error: 'no move' };
+      const extraAbs = { [target.id]: pendingEnemyB(enc, target) };
+      const dou = Math.ceil(resourceNow(p, '鬥氣') / 3); // 鬥氣加骰（付不起就退回不加）
+      let r = move ? playerAttack(p, enc, move.id, target.id, bestDefMode(target, move), rng, { dou, extraAbs }) : { error: 'no move' };
+      if (r.error && dou && move) r = playerAttack(p, enc, move.id, target.id, bestDefMode(target, move), rng, { extraAbs });
       if (r.error && move?.id !== 'basic') { // 付不起（例如被魔女額外花費卡住）就退回普攻
         move = p.moves.find((m) => m.id === 'basic');
-        r = move ? playerAttack(p, enc, move.id, target.id, bestDefMode(target, move), rng) : r;
+        r = move ? playerAttack(p, enc, move.id, target.id, bestDefMode(target, move), rng, { extraAbs }) : r;
       }
+      if (!r.error && extraAbs[target.id]) spendEnemyB(enc, target.id); // 這一下用掉他一次 B 蓄力
     }
     markDowns();
     if (!alive().length) { outcome = 'win'; break; }
     for (const m of alive()) {
-      const victims = team.filter((p) => !isDowned(p));
-      if (!victims.length) break;
-      const victim = victims[Math.floor(rng() * victims.length)];
-      monsterAttack(victim, enc, m.id, bestAtkMode(m, victim), rng);
-      markDowns();
+      if (m.hp < m.maxHp) { const c = useEnemySkill(enc, m.id, 'C', rng); if (c.ok) healed += c.healed; } // C 喝血
+      useEnemySkill(enc, m.id, 'A', rng); // A 技能：蓄力，下一次攻擊每一軌 +20
+      for (let k = 0; k < rankInfo(m).attacks; k++) { // 普通 1、菁英 2、BOSS 3 次攻擊
+        const victims = team.filter((p) => !isDowned(p));
+        if (!victims.length) break;
+        const spent = spendEnemyAttack(enc, m.id);
+        if (spent.error) break;
+        const victim = victims[Math.floor(rng() * victims.length)];
+        monsterAttack(victim, enc, m.id, bestAtkMode(m, victim), rng, { extraAtk: spent.extraAtk });
+        markDowns();
+      }
     }
     if (team.every(isDowned)) { outcome = 'lose'; break; }
   }
-  // 資源消耗：每種資源（只算這位玩家的招式真的會花到的；沒有任何招式用的資源不算，不然永遠是 0）＋毒性（占上限 15 的比例），全隊平均；
+  // 資源消耗：每種資源（只算這位玩家的招式真的會花到的、加上有基礎用法的鬥氣；沒有任何用途的資源不算，不然永遠是 0）＋毒性（占上限 15 的比例），全隊平均；
   // drainAvg = 各項平均（毒性算一項）
   const drain = {};
   for (const r of OTHER_RESOURCES) {
-    const owners = team.filter((p) => resourceMax(p, r) > 0 && p.moves.some((m) => (actionCost(p, m)[r] ?? 0) > 0));
+    const owners = team.filter((p) => resourceMax(p, r) > 0 && r === '鬥氣' || p.moves.some((m) => (actionCost(p, m)[r] ?? 0) > 0)); // 鬥氣有基礎用法（加骰），一律算
     if (owners.length) drain[r] = owners.reduce((a, p) => a + (1 - resourceNow(p, r) / resourceMax(p, r)), 0) / owners.length;
   }
   drain.毒性 = team.reduce((a, p) => a + Math.min(1, p.toxicity / TOXICITY_MAX), 0) / (team.length || 1);
@@ -179,7 +201,7 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
   return {
     outcome, rounds, monsterHp,
     drain, drainAvg: drainVals.reduce((a, v) => a + v, 0) / (drainVals.length || 1),
-    damage: monsterHp - enc.monsters.reduce((a, m) => a + m.hp, 0),
+    damage: monsterHp - enc.monsters.reduce((a, m) => a + m.hp, 0) + healed, healed,
     hpLeft: team.reduce((a, p) => a + p.hp, 0), hpMax: team.reduce((a, p) => a + maxHp(p), 0),
     downs, potions,
   };

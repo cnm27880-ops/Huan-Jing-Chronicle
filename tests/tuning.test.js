@@ -48,13 +48,14 @@ test('自動調整：找到讓回合數與資源消耗都達標的血量與攻�
   assert.equal(out.specs.length, 1);
 });
 
-test('模擬戰：回報每場的資源與毒性消耗；沒有招式用的資源不算進去', () => {
+test('模擬戰：回報每場的資源與毒性消耗；沒有用途的資源不算進去', () => {
   const s = { ...blankCharacter('甲'), skills: { 爆裂火球: 5 } };
-  s.baseStats = { ...s.baseStats, 生命: 500, 魔力: 100, 鬥氣: 50 };
+  s.baseStats = { ...s.baseStats, 生命: 500, 魔力: 100, 鬥氣: 50, 能量: 40 };
   s.moves.push({ ...moveFromCatalog('爆裂火球'), id: 'fb' });
   const r = simulateBattle([s], [{ kind: 'mob', count: 1, atkPower: 10, defPower: 10, hp: 100000 }], { maxRounds: 3 });
   assert.ok(r.drain.魔力 > 0 && r.drain.魔力 <= 1);
-  assert.equal('鬥氣' in r.drain, false); // 沒有任何招式會花鬥氣
+  assert.equal('能量' in r.drain, false); // 沒有任何招式會花能量（模擬也不做能量轉換）
+  assert.ok('鬥氣' in r.drain); // 鬥氣有基礎用法（攻擊加骰），一律算
   assert.ok('毒性' in r.drain);
   const summary = summarize([r, r]);
   assert.ok(Math.abs(summary.avgDrain - r.drainAvg) < 1e-9);

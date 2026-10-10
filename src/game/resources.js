@@ -48,6 +48,27 @@ export function pay(state, cost) {
 export const costText = (cost) =>
   Object.entries(cost).filter(([, v]) => v > 0).map(([k, v]) => `${v}${k}`).join(' + ') || '無';
 
+/**
+ * 基礎資源用法（2026/10 平衡更新）：靈氣可以 1 比 1 換成生命；能量可以 1 比 1 換成任意資源。
+ * 魔力、算力沒有基礎用法；鬥氣的用法是攻擊時加骰（見 combat.js 的 playerAttack opts.dou）。
+ * 換到的量不會超過目標的上限（多出來的不換、不扣）。
+ */
+export const CONVERT_TARGETS = { 靈氣: ['生命'], 能量: RESOURCE_STATS.filter((r) => r !== '能量') };
+export function convertResource(state, from, to, n) {
+  const amount = Math.floor(Number(n));
+  if (!(CONVERT_TARGETS[from] ?? []).includes(to)) return { error: from === '靈氣' ? '靈氣只能換成生命。' : from === '能量' ? '能量可以換成其他任何資源。' : `${from}沒有基礎用法，不能轉換。` };
+  if (!Number.isInteger(amount) || amount < 1) return { error: '數量要是 1 以上的整數。' };
+  if (state.hp <= 0) return { error: '你已經倒地，無法行動。' };
+  const have = resourceNow(state, from);
+  const room = resourceMax(state, to) - resourceNow(state, to); // 目標還裝得下多少
+  if (have < 1) return { error: `${from}不夠。` };
+  if (room < 1) return { error: `${to}已經是滿的。` };
+  const spent = Math.min(amount, have, room);
+  setResource(state, from, have - spent);
+  setResource(state, to, resourceNow(state, to) + spent);
+  return { ok: true, from, to, spent, gained: spent };
+}
+
 /** 魔女：放棄主動動作，回復 30 魔力 */
 export function witchRest(state) {
   if (!passivesOf(state).witch) return { error: '你沒有「魔女」技能。' };

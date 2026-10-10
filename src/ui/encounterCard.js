@@ -12,8 +12,11 @@ import {
   formatAbc, monsterAbs, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
   isDowned, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES, SPLIT_FOCUS,
 } from '../game/combat.js';
+import {
+  ENEMY_RANKS, SKILL_NAMES, enemyLeft, useEnemySkill, spendEnemyAttack, spendEnemyB, pendingEnemyB, nextRound,
+} from '../game/enemy.js';
 import { maxHp } from '../game/stats.js';
-import { costText } from '../game/resources.js';
+import { costText, resourceNow } from '../game/resources.js';
 import {
   publish, rollWith, getEncounter, encounterAction, getRoomStatus, imageUrl, uploadImage, deleteImage, presetAction,
 } from '../state/rollLog.js';
@@ -113,7 +116,7 @@ function layeredBar(m, downed) {
 }
 
 const trackLines = (result) => result.tracks.filter((t) => t.atkDice > 0).map(trackLine);
-const glyph = (m) => (m.kind === 'boss' ? '👹' : '👾');
+const glyph = (m) => (m.kind === 'boss' ? '👹' : m.rank === 'elite' ? '👺' : '👾');
 
 /** 圖片檔 → 縮小後的 WebP（瀏覽器不支援就 PNG／JPEG）base64；太大就再縮 */
 async function shrinkImage(file, longest) {
@@ -250,6 +253,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const targetIds = [...sel.targets];
     const modes = Object.fromEntries(targetIds.map((id) => [id, defModeOf(id)]));
     const hpBefore = state.hp;
+    // 敵人 B 技能（防禦強化）蓄力過的，這一下絕對防禦多一些；鬥氣加骰：這次花幾點
+    const encNow = currentEnc(state);
+    const extraAbs = Object.fromEntries(targetIds.map((id) => [id, pendingEnemyB(encNow, encNow.monsters.find((x) => x.id === id) ?? { hp: 0 })]).filter(([, n]) => n > 0));
+    const dou = Math.min(sel.dou, resourceNow(state, '鬥氣'));
     let r;
     let draw;
     let befores;
@@ -258,22 +265,25 @@ export function createEncounterCard({ getState, commit, rerender }) {
       ({ r, draw, befores, bosses } = await withRoomEncounter(state, async () => {
         const before = new Map(state.encounter.monsters.map((x) => [x.id, x.hp]));
         const boss = new Set(state.encounter.monsters.filter((x) => x.kind === 'boss').map((x) => x.id));
-        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, sel.moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai, targetIds, modes }));
+        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, sel.moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai, targetIds, modes, dou, extraAbs }));
         return { ...res, befores: before, bosses: boss };
       }));
     } catch (e) { return rollFailed(e); }
     if (r.error) return toast(r.error);
+    sel.dou = 0;
+    if (!online()) Object.keys(extraAbs).forEach((id) => spendEnemyB(state.encounter, id)); // 本機模式：蓄力用掉了（房間模式由伺服器扣）
     r.hits.forEach((x) => playFx(x.target.id, x.result.total > 0 ? 'hit' : 'block')); // 打中＝晃動閃光；沒破防＝護盾擋下
     const multi = r.hits.length > 1;
     const lines = [];
     r.hits.forEach((h2) => {
       if (multi) lines.push(targetLine(h2.target.id, h2.result.total));
       lines.push(...trackLines(h2.result));
-      if (h2.ignoreAbs) lines.push('終焉武裝：無視絕對防禦'); else if (h2.abs) lines.push(`敵人絕對防禦 ${h2.abs}`);
+      if (h2.ignoreAbs) lines.push('終焉武裝：無視絕對防禦'); else if (h2.abs) lines.push(`敵人絕對防禦 ${h2.abs}${h2.extraAbs ? `（含 B 技能 +${h2.extraAbs}）` : ''}`);
       lines.push(`${h2.target.id} 生命 ${fmt(befores.get(h2.target.id))} → ${fmt(h2.target.hp)} / ${fmt(h2.target.maxHp)}${h2.target.hp <= 0 ? '　倒下了！' : ''}`);
     });
     lines.push(...r.notes);
     if (r.potion) lines.push(`藥水加成：真實傷害 +${r.potion} 骰`);
+    if (r.dou) lines.push(`鬥氣 −${r.dou}：真實傷害 +${r.douDice} 骰（用到的每一軌）`);
     lines.push(`花費：${costText(r.cost)}`);
     if (state.hp !== hpBefore) lines.push(`${state.name} 生命 ${fmt(hpBefore)} → ${fmt(state.hp)} / ${fmt(maxHp(state))}`);
     publish({
@@ -284,7 +294,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       lines,
     }, { draw });
     if (online()) { // 怪物生命由伺服器改：回報這次打掉多少
-      const hits = r.hits.map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp) })).filter((x) => x.dmg > 0);
+      const hits = r.hits.map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp), ...(extraAbs[x.target.id] ? { usedB: true } : {}) })).filter((x) => x.dmg > 0 || x.usedB);
       if (hits.length) await act({ t: 'encHit', hits });
     }
     commit();
@@ -293,10 +303,20 @@ export function createEncounterCard({ getState, commit, rerender }) {
   async function doDefend(state, m) {
     const modes = sel.modes[m.id] ?? { atk: 0, def: 0 };
     const before = state.hp;
+    // 敵人這回合還能打幾次（普通 1、菁英 2、BOSS 3）；A 技能蓄力過就多加骰。房間模式由伺服器扣次數
+    let extraAtk = 0;
+    try {
+      if (online()) extraAtk = (await encounterAction({ t: 'encUse', id: m.id, use: 'atk' })).extraAtk ?? 0;
+      else {
+        const spent = spendEnemyAttack(state.encounter, m.id);
+        if (spent.error) return toast(spent.error);
+        extraAtk = spent.extraAtk;
+      }
+    } catch (e) { return toast(e.message || '操作失敗。'); }
     let r;
     let draw;
     try {
-      ({ r, draw } = await withRoomEncounter(state, () => rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng))));
+      ({ r, draw } = await withRoomEncounter(state, () => rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng, { extraAtk }))));
     } catch (e) { return rollFailed(e); }
     if (r.error) return toast(r.error);
     playFx(m.id, 'strike'); // 怪物撲過來
@@ -304,6 +324,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       who: state.name, kind: 'defend', label: `${m.id} 攻擊${m.kind === 'boss' ? `（${BOSS_ATK_MODES[modes.atk]}）` : ''}`,
       big: r.result.total, tone: r.result.total > 0 ? 'fail' : 'ok',
       lines: [
+        r.extraAtk ? `敵人 A 技能：這招每一軌各 +${r.extraAtk} 顆攻擊骰` : null,
         ...trackLines(r.result),
         r.potion ? `藥水加成：絕對防禦 +${r.potion} 骰（三軌）` : null,
         r.absorbed?.toShield ? `護盾吸收 ${fmt(r.absorbed.toShield)}` : null,
@@ -388,11 +409,75 @@ export function createEncounterCard({ getState, commit, rerender }) {
   }
 
   function gmBar(enc) {
-    if (!online() || !isGm()) return null;
+    if (!online()) { // 本機模式：沒有先攻順序，自己按「新回合」讓敵人的技能次數恢復
+      return enc.monsters.length
+        ? h('div', { class: 'row stage__gm' },
+            h('span', { class: 'hint', text: `第 ${enc.round ?? 0} 回合` }),
+            h('button', { type: 'button', class: 'btn btn--small', onclick: () => { nextRound(getState().encounter); rerender(); commit(); } }, '▶ 新回合（敵人技能次數恢復）'))
+        : null;
+    }
+    if (!isGm()) return null;
     return h('div', { class: 'row stage__gm' },
+      h('span', { class: 'hint', text: `第 ${enc.round ?? 0} 回合` }),
+      h('button', { type: 'button', class: 'btn btn--small', title: '回合數 +1，敵人的技能次數與蓄力恢復（有先攻順序時，繞完一圈會自動進下一回合）', onclick: () => act({ t: 'encRound' }) }, '▶ 新回合'),
       h('button', { type: 'button', class: 'btn btn--small', onclick: () => { ui.swapFrom = null; act({ t: 'encInit' }); } }, '🎲 抽先攻'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.order?.length || enc.locked, onclick: () => act({ t: 'encStart' }) }, '⚔️ 開打（鎖定）'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, onclick: () => act({ t: 'encNext' }) }, '下一位 ▶'));
+  }
+
+  // ---------- 敵人技能列與回合（2026/10 平衡更新，規則見 game/enemy.js） ----------
+  const SKILL_TIPS = {
+    A: '攻擊強化：用了之後，他的下一次攻擊每一軌各 +20 顆攻擊骰（一回合 1 次）',
+    B: '防禦強化：用了之後，他下一次被打時絕對防禦多 20 顆（BOSS 30 顆）；普通 1 次、菁英與 BOSS 一回合 2 次',
+    C: '喝血：只能在他自己的回合用，回復 ND16 生命（普通 10、菁英 20、BOSS 30 顆）；一回合 1 次',
+  };
+  /** 敵人用技能（GM；本機模式是自己）。房間模式由伺服器處理並寫紀錄 */
+  function useSkill(state, m, skill) {
+    if (online()) return act({ t: 'encUse', id: m.id, use: skill });
+    const r = useEnemySkill(state.encounter, m.id, skill);
+    if (r.error) return toast(r.error);
+    publish({
+      who: state.name, kind: 'note',
+      label: skill === 'C' ? `遭遇：${m.id} 喝血（${r.dice}）` : `遭遇：${m.id} 使用 ${skill} 技能（${SKILL_NAMES[skill]}）`,
+      lines: skill === 'C' ? [`${r.dice} = ${r.rolled}，回復 ${r.healed} 生命`] : [skill === 'A' ? `下一次攻擊，每一軌各 +${r.dice} 顆攻擊骰` : `下一次被打，絕對防禦 +${r.dice} 顆`],
+    });
+    return commit();
+  }
+
+  /** 一隻敵人的技能列：等級與每回合攻擊次數、A／B／C 剩餘次數與蓄力；只有 GM（本機是自己）按得動 */
+  function skillBar(state, enc, m) {
+    if (isDowned(m)) return null;
+    const left = enemyLeft(enc, m);
+    const info = ENEMY_RANKS[left.rank];
+    const canUse = !online() || isGm();
+    const charged = { A: left.chargeA, B: left.chargeB };
+    return h('div', { class: 'eskills', dataset: { rank: left.rank } },
+      h('span', { class: 'badge eskills__rank', title: `每回合攻擊 ${info.attacks} 次`, text: `${info.label}・${info.attacks} 打` }),
+      h('span', { class: 'eskill eskill--atk num', title: '這回合還能打幾次', text: `攻 ${left.atk}/${info.attacks}` }),
+      ['A', 'B', 'C'].map((k) => h('button', {
+        type: 'button', class: 'eskill num', title: SKILL_TIPS[k], dataset: { skill: k, ready: charged[k] ? '1' : '0' },
+        disabled: !canUse || left[k] < 1, 'aria-label': `${m.id} 使用 ${k} 技能：${SKILL_NAMES[k]}，剩 ${left[k]} 次`,
+        onclick: () => useSkill(state, m, k),
+      }, `${k}${k === 'C' ? '🩸' : k === 'A' ? '⚔' : '🛡'} ${left[k]}/${info[k].uses}${charged[k] ? ' ✓' : ''}`)));
+  }
+
+  /** 戰鬥結果（GM；本機是自己）：只記錄到紀錄裡，獎勵由 GM 另外發 */
+  const RESULTS = [
+    ['full', '完全勝利', 'ok', ['敵人被徹底擊敗。', '獲得全部獎勵（技能感悟、經驗、金幣、高級材料或 BOSS 特殊裝備）與配方；完美結局另有特殊紅利。']],
+    ['repel', '擊退勝利', 'ok', ['敵人的血被打到固定值或達成特殊條件，退走或放棄戰鬥。', '獲得一半的獎勵與配方（沒有特殊紅利）。']],
+    ['defeat', '戰敗', 'fail', ['玩家被打空血條或投降。', '什麼也不會得到，之後可能會有戰敗 CG。']],
+  ];
+  function resultBox(state) {
+    if (online() && !isGm()) return null;
+    return h('div', { class: 'row stage__result' },
+      h('span', { class: 'field-label', text: '戰鬥結果' }),
+      RESULTS.map(([id, label, tone, lines]) => h('button', {
+        type: 'button', class: 'btn btn--small btn--ghost', dataset: { result: id },
+        onclick: () => {
+          if (!confirm(`記錄這場戰鬥的結果：${label}？\n${lines.join('\n')}`)) return;
+          publish({ who: state.name, kind: 'note', label: `戰鬥結束：${label}`, tone, lines });
+        },
+      }, label)));
   }
 
   // ---------- BOSS ----------
@@ -443,7 +528,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
               'aria-label': armed ? `再點一次確認承受 ${m.id} 的${name}` : `承受 ${m.id} 的${name}（要點兩下）`,
               onclick: () => confirmHit(`${m.id}:${i}`, () => { modes.atk = i; doDefend(state, m); }),
             }, h('span', { class: 'boss-mode__name', text: armed ? '再點一次確認' : name }), abcCells(monsterAtk(m, i)));
-          })))));
+          }))),
+        skillBar(state, currentEnc(state), m)));
   }
 
   // ---------- 小怪矩陣 ----------
@@ -468,7 +554,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
         title: ui.armed === m.id ? '再點一次確認' : `承受 ${m.id} 的攻擊（${formatAbc(m.atk)}），要點兩下`,
         'aria-label': ui.armed === m.id ? `再點一次確認承受 ${m.id} 的攻擊` : `承受 ${m.id} 的攻擊（要點兩下）`,
         onclick: () => confirmHit(m.id, () => doDefend(state, m)),
-      }, ui.armed === m.id ? '✔' : '🛡️'));
+      }, ui.armed === m.id ? '✔' : '🛡️'),
+      skillBar(state, currentEnc(state), m));
   }
 
   function targetBar(state, enc) {
@@ -536,7 +623,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     return h('section', { class: 'gm-tools__sec' },
       h('h3', { class: 'tray__title', text: '新增敵人' }),
       h('div', { class: 'toggle-row' },
-        [['mob', '小怪'], ['boss', 'BOSS']].map(([id, label]) => h('button', {
+        [['mob', '小怪（普通）'], ['elite', '菁英（2 打）'], ['boss', 'BOSS（3 打）']].map(([id, label]) => h('button', {
           type: 'button', class: 'toggle', 'aria-pressed': String(f.kind === id), onclick: () => { f.kind = id; rerender(); },
         }, label))),
       h('div', { class: 'extra-row' }, numField('數量', 'count', 1), numField('攻擊強度', 'atk'), numField('防禦強度', 'def'), numField('血量', 'hp', 1), numField('絕對防禦（選填）', 'absDef')),
@@ -560,7 +647,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
             if (f[`${side}Type`] && f[`${side}Focus`]) spec[`${side}Focus`] = f[`${side}Focus`];
           }
           if (online()) return act({ t: 'encAdd', kind: f.kind, spec, ...(f.img ? { img: f.img } : {}) });
-          const added = (f.kind === 'boss' ? addBosses : addMobs)(state.encounter, spec);
+          const added = f.kind === 'boss' ? addBosses(state.encounter, spec) : addMobs(state.encounter, { ...spec, ...(f.kind === 'elite' ? { rank: 'elite' } : {}) });
           publish({ who: state.name, kind: 'note', label: `遭遇：新增 ${added.map((m) => m.id).join('、')}`, lines: [] });
           return commit();
         },
@@ -682,6 +769,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
           : null),
       initiativeBar(enc),
       gmBar(enc),
+      enc.monsters.length ? resultBox(state) : null,
       bosses.length ? bossHero(state, bosses) : null,
       mobs.length ? h('ul', { class: 'mobs', 'aria-label': '敵方隨從' }, mobs.map((m) => mobCard(state, m))) : null,
       enc.monsters.length
