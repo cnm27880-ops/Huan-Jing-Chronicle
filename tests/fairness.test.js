@@ -136,3 +136,36 @@ test('第一名開場就倒：隊伍勝率檢查（評價、扣分、模擬的 d
   assert.match(low.advice.join(' '), /太依賴他的輸出/);
   assert.equal(assess({ ...base, outWin: 0.7 }).items.find((i) => i.key === 'outWin').status, 'ok');
 });
+
+test('資料還沒填的玩家：偵測出來並略過，其他人照常；打不穿的另外說明原因', async () => {
+  const { blockedPlayers, splitBlank } = await import('../src/game/fairness.js');
+  const { blankCharacter } = await import('../src/game/importBot.js');
+  const players = [hero(1.5), blankCharacter('新人'), hero(0.8)];
+  const names = ['強', '新人', '中'];
+  const hits = measureHits(players, MOBS);
+  assert.equal(hits[1].perTarget, 0);
+  assert.equal(hits[1].atk, 0); // 沒有攻擊骰
+  assert.ok(hits[0].atk > 0 && hits[0].def > 0);
+  const blocked = blockedPlayers(hits, names);
+  assert.deepEqual(blocked.map((b) => [b.name, b.empty]), [['新人', true]]);
+  assert.match(blocked[0].why, /資料可能還沒填/);
+  const sp = splitBlank(players, names, hits);
+  assert.deepEqual(sp.names, ['強', '中']);
+  assert.equal(sp.players.length, 2);
+  assert.deepEqual(sp.skipped.map((x) => x.name), ['新人']);
+  // 有攻擊骰但打不穿：不算資料沒填，原因寫出攻擊骰與防禦
+  const wall = measureHits([hero(0.2)], [{ kind: 'mob', count: 3, atkPower: 10, defPower: 6000, hp: 100 }]);
+  const b2 = blockedPlayers(wall, ['弱']);
+  assert.equal(b2[0].empty, false);
+  assert.match(b2[0].why, /攻擊骰約 \d+ 顆，敵人防禦約 \d+ 顆/);
+});
+
+test('自動調整：結果不合理（血量被壓到下限）就標記，不建議套用', async () => {
+  const { autoTune: tune, PLANS: P } = await import('../src/game/tuning.js');
+  const evaluate = () => ({ runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 7, avgRoundsWin: 7, avgDamagePerRound: 100, avgMonsterHp: 700, avgDrain: 0.5, drainBy: {}, downRate: [] });
+  const out = await tune({ specs: [{ kind: 'boss', count: 1, hp: 1000, atkPower: 100 }], evaluate, target: P.conservative, yieldFn: async () => {} });
+  assert.equal(out.degenerate, true);
+  assert.match(out.notes.join(' '), /不建議套用/);
+  const ok = await tune({ specs: [{ kind: 'boss', count: 1, hp: 4000, atkPower: 20 }], evaluate: (specs) => ({ runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: specs[0].hp / 400, avgRoundsWin: specs[0].hp / 400, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: Math.min(1, specs[0].atkPower / 200), drainBy: {}, downRate: [] }), target: P.conservative, yieldFn: async () => {} });
+  assert.equal(ok.degenerate, false);
+});

@@ -8,7 +8,7 @@ import { toast } from './controls.js';
 import { listCharacters, fetchCharacter } from '../state/charSync.js';
 import { normalizeCharacter } from '../state/store.js';
 import { simulateBattle, summarize, seededRng, DEFAULT_MAX_ROUNDS } from '../game/simulate.js';
-import { measureHits, rankPlayers, suggestMobHp, capsFor, FAIR } from '../game/fairness.js';
+import { measureHits, rankPlayers, suggestMobHp, capsFor, blockedPlayers, splitBlank, FAIR } from '../game/fairness.js';
 import { POTIONS } from '../game/rules.js';
 import { assess, autoTune, penalty, scaleEncounter, shrinkEncounter, PLANS, TARGET } from '../game/tuning.js';
 import { getEncounter, presetAction } from '../state/rollLog.js';
@@ -36,6 +36,8 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     running: false, progress: 0, result: null, names: [],
     tuning: false, tuneProgress: 0, tuneResults: null, // tuneResults：[{ plan, specs, summary, penalty }]（保守版、激進版各一）；固定敵人時 specs 是調整後的 { monsters }
     tuneFrom: null,
+    skipBlank: true, // 略過沒有攻擊力（角色資料還沒填）的玩家
+    skipped: [], blocked: [], // 這次被略過的、以及打不出傷害的玩家（結果頁上方提醒）
     focus: 'spread', // 怪物怎麼挑目標：spread 平均分散（輪流打每個人）｜random 隨機
     supply: '回春湯', // 假設每位玩家都備足這種血藥（毒性 15 喝滿）；'' ＝ 只用玩家背包裡有的
     override: null, // 固定敵人套用自動調整後的模擬用版本（只在這個面板用，不會改場上或預組）
@@ -100,6 +102,23 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     };
   }
 
+  /**
+   * 讀玩家、量一次出手的傷害、依設定略過「沒有攻擊力」的玩家（角色資料還沒填，會讓整隊看起來只有一個人在打）。
+   * 回傳 { players, names, rank }；全部都沒有攻擊力就丟錯誤。
+   */
+  async function prepareTeam(source) {
+    const all = await loadPlayers();
+    const supply = ui.supply || null;
+    const hits0 = measureHits(all.players, source, { supply });
+    ui.blocked = blockedPlayers(hits0, all.names);
+    let { players, names } = all;
+    ui.skipped = [];
+    if (ui.skipBlank) { ({ players, names } = splitBlank(players, names, hits0)); ui.skipped = all.names.filter((n) => !names.includes(n)); }
+    if (!players.length) throw new Error('選的玩家都沒有攻擊力（角色資料還沒填），沒辦法模擬。');
+    const rank = rankPlayers(players.length === all.players.length ? hits0 : measureHits(players, source, { supply }));
+    return { players, names, rank };
+  }
+
   async function run() {
     if (ui.running || ui.tuning) return;
     if (!ui.picked.size) return toast('至少選一位玩家。');
@@ -108,10 +127,9 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     if (!fixed && !ui.specs.length) return toast('至少加一組敵人。');
     ui.running = true; ui.progress = 0; ui.result = null; ui.tuneResults = null; sheet.refresh();
     try {
-      const { players, names } = await loadPlayers();
-      ui.names = names;
       const source = fixed ?? ui.specs;
-      const rank = rankPlayers(measureHits(players, source, { supply: ui.supply || null }));
+      const { players, names, rank } = await prepareTeam(source);
+      ui.names = names;
       const results = [];
       for (let i = 0; i < RUNS; i++) {
         const opts = { supply: ui.supply || null, focus: ui.focus, focusOrder: rank.order };
@@ -154,8 +172,8 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     if (!fixed && !ui.specs.length) return toast('至少加一組敵人。');
     ui.tuning = true; ui.tuneProgress = 0; ui.tuneResults = null; sheet.refresh();
     try {
-      const { players, names } = await loadPlayers();
-      const rank = rankPlayers(measureHits(players, fixed ?? ui.specs, { supply: ui.supply || null }));
+      const { players, names, rank } = await prepareTeam(fixed ?? ui.specs);
+      if (rank.hits.every((h) => h.perTarget < 1)) throw new Error('所有玩家對這組敵人都打不出傷害，調整數值沒有意義。請先確認角色資料與怪物防禦。');
       const evaluate = makeEvaluate(players, names, rank, fixed, TUNE_RUNS);
       const mob = suggestMobHp(rank.hits); // 小怪血量依最弱玩家一次出手的傷害設
       const plans = [PLANS.conservative, PLANS.aggressive];
@@ -269,6 +287,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     const list = ui.tuneResults;
     if (!list) return null;
     return h('div', { class: 'simtune' },
+      blockedNotice(),
       h('p', { class: 'hint', text: '兩個方案都以目標為範圍（2～3 回合、第一名省力也要贏、最弱的也能打倒小怪）：小怪血量依最弱玩家一次出手的傷害設，BOSS 血量補足回合數，怪物攻擊盡量拉高讓血藥有存在感。保守版偏輕鬆、激進版偏緊繃；預估每組只跑了少數場次，套用後會用 200 場重新確認。' }),
       list.map((t) => {
         const a = assess(t.summary);
@@ -290,7 +309,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
               })),
           t.notes?.length ? h('ul', { class: 'simassess__advice' }, t.notes.map((n) => h('li', { text: n }))) : null,
           h('p', { class: 'hint', text: `預估：${(t.summary.avgRoundsWin ?? t.summary.avgRounds).toFixed(1)} 回合、資源消耗 ${pct(t.summary.avgDrain)}、勝率 ${pct(t.summary.win)}（${exact ? '符合這個方案' : '找不到完全符合的，這是最接近的'}${a.ok ? '' : '；還有項目沒達標'}）` }),
-          h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => applyTune(t.plan) }, `套用${t.plan.label}${ui.tuneFrom ? '（只用在模擬）' : ''}，並用 ${RUNS} 場重新模擬`));
+          t.degenerate ? h('p', { class: 'notice notice--bad', text: '這個方案不合理，已隱藏「套用」。請先處理上面的原因。' }) : h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => applyTune(t.plan) }, `套用${t.plan.label}${ui.tuneFrom ? '（只用在模擬）' : ''}，並用 ${RUNS} 場重新模擬`));
       }));
   }
 
@@ -320,6 +339,21 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         [['spread', '平均分散（輪流打每個人）'], ['strongest', '集火第一名（先打倒他，再打下一個）'], ['random', '隨機（可能集中在同一人）']].map(([v, label]) => h('option', { value: v, selected: v === ui.focus ? true : null, text: label }))));
   }
 
+  /** 提醒：被略過的玩家、以及打不出傷害的玩家（原因：資料沒填，或攻擊骰比敵人防禦低） */
+  function blockedNotice() {
+    const stillBlocked = ui.blocked.filter((b) => !(ui.skipBlank && b.empty));
+    if (!ui.skipped.length && !stillBlocked.length) return null;
+    return h('div', { class: 'notice notice--bad' },
+      ui.skipped.length ? h('p', { text: `已略過 ${ui.skipped.length} 位沒有攻擊力的玩家：${ui.skipped.join('、')}（角色資料可能還沒填；模擬只算有資料的玩家）。` }) : null,
+      stillBlocked.map((b) => h('p', { text: `${b.name}：${b.why}。` })));
+  }
+
+  function skipCard() {
+    return h('label', { class: 'check' },
+      h('input', { type: 'checkbox', checked: ui.skipBlank ? true : null, disabled: ui.running || ui.tuning ? true : null, onchange: (e) => { ui.skipBlank = e.target.checked; ui.result = null; ui.tuneResults = null; sheet.refresh(); } }),
+      h('span', { text: '略過沒有攻擊力的玩家（角色資料還沒填的，不然整隊看起來只有一個人在打）' }));
+  }
+
   function resultView() {
     const r = ui.result;
     if (!r) return null;
@@ -327,6 +361,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     const maxHp10 = Math.max(1, ...r.hpHist);
     return h('div', { class: 'simresult' },
       h('h3', { class: 'section-title', text: `結果（${fmt(r.runs)} 場）` }),
+      blockedNotice(),
       h('div', { class: 'stat-grid' },
         stat('勝率', pct(r.win), `敗 ${pct(r.lose)}・平手 ${pct(r.timeout)}`),
         stat('平均回合', r.avgRoundsWin.toFixed(1), `打贏的場次；全部 ${r.avgRounds.toFixed(1)}・上限 ${DEFAULT_MAX_ROUNDS}`),
@@ -361,7 +396,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       h('p', { class: 'hint', text: '在這個瀏覽器裡跑模擬，只讀取玩家的角色，不會改動任何存檔。' }),
       h('h3', { class: 'section-title', text: '1. 選玩家' }), playersCard(),
       h('h3', { class: 'section-title', text: '2. 敵人' }), sourceCard(),
-      h('h3', { class: 'section-title', text: '3. 血藥與攻擊分配' }), supplyCard(), focusCard(),
+      h('h3', { class: 'section-title', text: '3. 血藥與攻擊分配' }), supplyCard(), focusCard(), skipCard(),
       h('button', { type: 'button', class: 'btn btn--primary btn--go', disabled: ui.running || ui.tuning ? true : null, onclick: run },
         ui.running ? `模擬中… ${Math.round(ui.progress * 100)}%` : `▶ 開始模擬（${RUNS} 場）`),
       resultView());

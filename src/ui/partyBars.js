@@ -4,7 +4,7 @@
 // GM 不顯示（使用者 2026-10-10：GM 不會特意去注意）。資料是房間廣播的 vitals（src/state/vitals.js），判斷在 src/game/nudge.js。
 // ============================================================
 import { h, fmt } from './dom.js';
-import { getRoomStatus, getEncounter } from '../state/rollLog.js';
+import * as defaultRoom from '../state/rollLog.js';
 import { usageOf, barsOf, partyDigest, NUDGE } from '../game/nudge.js';
 
 const pct = (v) => `${Math.round(v * 100)}%`;
@@ -42,21 +42,45 @@ export function mateCard(v, { online = true, inBattle = false } = {}) {
     h('div', { class: 'mate__bars' }, barsOf(v).map(resPill)));
 }
 
-/** 折疊時的摘要列：標題＋幾個狀態小標籤 */
-function renderSummary(summary, d, count) {
-  summary.replaceChildren(...[
-    h('strong', { class: 'sx-party__title', text: `隊友 ${count}` }),
-    count ? h('span', { class: 'sx-chip', dataset: { tone: d.minPct < 30 ? 'bad' : d.minPct < 60 ? 'warn' : 'ok' }, text: `最低生命 ${d.minPct}%` }) : null,
-    d.downed ? h('span', { class: 'sx-chip', dataset: { tone: 'bad' }, text: `${d.downed} 人倒地` }) : null,
-    d.idle.length ? h('span', { class: 'sx-chip', dataset: { tone: 'idle' }, text: `🔔 ${d.idle.join('、')}` }) : null,
-  ].filter(Boolean));
+const OPEN_KEY = 'huanjing:party:open:v1';
+const readOpen = () => { try { return localStorage.getItem(OPEN_KEY) !== '0'; } catch { return true; } };
+const saveOpen = (v) => { try { localStorage.setItem(OPEN_KEY, v ? '1' : '0'); } catch { /* 存不了就算了，下次照預設 */ } };
+
+/** 精簡列上的小頭像：環＝生命，收起來也看得到每位隊友的狀況；有 🔔 表示戰鬥中資源還很滿 */
+function partyDot(v, { idle = false } = {}) {
+  return h('span', { class: 'pdot', dataset: { state: hpState(v) }, style: `--hp:${Math.round(hpPct(v) * 100)}`, role: 'img',
+    title: `${v.name}　生命 ${v.hp}/${v.maxHp}　動用 ${pct(usageOf(v))}${idle ? '　🔔 資源還很滿' : ''}`, 'aria-label': `${v.name} 生命 ${v.hp} / ${v.maxHp}` },
+  h('span', { class: 'pdot__initial', text: [...(v.name || '?')][0] }),
+  idle ? h('span', { class: 'pdot__bell', 'aria-hidden': 'true', text: '🔔' }) : null);
 }
 
-/** 回傳 { node, render }：node 放進版面，房間狀態變了就呼叫 render()（只重畫內容，折疊狀態不變） */
-export function createPartyPanel() {
-  const summary = h('summary', { class: 'sx-party__sum' });
-  const body = h('div', { class: 'sx-party__body' });
-  const node = h('details', { class: 'sx-party', open: true, hidden: true }, summary, body);
+/**
+ * 回傳 { node, render }：懸浮面板——常駐一條精簡列（每位隊友一個生命環），展開時浮在紀錄上方、不擠佔版面。
+ * 單擊精簡列展開／收合；展開後在面板上雙擊也能收合；有人倒地或生命危急時會自動展開（只展開、不改記住的偏好），
+ * 所以就算玩家收起來，出事時還是看得到。收合偏好記在這台裝置（localStorage）。
+ */
+export function createPartyPanel({ room = defaultRoom } = {}) {
+  const { getRoomStatus, getEncounter } = room;
+  const label = h('span', { class: 'sx-party__label' });
+  const dots = h('span', { class: 'sx-party__dots' });
+  const chips = h('span', { class: 'sx-party__chips' });
+  const chevron = h('span', { class: 'sx-party__chev', 'aria-hidden': 'true', text: '▾' });
+  const bar = h('button', { type: 'button', class: 'sx-party__bar', 'aria-expanded': 'true', title: '單擊展開／收合隊友資源' }, label, dots, chips, chevron);
+  const pop = h('div', { class: 'sx-party__pop', title: '雙擊收合' });
+  const node = h('div', { class: 'sx-party', hidden: true }, bar, pop);
+  let open = readOpen();
+  let lastDowned = 0;
+  let lastDanger = false;
+
+  const apply = () => {
+    pop.hidden = !open;
+    bar.setAttribute('aria-expanded', String(open));
+    chevron.textContent = open ? '▴' : '▾';
+    node.dataset.open = open ? '1' : '0';
+  };
+  const toggle = () => { open = !open; saveOpen(open); apply(); };
+  bar.addEventListener('click', toggle);
+  pop.addEventListener('dblclick', () => { open = false; saveOpen(false); apply(); });
 
   function render() {
     const r = getRoomStatus();
@@ -68,11 +92,23 @@ export function createPartyPanel() {
     const inBattle = Boolean(getEncounter()?.monsters?.some((m) => m.hp > 0));
     const d = partyDigest(mates.map(([, v]) => v), { inBattle });
     node.dataset.level = d.level;
-    renderSummary(summary, d, mates.length);
-    body.replaceChildren(mates.length
+    label.textContent = `隊友 ${mates.length}`;
+    dots.replaceChildren(...mates.map(([, v]) => partyDot(v, { idle: inBattle && !v.downed && usageOf(v) < NUDGE.idleUsage })));
+    chips.replaceChildren(...[
+      d.downed ? h('span', { class: 'sx-chip', dataset: { tone: 'bad' }, text: `${d.downed} 倒地` }) : null,
+      !d.downed && mates.length && d.minPct < 30 ? h('span', { class: 'sx-chip', dataset: { tone: 'bad' }, text: `最低 ${d.minPct}%` }) : null,
+    ].filter(Boolean));
+    pop.replaceChildren(mates.length
       ? h('ul', { class: 'party__list' }, mates.map(([uid, v]) => mateCard(v, { online: onlineIds.has(uid), inBattle })))
-      : h('p', { class: 'hint', text: '隊友上線並操作過角色後，這裡會顯示他們的生命與資源。每一條都是「還剩多少」，空了＝用光。' }));
+      : h('p', { class: 'hint', text: '隊友上線並操作過角色後，這裡會顯示他們的生命與資源。每一個膠囊都填到「還剩多少」，空了＝用光。' }));
+    // 出事了就自動展開（有人新倒地、或有人生命危急）；已經展開的不動，收起來的偏好也不會被改掉
+    const danger = mates.some(([, v]) => !v.downed && v.maxHp > 0 && v.hp / v.maxHp < NUDGE.danger);
+    if (!open && (d.downed > lastDowned || (danger && !lastDanger))) open = true;
+    lastDowned = d.downed;
+    lastDanger = danger;
+    apply();
   }
 
+  apply();
   return { node, render };
 }
