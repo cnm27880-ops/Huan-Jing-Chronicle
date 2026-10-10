@@ -9,6 +9,7 @@ import { toast } from './controls.js';
 import * as defaultRoom from '../state/rollLog.js';
 import { takeItems, refundItems } from '../game/mail.js';
 import { detectEvents, createNudgeGate, canFeed, myOptions } from '../game/nudge.js';
+import { resPill } from './partyBars.js';
 
 const LOCK_MS = 1000; // 「我知道了」要等一下才能按（不是故意刁難：避免連點把提醒直接關掉）
 const pctOf = (v) => (v.maxHp > 0 ? Math.round((v.hp / v.maxHp) * 100) : 0);
@@ -50,16 +51,21 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
     draw();
   }
 
-  const titleOf = (ev) => {
-    if (ev.kind === 'downed') return `🆘 ${ev.name} 倒地了`;
-    if (ev.kind === 'danger') return `⚠️ ${ev.name} 生命只剩 ${pctOf(vitals[ev.uid] ?? { hp: 0, maxHp: 1 })}%`;
-    return `🔥 全隊吃緊：${(ev.uids ?? []).map((u) => vitals[u]?.name).filter(Boolean).join('、')} 都有麻煩`;
-  };
+  /** 事件的圖示、標題、副標（目前的生命與毒性） */
+  function metaOf(ev) {
+    const uid = ev.uid ?? targetOf(ev);
+    const v = uid ? vitals[uid] : null;
+    const sub = v ? `生命 ${fmt(v.hp)}/${fmt(v.maxHp)}${typeof v.tox === 'number' ? `・毒性 ${v.tox}/15` : ''}` : '';
+    if (ev.kind === 'downed') return { icon: '✚', title: `${ev.name} 倒地了`, sub, v };
+    if (ev.kind === 'danger') return { icon: '!', title: `${ev.name} 生命危急`, sub, v };
+    return { icon: '≋', title: '全隊吃緊', sub: `${(ev.uids ?? []).map((u) => vitals[u]?.name).filter(Boolean).join('、')} 都有麻煩`, v: null };
+  }
 
-  /** 一個事件的區塊；同一位隊友只在第一個事件出現餵藥按鈕（covered），喝得下的藥水最多列 3 瓶，全都喝不下就改成一句話 */
+  /** 一個事件的卡片；同一位隊友只在第一個事件出現餵藥選項（covered），喝得下的藥水最多列 3 瓶，全都喝不下就改成一句話 */
   function eventBlock(ev, opts, covered) {
     const uid = targetOf(ev);
     const mate = uid ? vitals[uid] : null;
+    const meta = metaOf(ev);
     const rows = [];
     if (mate && !covered.has(uid)) {
       covered.add(uid);
@@ -67,37 +73,46 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
       if (fit.length) {
         rows.push(h('div', { class: 'nudge__acts' }, fit.map((p) => {
           const done = modal.fed.has(`${uid}:${p.name}`);
-          return h('button', {
-            type: 'button', class: 'btn btn--primary btn--small', disabled: done ? true : null,
-            onclick: (e) => feed(uid, p.name, e.currentTarget),
-          }, done ? `✓ 已餵 ${p.name}` : `餵 ${mate.name}：${p.name}（約 +${fmt(Math.round(p.avg))}・剩 ${fmt(p.qty)}）`);
+          return h('button', { type: 'button', class: 'nudge__potion', disabled: done ? true : null, onclick: (e) => feed(uid, p.name, e.currentTarget) },
+            h('span', { class: 'nudge__pname', text: p.name }),
+            h('span', { class: 'nudge__pdesc', text: `約回復 ${fmt(Math.round(p.avg))}・剩 ${fmt(p.qty)}` }),
+            h('span', { class: 'nudge__pgo', text: done ? '✓ 已餵' : `餵給 ${mate.name}` }));
         })));
       } else if (opts.heals.length) {
         rows.push(h('p', { class: 'nudge__none', text: `${mate.name} 的毒性已滿，喝不下藥水。` }));
       }
     }
-    return h('section', { class: 'nudge__ev', dataset: { kind: ev.kind } }, h('h3', { class: 'nudge__evtitle', text: titleOf(ev) }), rows);
+    const pct = meta.v && meta.v.maxHp > 0 ? Math.max(0, Math.min(100, (meta.v.hp / meta.v.maxHp) * 100)) : null;
+    return h('section', { class: 'nudge__ev', dataset: { kind: ev.kind } },
+      h('div', { class: 'nudge__evhead' },
+        h('span', { class: 'nudge__evicon', 'aria-hidden': 'true', text: meta.icon }),
+        h('div', { class: 'nudge__evtext' }, h('strong', { class: 'nudge__evtitle', text: meta.title }), meta.sub ? h('small', { class: 'nudge__evsub', text: meta.sub }) : null)),
+      pct == null ? null : h('span', { class: 'nudge__hp' }, h('span', { class: 'nudge__hpfill', style: `width:${pct}%` })),
+      rows);
   }
 
   function draw() {
     if (!modal) return;
     const state = getState();
     const opts = myOptions(state);
-    const fresh = opts.fresh.map((r) => `${r.key} ${fmt(r.now)}/${fmt(r.max)}`);
     const tips = [];
-    if (fresh.length) tips.push(`你還有這些資源可以用：${fresh.join('、')}（招式與鬥氣加骰都會用到）。`);
-    if (opts.buffs.length) tips.push(`你還有 ${opts.buffs.map((b) => `${b.name}×${fmt(b.qty)}`).join('、')} 可以用（攻擊／防禦藥水）。`);
+    if (opts.fresh.length) tips.push('招式與鬥氣加骰都會用到這些資源。');
+    if (opts.buffs.length) tips.push(`攻擊／防禦藥水：${opts.buffs.map((b) => `${b.name}×${fmt(b.qty)}`).join('、')}。`);
     if (!opts.heals.length) tips.push('你手上沒有可以餵的回復藥水。');
     const onSession = location.hash === '#session';
     const dismiss = modal.dismiss;
     const covered = new Set();
     modal.panel.replaceChildren(...[ // replaceChildren 不收陣列也不收 null，先攤平
-      h('h2', { class: 'nudge__title', text: '隊友需要幫忙' }),
-      modal.events.map((ev) => eventBlock(ev, opts, covered)),
-      h('p', { class: 'nudge__you-title', text: '你現在能做的' }),
-      h('ul', { class: 'nudge__tips' }, tips.map((t) => h('li', { text: t }))),
+      h('header', { class: 'nudge__head' },
+        h('span', { class: 'nudge__icon', 'aria-hidden': 'true', text: '!' }),
+        h('div', {}, h('h2', { class: 'nudge__title', text: '隊友需要幫忙' }), h('p', { class: 'nudge__sub', text: '戰鬥中的狀況，以下是你現在可以做的事。' }))),
+      h('div', { class: 'nudge__evs' }, modal.events.map((ev) => eventBlock(ev, opts, covered))),
+      h('section', { class: 'nudge__you' },
+        h('h3', { class: 'nudge__you-title', text: '你還有這些資源可以用' }),
+        opts.fresh.length ? h('div', { class: 'mate__bars' }, opts.fresh.map((r) => resPill({ key: r.key, now: r.now, max: r.max, left: r.now / r.max, text: `${r.key} ${r.now} / ${r.max}` }))) : h('p', { class: 'nudge__none', text: '你的資源已經用掉大半。' }),
+        tips.length ? h('ul', { class: 'nudge__tips' }, tips.map((t) => h('li', { text: t }))) : null),
       h('div', { class: 'nudge__foot' },
-        onSession ? null : h('button', { type: 'button', class: 'btn btn--small', onclick: () => { dismiss(); location.hash = '#session'; } }, '到跑團頁出招'),
+        onSession ? null : h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => { dismiss(); location.hash = '#session'; } }, '到跑團頁'),
         dismiss.btn)].flat());
   }
 
@@ -109,17 +124,17 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
     }
     const panel = h('div', { class: 'nudge__panel', role: 'alertdialog', 'aria-modal': 'true', 'aria-label': '隊友需要幫忙' });
     const backdrop = h('div', { class: 'nudge', 'aria-hidden': 'false' }, panel);
-    const btn = h('button', { type: 'button', class: 'btn btn--small', disabled: true }, '我知道了（1）');
+    const btn = h('button', { type: 'button', class: 'btn btn--primary', disabled: true }, '我知道了');
     const dismiss = () => { backdrop.remove(); modal = null; };
     dismiss.btn = btn;
     btn.addEventListener('click', dismiss);
     modal = { events: [...events], panel, node: backdrop, fed: new Set(), dismiss };
     document.body.append(backdrop);
     draw();
-    setTimeout(() => { btn.disabled = false; btn.textContent = '我知道了'; }, LOCK_MS);
+    setTimeout(() => { btn.disabled = false; }, LOCK_MS);
     // 擋住 Esc 讓底下的面板也不會被關掉；提醒本身只能按「我知道了」
     backdrop.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); } });
-    (panel.querySelector('.btn--primary:not(:disabled)') ?? btn).focus({ preventScroll: true });
+    (panel.querySelector('.nudge__potion:not(:disabled)') ?? btn).focus({ preventScroll: true });
   }
 
   subscribeRoom(() => {
