@@ -92,8 +92,9 @@ export function assess(sum) {
  * evaluate(specs) → summarize 的結果（呼叫端決定每次跑幾場）；specs 是自訂強度的敵人清單。
  * 回傳 { specs, hpScale, atkScale, summary, penalty }。每評估一次就 await 一下，畫面才不會卡住。
  */
-export async function autoTune({ specs, evaluate, target = TARGET, onProgress = () => {}, yieldFn = () => new Promise((res) => setTimeout(res, 0)), maxIter = 12 }) {
-  const apply = (kh, ka) => specs.map((s) => ({ ...s, hp: Math.max(1, Math.round(s.hp * kh)), atkPower: Math.max(1, Math.round(s.atkPower * ka)) }));
+export async function autoTune({ specs, evaluate, target = TARGET, onProgress = () => {}, yieldFn = () => new Promise((res) => setTimeout(res, 0)), maxIter = 12, build = null }) {
+  // build(血量倍率, 攻擊倍率) 可以換成別的縮放方式（固定敵人用 scaleEncounter）；evaluate 收到的就是 build 的結果
+  const apply = build ?? ((kh, ka) => specs.map((s) => ({ ...s, hp: Math.max(1, Math.round(s.hp * kh)), atkPower: Math.max(1, Math.round(s.atkPower * ka)) })));
   let best = { kh: 1, ka: 1 };
   let bestSum = evaluate(apply(1, 1));
   let bestPen = penalty(bestSum, target);
@@ -114,4 +115,19 @@ export async function autoTune({ specs, evaluate, target = TARGET, onProgress = 
     if (!improved) step = Math.sqrt(step);
   }
   return { specs: apply(best.kh, best.ka), hpScale: best.kh, atkScale: best.ka, summary: bestSum, penalty: bestPen };
+}
+
+/**
+ * 固定敵人（場上的或預組，A/B/C 已經抽好）的縮放：血量乘 kh、每條軌道的攻擊骰數乘 ka（有骰的軌道至少 1 顆）。
+ * 回傳新的 { monsters }，不改動原本的資料；BOSS 的 atk 是三種攻擊（陣列），小怪是單一份。
+ */
+export function scaleEncounter(enc, kh, ka) {
+  const scaleDice = (d) => Object.fromEntries(Object.entries(d ?? {}).map(([t, v]) => [t, v > 0 ? Math.max(1, Math.round(v * ka)) : v]));
+  return {
+    ...enc,
+    monsters: (enc.monsters ?? []).map((m) => {
+      const maxHp = Math.max(1, Math.round(m.maxHp * kh));
+      return { ...m, maxHp, hp: maxHp, atk: Array.isArray(m.atk) ? m.atk.map(scaleDice) : scaleDice(m.atk) };
+    }),
+  };
 }
