@@ -8,7 +8,7 @@ import { toast } from './controls.js';
 import { listCharacters, fetchCharacter } from '../state/charSync.js';
 import { normalizeCharacter } from '../state/store.js';
 import { simulateBattle, summarize, DEFAULT_MAX_ROUNDS } from '../game/simulate.js';
-import { assess, autoTune, penalty, PLANS, TARGET } from '../game/tuning.js';
+import { assess, autoTune, penalty, scaleEncounter, PLANS, TARGET } from '../game/tuning.js';
 import { getEncounter, presetAction } from '../state/rollLog.js';
 import { formatAbc } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
@@ -32,9 +32,16 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     list: null, error: '', picked: new Set(), cache: new Map(), loading: false,
     specs: [], form: { kind: 'mob', count: 1, atkPower: 100, defPower: 100, hp: 1000, absDef: 0, atkMod: '', defMod: '' },
     running: false, progress: 0, result: null, names: [],
-    tuning: false, tuneProgress: 0, tuneResults: null, // tuneResults：[{ plan, specs, summary, penalty }]（保守版、激進版各一）
+    tuning: false, tuneProgress: 0, tuneResults: null, // tuneResults：[{ plan, specs, summary, penalty }]（保守版、激進版各一）；固定敵人時 specs 是調整後的 { monsters }
+    tuneFrom: null,
+    override: null, // 固定敵人套用自動調整後的模擬用版本（只在這個面板用，不會改場上或預組）
   };
   let sheet;
+
+  /** 跑完後把結果捲到畫面上（結果在面板最下面，不捲的話要自己往下拉） */
+  function scrollTo(selector) {
+    requestAnimationFrame(() => document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
 
   async function loadList() {
     try { ui.list = await list(); } catch (e) { ui.error = e.message; }
@@ -44,6 +51,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
 
   /** 固定敵人（場上的或預組）；自訂強度回傳 null */
   function fixedEnemies() {
+    if (ui.override) return ui.override;
     if (ui.source === 'stage') return getEncounter()?.monsters?.length ? { monsters: getEncounter().monsters } : null;
     if (ui.source.startsWith('preset:')) return ui.presetList.find((p) => `preset:${p.name}` === ui.source) ?? null;
     return null;
@@ -90,37 +98,48 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     } catch (e) { toast(e.message || '模擬失敗。'); }
     ui.running = false; ui.progress = 1;
     sheet.refresh();
+    if (ui.result) scrollTo('.simresult');
   }
 
-  /** 自動調整：只動「自訂強度」的敵人（血量與攻擊強度一起縮放），保守版、激進版各找一組，讓 GM 比較後挑一個套用 */
+  /**
+   * 自動調整：血量與攻擊一起縮放，保守版、激進版各找一組，讓 GM 比較後挑一個套用。
+   * 自訂強度：縮放敵人的血量與攻擊強度；場上的敵人／預組：縮放血量與 A/B/C 攻擊骰數（只影響模擬，不改場上與預組）。
+   */
   async function tune() {
     if (ui.running || ui.tuning) return;
-    if (ui.source !== 'custom') return toast('自動調整只能用在「自訂強度」；場上的敵人和預組的 A/B/C 是固定的。');
     if (!ui.picked.size) return toast('至少選一位玩家。');
-    if (!ui.specs.length) return toast('至少加一組敵人。');
+    const fixed = ui.source === 'custom' ? null : fixedEnemies();
+    if (ui.source !== 'custom' && !fixed) return toast('場上沒有敵人，或找不到這個預組。');
+    if (!fixed && !ui.specs.length) return toast('至少加一組敵人。');
     ui.tuning = true; ui.tuneProgress = 0; ui.tuneResults = null; sheet.refresh();
     try {
       const { players, names } = await loadPlayers();
-      const evaluate = (specs) => summarize(Array.from({ length: TUNE_RUNS }, () => simulateBattle(players, specs.map((s) => ({ ...s })))), names);
+      const evaluate = fixed
+        ? (enc) => summarize(Array.from({ length: TUNE_RUNS }, () => simulateBattle(players, [], { encounter: enc })), names)
+        : (specs) => summarize(Array.from({ length: TUNE_RUNS }, () => simulateBattle(players, specs.map((s) => ({ ...s })))), names);
       const plans = [PLANS.conservative, PLANS.aggressive];
       const out = [];
       for (const [i, plan] of plans.entries()) {
         const r = await autoTune({
           specs: ui.specs, evaluate, target: plan,
+          build: fixed ? (kh, ka) => scaleEncounter(fixed, kh, ka) : null,
           onProgress: (p) => { ui.tuneProgress = (i + p) / plans.length; sheet.refresh(); },
         });
         out.push({ plan, ...r });
       }
       ui.tuneResults = out;
+      ui.tuneFrom = fixed; // 調整前的固定敵人（畫面比對前後用）；自訂強度時是 null
     } catch (e) { toast(e.message || '自動調整失敗。'); }
     ui.tuning = false;
     sheet.refresh();
+    if (ui.tuneResults) scrollTo('.simtune');
   }
 
   function applyTune(plan) {
     const t = ui.tuneResults?.find((x) => x.plan.key === plan.key);
     if (!t) return;
-    ui.specs = t.specs.map((s) => ({ ...s }));
+    if (ui.tuneFrom) ui.override = t.specs; // 固定敵人：之後的模擬都用調整後的版本
+    else ui.specs = t.specs.map((s) => ({ ...s }));
     ui.tuneResults = null;
     run(); // 套用後馬上用 200 場確認
   }
@@ -146,7 +165,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     const fixed = fixedEnemies();
     return h('div', {},
       h('label', { class: 'extra' }, h('span', { text: '敵人來源' }),
-        h('select', { class: 'field', disabled: ui.running ? true : null, onchange: (e) => { ui.source = e.target.value; sheet.refresh(); } },
+        h('select', { class: 'field', disabled: ui.running ? true : null, onchange: (e) => { ui.source = e.target.value; ui.override = null; ui.tuneResults = null; sheet.refresh(); } },
           options.map(([v, label]) => h('option', { value: v, selected: v === ui.source ? true : null, text: label })))),
       h('p', { class: 'hint', text: ui.source === 'custom'
         ? '每一場都重新抽怪物的 A/B/C，所以勝率代表「這種強度的敵人，平均來說打不打得贏」（會包含抽到很兇或很弱的情況）。'
@@ -154,9 +173,9 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       ui.source === 'custom'
         ? enemiesCard()
         : fixed
-          ? h('ul', { class: 'import-list' }, fixed.monsters.map((m) => h('li', { class: 'import-row' },
+          ? h('div', {}, ui.override ? h('p', { class: 'notice', text: '目前用的是「自動調整後」的數值（只影響模擬，不會改場上或預組的敵人）。' }) : null, h('ul', { class: 'import-list' }, fixed.monsters.map((m) => h('li', { class: 'import-row' },
               h('span', { text: `${m.kind === 'boss' ? '👹' : m.rank === 'elite' ? '👺' : '👾'} ${m.id}　血 ${fmt(m.maxHp)}${m.abs ? `・絕防 ${fmt(m.abs)}` : ''}` }),
-              h('small', { class: 'hint', text: m.kind === 'boss' ? `攻 ${m.atk.map(formatAbc).join('／')}` : `攻 ${formatAbc(m.atk)}・防 ${formatAbc(m.def)}` }))))
+              h('small', { class: 'hint', text: m.kind === 'boss' ? `攻 ${m.atk.map(formatAbc).join('／')}` : `攻 ${formatAbc(m.atk)}・防 ${formatAbc(m.def)}` })))))
           : h('p', { class: 'notice', text: '場上沒有敵人。先在跑團頁新增，或改選預組／自訂強度。' }));
   }
 
@@ -200,9 +219,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         h('span', { class: 'badge', dataset: { tone: i.status === 'ok' ? 'good' : 'bad' }, text: `${STATUS_LABEL[i.status]}・${i.text}` })))),
       h('h3', { class: 'section-title', text: '策略建議' }),
       h('ul', { class: 'simassess__advice' }, a.advice.map((t) => h('li', { text: t }))),
-      ui.source === 'custom'
-        ? h('button', { type: 'button', class: 'btn btn--small', disabled: ui.running || ui.tuning ? true : null, onclick: tune }, ui.tuning ? `調整中… ${Math.round(ui.tuneProgress * 100)}%` : '🎯 自動調整數值（保守／激進兩個方案）')
-        : null,
+      h('button', { type: 'button', class: 'btn btn--small', disabled: ui.running || ui.tuning ? true : null, onclick: tune }, ui.tuning ? `調整中… ${Math.round(ui.tuneProgress * 100)}%` : '🎯 自動調整數值（保守／激進兩個方案）'),
       tuneView());
   }
 
@@ -217,13 +234,20 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         const exact = penalty(t.summary, t.plan) === 0;
         return h('section', { class: 'simtune__plan' },
           h('h4', { class: 'field-label', text: `${t.plan.key === 'aggressive' ? '🔥' : '🛡️'} ${t.plan.label}：${t.plan.note}` }),
-          h('ul', { class: 'import-list' }, t.specs.map((s, i) => {
-            const o = ui.specs[i];
-            return h('li', { class: 'import-row' },
-              h('span', { text: `${{ boss: '👹 BOSS', elite: '👺 菁英' }[s.kind] ?? '👾 小怪'} ×${s.count}　血量 ${fmt(o.hp)} → ${fmt(s.hp)}　攻擊強度 ${fmt(o.atkPower)} → ${fmt(s.atkPower)}` }));
-          })),
+          ui.tuneFrom
+            ? h('ul', { class: 'import-list' }, t.specs.monsters.map((m, i) => {
+                const o = ui.tuneFrom.monsters[i];
+                const atk = (x) => (Array.isArray(x.atk) ? x.atk.map(formatAbc).join('／') : formatAbc(x.atk));
+                return h('li', { class: 'import-row' },
+                  h('span', { text: `${m.kind === 'boss' ? '👹' : m.rank === 'elite' ? '👺' : '👾'} ${m.id}　血量 ${fmt(o.maxHp)} → ${fmt(m.maxHp)}　攻擊 ${atk(o)} → ${atk(m)}` }));
+              }))
+            : h('ul', { class: 'import-list' }, t.specs.map((s, i) => {
+                const o = ui.specs[i];
+                return h('li', { class: 'import-row' },
+                  h('span', { text: `${{ boss: '👹 BOSS', elite: '👺 菁英' }[s.kind] ?? '👾 小怪'} ×${s.count}　血量 ${fmt(o.hp)} → ${fmt(s.hp)}　攻擊強度 ${fmt(o.atkPower)} → ${fmt(s.atkPower)}` }));
+              })),
           h('p', { class: 'hint', text: `預估：${t.summary.avgRounds.toFixed(1)} 回合、資源消耗 ${pct(t.summary.avgDrain)}、勝率 ${pct(t.summary.win)}（${exact ? '符合這個方案' : '找不到完全符合的，這是最接近的'}${a.ok ? '' : '；還有項目沒達標'}）` }),
-          h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => applyTune(t.plan) }, `套用${t.plan.label}，並用 ${RUNS} 場重新模擬`));
+          h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => applyTune(t.plan) }, `套用${t.plan.label}${ui.tuneFrom ? '（只用在模擬）' : ''}，並用 ${RUNS} 場重新模擬`));
       }));
   }
 

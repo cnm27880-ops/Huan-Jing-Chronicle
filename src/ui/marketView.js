@@ -32,7 +32,7 @@ async function doBlackBuy(state, item, qty, commit) {
   try { ({ r, draw } = await rollWith(state, (st, rng) => blackBuy(st, item, qty, rng))); } catch (e) { return rollFailed(e); }
   if (r.error) return toast(r.error);
   publish({
-    who: state.name, kind: 'note', label: `黑市購買 ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 金幣`,
+    who: state.name, kind: 'deal', label: `黑市購買 ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 金幣`,
     tone: r.labor ? 'fail' : undefined,
     lines: [
       `${diceText(BLACK_BUY_DICE)} → ${r.roll}（溢價 ×${r.rate}）`,
@@ -51,7 +51,7 @@ async function doBlackSell(state, item, qty, commit, gearIds = null) {
   try { ({ r, draw } = await rollWith(state, (st, rng) => blackSell(st, item, qty, rng, gearIds))); } catch (e) { return rollFailed(e); }
   if (r.error) return toast(r.error);
   publish({
-    who: state.name, kind: 'note', label: `黑市販賣 ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 代金券`,
+    who: state.name, kind: 'deal', label: `黑市販賣 ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 代金券`,
     lines: [`${diceText(BLACK_SELL_DICE)} → ${r.roll}（壓價 ×${r.rate}）`, `${fmt(r.unit)} × ${fmt(qty)} × ${r.rate} = ${fmt(r.total)} 代金券`],
   }, { draw });
   toast(`得到 ${fmt(r.total)} 代金券`);
@@ -70,9 +70,8 @@ function doHall(state, side, item, qty, commit, gearIds = null) {
 function doSpecial(state, side, item, qty, commit, gearIds = null) {
   const r = specialTrade(state, side, item, qty, gearIds);
   if (r.error) return toast(r.error);
-  publish({ who: state.name, kind: 'note', label: `特殊黑市${side === 'buy' ? '購買' : '販賣'} ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 代金券`, lines: [`本次黑市團還能交易 ${specialLeft(state)} 個`] });
   toast(`${side === 'buy' ? '花了' : '得到'} ${fmt(r.total)} 代金券`);
-  logActivity(state, { cat: 'item', text: `特殊黑市${side === 'buy' ? '購買' : '販賣'} ${item} ×${fmt(qty)}，${fmt(r.total)} 代金券`, lines: [] });
+  logActivity(state, { cat: 'item', text: `特殊黑市${side === 'buy' ? '購買' : '販賣'} ${item} ×${fmt(qty)}，${fmt(r.total)} 代金券`, lines: [`本次黑市團還能交易 ${specialLeft(state)} 個`] });
   commit();
 }
 
@@ -118,9 +117,10 @@ export function createMarketView({ root, getState, commit }) {
     return h('li', { class: `trade-row${tier !== null ? ' rarity' : ''}`, dataset: { tier: tier ?? 'none', rarity: tier ?? 'none' } },
       h('span', { class: 'trade-row__icon', 'aria-hidden': 'true', text: iconOf(item) }),
       h('div', { class: 'trade-row__info' },
-        h('strong', { class: 'rarity__name', text: plainName(item) }),
-        rarityTag(tier),
-        have != null ? h('small', { class: 'trade-row__have', text: `持有 ${fmt(have)}` }) : null,
+        h('div', { class: 'trade-row__head' },
+          h('strong', { class: 'rarity__name', text: plainName(item) }),
+          rarityTag(tier),
+          have != null ? h('small', { class: 'trade-row__have', text: `持有 ${fmt(have)}` }) : null),
         h('span', { class: 'trade-row__price', text: price }),
         subEl),
       h('div', { class: 'trade-row__act' },

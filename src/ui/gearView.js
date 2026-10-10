@@ -15,12 +15,12 @@ import {
 } from '../game/equipment.js';
 import { derivedStats } from '../game/stats.js';
 import { RULE_SKILLS } from '../game/skills.js';
-import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL } from '../game/skillTable.js';
+import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable } from '../game/skillTable.js';
 import { publish, rollWith } from '../state/rollLog.js';
+import { logActivity } from '../state/activityLog.js';
 import { openReveal } from './reveal.js';
 import { openGearSellSheet } from './marketView.js';
-import { openSheet } from './sheet.js';
-import { skillTile, skillInfoBlock } from './skillTile.js';
+import { badgeCard } from './badgePanel.js';
 
 const tierIndex = (g) => GEAR_TIERS.indexOf(g.tier);
 const SLOT_ICON = { weapon: '⚔️', armor: '🛡️', accessory: '💍' };
@@ -64,36 +64,23 @@ export function createGearView({ root, getState, commit }) {
       h('button', { type: 'button', class: 'btn btn--ghost btn--small stat-food', onclick: () => openFoodSheet(state, 'session', commit) }, '🍽️ 跑團胃袋吃東西'));
   }
 
-  // ---------- 技能等級（原本在戰鬥頁，功能不變） ----------
-  // ---------- 技能（新匯入的角色：技能目錄 + 自動加總） ----------
-  const TIER_RANK = { 初階: 0, 進階: 1, 大師: 2, 傳說: 3, 神級: 4 };
-
-  function catalogSkillCard(state) {
-    const rank = (n) => TIER_RANK[SKILL_TABLE[n]?.tier] ?? 9;
-    const learned = Object.entries(state.skills ?? {}).filter(([n]) => inCatalog(n))
-      .sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0], 'zh-TW'));
-    const unlearned = Object.keys(SKILL_TABLE).filter((n) => !(n in (state.skills ?? {})))
-      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'zh-TW'));
+  // ---------- 啟動型技能（武裝這類要花算力啟動才會算進面板；其他已學技能在修整日「學習」看） ----------
+  function activationCard(state) {
+    const list = Object.entries(state.skills ?? {}).filter(([n]) => inCatalog(n) && needsActivation(n))
+      .sort((a, b) => a[0].localeCompare(b[0], 'zh-TW'));
+    if (!list.length) return null;
     return h('section', { class: 'card' },
-      h('h2', { class: 'section-title', text: `技能（已學會 ${fmt(learned.length)} 個）` }),
-      learned.length
-        ? h('div', { class: 'skill-tiles' }, learned.map(([name, lv]) => {
-            const t = SKILL_TABLE[name];
-            const footer = needsActivation(name)
-              ? h('label', { class: 'check skill-tile__on', onclick: (e) => e.stopPropagation() },
-                  h('input', { type: 'checkbox', checked: state.skillOn?.[name] ? true : null, onchange: (e) => { state.skillOn = { ...state.skillOn, [name]: e.target.checked }; commit(); } }),
-                  h('span', { text: `啟動 −${t.activate.算力} 算力` }))
-              : null;
-            return skillTile(name, {
-              level: lv, footer, note: t.manual ? '數值手動' : null,
-              onOpen: () => openSheet(name, () => h('div', { class: 'learn' }, skillInfoBlock(name), h('p', { class: 'hint', text: `目前 ${lv} 級` }))),
-            });
-          }))
-        : h('p', { class: 'notice', text: '還沒有學會技能。' }));
+      h('h2', { class: 'section-title', text: '啟動型技能' }),
+      h('p', { class: 'hint', text: '勾選才會把效果算進數值面板，並扣除算力。其他技能到「修整日 → 學習」查看。' }),
+      h('ul', { class: 'activate-grid' }, list.map(([name, lv]) => h('li', { class: 'activate-cell' },
+        h('strong', { text: `${name}　${lv} 級` }),
+        h('label', { class: 'check' },
+          h('input', { type: 'checkbox', checked: state.skillOn?.[name] ? true : null, onchange: (e) => { state.skillOn = { ...state.skillOn, [name]: e.target.checked }; commit(); } }),
+          h('span', { text: `啟動 −${SKILL_TABLE[name].activate.算力} 算力` }))))));
   }
 
   function skillCard(state) {
-    if (usesSkillTable(state)) return catalogSkillCard(state);
+    if (usesSkillTable(state)) return activationCard(state);
     const entries = Object.entries(state.skills ?? {});
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '技能等級（會影響戰鬥規則的）' }),
@@ -190,6 +177,10 @@ export function createGearView({ root, getState, commit }) {
         made.length > 5 ? `…共 ${made.length} 件，其中 ${upgrades} 件比身上好` : null,
       ].filter(Boolean),
     }, { draw });
+    logActivity(state, {
+      cat: 'item', text: `鑑定 ${name} ×${made.length}，最高 ${effectText(best)}`,
+      lines: made.slice(0, 8).map((g) => `${gearName(g)}：${effectText(g)}`),
+    });
     commit();
     // 開獎動畫（只是畫面；數值上面已經擲好存好）
     // 超過 12 件時只翻數值最高的 12 件（保持鑑定順序，最好的一定在裡面）
@@ -263,6 +254,10 @@ export function createGearView({ root, getState, commit }) {
         made.length > 5 ? `…共 ${made.length} 顆` : null,
       ].filter(Boolean),
     }, { draw });
+    logActivity(state, {
+      cat: 'item', text: `鑑定 ${name} ×${made.length}，最高 ${best.stat}+${best.value}`,
+      lines: made.slice(0, 8).map((g) => `${gemName(g)}：${g.stat}+${g.value}`),
+    });
     commit();
     const top = new Set([...made].sort((a, b) => b.value - a.value).slice(0, 12).map((g) => g.id));
     const picked = made.filter((g) => top.has(g.id));
@@ -308,7 +303,7 @@ export function createGearView({ root, getState, commit }) {
                     const err = socketGem(state, gem.id, target.id);
                     if (err) return toast(err);
                     delete ui.gemTarget[gem.id];
-                    publish({ who: state.name, kind: 'note', label: `鑲嵌 ${gemName(gem)}`, lines: [`${gem.stat} +${gem.value} → ${gearName(target)}`] });
+                    logActivity(state, { cat: 'item', text: `鑲嵌 ${gemName(gem)}`, lines: [`${gem.stat} +${gem.value} → ${gearName(target)}`] });
                     toast(`已鑲進${gearName(target)}`);
                     commit();
                   },
@@ -388,7 +383,7 @@ export function createGearView({ root, getState, commit }) {
     root.replaceChildren(
       h('div', { class: 'page-wrap gear-layout' },
         h('div', { class: 'gear-col' }, slotsCard(state), identifyCard(state), gemCard(state), ownedCard(state)), // 背包裝備放寶石下面，右欄技能表才不會太長
-        h('div', { class: 'gear-col' }, panelCard(state), skillCard(state))));
+        h('div', { class: 'gear-col' }, panelCard(state), skillCard(state), badgeCard({ getState, commit }))));
     root.scrollTop = scrollY;
   }
 

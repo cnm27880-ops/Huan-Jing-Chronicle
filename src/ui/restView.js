@@ -20,7 +20,6 @@ import {
 } from '../game/engine.js';
 import { SKILL_TABLE, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo } from '../game/skillTable.js';
 import { drawBooks, chooseDraw, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
-import { badgeStatus, craftBadge, renameBadge, markBadgeOwned, BADGE_COUNT, BADGE_NAME_MAX } from '../game/badges.js';
 import {
   allRecipes, allMaterials, USABLE_ITEMS, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
   specialMaxTimes, craftSpecial, useSpecialItem, gatherDaily, dailyDone, feedMeatball, harvestMeat,
@@ -323,58 +322,6 @@ export function createRestView({ root, getState, commit }) {
           })));
   }
 
-  function badgeSection(state) {
-    return section('生活徽章',
-      h('ul', { class: 'badge-list' }, LIFE_SKILLS.map((skill) => h('li', { class: 'badge-row' },
-        h('strong', { text: `${ICONS[skill]} ${skill}　技能 ${state.lifeSkills[skill] ?? 0}` }),
-        h('div', { class: 'badge-row__btns' }, badgeStatus(state, skill).map((b) => {
-          const label = b.kind === '神級' ? '神級徽章' : `${BADGE_COUNT}次徽章（${fmt(Math.min(b.progress.have, BADGE_COUNT))}/${BADGE_COUNT}）`;
-          if (b.made) {
-            return h('div', { class: 'badge-made' },
-              h('span', { class: 'badge-made__name', text: `✓ ${b.item}` }),
-              h('button', {
-                type: 'button', class: 'btn btn--ghost btn--small',
-                onclick: () => {
-                  const name = prompt(`幫「${b.item}」取新名字（最多 ${BADGE_NAME_MAX} 字）`, b.item);
-                  if (name === null) return;
-                  const r = renameBadge(getState(), skill, b.kind, name);
-                  if (!r.ok) return toast(r.error);
-                  toast(`改名為 ${r.item}`);
-                  logActivity(getState(), { cat: 'learn', text: `徽章改名：${b.item} → ${r.item}`, lines: [] });
-                  commit();
-                },
-              }, '改名'));
-          }
-          // 試算表／機器人已經加過等級的玩家：只記起來，不再加等級（背包有徽章物品的不會走到這裡，會直接算做過）
-          const owned = h('button', {
-            type: 'button', class: 'btn btn--ghost btn--small', title: '技能等級已經含這個徽章的 +1（例如在試算表自己加過）',
-            onclick: () => {
-              if (!confirm(`確定「${skill}」的${label.split('（')[0]}你已經做過、等級已經含它的 +1 嗎？\n按確定只會記成做過，不會再加等級，之後無法再製作這個徽章。`)) return;
-              const r = markBadgeOwned(getState(), skill, b.kind);
-              if (!r.ok) return toast(r.error);
-              toast('已記成做過，不會再加等級');
-              logActivity(getState(), { cat: 'learn', text: `記錄已做過的徽章：${b.item}（技能等級不變）`, lines: [] });
-              commit();
-            },
-          }, '我已經做過了');
-          const craftBtn = b.reached
-            ? h('button', {
-                type: 'button', class: 'btn btn--primary btn--small',
-                onclick: () => {
-                  const name = prompt(`製作徽章：${skill}技能等級 +1，每種只能做一次。\n（如果你的等級已經含這個徽章的 +1，請取消，改按「我已經做過了」。）\n名稱可以自己取（最多 ${BADGE_NAME_MAX} 字，之後也能改）：`, b.item);
-                  if (name === null) return;
-                  const r = craftBadge(getState(), skill, b.kind, name);
-                  if (!r.ok) return toast(r.error);
-                  toast(`做出 ${r.item}，${skill}技能升到 ${r.level}`);
-                  logActivity(getState(), { cat: 'learn', text: `製作徽章：${r.item}，${skill}技能升到 ${r.level}`, lines: [] });
-                  commit();
-                },
-              }, `製作${label}`)
-            : h('button', { type: 'button', class: 'btn btn--small', disabled: true }, `${label} 未達成`);
-          return h('div', { class: 'badge-cell' }, craftBtn, owned);
-        }))))));
-  }
-
   function learnTile(state, name) {
     const lv = Number(state.skills?.[name]) || 0;
     const note = lv >= MAX_SKILL_LEVEL ? '已滿級' : maxAffordableLevel(state, name) > lv ? '可以升級' : '材料不足';
@@ -387,7 +334,7 @@ export function createRestView({ root, getState, commit }) {
     }
     const learned = Object.keys(state.skills ?? {}).filter(inCatalog).sort(byTier);
     const unlearned = Object.keys(SKILL_TABLE).filter((n) => !(n in (state.skills ?? {}))).sort(byTier);
-    return [drawSection(state), badgeSection(state), section('學習技能',
+    return [drawSection(state), section('學習技能',
       h('p', { class: 'hint', text: `目前經驗 ${fmt(state.exp)}` }),
       h('h3', { class: 'field-label', text: `已學會（${fmt(learned.length)}）` }),
       learned.length ? h('div', { class: 'skill-tiles' }, learned.map((n) => learnTile(state, n))) : h('p', { class: 'notice', text: '還沒有學會技能。' }),

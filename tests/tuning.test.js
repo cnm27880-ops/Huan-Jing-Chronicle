@@ -1,7 +1,7 @@
 // 模擬戰的評價、策略與自動調整（GM 目標：2～3 回合、每場耗約一半資源）
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, penalty, autoTune, TARGET, PLANS } from '../src/game/tuning.js';
+import { assess, penalty, autoTune, scaleEncounter, TARGET, PLANS } from '../src/game/tuning.js';
 import { simulateBattle, summarize } from '../src/game/simulate.js';
 import { blankCharacter } from '../src/game/importBot.js';
 import { moveFromCatalog } from '../src/game/skills.js';
@@ -94,4 +94,18 @@ test('自動調整：兩個方案找到的血量不同（保守回合長、激�
   assert.equal(a.penalty, 0);
   assert.ok(c.specs[0].hp > a.specs[0].hp);
   assert.ok(c.specs[0].atkPower < a.specs[0].atkPower);
+});
+
+test('scaleEncounter：固定敵人的血量與攻擊骰數按倍率縮放，不改原資料，有骰的軌道至少 1 顆', () => {
+  const enc = { monsters: [
+    { id: '小怪1', kind: 'mob', maxHp: 100, hp: 40, atk: { A: 10, B: 0, C: 1 } },
+    { id: 'BOSS', kind: 'boss', maxHp: 1000, hp: 1000, atk: [{ A: 4, B: 4, C: 0 }, { A: 8, B: 0, C: 0 }, { A: 20, B: 20, C: 20 }] },
+  ] };
+  const out = scaleEncounter(enc, 2, 0.5);
+  assert.deepEqual(out.monsters[0].atk, { A: 5, B: 0, C: 1 }); // C 只有 1 顆，縮小後仍保留 1
+  assert.equal(out.monsters[0].maxHp, 200);
+  assert.equal(out.monsters[0].hp, 200); // 生命補滿
+  assert.deepEqual(out.monsters[1].atk[2], { A: 10, B: 10, C: 10 });
+  assert.equal(enc.monsters[0].maxHp, 100); // 原資料不變
+  assert.equal(enc.monsters[0].hp, 40);
 });

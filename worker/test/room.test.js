@@ -164,6 +164,21 @@ test('draw 過期後不能再用', () => {
   assert.equal(eventOf(send(r.core, P1, { t: 'post', draw, event: { kind: 'note', label: 'x' } })).srv, undefined);
 });
 
+test('鑑定與黑市交易（identify／deal）不進紀錄歷史、不廣播，但仍會消耗 draw；不會擠掉跑團紀錄', () => {
+  const r = room({ rng: seqRng([2]) });
+  send(r.core, P1, { t: 'post', event: { kind: 'attack', label: '重擊' } });
+  for (const kind of ['identify', 'deal']) {
+    const draw = send(r.core, P1, { t: 'draw', pools: [[4, 1]] }).out[0].msg.draw;
+    const res = send(r.core, P1, { t: 'post', draw, event: { kind, label: `${kind} x` } });
+    assert.equal(res.out.some((o) => o.msg.t === 'event'), false);
+    assert.equal(res.out[0].msg.t, 'posted');
+    assert.equal(send(r.core, P1, { t: 'post', draw, event: { kind: 'note', label: 'y' } }).out.find((o) => o.msg.t === 'event').msg.event.srv, undefined); // draw 已被用掉
+  }
+  for (let i = 0; i < HISTORY_LIMIT + 10; i++) send(r.core, P1, { t: 'post', event: { kind: 'identify', label: `i${i}` } });
+  assert.equal(r.core.history().filter((e) => e.kind === 'identify' || e.kind === 'deal').length, 0);
+  assert.equal(r.core.history().some((e) => e.label === '重擊'), true); // 戰鬥紀錄還在
+});
+
 test('紀錄只留最近 200 筆，新的在前；重新建立房間物件（模擬重新部署／休眠）後仍在', () => {
   const r = room({ rng: seqRng([1]) });
   for (let i = 0; i < HISTORY_LIMIT + 25; i++) send(r.core, P1, { t: 'post', event: { kind: 'note', label: `n${i}` } });

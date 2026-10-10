@@ -1041,6 +1041,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .trade-row.rarity { border-left-color: var(--t); }
 .trade-row__icon { display: grid; place-items: center; width: 40px; height: 40px; font-size: 1.3rem; background: var(--paper); border-radius: 10px; }
 .trade-row__info { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+.trade-row__head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; flex-basis: 100%; min-width: 0; }
 .trade-row__have { color: var(--soft); font-size: 0.75rem; }
 .trade-row__price { flex-basis: 100%; color: var(--ink2); font-size: 0.82rem; }
 .trade-row__sub { flex-basis: 100%; color: var(--gold); font-size: 0.78rem; }
@@ -1175,9 +1176,15 @@ input[type='number'], .amount__input { text-align: center; }
 .badge-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 6px; }
 .badge-row { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .badge-row__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-.badge-cell { display: grid; gap: 4px; align-content: start; }
+.badge-cell { display: grid; gap: 2px; align-content: start; justify-items: center; }
+.badge-cell > .btn { width: 100%; margin: 0; }
+/* 「我已經做過了」：置中在自己的徽章按鈕下方，淡色小字，滑過才轉金色（沒有底線） */
+.badge-link { padding: 2px 10px; color: var(--faint); font: inherit; font-size: 0.7rem; letter-spacing: 0.08em; background: none; border: 0; border-radius: var(--r-pill); cursor: pointer; transition: color 0.15s ease, background 0.15s ease; }
+.badge-link:hover { color: var(--gold); background: var(--goldbg); }
+.badge-link:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 .badge-made { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; font-size: 0.8rem; color: var(--soft); }
-.badge-made__name { min-width: 0; overflow-wrap: anywhere; }
+.badge-made__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* 名字太長就刪節號，完整名字在滑過時顯示 */
+.badge-made .btn { flex: none; white-space: nowrap; }
 
 /* 修整日「特殊」分頁 */
 .special-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; margin-top: 6px; }
@@ -1479,6 +1486,7 @@ input[type='number'], .amount__input { text-align: center; }
 .sx-room[open] .sx-room__sum { margin-bottom: 8px; color: var(--gold); }
 .sx-room__body .room { margin: 0; }
 .sx-feedhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex-shrink: 0; }
+.sx-feedhead[hidden] { display: none; }
 .sx-feedhead .tabs-seg { display: flex; flex-wrap: wrap; flex: 1; min-width: 0; margin: 0; padding: 3px; }
 .sx-feedhead .seg { flex: 1 1 auto; padding: 0 8px; min-height: 32px; font-size: 0.78rem; white-space: nowrap; }
 .sx-feedhead .hint { margin: 0 0 0 auto; font-size: 0.72rem; }
@@ -1769,3 +1777,87 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .skillpanel .field-label, .skillpanel .hint, .skillpanel .section-title { margin: 0; }
 
 .simtune__plan { display: grid; gap: 6px; margin-top: 10px; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+
+/* ============================================================
+   電腦版緊湊排版（修整日、裝備、交易）：內容區加寬、格子變小，少往下滑。手機版面不動。
+   ============================================================ */
+@media (min-width: 901px) {
+  #view-rest .rest-root, #view-market .mk-root { max-width: 1800px; }
+  .page-wrap.gear-layout { max-width: 1800px; }
+
+  /* 修整日：採集／製作的選擇格縮小（圖示放左邊、文字放右邊），讓下方真正擲骰的區域早點出現 */
+  #view-rest .action-cards { gap: 6px; }
+  #view-rest .action-card {
+    grid-template-columns: auto minmax(0, 1fr); justify-items: start; align-items: center; column-gap: 8px;
+    min-height: 0; padding: 6px 28px 6px 8px; text-align: left;
+  }
+  #view-rest .action-card__icon { grid-row: 1 / span 2; width: 34px; height: 34px; margin: 0; font-size: 1.15rem; }
+  #view-rest .action-card__name { font-size: 0.88rem; }
+  #view-rest .action-card__sub { font-size: 0.7rem; }
+  #view-rest .action-card__mod { top: 4px; right: 6px; font-size: 0.74rem; }
+  #view-rest .diff-grid { gap: 6px; }
+  #view-rest .diff { gap: 2px; padding: 6px 8px; font-size: 0.78rem; }
+
+  /* 修整日「特殊」：材料格子上下縮窄、一排放更多張 */
+  .special-list { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 5px; margin-top: 4px; }
+  .special-card { gap: 4px; padding: 6px 8px; }
+  .special-card__head { line-height: 1.25; }
+  .special-card .field { padding: 4px 6px; }
+
+  /* 裝備欄：四件一排 */
+  .gear-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* 交易：購買每排 3 個、販賣每排 2 個（左右兩欄 3:2），物品卡改成上下兩層（資訊在上、數量與按鈕在下） */
+@media (min-width: 1000px) {
+  #view-market .mk-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  #view-market .mk-grid > .card:nth-child(odd) .trade-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #view-market .mk-grid > .card:nth-child(even) .trade-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #view-market .trade-row { grid-template-columns: 40px minmax(0, 1fr); gap: 6px 10px; padding: 8px; }
+  #view-market .trade-row__act { grid-column: 1 / -1; justify-content: flex-end; }
+  #view-market .trade-row__qty { flex: 0 1 4.6rem; }
+  #view-market .trade-row__act .btn { min-width: 0; flex: 1; }
+}
+
+/* 裝備頁「啟動型技能」：電腦版四個一排（名稱與等級在上、啟動勾選在下），手機兩個一排 */
+.activate-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+@media (min-width: 901px) { .activate-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.activate-cell { display: grid; gap: 4px; padding: 8px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.activate-cell strong { font-size: 0.88rem; overflow-wrap: anywhere; }
+.activate-cell .check { font-size: 0.76rem; color: var(--soft); }
+
+/* 特殊材料卡：名稱與說明之間不留空（#view-rest .rest-step .hint 的上邊距會蓋掉一般規則，所以要寫得一樣具體） */
+#view-rest .special-card .hint { margin: 0; font-size: 0.74rem; line-height: 1.35; }
+
+/* ============================================================
+   手機緊湊排版（交易、修整日）：觸控目標維持 44px 以上，只縮卡片的留白與圖示
+   ============================================================ */
+/* 交易：每排 2 個。上面「圖示＋名稱」，價格與小計從圖示的左邊開始、橫跨整張卡（一行放得下），最下面是數量與按鈕 */
+@media (max-width: 999px) {
+  #view-market .trade-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  #view-market .trade-row {
+    grid-template-columns: 34px minmax(0, 1fr); grid-template-areas: 'icon head' 'price price' 'sub sub' 'act act';
+    gap: 3px 8px; padding: 8px; align-items: start;
+  }
+  #view-market .trade-row__info { display: contents; }
+  #view-market .trade-row__icon { grid-area: icon; width: 34px; height: 34px; font-size: 1.1rem; border-radius: 8px; }
+  #view-market .trade-row__head { grid-area: head; gap: 1px 6px; }
+  #view-market .trade-row__price { grid-area: price; font-size: 0.72rem; white-space: nowrap; }
+  #view-market .trade-row__sub { grid-area: sub; font-size: 0.7rem; }
+  #view-market .trade-row__act { grid-area: act; justify-content: stretch; gap: 4px; margin-top: 2px; }
+  #view-market .trade-row__qty { flex: 0 0 3.2rem; width: 3.2rem; min-height: 44px; padding: 0 4px; }
+  #view-market .trade-row__act .btn { flex: 1; min-width: 0; min-height: 44px; padding: 0 6px; font-size: 0.8rem; white-space: nowrap; }
+}
+/* 修整日：行動卡與難度卡矮一點、特殊材料卡留白縮小 */
+@media (max-width: 900px) {
+  #view-rest .action-cards { gap: 5px; }
+  #view-rest .action-card { min-height: 0; padding: 7px 2px 6px; gap: 0; }
+  #view-rest .action-card__icon { width: 34px; height: 34px; margin-bottom: 2px; font-size: 1.1rem; }
+  #view-rest .action-card__name { font-size: 0.82rem; }
+  #view-rest .action-card__sub { font-size: 0.68rem; }
+  #view-rest .diff-grid { gap: 5px; }
+  #view-rest .diff { gap: 2px; padding: 6px 7px; }
+  .special-list { gap: 5px; margin-top: 4px; }
+  .special-card { gap: 4px; padding: 7px 9px; }
+  .special-card__head { line-height: 1.25; }
+}

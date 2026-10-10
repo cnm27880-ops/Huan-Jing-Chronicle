@@ -42,12 +42,12 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/simulate.js` | 模擬戰（階段 D，純函式）：續航最長招式、怪物隨機打人、自動喝藥與隊友救人、勝率／回合數／傷害／剩餘生命統計；不碰真實存檔 |
 | `src/ui/simPanel.js` | GM 專用「模擬戰」面板（跑團頁房間區塊）：選玩家＋敵人來源（自訂強度每場重抽／場上的敵人／預組，後兩種固定 A/B/C）＋場數，畫回合分布與剩餘生命條狀圖 |
 | `src/game/enemy.js` | 敵人等級（普通／菁英 2 打／BOSS 3 打）與技能 A 攻擊強化、B 防禦強化（每回合歸零）、C 喝血（整場戰鬥 1 次）的次數與效果（伺服器與前端共用）（純函式） |
-| `src/game/tuning.js` | 模擬戰的目標（2～3 回合、每場約耗一半資源）、評價與策略建議、自動調整敵人血量與攻擊強度（保守版／激進版兩個方案 `PLANS`）（純函式） |
+| `src/game/tuning.js` | 模擬戰的目標（2～3 回合、每場約耗一半資源）、評價與策略建議、自動調整敵人血量與攻擊強度（保守版／激進版兩個方案 `PLANS`；自訂強度與固定敵人 `scaleEncounter` 都能調）（純函式） |
 | `src/game/activity.js`、`src/state/activityLog.js`、`src/ui/logsView.js` | 玩家日誌：內容格式（修整／學習／物品）、回報點（房間伺服器，離線存本機）、「日誌」大分頁（`#logs`，所有玩家都看得到每位玩家的）；伺服器端在 `room-core.js` 的 `actPost`／`actList`，每人留 500 筆 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`，立繪與隊友狀態在 `worker/test/images.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
-| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏）、玩家交易（交易單也放在信箱表，`tradeRespond` 處理接受／拒絕／失敗／取消，先刪先贏）、GM 寫入玩家角色時記「異動」事件（`worker/src/audit.js` 比對前後差異）、GM 新增的特殊配方與材料（`specialSet`／`specialDel`）與專屬技能（`skillSet`／`skillDel`），存在 meta、全員同步、每次改動記異動；怪物立繪（`imgPut`／`imgDel`／`encImg`，GM 上傳、存 SQLite、`room.js` 的 GET `/img/:id` 讀，網址由 `index.js` 驗登入）；隊友狀態（`vitals`，每人回報生命與資源、全員廣播）；敵人預組（`presetList`／`presetSave`／`presetDel`／`presetLoad`，只有 GM，回覆只送 GM 自己） |
+| `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏）、玩家交易（交易單也放在信箱表，`tradeRespond` 處理接受／拒絕／失敗／取消，先刪先贏）、GM 寫入玩家角色時記「異動」事件（`worker/src/audit.js` 比對前後差異；鑑定 identify、黑市 deal、異動 audit 不存進 200 筆的紀錄歷史，只即時廣播或寫進日誌頁）、GM 新增的特殊配方與材料（`specialSet`／`specialDel`）與專屬技能（`skillSet`／`skillDel`），存在 meta、全員同步、每次改動記異動；怪物立繪（`imgPut`／`imgDel`／`encImg`，GM 上傳、存 SQLite、`room.js` 的 GET `/img/:id` 讀，網址由 `index.js` 驗登入）；隊友狀態（`vitals`，每人回報生命與資源、全員廣播）；敵人預組（`presetList`／`presetSave`／`presetDel`／`presetLoad`，只有 GM，回覆只送 GM 自己） |
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |
@@ -78,7 +78,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/restView.js` | 修整日頁面：上方 HUD、採集／製作／跑團檢定分頁、設定步驟＋大按鈕、結果卡 |
 | `src/ui/statusBar.js` | 修整日的 HUD（時間、熟練、胃袋）與「吃東西」面板 |
 | `src/ui/bagView.js` | 背包頁面 |
-| `src/ui/gearView.js` | 裝備頁：面板、裝備欄、鑑定、寶石、背包裝備（不能丟棄，只能賣出） |
+| `src/ui/gearView.js` | 裝備頁：面板、裝備欄（電腦版四件一排）、鑑定、寶石、背包裝備（不能丟棄，只能賣出）；右欄是「啟動型技能」勾選（其他已學技能到修整日學習看）與生活徽章 |
+| `src/ui/badgePanel.js` | 生活徽章面板（原本在修整日學習分頁，現在放裝備頁右欄）：製作、改名、「我已經做過了」 |
 | `src/ui/reveal.js` | 鑑定開獎動畫（翻牌、數值跳動；只是畫面，數值鑑定時就已存好） |
 | `src/ui/marketView.js` | 交易頁（交易大廳／黑市／特殊黑市）＋裝備頁「賣出」面板 |
 | `src/ui/battleView.js` | 戰鬥的個人部分（跑團頁左欄常駐，原戰鬥面板拆開）：HUD（生命／資源／防禦三軌／狀態標籤）、手機膠囊 HUD、招式條（選中的有「出招」）、藥水、狀態與防禦骰 |
