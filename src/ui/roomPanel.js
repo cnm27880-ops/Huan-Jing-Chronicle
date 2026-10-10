@@ -23,17 +23,18 @@ export function mountRoomPanel(container) {
       reconnecting: '連線中斷，重新連線中…（暫時使用本機骰盤，結果不會同步給大家）',
       denied: r.message,
     }[r.phase];
-    const parts = [h('div', { class: 'room__status' }, h('span', { class: 'room__dot', 'aria-hidden': 'true' }), h('span', { text }))];
+    // 連上之後標題列（「房間・N / M 人在線」）已經有狀態，內文只留 GM 與成員；其他狀態才顯示一行說明
+    const parts = r.phase === 'online' ? [] : [h('div', { class: 'room__status' }, h('span', { class: 'room__dot', 'aria-hidden': 'true' }), h('span', { text }))];
 
     if (r.phase === 'online') {
       const nameOf = (uid) => r.gm.names[uid] ?? r.members.find((m) => m.uid === uid)?.name ?? '（尚未加入）';
-      const gmText = r.gm.uids.length ? r.gm.uids.map(nameOf).join('、') : '尚未設定';
+      const gmText = r.gm.uids.length ? r.gm.uids.map(nameOf).join('、') : '未設定';
       parts.push(
-        h('p', { class: 'room__gm' }, `GM：${gmText}`, r.gm.override ? h('span', { class: 'badge', dataset: { tone: 'warn' }, text: '暫代中（測試用）' }) : null),
-        r.members.length
-          ? h('ul', { class: 'room__members' }, r.members.map((m) => h('li', { class: 'room__member', dataset: { online: m.online ? '1' : '0' }, text: m.name })))
-          : null,
-        r.battleNo ? h('p', { class: 'hint', text: `目前是第 ${r.battleNo} 場戰鬥` }) : null);
+        h('div', { class: 'room__line' },
+          h('span', { class: 'room__gm', title: r.battleNo ? `目前是第 ${r.battleNo} 場戰鬥` : '' }, `GM ${gmText}`, r.gm.override ? h('span', { class: 'badge', dataset: { tone: 'warn' }, text: '暫代' }) : null),
+          r.members.length
+            ? h('ul', { class: 'room__members' }, r.members.map((m) => h('li', { class: 'room__member', dataset: { online: m.online ? '1' : '0' }, text: m.name })))
+            : null));
       const btns = [];
       if (r.me?.isGm) {
         btns.push(h('button', {
@@ -53,7 +54,7 @@ export function mountRoomPanel(container) {
           : h('button', {
               type: 'button', class: 'btn btn--ghost btn--small',
               onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: '暫代 GM？', lines: ['原本的 GM 在你還回去之前沒有 GM 權限，所有人都會看到。'], okText: '暫代' })) setGmOverride('take'); },
-            }, '暫代 GM（測試用）'));
+            }, '暫代 GM'));
       }
       if (btns.length) parts.push(h('div', { class: 'row room__btns' }, btns));
     }

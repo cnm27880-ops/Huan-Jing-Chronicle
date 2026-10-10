@@ -3,7 +3,7 @@
 // 之後接上 Cloudflare 時，只要改這個檔案，其他程式不用動
 // ============================================================
 import { SAMPLE_CHARACTER } from '../data/sample/fude.js';
-import { basicMove } from '../game/skills.js';
+import { basicMove, catalogOf } from '../game/skills.js';
 import { maxHp, derivedStats } from '../game/stats.js';
 import { syncBadgeMade } from '../game/badges.js';
 import { syncKeepsakes } from '../game/keepsakes.js';
@@ -37,6 +37,9 @@ function upgrade(state) {
   // 招式沒有消耗資源欄的舊存檔：依招式名稱從示範角色補上；第一次升級時補上技能庫招式
   for (const m of state.moves) {
     if (!m.cost) m.cost = clone(SAMPLE_CHARACTER.moves.find((x) => x.name === m.name)?.cost ?? {});
+    // 綁定技能的攻擊招式：消耗以技能為準（舊版把「2 生命 + 3 算力」的全域響應耗用直接存進招式，現在由響應自己扣）
+    const cat = m.skill ? catalogOf(m.skill) : null;
+    if (cat?.kind === 'attack') m.cost = clone(cat.cost ?? {});
   }
   // 普攻：每人固定有一個（見 skills.js 的 basicMove）
   if (!state.moves.some((m) => m.id === 'basic')) state.moves.push(basicMove());

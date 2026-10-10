@@ -16,7 +16,9 @@ import {
 import { rollSum } from './dice.js';
 import { derivedStats, maxHp } from './stats.js';
 import { removeItem } from './engine.js';
-import { passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS, douMult } from './skills.js';
+import {
+  passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS, douMult, attackResponses, dragonGain, hasCyberHacker, addCost,
+} from './skills.js';
 import { actionCost, shortfall, pay, costText } from './resources.js';
 
 /** 每 1 點 = 1 顆 D4 */
@@ -40,7 +42,7 @@ export function formatAbc(dice) {
  * 每條軌道 = 該軌道傷害 + 真實傷害 + 招式加成 + 藥水加成
  * 回傳 { dice:{A,B,C}, parts:{ C:[{label,value}] } }
  */
-export function attackDice(state, move, potionBonus = 0, douBonus = 0) {
+export function attackDice(state, move, potionBonus = 0, douBonus = 0, respDice = {}) {
   const p = derivedStats(state);
   const brute = passivesOf(state).brute;
   const extra = moveExtra(state, move);
@@ -54,6 +56,8 @@ export function attackDice(state, move, potionBonus = 0, douBonus = 0) {
       { label: '招式加成', value: extra[t] ?? 0 },
       { label: '藥水', value: potionBonus },
       { label: '鬥氣', value: douBonus }, // 花鬥氣換來的真實傷害骰（每條用到的軌道都加）
+      { label: '響應', value: respDice[t] ?? 0 }, // 腦機協議、殘缺筆記…（見 skills.js 的 ATTACK_RESPONSES）
+      { label: '龍', value: t === 'B' ? state.buffs?.dragon ?? 0 : 0 }, // 龍：造成能量傷害後累積的能量傷害，直到戰鬥結束
     ];
     parts[t] = list.filter((x, i) => i < 2 || x.value !== 0);
     dice[t] = list.reduce((a, x) => a + x.value, 0);
@@ -72,7 +76,7 @@ export const ATTACK_MODES = {
  * 萬物歸一 = 物+能+魂+真傷；大羅真仙 = 招式選定軌道 + 真傷（真傷只算一次）。
  * 回傳 { dice, parts } 其中 dice = 總骰數
  */
-export function pooledAttack(state, move, potionBonus = 0, douBonus = 0) {
+export function pooledAttack(state, move, potionBonus = 0, douBonus = 0, respDice = {}) {
   const p = derivedStats(state);
   const brute = passivesOf(state).brute;
   const extra = moveExtra(state, move);
@@ -83,6 +87,8 @@ export function pooledAttack(state, move, potionBonus = 0, douBonus = 0) {
     { label: '招式加成', value: tracks.reduce((a, t) => a + (extra[t] ?? 0), 0) },
     { label: '藥水', value: potionBonus },
     { label: '鬥氣', value: douBonus },
+    { label: '響應', value: tracks.reduce((a, t) => a + (respDice[t] ?? 0), 0) },
+    { label: '龍', value: tracks.includes('B') ? state.buffs?.dragon ?? 0 : 0 },
   ];
   const parts = list.filter((x, i) => i <= tracks.length || x.value !== 0);
   return { dice: list.reduce((a, x) => a + x.value, 0), parts };
@@ -268,6 +274,26 @@ function resolveHit(state, move, target, mode, atkPlan, rng, extraAbs = 0) {
 }
 
 /**
+ * 算出這次出招會觸發哪些攻擊響應：依序檢查，付不起的略過。baseCost = 招式本身要付的；off = 玩家關掉的響應。
+ * 回傳 { cost（含響應）, respDice: {A,B,C}, used[], skipped[] }
+ */
+export function planResponses(state, move, baseCost, off = []) {
+  let cost = baseCost;
+  const used = [];
+  const skipped = [];
+  const respDice = { A: 0, B: 0, C: 0 };
+  for (const r of attackResponses(state, move)) {
+    if (off?.includes(r.name)) continue;
+    const next = addCost(cost, r.cost);
+    if (!r.free && shortfall(state, next)) { skipped.push(r); continue; }
+    cost = next;
+    respDice[r.track] += r.dice;
+    used.push(r);
+  }
+  return { cost, respDice, used, skipped };
+}
+
+/**
  * 玩家對怪物出招。流程：付資源（含魔女額外 30 魔力）→ 對每個目標結算 → 響應效果（百分比傷害、吸血）。
  * opts.yuwai：域外魔祖「花 30 靈氣，追加扣目標現有生命 10%」（只對修仙招式）。
  * opts.targetIds：玩家手動選的目標（依點選順序）。最多選「招式的目標數」個，選太多回傳錯誤、選比較少就只打選到的。
@@ -275,6 +301,7 @@ function resolveHit(state, move, target, mode, atkPlan, rng, extraAbs = 0) {
  * opts.modes：每隻 BOSS 各自的防禦模式（怪物 id → 模式）；沒寫的用 mode。
  * opts.dou：這次攻擊花多少鬥氣（每點 +1 顆真實傷害骰，冠軍勇士每點 +4 顆）。
  * opts.extraAbs：敵人 B 技能多出來的絕對防禦骰（怪物 id → 骰數）。
+ * opts.respOff：這次不要觸發的攻擊響應（技能名稱陣列）；沒給＝學過的、符合條件的、付得起的都自動觸發。
  * 回傳 { move, target, hits[], cost, heal, ... }；失敗回傳 { error }。第一個目標的欄位也放在最外層，方便畫面使用。
  */
 export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math.random, opts = {}) {
@@ -300,16 +327,21 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   const dou = Math.max(0, Math.floor(Number(opts.dou) || 0));
   const douDice = dou * douMult(state);
   const extraCost = { ...(yuwai ? PASSIVE_RIDERS.域外魔祖.cost : {}), ...(dou ? { 鬥氣: dou } : {}) };
-  const cost = actionCost(state, move, extraCost);
+  let cost = actionCost(state, move, extraCost);
   const lack = shortfall(state, cost);
   if (lack) return { error: `資源不足：${lack}（需要 ${costText(cost)}）` };
+  // 攻擊響應：招式本身付得起才輪到它們；每個響應各自檢查，付不起的略過（不擋出招）
+  const plan = planResponses(state, move, cost, opts.respOff);
+  const { respDice, used: responses } = plan;
+  cost = plan.cost;
+  const notes = plan.skipped.map((r) => `響應「${r.name}」資源不足，略過`);
   pay(state, cost);
 
   const potion = state.buffs.atk;
   const pooled = move.mode === 'all' || move.mode === 'abs';
-  const atk = pooled ? pooledAttack(state, move, potion, douDice) : attackDice(state, move, potion, douDice);
+  const atk = pooled ? pooledAttack(state, move, potion, douDice, respDice) : attackDice(state, move, potion, douDice, respDice);
   const hits = targets.map((t) => resolveHit(state, move, t, opts.modes?.[t.id] ?? mode, atk, rng, opts.extraAbs?.[t.id] ?? 0));
-  const notes = [];
+  for (const r of responses) notes.push(`響應「${r.name}」：${r.free ? '' : `花 ${costText(r.cost)}，`}${r.track} 軌 +${r.dice} 顆傷害骰`);
 
   // 響應：萬物歸一破防時，額外扣目標現有生命 %
   const cat = move.skill ? catalogOf(move.skill) : null;
@@ -350,11 +382,21 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
     notes.push(`${d.name}：目標共損失 ${lost} 生命，回復 ${got}（上限 ${d.cap}）`);
   }
 
+  // 響應：龍（造成能量傷害後，自己的能量傷害 +3／級，直到戰鬥結束；這一下已經打完，從下一次出招開始算）
+  const gain = dragonGain(state);
+  const dealtEnergy = gain > 0 && hits.some((h) => h.result.tracks.some((t) => (t.track === 'B' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0));
+  let dragon = 0;
+  if (dealtEnergy) {
+    state.buffs.dragon = (state.buffs.dragon ?? 0) + gain;
+    dragon = gain;
+    notes.push(`響應「龍」：造成能量傷害，能量傷害 +${gain}（累計 +${state.buffs.dragon}，直到戰鬥結束）`);
+  }
+
   state.buffs.atk = 0;
   const h0 = hits[0];
   return {
     move, target: h0.target, mode, atk, def: h0.def, result: h0.result, potion, ignoreAbs: h0.ignoreAbs, abs: h0.abs,
-    hits, cost, healed, notes, dou, douDice, downed: isDowned(h0.target),
+    hits, cost, healed, notes, dou, douDice, respDice, responses, dragon, downed: isDowned(h0.target),
   };
 }
 
@@ -400,7 +442,23 @@ export function monsterAttack(state, enc, monsterId, mode = 0, rng = Math.random
   state.buffs.def = 0;
   const wasDowned = isDowned(state);
   const absorbed = damagePlayer(state, result.total);
-  return { monster, mode, atk, def, result, potion, extraAtk, absorbed, downed: isDowned(state), newlyDowned: !wasDowned && isDowned(state) };
+  // 響應：賽博駭客——受到靈魂傷害但沒破防，攻擊方立刻扣「精神意志面板」顆 D4 的生命；一回合只能 1 次
+  // （有開始回合計數才擋重複；本機模式沒有回合計數，只提醒玩家自己確認）
+  let reflect = null;
+  const soul = result.tracks.find((x) => x.track === 'C');
+  if (hasCyberHacker(state) && soul && soul.atkDice > 0 && soul.damage === 0) {
+    const round = enc.round ?? 0;
+    if (round > 0 && state.buffs.cyberRound === round) reflect = { skipped: true, round };
+    else {
+      const dice = derivedStats(state)[TRACK_DEF_STAT.C].total;
+      const rolled = rollTrack(dice, rng);
+      const before = monster.hp;
+      monster.hp = Math.max(0, monster.hp - rolled);
+      if (round > 0) state.buffs.cyberRound = round;
+      reflect = { dice, rolled, lost: before - monster.hp, round };
+    }
+  }
+  return { monster, mode, atk, def, result, potion, extraAtk, absorbed, reflect, downed: isDowned(state), newlyDowned: !wasDowned && isDowned(state) };
 }
 
 // ---------- 藥水 ----------

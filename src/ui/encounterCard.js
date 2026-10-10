@@ -266,7 +266,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       ({ r, draw, befores, bosses } = await withRoomEncounter(state, async () => {
         const before = new Map(state.encounter.monsters.map((x) => [x.id, x.hp]));
         const boss = new Set(state.encounter.monsters.filter((x) => x.kind === 'boss').map((x) => x.id));
-        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, sel.moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai, targetIds, modes, dou, extraAbs }));
+        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, sel.moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai, targetIds, modes, dou, extraAbs, respOff: [...sel.respOff] }));
         return { ...res, befores: before, bosses: boss };
       }));
     } catch (e) { return rollFailed(e); }
@@ -301,6 +301,13 @@ export function createEncounterCard({ getState, commit, rerender }) {
     commit();
   }
 
+  /** 賽博駭客的紀錄行：靈魂傷害沒破防 → 攻擊方扣精神意志顆 D4 */
+  const reflectLine = (rf, id) => {
+    if (!rf) return null;
+    if (rf.skipped) return '賽博駭客：靈魂傷害未破防，但這回合已經觸發過（一回合只能 1 次）';
+    return `賽博駭客：靈魂傷害未破防，${id} 立刻扣 ${rf.dice}D4 = ${fmt(rf.rolled)} 生命（實際 −${fmt(rf.lost)}）`;
+  };
+
   async function doDefend(state, m) {
     const modes = sel.modes[m.id] ?? { atk: 0, def: 0 };
     const before = state.hp;
@@ -331,8 +338,13 @@ export function createEncounterCard({ getState, commit, rerender }) {
         r.absorbed?.toShield ? `護盾吸收 ${fmt(r.absorbed.toShield)}` : null,
         `${state.name} 生命 ${fmt(before)} → ${fmt(state.hp)} / ${fmt(maxHp(state))}`,
         r.newlyDowned ? `${state.name} 倒地！` : null,
+        reflectLine(r.reflect, m.id),
       ].filter(Boolean),
     }, { draw });
+    if (r.reflect && !r.reflect.skipped) {
+      toast(`賽博駭客觸發：${m.id} 立刻扣 ${fmt(r.reflect.lost)} 生命（${r.reflect.dice}D4 = ${fmt(r.reflect.rolled)}）。`);
+      if (online() && r.reflect.lost > 0) await act({ t: 'encHit', hits: [{ id: m.id, dmg: r.reflect.lost }] }); // 怪物生命由伺服器改：回報這次反擊扣多少
+    } else if (r.reflect?.skipped) toast('賽博駭客：這回合已經觸發過了（一回合只能 1 次）。');
     commit();
   }
 

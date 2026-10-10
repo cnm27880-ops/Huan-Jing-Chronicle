@@ -8,5 +8,6 @@ export const battleSel = {
   focusBoss: null, // 中間大立繪顯示哪一隻 BOSS（有好幾隻時）
   modes: {}, // 怪物 id → { atk, def }
   yuwai: false,
+  respOff: new Set(), // 這次不要觸發的攻擊響應（技能名稱）；預設全開，付不起的會自動略過
   dou: 0, // 這次出招要花幾點鬥氣加骰（出招後歸零）
 };
