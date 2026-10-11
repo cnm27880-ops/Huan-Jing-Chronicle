@@ -226,3 +226,23 @@ test('GM 發放獎勵：只有 GM；全員收到物品、金幣、經驗、時�
   const claim = send(core, P1, { t: 'mailClaim', rid: 'e', id: mails[0].id });
   assert.equal(claim.out[0].msg.mail.kind, 'reward');
 });
+
+test('送已鑑定裝備：只送裝備（不附物品）也行；裝備資料只留已知欄位；壞資料被擋；交易單也能附裝備、成交與取消時跟著走', () => {
+  const core = room();
+  const g = { id: 7, tier: '傳說', slot: 'accessory', effects: [{ stat: '物理傷害', value: 12 }], roll: { d15: 3 }, gem: { id: 2, stat: '生命', value: 30 }, evil: '<script>' };
+  const res = send(core, P1, { t: 'mailSend', rid: 'g', to: '400', kind: 'gift', items: {}, gear: [g] });
+  const mail = pushed(res).msg.mails[0];
+  assert.equal(mail.gear.length, 1);
+  assert.equal(mail.gear[0].evil, undefined);
+  assert.equal(mail.gear[0].gem.value, 30);
+  assert.equal(errorOf(send(core, P1, { t: 'mailSend', to: '400', kind: 'gift', items: {}, gear: [{ ...g, slot: 'hat' }] }))?.code, 'bad_mail');
+  assert.equal(errorOf(send(core, P1, { t: 'mailSend', to: '400', kind: 'gift', items: {}, gear: Array(11).fill(g) }))?.code, 'bad_mail');
+  assert.equal(errorOf(send(core, P1, { t: 'mailSend', to: '400', kind: 'gift', items: {} }))?.code, 'bad_mail'); // 什麼都沒給
+  // 交易單
+  const t = send(core, P1, { t: 'mailSend', rid: 't', to: '400', kind: 'trade', give: {}, giveGear: [g], want: { 鐵礦: 1 }, wantGold: 0, giveGold: 0 });
+  const offer = pushed(t).msg.mails[0];
+  assert.equal(offer.giveGear.length, 1);
+  const ok = send(core, P2, { t: 'tradeRespond', rid: 'a', id: offer.id, action: 'accept' });
+  const toB = ok.out.filter((o) => o.to === 'user' && o.msg.t === 'mail').find((o) => o.uid === '400').msg.mails[0];
+  assert.equal(toB.gear.length, 1); // 成交：裝備寄給接受的人
+});

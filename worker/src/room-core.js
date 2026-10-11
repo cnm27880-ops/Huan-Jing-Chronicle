@@ -21,7 +21,7 @@ import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
-  MAX_PENDING_MAIL, MAX_PENDING_TRADES, MAX_MAIL_GOLD, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_REWARD_EXP, MAX_REWARD_TIME, MAX_REWARD_TARGETS, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
+  MAX_PENDING_MAIL, MAX_PENDING_TRADES, MAX_MAIL_GEAR, MAX_MAIL_GOLD, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_REWARD_EXP, MAX_REWARD_TIME, MAX_REWARD_TARGETS, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -60,6 +60,33 @@ function parseItems(raw, allowEmpty = false) {
     items[n] = (items[n] ?? 0) + qty;
   }
   return { items };
+}
+
+/** 已鑑定裝備清單驗證與整理（贈送／交易附的裝備）：只留已知欄位，回傳 { gear } 或 { error }；沒給＝空 */
+function parseGear(raw) {
+  if (raw == null) return { gear: [] };
+  const bad = { error: '裝備資料錯誤（最多 10 件）。' };
+  if (!Array.isArray(raw) || raw.length > MAX_MAIL_GEAR) return bad;
+  const gear = [];
+  for (const g of raw) {
+    if (!g || typeof g !== 'object' || !['weapon', 'armor', 'accessory'].includes(g.slot)) return bad;
+    const tier = cleanStr(g.tier, 10);
+    if (!tier || !Array.isArray(g.effects) || g.effects.length > 4) return bad;
+    const effects = g.effects.map((e) => ({ stat: cleanStr(e?.stat, 10), value: e?.value }));
+    if (effects.some((e) => !e.stat || !isInt(e.value, 0, 100000))) return bad;
+    const out = { tier, slot: g.slot, effects };
+    if (g.special === true) out.special = true;
+    const name = cleanStr(g.name, 40); if (name) out.name = name;
+    const note = cleanStr(g.note, 80); if (note) out.note = note;
+    if (g.gem != null) {
+      const stat = cleanStr(g.gem?.stat, 10);
+      if (!stat || !isInt(g.gem.value, 0, 100000)) return bad;
+      out.gem = { id: isInt(g.gem.id, 0, 1e9) ? g.gem.id : 0, stat, value: g.gem.value };
+    }
+    if (g.roll && typeof g.roll === 'object' && JSON.stringify(g.roll).length < 300) out.roll = g.roll;
+    gear.push(out);
+  }
+  return { gear };
 }
 
 /** 顯示用的角色名稱由前端送來（角色資料還在前端）；但「系統」保留給伺服器，不能冒用 */
@@ -375,20 +402,24 @@ export class RoomCore {
     if (msg.kind === 'gift') {
       const gold = msg.gold == null ? 0 : msg.gold; // 贈送也可以附金幣（只送金幣、不附物品也行）
       if (!isInt(gold, 0, MAX_MAIL_GOLD)) return err(rid, 'bad_mail', '金幣要是 0 以上的整數。');
-      const got = parseItems(msg.items, gold > 0);
+      const gears = parseGear(msg.gear);
+      if (gears.error) return err(rid, 'bad_mail', gears.error);
+      const got = parseItems(msg.items, gold > 0 || gears.gear.length > 0);
       if (got.error) return err(rid, 'bad_mail', got.error);
       Object.assign(mail, { kind: 'gift', items: got.items });
+      if (gears.gear.length) mail.gear = gears.gear;
       if (gold > 0) mail.gold = gold;
       if (msg.bounced === true) mail.bounced = true; // 對方拒收的藥水退回
     } else if (msg.kind === 'trade') { // 玩家交易：我給 give、要對方拿 want 來換；東西由寄的人先扣（押在這張單上），對方回覆前都留在伺服器
       const giveGold = msg.giveGold == null ? 0 : msg.giveGold;
       const wantGold = msg.wantGold == null ? 0 : msg.wantGold;
       if (!isInt(giveGold, 0, MAX_MAIL_GOLD) || !isInt(wantGold, 0, MAX_MAIL_GOLD)) return err(rid, 'bad_mail', '交易單：金幣要是 0 以上的整數。');
-      const give = parseItems(msg.give, giveGold > 0); // 每一邊「物品或金幣」至少要有一樣
+      const giveGear = parseGear(msg.giveGear); // 已鑑定裝備只能放在「我給出」這邊（對方要拿什麼換仍是用名稱指定）
+      const give = parseItems(msg.give, giveGold > 0 || (giveGear.gear?.length ?? 0) > 0); // 每一邊「物品、裝備或金幣」至少要有一樣
       const want = parseItems(msg.want, wantGold > 0);
-      if (give.error || want.error) return err(rid, 'bad_mail', `交易單：${give.error ?? want.error}`);
+      if (give.error || want.error || giveGear.error) return err(rid, 'bad_mail', `交易單：${give.error ?? want.error ?? giveGear.error}`);
       if (this.tradeRows(user.uid).filter((o) => o.from === user.uid).length >= MAX_PENDING_TRADES) return err(rid, 'trade_full', `你還有 ${MAX_PENDING_TRADES} 筆交易沒有回覆，先取消或等對方處理。`);
-      Object.assign(mail, { kind: 'trade', to, toName, give: give.items, want: want.items, giveGold, wantGold });
+      Object.assign(mail, { kind: 'trade', to, toName, give: give.items, want: want.items, giveGold, wantGold, ...(giveGear.gear.length ? { giveGear: giveGear.gear } : {}) });
     } else if (msg.kind === 'potion') {
       const def = POTIONS[msg.potion];
       if (!def?.heal) return err(rid, 'bad_mail', '只有回復藥水可以餵給別人。');
@@ -497,10 +528,10 @@ export class RoomCore {
     };
     if (action === 'accept') {
       put(offer.from, { from: offer.to, fromName: bName, items: offer.want, gold: offer.wantGold, note: `${bName} 接受了你的交易` });
-      put(offer.to, { from: offer.from, fromName: aName, items: offer.give, gold: offer.giveGold, note: `與 ${aName} 的交易成功` });
+      put(offer.to, { from: offer.from, fromName: aName, items: offer.give, gold: offer.giveGold, gear: offer.giveGear, note: `與 ${aName} 的交易成功` });
     } else {
       const note = { reject: `${bName} 拒絕了你的交易，東西已退回`, fail: `${bName} 的東西不夠，交易失敗，東西已退回`, cancel: `你取消了給 ${bName} 的交易，東西已退回` }[action];
-      put(offer.from, { from: action === 'cancel' ? offer.from : offer.to, fromName: action === 'cancel' ? aName : bName, items: offer.give, gold: offer.giveGold, bounced: true, note });
+      put(offer.from, { from: action === 'cancel' ? offer.from : offer.to, fromName: action === 'cancel' ? aName : bName, items: offer.give, gold: offer.giveGold, gear: offer.giveGear, bounced: true, note });
     }
     const other = user.uid === offer.from ? offer.to : offer.from;
     out.push({ to: 'user', uid: other, msg: { t: 'tradeChanged' } });

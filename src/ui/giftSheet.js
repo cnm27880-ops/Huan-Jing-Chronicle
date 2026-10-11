@@ -12,6 +12,7 @@ import { KNOWN_ITEMS } from './items.js';
 import { getRoomStatus, sendMail, notifyTradeChange } from '../state/rollLog.js';
 import { createOffersView, incomingCount, refreshTrades } from './playerTrade.js';
 import { itemsText, takeOffer, refundOffer, splitGold, GOLD_NAME } from '../game/trade.js';
+import { takeGear, refundGear } from '../game/mail.js';
 import { logActivity } from '../state/activityLog.js';
 
 const KNOWN = new Set([GOLD_NAME, ...KNOWN_ITEMS]);
@@ -32,22 +33,25 @@ export const teammates = () => {
  * mode 決定一開始停在哪個。東西（與金幣）先從自己的背包扣，寄失敗會還回來。
  */
 export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
-  const ui = { mode, to: '', picked: new Map(), wants: [{ name: '', qty: 1 }], busy: false }; // picked：物品名 → 要送的數量
+  const ui = { mode, to: '', picked: new Map(), pickedGear: new Set(), wants: [{ name: '', qty: 1 }], busy: false }; // picked：物品名 → 要送的數量
   let sheet;
 
   /** 寄出前的共同步驟：先把東西（與金幣）從背包扣掉；寄失敗再還回來。mail = sendMail 的內容（不含 to） */
   async function dispatch(sendBtn, idleText, give, giveGold, mail, onOk) {
     const state = getState();
-    if (!takeOffer(state, give, giveGold)) return toast('背包裡的數量（或金幣）不夠，請重新選。');
+    const gears = takeGear(state, [...ui.pickedGear]); // 已鑑定裝備整件拿出來（找不到就一件都不拿）
+    if (!gears) return toast('有裝備已經不在背包裡了，請重新選。');
+    if (!takeOffer(state, give, giveGold)) { refundGear(state, gears); return toast('背包裡的數量（或金幣）不夠，請重新選。'); }
     ui.busy = true; sendBtn.disabled = true; sendBtn.textContent = '送出中…';
     commit();
     try {
-      await sendMail({ to: ui.to, ...mail });
+      await sendMail({ to: ui.to, ...mail, ...(gears.length ? { [mail.kind === 'trade' ? 'giveGear' : 'gear']: gears } : {}) });
       const who = teammates().find((m) => m.uid === ui.to)?.name ?? '對方';
-      onOk(state, who);
+      onOk(state, who, gears);
       closeSheet();
     } catch (e) {
       refundOffer(state, give, giveGold); // 寄失敗：還回背包
+      refundGear(state, gears);
       commit();
       ui.busy = false;
       toast(`沒有送出：${e.message}`);
@@ -61,10 +65,10 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
     if (!ui.to) return toast(ui.mode === 'gift' ? '先選要送給誰。' : '先選要跟誰交易。');
     if (ui.mode === 'gift') {
       const gold = giveGold;
-      if (!Object.keys(give).length && gold < 1) return toast('先點選要送的東西（金幣也在物品格裡）。');
-      return dispatch(sendBtn, '🎁 送出', give, gold, { kind: 'gift', items: give, ...(gold > 0 ? { gold } : {}) }, (state, who) => {
+      if (!Object.keys(give).length && gold < 1 && !ui.pickedGear.size) return toast('先點選要送的東西（金幣、已鑑定裝備也在物品格裡）。');
+      return dispatch(sendBtn, '🎁 送出', give, gold, { kind: 'gift', items: give, ...(gold > 0 ? { gold } : {}) }, (state, who, gears) => {
         toast(`已送給 ${who}（對方不在線也會在上線時收到）。`);
-        logActivity(state, { cat: 'item', text: `送給 ${who}：${itemsText(give, gold)}`, lines: [] });
+        logActivity(state, { cat: 'item', text: `送給 ${who}：${itemsText(give, gold, gears)}`, lines: [] });
       });
     }
     const wantRaw = {};
@@ -75,13 +79,13 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
       wantRaw[name] = (wantRaw[name] ?? 0) + w.qty;
     }
     const { items: want, gold: wantGold } = splitGold(wantRaw); // 「要對方拿出來換」的名稱填「金幣」＝要金幣
-    if (!Object.keys(give).length && giveGold < 1) return toast('你要給出的東西或金幣，至少要有一樣。');
+    if (!Object.keys(give).length && giveGold < 1 && !ui.pickedGear.size) return toast('你要給出的東西、裝備或金幣，至少要有一樣。');
     if (!Object.keys(want).length && wantGold < 1) return toast('請填你要對方拿什麼來換（物品或金幣）。');
     const odd = Object.keys(want).filter((n) => !KNOWN.has(n));
     if (odd.length && !(await askConfirm(sendBtn, { title: `「${odd.join('、')}」不是已知的物品名稱`, lines: ['對方可能永遠湊不出來。仍要送出？'], okText: '仍要送出' }))) return undefined;
-    return dispatch(sendBtn, '🤝 送出交易單', give, giveGold, { kind: 'trade', give, giveGold, want, wantGold }, (state, who) => {
+    return dispatch(sendBtn, '🤝 送出交易單', give, giveGold, { kind: 'trade', give, giveGold, want, wantGold }, (state, who, gears) => {
       toast(`交易單已送給 ${who}，等對方回覆（你押的東西隨時可以到「📥 待回覆」取消）。`);
-      logActivity(state, { cat: 'item', text: `發起交易給 ${who}`, lines: [`給出：${itemsText(give, giveGold)}`, `要換：${itemsText(want, wantGold)}`] });
+      logActivity(state, { cat: 'item', text: `發起交易給 ${who}`, lines: [`給出：${itemsText(give, giveGold, gears)}`, `要換：${itemsText(want, wantGold)}`] });
       notifyTradeChange();
     });
   }
@@ -104,17 +108,18 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
     const trade = ui.mode === 'trade';
     const idle = trade ? '🤝 送出交易單' : '🎁 送出';
     const total = h('span', { class: 'gift-foot__n' });
-    const clear = h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { ui.picked.clear(); picker.refresh(); } }, '清除已選');
+    const clear = h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { ui.picked.clear(); ui.pickedGear.clear(); picker.refresh(); } }, '清除已選');
     const sendBtn = h('button', { type: 'button', class: 'btn btn--primary btn--go', onclick: () => send(sendBtn) }, idle);
     function renderFoot() { // 選取有變（挑選器每次更新都會呼叫）：更新底部的「已選幾件」與送出鈕
       const { items, gold } = splitGold(ui.picked);
       const n = Object.values(items).reduce((a, b) => a + b, 0);
-      const parts = [Object.keys(items).length ? `${Object.keys(items).length} 種・共 ${fmt(n)} 件` : '', gold > 0 ? `金幣 ${fmt(gold)}` : ''].filter(Boolean);
-      total.textContent = parts.length ? `${trade ? '給出' : '已選'} ${parts.join('＋')}` : '點物品就會選取（金幣也在裡面）';
-      clear.hidden = !ui.picked.size;
-      sendBtn.disabled = ui.busy || !ui.picked.size;
+      const parts = [Object.keys(items).length ? `${Object.keys(items).length} 種・共 ${fmt(n)} 件` : '', ui.pickedGear.size ? `裝備 ${ui.pickedGear.size} 件` : '', gold > 0 ? `金幣 ${fmt(gold)}` : ''].filter(Boolean);
+      total.textContent = parts.length ? `${trade ? '給出' : '已選'} ${parts.join('＋')}` : '點物品就會選取（金幣、已鑑定裝備也在裡面）';
+      const any = ui.picked.size || ui.pickedGear.size;
+      clear.hidden = !any;
+      sendBtn.disabled = ui.busy || !any;
     }
-    const picker = createItemPicker({ state, picked: ui.picked, onChange: renderFoot });
+    const picker = createItemPicker({ state, picked: ui.picked, pickedGear: ui.pickedGear, onChange: renderFoot });
 
     const wantBox = h('div', { class: 'trade-wants' });
     function renderWants() {

@@ -6,6 +6,10 @@ import { addItem, removeItem, countOf } from './engine.js';
 import { POTIONS, TOXICITY_MAX } from './rules.js';
 import { healPlayer, isDowned } from './combat.js';
 import { maxHp } from './stats.js';
+import { gearName, effectText } from './equipment.js';
+
+/** 一件已鑑定裝備寫成文字：「傳說飾品（物理傷害+12）」，有寶石會加註 */
+export const gearLine = (g) => `${gearName(g)}（${effectText(g)}${g.gem ? `；寶石 ${g.gem.stat}+${g.gem.value}` : ''}）`;
 
 /** 可以送的東西：背包裡有的；紀念品是玩家自己的特色（有專屬說明），不送 */
 export const giftable = (state, name) => countOf(state, name) > 0 && !state.keepsakes?.[name];
@@ -19,6 +23,21 @@ export function takeItems(state, items) {
 }
 export const refundItems = (state, items) => Object.entries(items).forEach(([name, n]) => addItem(state, name, n));
 
+/** 可以送的已鑑定裝備：背包裡的（身上穿著的要先脫下來）。鑲在上面的寶石會跟著一起送 */
+export const giftableGear = (state) => state.gear ?? [];
+
+/** 寄出前把挑好的裝備（id 陣列）從背包拿出來，回傳裝備陣列；任何一件找不到就一件都不拿、回傳 null。寄失敗時用 refundGear 還回去 */
+export function takeGear(state, ids) {
+  const set = new Set(ids);
+  const found = giftableGear(state).filter((g) => set.has(g.id));
+  if (found.length !== set.size) return null;
+  state.gear = state.gear.filter((g) => !set.has(g.id));
+  return found;
+}
+export const refundGear = (state, gears) => { state.gear.push(...gears); };
+/** 收到的裝備放進背包，換成自己的新編號（免得和自己原本的裝備編號撞到） */
+export const receiveGear = (state, gears) => gears.map((g) => { const inst = { ...g, id: state.nextGearId++ }; state.gear.push(inst); return inst; });
+
 /**
  * 收到信件：套用到自己的角色。mail = 伺服器給的 { id, from, fromName, kind, items | potion, heal }
  * 回傳 { title, lines, bounce? }：bounce = 要退回給寄件人的東西（例如毒性已滿喝不下的藥水）
@@ -30,9 +49,10 @@ export function applyMail(state, mail) {
     for (const [name, n] of entries) addItem(state, name, n);
     const gold = Number.isInteger(mail.gold) && mail.gold > 0 ? mail.gold : 0; // 玩家交易的金幣
     state.gold += gold;
+    const gears = receiveGear(state, Array.isArray(mail.gear) ? mail.gear.filter((g) => g && Array.isArray(g.effects)) : []); // 已鑑定裝備
     return {
       title: typeof mail.note === 'string' && mail.note ? mail.note : mail.bounced ? `${from} 退回了東西` : `${from} 送給你東西`, // note：玩家交易的結果（伺服器寫的）
-      lines: [...entries.map(([name, n]) => `${name} ×${n}`), ...(gold ? [`金幣 +${gold.toLocaleString('zh-TW')}`] : [])],
+      lines: [...entries.map(([name, n]) => `${name} ×${n}`), ...gears.map((g) => `${gearLine(g)}（已放進背包裝備）`), ...(gold ? [`金幣 +${gold.toLocaleString('zh-TW')}`] : [])],
     };
   }
   if (mail.kind === 'reward') { // GM 發放的獎勵（任務獎勵、補償）：物品、金幣、經驗、時間

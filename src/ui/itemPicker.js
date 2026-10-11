@@ -6,24 +6,27 @@
 import { h, fmt } from './dom.js';
 import { iconOf, plainName, CATEGORIES, categoryOf } from './items.js';
 import { holdRepeat } from './holdRepeat.js';
-import { giftable } from '../game/mail.js';
+import { giftable, giftableGear } from '../game/mail.js';
+import { gearName, effectText } from '../game/equipment.js';
 import { GOLD_NAME } from '../game/trade.js';
 import { countOf } from '../game/engine.js';
 
 /** 物品顯示名：名字本身已含圖示的不重複加 */
 export const labelOf = (n) => { const i = iconOf(n); return i ? `${i} ${plainName(n)}` : n; };
 
+const GEAR_ICON = { weapon: '⚔️', armor: '🛡️', accessory: '💍' };
 const GOLD_STEP = 100; // 金幣 −／＋ 每次加減多少
 
 /**
  * 回傳 { head, grid, owned }：head（分類鈕）與 grid（物品格）由呼叫端放進自己的版面；
  * owned 是背包裡可以送的東西名單（不含金幣）。
  */
-export function createItemPicker({ state, picked, onChange = () => {} }) {
+export function createItemPicker({ state, picked, pickedGear = new Set(), onChange = () => {} }) {
   const ui = { cat: 'all' };
   const owned = Object.keys(state.inventory).filter((n) => giftable(state, n));
   const hasGold = (state.gold ?? 0) > 0;
-  const cats = [{ id: 'all', name: '全部' }, ...(hasGold ? [{ id: 'gold', name: '🪙 金幣' }] : []), ...CATEGORIES.filter((c) => owned.some((n) => categoryOf(n) === c.id))];
+  const gears = giftableGear(state); // 已鑑定的裝備（一件一格，只能整件送；pickedGear 放選中的裝備 id）
+  const cats = [{ id: 'all', name: '全部' }, ...(hasGold ? [{ id: 'gold', name: '🪙 金幣' }] : []), ...(gears.length ? [{ id: 'identified', name: '已鑑定裝備' }] : []), ...CATEGORIES.filter((c) => owned.some((n) => categoryOf(n) === c.id))];
   const chips = h('div', { class: 'gift-cats', role: 'tablist', 'aria-label': '物品分類' });
   const grid = h('div', { class: 'gift-grid' });
 
@@ -71,12 +74,26 @@ export function createItemPicker({ state, picked, onChange = () => {} }) {
       stepper);
   }
 
+  /** 已鑑定裝備的一格：點一下選取／取消（沒有數量） */
+  function gearTile(g) {
+    const on = pickedGear.has(g.id);
+    return h('div', { class: 'gift-tile', dataset: { on: on ? '1' : '0' } },
+      h('button', {
+        type: 'button', class: 'gift-tile__main', 'aria-pressed': String(on),
+        onclick: () => { if (on) pickedGear.delete(g.id); else pickedGear.add(g.id); renderGrid(); },
+      },
+      h('span', { class: 'gift-tile__name', text: `${GEAR_ICON[g.slot] ?? ''} ${gearName(g)}` }),
+      h('small', { class: 'num', text: `${g.tier}・${effectText(g)}${g.gem ? `・鑲 ${g.gem.stat}寶石+${g.gem.value}` : ''}` })));
+  }
+
   function renderGrid() {
     const names = [
       ...(hasGold && (ui.cat === 'all' || ui.cat === 'gold') ? [GOLD_NAME] : []),
-      ...(ui.cat === 'gold' ? [] : owned.filter((n) => ui.cat === 'all' || categoryOf(n) === ui.cat)),
+      ...(ui.cat === 'gold' || ui.cat === 'identified' ? [] : owned.filter((n) => ui.cat === 'all' || categoryOf(n) === ui.cat)),
     ];
-    grid.replaceChildren(...(names.length ? names.map(tile) : [h('p', { class: 'notice', text: '背包裡沒有可以送的東西（紀念品不能送）。' })]));
+    const gearTiles = ui.cat === 'all' || ui.cat === 'identified' ? gears.map(gearTile) : [];
+    const tiles = [...gearTiles, ...names.map(tile)];
+    grid.replaceChildren(...(tiles.length ? tiles : [h('p', { class: 'notice', text: '背包裡沒有可以送的東西（紀念品不能送；身上穿著的裝備要先脫下）。' })]));
     onChange();
   }
 

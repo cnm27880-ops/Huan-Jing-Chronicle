@@ -5,7 +5,7 @@
 // 交易單的格式：{ give, giveGold, want, wantGold }（give／want 是 { 物品名: 數量 }，金幣是整數，沒有就是 0）。
 // ============================================================
 import { countOf } from './engine.js';
-import { giftable, takeItems, refundItems } from './mail.js';
+import { giftable, takeItems, refundItems, gearLine } from './mail.js';
 
 /** 物品挑選器與交易單的「要換什麼」裡，金幣用這個名字當成一種物品（同名的物品不存在）；送出前用 splitGold 拆開 */
 export const GOLD_NAME = '金幣';
@@ -19,9 +19,10 @@ export function splitGold(picked) {
   return { items, gold };
 }
 
-/** 寫成文字：「豪華蓋飯 ×10、鐵礦 ×5、金幣 500」 */
-export const itemsText = (items, gold = 0) => [
+/** 寫成文字：「豪華蓋飯 ×10、鐵礦 ×5、傳說飾品（物理傷害+12）、金幣 500」（gear = 已鑑定裝備陣列） */
+export const itemsText = (items, gold = 0, gear = []) => [
   ...Object.entries(items ?? {}).map(([name, n]) => `${name} ×${n}`),
+  ...(gear ?? []).map(gearLine),
   ...(gold > 0 ? [`金幣 ${gold.toLocaleString('zh-TW')}`] : []),
 ].join('、');
 
