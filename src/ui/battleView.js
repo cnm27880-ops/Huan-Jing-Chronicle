@@ -13,7 +13,7 @@ import {
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
-  SKILL_CATALOG, bindableSkills, attackResponses, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
+  SKILL_CATALOG, bindableSkills, attackResponses, ATTACK_RESPONSES, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
 } from '../game/skills.js';
 import {
   OTHER_RESOURCES, resourceMax, resourceNow, setResource, restoreAllResources, actionCost, shortfall, costText, witchRest,
@@ -378,7 +378,6 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         open ? h('small', { class: 'move__detail', text: d.text }) : null,
         lack ? h('small', { class: 'move__lack', text: `缺少：${lack}` }) : null),
         support && open ? supportButtons(state, m) : null,
-        armed ? respRow(state, m) : null,
         armed
           ? h('button', {
               type: 'button', class: 'btn btn--primary move__fire', disabled: Boolean(lack) || !fire.ready || isDowned(state), onclick: () => onFire(),
@@ -391,27 +390,30 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   }
 
   /**
-   * 攻擊響應列：選中的招式符合條件、而且你學過的響應（腦機協議、殘缺筆記…）。預設全開，點一下關掉（省資源）；
-   * 出招時付不起的會自動略過。不花資源的（真龍九變圖）一定生效。
+   * 攻擊響應列（常駐在鬥氣、大魔導師加骰下面，對所有招式一起生效）：你學過的響應（腦機協議、殘缺筆記…）。預設全開，點一下關掉（省資源）；
+   * 出招時只有「符合選中招式的條件、付得起」的才會觸發，不符合的（例如招式系別不對）顯示淡色、付不起的顯示紅色。不花資源的（真龍九變圖）一定生效。
    */
-  function respRow(state, m) {
-    const list = attackResponses(state, m);
-    if (!list.length) return null;
-    const plan = d2plan(state, m);
-    const usedNames = new Set(plan.used.map((r) => r.name));
+  function respBar(state) {
+    const names = Object.keys(ATTACK_RESPONSES).filter((n) => skillLevel(state, n) > 0);
+    if (!names.length) return null;
+    const cur = state.moves.find((m) => m.id === sel.moveId);
+    const fits = cur ? new Map(attackResponses(state, cur).map((r) => [r.name, r])) : null;
+    const usedNames = cur ? new Set(planResponses(state, cur, actionCost(state, cur), [...sel.respOff]).used.map((r) => r.name)) : null;
     return h('div', { class: 'resp', role: 'group', 'aria-label': '響應' },
       h('span', { class: 'resp__title', text: '響應' }),
-      list.map((r) => {
-        const off = sel.respOff.has(r.name);
-        const lacking = !off && !r.free && !usedNames.has(r.name);
+      names.map((name) => {
+        const def = ATTACK_RESPONSES[name];
+        const off = sel.respOff.has(name);
+        const r = fits?.get(name);
+        const status = off ? 'off' : fits && !r ? 'na' : r && !r.free && !usedNames.has(name) ? 'lack' : 'on';
+        const note = off ? '（已關閉）' : status === 'na' ? '（這個招式用不到）' : status === 'lack' ? '（資源不足，這次會略過）' : '';
         return h('button', {
-          type: 'button', class: 'resp__chip', 'aria-pressed': String(!off && !lacking), disabled: r.free ? true : null, dataset: { state: off ? 'off' : lacking ? 'lack' : 'on' },
-          title: `${r.name}：${lacking ? '資源不足，這次會略過。' : ''}造成${{ A: '物理', B: '能量', C: '靈魂' }[r.track]}傷害時${r.free ? '' : `，消耗 ${costText(r.cost)}`}，${r.tracks.join('')} 軌 +${r.dice} 顆傷害骰。${r.free ? '' : '點一下開／關。'}`,
-          onclick: () => { if (off) sel.respOff.delete(r.name); else sel.respOff.add(r.name); rerender(); },
-        }, r.name); // 只顯示名字；效果與消耗看 title（滑過），資源不足時膠囊變紅
+          type: 'button', class: 'resp__chip', 'aria-pressed': String(!off), disabled: def.free ? true : null, dataset: { state: status },
+          title: `${name}${note}：造成${{ A: '物理', B: '能量', C: '靈魂', all: '招式' }[def.track]}傷害時${def.free ? '' : `，消耗 ${costText(r?.cost ?? def.cost)}`}，加傷害骰${def.school ? `（限${def.school}招式）` : ''}。${def.free ? '' : '點一下開／關。'}`,
+          onclick: () => { if (off) sel.respOff.delete(name); else sel.respOff.add(name); rerender(); },
+        }, name);
       }));
   }
-  const d2plan = (state, m) => planResponses(state, m, actionCost(state, m), [...sel.respOff]);
 
   /** 鬥氣加骰：直接輸入這次出招花幾點鬥氣（不能超過現有的），每點 +1 顆真實傷害骰（冠軍勇士每點 4 顆）；出招後歸零 */
   function douRow(state) {
@@ -525,6 +527,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         : null,
       douRow(state),
       mageRow(state),
+      respBar(state),
       state.moves.length
         ? h('ul', { class: 'move-list' }, state.moves.map((m) => moveRow(state, m)))
         : h('p', { class: 'notice', text: '還沒有自訂招式。下面綁定一個主動技能新增。' }),
