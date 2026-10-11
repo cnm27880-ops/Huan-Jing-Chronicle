@@ -7,7 +7,7 @@
 import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { toast } from './controls.js';
-import { getRoomStatus, tradeList, tradeRespond, onTradeChange, notifyTradeChange } from '../state/rollLog.js';
+import { getRoomStatus, tradeList, tradeRespond, onTradeChange, notifyTradeChange, UNSURE_NOTE } from '../state/rollLog.js';
 import { payOffer, shortages, itemsText, refundOffer } from '../game/trade.js';
 import { logActivity } from '../state/activityLog.js';
 
@@ -54,9 +54,9 @@ export function createOffersView({ getState, commit }) {
         try {
           await tradeRespond(o.id, 'accept');
         } catch (e) {
-          refundOffer(state, o.want, o.wantGold);
+          if (!e.uncertain) refundOffer(state, o.want, o.wantGold); // 逾時／斷線時伺服器可能已處理，不能還
           commit();
-          toast(`交易沒有成功：${e.message}`);
+          toast(e.uncertain ? UNSURE_NOTE : `交易沒有成功：${e.message}`);
           return;
         }
         logActivity(state, { cat: 'item', text: `玩家交易成功：${o.fromName}`, lines: [`付出：${itemsText(o.want)}`] });

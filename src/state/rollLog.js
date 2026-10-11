@@ -88,7 +88,11 @@ const DENIED_TEXT = {
   expired: '登入已過期，已改用本機模式。請重新登入。',
 };
 
-export class RollError extends Error {}
+/** uncertain = 訊息已經送出、但沒等到伺服器回覆（逾時或斷線）：伺服器可能已經處理了，呼叫端不能直接把扣掉的東西還回去（會變成兩邊都有） */
+export class RollError extends Error {
+  constructor(message, { uncertain = false } = {}) { super(message); this.uncertain = uncertain; }
+}
+export const UNSURE_NOTE = '連線不穩，不確定有沒有成功。東西先不退回，請先確認對方有沒有收到（或看日誌），沒收到再請 GM 補發。';
 
 const room = {
   phase: 'local', // local 本機｜connecting 連線中｜online 已加入｜reconnecting 重新連線中｜denied 被拒絕
@@ -139,7 +143,7 @@ function setPhase(phase, extra = {}) {
 }
 
 function failPending(message) {
-  for (const [, p] of pending) { clearTimeout(p.timer); p.reject(new RollError(message)); }
+  for (const [, p] of pending) { clearTimeout(p.timer); p.reject(new RollError(message, { uncertain: true })); }
   pending.clear();
 }
 
@@ -147,7 +151,7 @@ function request(msg) {
   return new Promise((resolve, reject) => {
     if (!isOnline()) return reject(new RollError('尚未連上房間。'));
     const rid = `r${Date.now().toString(36)}${(++ridCounter).toString(36)}`;
-    const timer = setTimeout(() => { pending.delete(rid); reject(new RollError('伺服器沒有回應，請再試一次。')); }, REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => { pending.delete(rid); reject(new RollError('伺服器沒有回應，請再試一次。', { uncertain: true })); }, REQUEST_TIMEOUT_MS);
     pending.set(rid, { resolve, reject, timer });
     if (!client?.send({ ...msg, rid })) { clearTimeout(timer); pending.delete(rid); reject(new RollError('連線中斷，請再試一次。')); }
   });

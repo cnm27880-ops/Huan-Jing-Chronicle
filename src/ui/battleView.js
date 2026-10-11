@@ -26,7 +26,7 @@ import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
 import { battleSel as sel } from './battleSelect.js';
 import { teammates } from './giftSheet.js';
-import { sendMail } from '../state/rollLog.js';
+import { sendMail, UNSURE_NOTE } from '../state/rollLog.js';
 import { takeItems, refundItems } from '../game/mail.js';
 
 // 戰鬥紀錄只放戰鬥相關事件；黑市、鑑定、鑲嵌、一般檢定與自訂骰只出現在跑團頁
@@ -188,9 +188,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       const res = await sendMail({ to: ui.feedTo, kind: 'potion', potion: name });
       toast(`已餵出${name}（回復 ${res.heal}），紀錄會顯示在戰鬥紀錄裡。`);
     } catch (e) {
-      refundItems(state, { [name]: 1 });
+      if (!e.uncertain) refundItems(state, { [name]: 1 }); // 逾時／斷線時可能已經餵出去，不能還
       commit();
-      toast(`沒有餵出去：${e.message}`);
+      toast(e.uncertain ? UNSURE_NOTE : `沒有餵出去：${e.message}`);
     }
   }
 

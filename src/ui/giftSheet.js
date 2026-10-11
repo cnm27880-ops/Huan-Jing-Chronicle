@@ -9,7 +9,7 @@ import { openSheet, closeSheet } from './sheet.js';
 import { toast } from './controls.js';
 import { createItemPicker } from './itemPicker.js';
 import { KNOWN_ITEMS } from './items.js';
-import { getRoomStatus, sendMail, notifyTradeChange } from '../state/rollLog.js';
+import { getRoomStatus, sendMail, notifyTradeChange, UNSURE_NOTE } from '../state/rollLog.js';
 import { createOffersView, incomingCount, refreshTrades } from './playerTrade.js';
 import { itemsText, takeOffer, refundOffer, splitGold, GOLD_NAME } from '../game/trade.js';
 import { logActivity } from '../state/activityLog.js';
@@ -47,10 +47,10 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
       onOk(state, who);
       closeSheet();
     } catch (e) {
-      refundOffer(state, give, giveGold); // 寄失敗：還回背包
+      if (!e.uncertain) refundOffer(state, give, giveGold); // 確定沒送出才還回背包；逾時／斷線可能已經送出，還回去會變成兩邊都有
       commit();
       ui.busy = false;
-      toast(`沒有送出：${e.message}`);
+      toast(e.uncertain ? UNSURE_NOTE : `沒有送出：${e.message}`);
       sendBtn.disabled = false; sendBtn.textContent = idleText;
     }
     return undefined;
