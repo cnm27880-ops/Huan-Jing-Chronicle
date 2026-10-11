@@ -75,7 +75,8 @@ async function login(request, env) {
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('scope', 'identify');
   url.searchParams.set('state', nonce);
-  url.searchParams.set('prompt', 'none');
+  // 預設 none：已授權過的人直接通過（不用再按一次）。登出後換帳號（?switch=1）改 consent：不靜默通過，Discord 會顯示授權畫面
+  url.searchParams.set('prompt', new URL(request.url).searchParams.get('switch') === '1' ? 'consent' : 'none');
   return new Response(null, {
     status: 302,
     headers: {

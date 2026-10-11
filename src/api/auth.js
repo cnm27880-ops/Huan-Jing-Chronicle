@@ -37,12 +37,16 @@ export async function getCurrentUser() {
   }
 }
 
-export const loginUrl = () => `${API_BASE}/auth/login`;
+/** 剛登出過（這個分頁）→ 下次登入要求 Discord 重新授權，不然 Discord 還記得原本的帳號，會馬上又自動登入 */
+const SWITCH_KEY = 'huanjing:switch-account';
+const wantSwitch = () => { try { return sessionStorage.getItem(SWITCH_KEY) === '1'; } catch { return false; } };
+export const loginUrl = () => `${API_BASE}/auth/login${wantSwitch() ? '?switch=1' : ''}`;
 
 /** 登出；回傳是否成功（失敗時前端維持原狀） */
 export async function logout() {
   try {
     const res = await request('/auth/logout', { method: 'POST' });
+    if (res.ok) { try { sessionStorage.setItem(SWITCH_KEY, '1'); } catch { /* 存不了就算了 */ } }
     return res.ok;
   } catch {
     return false;
