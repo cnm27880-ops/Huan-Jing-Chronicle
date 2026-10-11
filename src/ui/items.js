@@ -1,6 +1,7 @@
 // ============================================================
 // 物品外觀：圖示、稀有度、分類（只影響畫面，不影響規則）
 // ============================================================
+import { SKILL_TABLE } from '../data/skills.js';
 import { GATHER_POOLS, RECIPES, FOODS, CRAFT_ACTIONS, POTIONS as POTION_RULES } from '../game/rules.js';
 
 export const TIERS = ['簡單', '普通', '困難', '史詩', '神級'];
@@ -42,7 +43,11 @@ export function tierOf(name) {
  */
 export const RARITY_NAMES = ['初階', '進階', '大師', '傳說', '神話'];
 const BOOK_RARITY = { 殘缺: 0, 初階: 0, 進階: 1, 大師: 2, 傳說: 3, 神級: 4 };
+const SKILL_TIER_RARITY = { 初階: 0, 進階: 1, 大師: 2, 傳說: 3 };
+/** 抽出來的技能書：物品名就是技能名（例如「八卦掌」），要放進技能書分類、顏色照技能位階 */
+export const isSkillBook = (name) => Object.hasOwn(SKILL_TABLE, name);
 export function rarityOf(name) {
+  if (isSkillBook(name)) return SKILL_TIER_RARITY[SKILL_TABLE[name].tier] ?? null;
   const book = String(name).match(/^(殘缺|初階|進階|大師|傳說|神級)技能書$/);
   if (book) return BOOK_RARITY[book[1]];
   return tierOf(name);
@@ -50,6 +55,7 @@ export function rarityOf(name) {
 
 export function iconOf(name) {
   if (ICON[name]) return ICON[name];
+  if (isSkillBook(name)) return '📜';
   if (/武器$/.test(name)) return '⚔️';
   if (/防具$/.test(name)) return '🛡️';
   if (/飾品$/.test(name)) return '💍';
@@ -76,7 +82,7 @@ export const CATEGORIES = [
   { id: 'meal', name: '料理', test: (n) => MEALS.has(n) },
   { id: 'potion', name: '藥劑', test: (n) => POTIONS.has(n) },
   { id: 'gear', name: '裝備與寶石', test: (n) => GEAR.has(n) || tierOf(n) !== null && /(武器|防具|飾品|寶石)$/.test(n) },
-  { id: 'book', name: '技能書', test: (n) => n.endsWith('技能書') },
+  { id: 'book', name: '技能書', test: (n) => n.endsWith('技能書') || isSkillBook(n) },
   { id: 'keepsake', name: '紀念品與收藏', test: () => true },
 ];
 
