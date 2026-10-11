@@ -22,6 +22,7 @@ export function showCover({ onEnter, notice, onUserChange } = {}) {
     userBox.replaceChildren();
     userBox.hidden = !user;
     discord.hidden = !!user;
+    discord.href = loginUrl(); // 剛登出過的話，登入網址會多帶「要求重新授權」
     note.textContent = user ? '已登入。目前角色存檔仍存在這個瀏覽器；共享存檔與擲骰將在下一階段加入。' : (notice || GUEST_NOTE);
     enter.textContent = user ? `以 ${user.name} 進入` : '以訪客進入';
     if (!user) return;
