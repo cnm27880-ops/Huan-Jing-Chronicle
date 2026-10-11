@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 import { addItem, countOf } from '../src/game/engine.js';
 import { maxHp } from '../src/game/stats.js';
-import { giftable, takeItems, refundItems, applyMail } from '../src/game/mail.js';
+import { giftable, takeItems, refundItems, applyMail, takeGear, refundGear } from '../src/game/mail.js';
+import { blankCharacter } from '../src/game/importBot.js';
 
 const hero = () => JSON.parse(JSON.stringify(SAMPLE_CHARACTER));
 
@@ -108,4 +109,24 @@ test('收到 GM 發放的獎勵：物品、金幣、經驗、時間都加進角�
   assert.match(r.title, /第三章/);
   applyMail(state, { kind: 'reward', gold: -5, exp: 1.5, time: 'x' }); // 壞資料不會讓數字變負或變 NaN
   assert.deepEqual([state.gold, state.exp, state.time], [110, 55, 5]);
+});
+
+test('送已鑑定裝備：從背包拿出（鑲的寶石跟著走）、找不到就一件都不拿、收到換新編號、寄失敗可還回去', async () => {
+  const a = blankCharacter('甲'); const b = blankCharacter('乙');
+  a.gear = [
+    { id: 1, tier: '傳說', slot: 'weapon', effects: [{ stat: '物理傷害', value: 12 }], gem: { id: 1, stat: '生命', value: 30 } },
+    { id: 2, tier: '進階', slot: 'armor', effects: [{ stat: '絕對防禦', value: 5 }] },
+  ];
+  assert.equal(takeGear(a, [1, 99]), null);
+  assert.equal(a.gear.length, 2);
+  const got = takeGear(a, [1]);
+  assert.equal(a.gear.length, 1);
+  refundGear(a, got); assert.equal(a.gear.length, 2);
+  b.gear = [{ id: 1, tier: '低階', slot: 'weapon', effects: [{ stat: '物理傷害', value: 1 }] }];
+  b.nextGearId = 2;
+  const r = applyMail(b, { kind: 'gift', fromName: '甲', items: {}, gear: got });
+  assert.equal(b.gear.length, 2);
+  assert.equal(b.gear[1].id, 2);
+  assert.equal(b.gear[1].gem.value, 30);
+  assert.match(r.lines[0], /傳說武器.*物理傷害\+12.*生命\+30/);
 });
