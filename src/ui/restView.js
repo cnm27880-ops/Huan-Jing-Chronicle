@@ -18,7 +18,7 @@ import {
 import {
   modifier, gather, craft, craftableTimes, keepsakeApplies, countOf,
 } from '../game/engine.js';
-import { SKILL_TABLE, LEARN_BOOKS, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo, isKeptBook, toggleKeepBook } from '../game/skillTable.js';
+import { SKILL_TABLE, LEARN_BOOKS, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo, isKeptBook, toggleKeepBook, INSIGHT_TIERS } from '../game/skillTable.js';
 import { drawBooks, chooseDraw, bookProgress, bookProgressList, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
 import {
   allRecipes, allMaterials, USABLE_ITEMS, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
@@ -261,7 +261,7 @@ export function createRestView({ root, getState, commit }) {
           plan.gate && plan.gate.need > 0 ? costRow('累計花費經驗（門檻）', plan.gate.need, plan.gate.have) : null,
           costRow('經驗', plan.exp, plan.haveExp),
           Object.entries(plan.books).map(([n, q]) => costRow(`${iconOf(n)} ${n}`, q, getState().inventory[n] ?? 0)),
-          Object.entries(plan.fodder).map(([n, q]) => costRow(`♻️ ${n}（肥料，抵 ${SKILL_TABLE[n].tier}技能書）`, q, getState().inventory[n] ?? 0))),
+          Object.entries(plan.fodder).map(([n, q]) => costRow(`♻️ ${n}（肥料，抵 ${INSIGHT_TIERS[n] ?? SKILL_TABLE[n].tier}技能書）`, q, getState().inventory[n] ?? 0))),
         swapAt.length ? h('p', { class: 'hint', text: `會在 ${swapAt.join('、')} 級自動對調「${FOOL_SWAPS[name][0]}」與「${FOOL_SWAPS[name][1]}」。` }) : null,
         h('button', {
           type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: (e) => doUpgrade(plan, e.currentTarget),

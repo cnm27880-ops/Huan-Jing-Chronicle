@@ -8,6 +8,8 @@ import { itemTile, amountPicker, toast, rarityTag } from './controls.js';
 import { KNOWN_ITEMS, rarityOf, iconOf, plainName } from './items.js';
 import { FOODS, STOMACH_SLOTS } from '../game/rules.js';
 import { addItem, removeItem, countOf, eat, useKeepsake } from '../game/engine.js';
+import { USABLE_ITEMS, useSpecialItem } from '../game/special.js';
+import { INSIGHT_TIERS } from '../game/skillTable.js';
 import { logActivity } from '../state/activityLog.js';
 
 export function openItemSheet(state, name, commit) {
@@ -34,6 +36,16 @@ export function openItemSheet(state, name, commit) {
       commit();
       countOf(state, name) ? sheet.refresh() : close();
     };
+    const usable = USABLE_ITEMS[name];
+    const doUseSpecial = () => {
+      const r = useSpecialItem(state, name);
+      if (!r.ok) return toast(r.error);
+      const got = Object.entries(r.gives).map(([k, q]) => `${k} ×${q}`).join('、');
+      toast(`使用 ${name}：${got}`);
+      logActivity(state, { cat: 'item', text: `使用 ${name}`, lines: [got] });
+      commit();
+      countOf(state, name) ? sheet.refresh() : close();
+    };
     return h('div', { class: 'item-sheet' },
       h('div', { class: `item-sheet__hero${tier !== null ? ' rarity' : ''}`, dataset: { tier: tier ?? 'none', rarity: tier ?? 'none' } },
         h('span', { class: 'item-sheet__icon', text: iconOf(name) }),
@@ -42,6 +54,12 @@ export function openItemSheet(state, name, commit) {
           h('p', { class: 'item-sheet__have' }, '持有 ', h('strong', { text: fmt(have) })))),
       def ? h('p', { class: 'item-sheet__desc', text: def.desc }) : null,
       food ? h('p', { class: 'item-sheet__desc', text: `效果：${food.effect}` }) : null,
+      INSIGHT_TIERS[name] ? h('p', { class: 'item-sheet__desc', text: `升級用肥料：1 個抵 1 本${INSIGHT_TIERS[name]}通用技能書（升級時最優先使用，不能拿來學新技能）` }) : null,
+      usable
+        ? h('div', { class: 'item-sheet__eat' },
+            h('p', { class: 'item-sheet__desc', text: `使用 → ${Object.entries(usable.gives).map(([k, q]) => `${k} ×${q}`).join('、')}` }),
+            h('button', { type: 'button', class: 'btn btn--primary', disabled: have < 1, onclick: doUseSpecial }, '使用 1 個'))
+        : null,
       def?.use && have > 0
         ? h('div', { class: 'item-sheet__eat' }, h('button', { type: 'button', class: 'btn btn--primary', onclick: doUse }, '使用 1 個'))
         : null,
