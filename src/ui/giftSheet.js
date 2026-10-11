@@ -131,7 +131,7 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
         h('label', { class: 'extra' }, h('span', { text: trade ? '交易對象' : '送給' }),
           h('select', { class: 'field', 'aria-label': '送給誰', onchange: (e) => { ui.to = e.target.value; } },
             h('option', { value: '', text: '選擇玩家…' }),
-            mates.map((m) => h('option', { value: m.uid, selected: ui.to === m.uid ? true : null, text: `${m.name}${m.online ? '' : '（離線）'}` })))),
+            mates.map((m) => h('option', { value: m.uid, selected: ui.to === m.uid ? true : null, text: `${m.name}${m.playerName && m.playerName !== m.name ? `（${m.playerName}）` : ''}${m.online ? '' : '（離線）'}` })))),
         trade ? h('p', { class: 'field-label', text: '① 我要給出（點物品選取、選好數量；金幣也在物品裡）' }) : null,
         picker.head),
       picker.grid,
@@ -147,5 +147,5 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
   }
 
   sheet = openSheet('贈送／交易', body, { tall: true });
-  refreshTrades().then((ok) => { if (ok && !ui.busy && ui.mode !== 'inbox' && incomingCount()) sheet.refresh(); }); // 開啟時順便查一次，「待回覆」分頁才有數字
+  refreshTrades().then((ok) => { if (ok && !ui.busy && ui.mode !== 'inbox' && incomingCount() && !document.activeElement?.closest('.sheet__body')) sheet.refresh(); }); // 玩家正在點下拉選單／輸入時不重畫，否則選單會突然收起來 // 開啟時順便查一次，「待回覆」分頁才有數字
 }
