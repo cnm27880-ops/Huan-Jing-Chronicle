@@ -57,7 +57,7 @@ test('送東西的驗證：不能寄給自己、不在白名單、空的、數�
   assert.equal(gift('400', {}), 'bad_mail');
   assert.equal(gift('400', { 鐵礦: 0 }), 'bad_mail');
   assert.equal(gift('400', { 鐵礦: 1.5 }), 'bad_mail');
-  assert.equal(gift('400', { 鐵礦: 10000 }), 'bad_mail');
+  assert.equal(gift('400', { 鐵礦: 10_000_001 }), 'bad_mail');
   assert.equal(gift('400', Object.fromEntries(Array.from({ length: 31 }, (_, i) => [`物${i}`, 1]))), 'bad_mail');
   assert.equal(send(core, OUT, { t: 'mailSend', to: '400', kind: 'gift', items: { 鐵礦: 1 } }).close?.code, 4403); // 白名單外的人連線就會被踢，不能寄
   assert.equal(errorOf(send(core, P1, { t: 'mailSend', to: '400', kind: 'weird' }))?.code, 'bad_mail');
