@@ -210,3 +210,19 @@ test('贈送也能附金幣：只送金幣也可以；金幣要是整數、不�
   assert.equal(errorOf(gift({ items: { 鐵礦: 1 }, gold: 1.5 }))?.code, 'bad_mail');
   assert.equal(errorOf(gift({ items: {}, gold: 2_000_000_000 }))?.code, 'bad_mail');
 });
+
+test('GM 發放獎勵：只有 GM；全員收到物品、金幣、經驗、時間；找不到的玩家整筆不發', () => {
+  const core = room();
+  const GMU = { uid: '100', name: 'GM', avatar: null };
+  assert.equal(errorOf(send(core, P1, { t: 'reward', rid: 'a', to: ['400'], gold: 5 })).code, 'forbidden');
+  assert.equal(errorOf(send(core, GMU, { t: 'reward', rid: 'b', to: ['400', '999'], gold: 5 })).code, 'bad_reward'); // 999 不在名單
+  assert.equal(errorOf(send(core, GMU, { t: 'reward', rid: 'c', to: ['400'] })).code, 'bad_reward'); // 什麼都沒填
+  assert.equal(core.pendingMail('400').length, 0); // 失敗不留信
+  const ok = send(core, GMU, { t: 'reward', rid: 'd', to: ['300', '400'], items: { 大師技能書: 2 }, gold: 100, exp: 50, time: 2, note: '第三章' });
+  assert.equal(ok.out[0].msg.t, 'rewardSent'); assert.equal(ok.out[0].msg.count, 2);
+  const mails = ok.out.filter((o) => o.to === 'user').map((o) => o.msg.mails[0]);
+  assert.deepEqual(mails.map((m) => m.kind), ['reward', 'reward']);
+  assert.deepEqual(mails[0].items, { 大師技能書: 2 }); assert.equal(mails[0].time, 2); assert.equal(mails[0].exp, 50);
+  const claim = send(core, P1, { t: 'mailClaim', rid: 'e', id: mails[0].id });
+  assert.equal(claim.out[0].msg.mail.kind, 'reward');
+});

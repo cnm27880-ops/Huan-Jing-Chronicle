@@ -21,6 +21,9 @@ export const MAX_PENDING_MAIL = 50; // 每人最多同時放幾封未領取的
 export const MAX_PENDING_TRADES = 10; // 每人最多同時發出幾筆還沒回覆的玩家交易
 export const MAX_MAIL_ITEM_KINDS = 30; // 一封最多幾種東西
 export const MAX_MAIL_GOLD = 1_000_000_000; // 玩家交易單上的金幣上限
+export const MAX_REWARD_EXP = 1_000_000; // GM 發放獎勵：單次經驗上限
+export const MAX_REWARD_TIME = 1000; // GM 發放獎勵：單次時間上限
+export const MAX_REWARD_TARGETS = 60; // GM 發放獎勵：一次最多幾位玩家
 export const MAX_MAIL_ITEM_QTY = 10_000_000; // 單一種東西的數量上限（代金券動輒十幾萬張，所以不能設太小）
 
 // 怪物立繪（GM 上傳）：前端先縮成 WebP 再送，伺服器存在房間的 SQLite，用網址讀取

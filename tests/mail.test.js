@@ -98,3 +98,14 @@ test('整條流程：玩家一送禮＋餵藥，玩家二離線；上線後領�
   assert.equal(target.toxicity, POTIONS.回春湯.toxicity);
   assert.equal(core.hello(B).mail.length, 0);
 });
+
+test('收到 GM 發放的獎勵：物品、金幣、經驗、時間都加進角色', async () => {
+  const { applyMail } = await import('../src/game/mail.js');
+  const state = { inventory: {}, sortOrder: [], gold: 10, exp: 5, time: 3 };
+  const r = applyMail(state, { kind: 'reward', items: { 大師技能書: 2 }, gold: 100, exp: 50, time: 2, note: '第三章' });
+  assert.equal(state.inventory['大師技能書'], 2);
+  assert.deepEqual([state.gold, state.exp, state.time], [110, 55, 5]);
+  assert.match(r.title, /第三章/);
+  applyMail(state, { kind: 'reward', gold: -5, exp: 1.5, time: 'x' }); // 壞資料不會讓數字變負或變 NaN
+  assert.deepEqual([state.gold, state.exp, state.time], [110, 55, 5]);
+});

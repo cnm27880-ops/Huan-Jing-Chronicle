@@ -247,7 +247,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'mailClaimed': case 'trades': case 'tradeOk': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': case 'presets': case 'acts': {
+    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'rewardSent': case 'mailClaimed': case 'trades': case 'tradeOk': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': case 'presets': case 'acts': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;
