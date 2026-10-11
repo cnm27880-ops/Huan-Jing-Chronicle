@@ -7,12 +7,20 @@ import { h, fmt } from './dom.js';
 import { openSheet } from './sheet.js';
 import { listCharacters, fetchCharacter } from '../state/charSync.js';
 import { roomRequest } from '../state/rollLog.js';
-import { askConfirm } from './confirmPop.js';
+import { askText } from './confirmPop.js';
 import { blankCharacter } from '../game/importBot.js';
 import { derivedStats } from '../game/stats.js';
 import { ALL_STATS, GEAR_TIERS, GEAR_SLOT_NAME, EQUIP_SLOTS, EQUIP_SLOT_LABEL } from '../game/rules.js';
 import { addManualGear, gearName, unequip } from '../game/equipment.js';
 import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL, getCustomSkillNames } from '../game/skillTable.js';
+
+/** 把角色資料存成 JSON 檔下載（覆蓋前的備份） */
+function downloadBackup(filename, data) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
+  const a = h('a', { href: url, download: filename });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
 
 const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) : '不明');
 const int = (v) => Math.trunc(Number(v)) || 0;
@@ -48,15 +56,20 @@ export function openGmCharEditor() {
     sheet.refresh();
   }
 
-  /** 把某位玩家的角色換成空白角色（名字用 Discord 名稱）：伺服器上的存檔與他的隊友狀態一起清掉。對方下次開網站時，選「使用伺服器的存檔」才會拿到空白角色 */
+  /** 把某位玩家的角色換成空白角色（名字用 Discord 名稱）：伺服器上的存檔與他的隊友狀態一起清掉。對方下次開網站時，選「使用伺服器的存檔」才會拿到空白角色。
+   *  防手誤：必須輸入角色名稱才會執行；覆蓋前先把舊角色下載成備份檔（JSON）到這台電腦 */
   async function resetBlank(c, anchor) {
     const name = c.name || '新玩家';
-    if (!(await askConfirm(anchor, { title: `把「${c.charName || c.name}」換成空白角色？`, lines: [`會用「${name}」當角色名稱；原本的角色資料會被覆蓋，無法復原。`, `${name} 下次開網站時要選「使用伺服器的存檔」。`], okText: '換成空白角色', danger: true }))) return;
-    ui.busy = true; sheet.refresh();
+    const label = c.charName || c.name;
+    const typed = await askText(anchor, { title: `要把「${label}」換成空白角色，請輸入角色名稱確認`, lines: [`會用「${name}」當角色名稱；原本的角色資料會被覆蓋。`, '覆蓋前會先下載一份備份檔到這台電腦。'], okText: '換成空白角色', maxLength: 80 });
+    if (typed === null) return;
+    if (typed.trim() !== label) { ui.message = `角色名稱輸入不一致（要輸入「${label}」），沒有動作。`; sheet.refresh(); return; }
+    ui.busy = true; ui.message = ''; sheet.refresh();
     try {
-      const res = await roomRequest({ t: 'charImport', uid: c.uid, base: c.version, reset: true, data: { ...blankCharacter(name), statMode: 'skills' } });
-      ui.error = '';
-      ui.message = res.ok ? `已把「${name}」換成空白角色。` : '失敗：玩家剛剛存檔了，請重新整理清單再試。';
+      const old = await fetchCharacter(c.uid); // 取最新版本與內容（清單上的版本可能已經過期）
+      if (old.data) downloadBackup(`${label}-備份-v${old.version}.json`, old.data);
+      const res = await roomRequest({ t: 'charImport', uid: c.uid, base: old.version, reset: true, data: { ...blankCharacter(name), statMode: 'skills' } });
+      ui.message = res.ok ? `已把「${label}」換成空白角色（舊角色已下載成備份檔）。` : '失敗：玩家剛剛存檔了，請重新整理清單再試。';
       await loadList();
     } catch (e) { ui.message = `失敗：${e.message}`; }
     ui.busy = false;
