@@ -280,9 +280,9 @@ export function createRestView({ root, getState, commit }) {
   };
 
   const PROGRESS_TEXT = {
-    need: (p) => `同名書 ${p.have} / ${p.need}・還差 ${p.lack} 本`,
-    complete: (p) => `同名書 ${p.have} / ${p.need}・已湊滿，再選用不到`,
-    learned: (p) => `已學會 Lv${p.level}・再選用不到`,
+    need: (p) => `同名技能書 ${p.have}/${p.need}`,
+    complete: (p) => `同名技能書 ${p.have}/${p.need}`,
+    learned: (p) => `已學會 Lv${p.level}`,
   };
 
   /** 抽取結果：每組 3 個技能選 1。一次會開很多本，所以點了就選，不再二次確認；每個選項標出你目前的同名書進度 */
@@ -292,7 +292,7 @@ export function createRestView({ root, getState, commit }) {
       const list = bookProgressList(state);
       if (!list.length) return null;
       return h('div', { class: 'draw-progress' },
-        h('p', { class: 'field-label', text: '我的技能書進度（學新技能要 3 本同名；已湊滿或已學會的，再多也用不到）' }),
+        h('p', { class: 'field-label', text: '我的技能書進度' }),
         h('div', { class: 'draw-progress__list' }, list.map((p) => h('span', { class: 'draw-chip', dataset: { status: p.status }, title: PROGRESS_TEXT[p.status](p), text: p.status === 'learned' ? `${p.name} ✓Lv${p.level}` : `${p.name} ${p.have}/${p.need}` }))));
     }
     function body() {
