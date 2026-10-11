@@ -7,6 +7,8 @@ import { h, fmt } from './dom.js';
 import { openSheet } from './sheet.js';
 import { listCharacters, fetchCharacter } from '../state/charSync.js';
 import { roomRequest } from '../state/rollLog.js';
+import { askConfirm } from './confirmPop.js';
+import { blankCharacter } from '../game/importBot.js';
 import { derivedStats } from '../game/stats.js';
 import { ALL_STATS, GEAR_TIERS, GEAR_SLOT_NAME, EQUIP_SLOTS, EQUIP_SLOT_LABEL } from '../game/rules.js';
 import { addManualGear, gearName, unequip } from '../game/equipment.js';
@@ -46,13 +48,29 @@ export function openGmCharEditor() {
     sheet.refresh();
   }
 
+  /** 把某位玩家的角色換成空白角色（名字用 Discord 名稱）：伺服器上的存檔與他的隊友狀態一起清掉。對方下次開網站時，選「使用伺服器的存檔」才會拿到空白角色 */
+  async function resetBlank(c, anchor) {
+    const name = c.name || '新玩家';
+    if (!(await askConfirm(anchor, { title: `把「${c.charName || c.name}」換成空白角色？`, lines: [`會用「${name}」當角色名稱；原本的角色資料會被覆蓋，無法復原。`, `${name} 下次開網站時要選「使用伺服器的存檔」。`], okText: '換成空白角色', danger: true }))) return;
+    ui.busy = true; sheet.refresh();
+    try {
+      const res = await roomRequest({ t: 'charImport', uid: c.uid, base: c.version, reset: true, data: { ...blankCharacter(name), statMode: 'skills' } });
+      ui.error = '';
+      ui.message = res.ok ? `已把「${name}」換成空白角色。` : '失敗：玩家剛剛存檔了，請重新整理清單再試。';
+      await loadList();
+    } catch (e) { ui.message = `失敗：${e.message}`; }
+    ui.busy = false;
+    sheet.refresh();
+  }
+
   function listView() {
     if (ui.error) return h('p', { class: 'notice notice--bad', text: ui.error });
     if (!ui.list) return h('p', { class: 'hint', text: '讀取中…' });
     if (!ui.list.length) return h('p', { class: 'notice', text: '還沒有任何玩家的角色存在伺服器上。' });
-    return h('ul', { class: 'import-list' }, ui.list.map((c) => h('li', { class: 'import-row' },
+    return h('div', {}, ui.message ? h('p', { class: 'notice', text: ui.message }) : null, h('ul', { class: 'import-list' }, ui.list.map((c) => h('li', { class: 'import-row' },
       h('strong', { text: c.charName || c.name }), h('small', { class: 'hint', text: `${c.name}・第 ${c.version} 版・${when(c.updatedAt)}` }),
-      h('button', { type: 'button', class: 'btn btn--small', disabled: ui.busy ? true : null, onclick: () => open(c.uid) }, '開啟'))));
+      h('button', { type: 'button', class: 'btn btn--small', disabled: ui.busy ? true : null, onclick: () => open(c.uid) }, '開啟'),
+      h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.busy ? true : null, onclick: (e) => resetBlank(c, e.currentTarget) }, '換成空白')))));
   }
 
   /** 把技能指定給玩家（例如 GM 新增的專屬技能）：直接設定等級；GM 自己決定要不要補技能書與經驗 */

@@ -941,7 +941,12 @@ export class RoomCore {
     const { lines } = describeCharChange(before ? JSON.parse(before.json) : null, msg.data);
     const label = `${user.name} 修改了「${cleanStr(msg.data.name, 80)}」（${member}）的角色`;
     const ev = this.record({ who: '系統', kind: 'audit', target: uid, label, lines }, user);
-    return { out: [...saved, ...this.broadcastEvent(ev).out, ...this.sysActivity(user, label, lines)], close: null };
+    const cleared = [];
+    if (msg.reset === true) { // GM 換成空白角色：舊的隊友狀態（名字、生命、資源）一起清掉，免得別人的選單還看到舊角色
+      this.db.exec('DELETE FROM vitals WHERE uid = ?', uid);
+      cleared.push({ to: 'all', msg: { t: 'vitalsClear', uid } });
+    }
+    return { out: [...saved, ...this.broadcastEvent(ev).out, ...this.sysActivity(user, label, lines), ...cleared], close: null };
   }
 
   /** GM：所有已存檔玩家的清單（不含角色內容），模擬戰挑人用 */
