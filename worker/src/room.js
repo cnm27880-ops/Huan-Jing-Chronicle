@@ -4,6 +4,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { RoomCore } from './room-core.js';
 import { MAX_SOCKETS_PER_USER } from './config.js';
+import { dumpDatabase } from './backup.js';
 
 function sqlAdapter(storage) {
   return {
@@ -21,6 +22,11 @@ export class Room extends DurableObject {
     ctx.blockConcurrencyWhile(async () => { this.core.migrate(); });
     // 心跳：前端送 "ping"，由 Cloudflare 直接回 "pong"，不用把 Durable Object 叫醒
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
+  }
+
+  /** 每日備份用（Worker 透過 RPC 呼叫，瀏覽器碰不到）：回傳所有資料表的內容 */
+  dumpAll() {
+    return dumpDatabase(sqlAdapter(this.ctx.storage), Date.now());
   }
 
   online(except) {

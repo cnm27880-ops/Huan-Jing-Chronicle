@@ -9,6 +9,10 @@
   // 固定團房間（Durable Object，SQLite 儲存）。migrations 會在部署時自動建立，不用手動操作。
   "durable_objects": { "bindings": [{ "name": "ROOM", "class_name": "Room" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  // 每日自動備份：每天 UTC 20:07（台灣 04:07）把房間資料存進 R2，保留最近 30 份（src/backup.js）。
+  // bucket 要先在 Cloudflare 後台建立（名稱要和 bucket_name 一致），否則部署會失敗。
+  "triggers": { "crons": ["7 20 * * *"] },
+  "r2_buckets": [{ "binding": "BACKUP", "bucket_name": "huan-jing-backup" }],
   // 非機密設定。Client Secret 與 Session Secret 絕對不要寫在這裡（放後台 Secrets）。
   "vars": {
     "SITE_ORIGIN": "https://huan-jing.yuci8660.uk",
