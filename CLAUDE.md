@@ -74,6 +74,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/badges.js` | 生活技能徽章（神級、500 次）：判斷達標、製作後技能 +1（純函式） |
 | `src/game/importSheet.js` | 試算表角色卡（貼上的文字）→ 網站角色：用標題文字找位置，不看固定格子；算出「手動調整」（純函式） |
 | `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |
+| `src/ui/rewardSheet.js` | GM 專用「🎁 發放獎勵」面板（跑團頁房間區塊）：勾選玩家（預設全員）＋物品（技能書快捷鈕）、金幣、經驗、時間、備註，一次發出；也拿來補償（例如玩家忘了喝惜未央，直接補時間）。伺服器 `room-core.js` 的 `onReward`（只有 GM，走信箱 `kind:'reward'`，不用扣任何人的背包，上限：經驗 100 萬、時間 1000、60 位玩家），玩家端 `mail.js` 的 `applyMail` 套用（時間沒有上限）並跳通知 |
 | `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：看並改玩家的手動調整、技能等級、啟動 |
 | `public/manifest.webmanifest`、`public/sw.js`、`public/icons/` | PWA（可加到主畫面）：manifest、Service Worker（只快取 /assets、/icons、/img，網頁與 API 不碰，改版後要讓舊快取失效就把 `sw.js` 的 `CACHE` 版本號 +1）、圖示（暫用，`tools/make-icons.py` 產生；換正式圖示：`python3 tools/make-icons.py --source 圖片.png`） |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |

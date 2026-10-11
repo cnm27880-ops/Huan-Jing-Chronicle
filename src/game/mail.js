@@ -35,6 +35,17 @@ export function applyMail(state, mail) {
       lines: [...entries.map(([name, n]) => `${name} ×${n}`), ...(gold ? [`金幣 +${gold.toLocaleString('zh-TW')}`] : [])],
     };
   }
+  if (mail.kind === 'reward') { // GM 發放的獎勵（任務獎勵、補償）：物品、金幣、經驗、時間
+    const entries = Object.entries(mail.items ?? {}).filter(([name, n]) => typeof name === 'string' && Number.isInteger(n) && n > 0);
+    for (const [name, n] of entries) addItem(state, name, n);
+    const pos = (v) => (Number.isInteger(v) && v > 0 ? v : 0);
+    const gold = pos(mail.gold); const exp = pos(mail.exp); const time = pos(mail.time);
+    state.gold += gold; state.exp += exp; state.time += time; // 時間沒有上限（和直接使用紀念品一樣）
+    return {
+      title: typeof mail.note === 'string' && mail.note ? `GM 發放獎勵：${mail.note}` : 'GM 發放獎勵',
+      lines: [...entries.map(([name, n]) => `${name} ×${n}`), ...(gold ? [`金幣 +${gold.toLocaleString('zh-TW')}`] : []), ...(exp ? [`經驗 +${exp.toLocaleString('zh-TW')}`] : []), ...(time ? [`時間 +${time}`] : [])],
+    };
+  }
   if (mail.kind === 'potion') {
     const def = POTIONS[mail.potion];
     if (!def?.heal || !Number.isInteger(mail.heal) || mail.heal < 0) return { title: `${from} 餵你的藥水無法使用`, lines: [] };

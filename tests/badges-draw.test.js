@@ -119,3 +119,13 @@ test('徽章改名：機器人匯入的預設名徽章也能改，且不會被�
   assert.equal(badgeStatus(s, '釣魚')[1].made, true);
   assert.equal(craftBadge(s, '釣魚', '500次').ok, false);
 });
+
+test('技能書進度：還差幾本、湊滿、已學會（再選沒用）；進度清單還差的排前面', async () => {
+  const { bookProgress, bookProgressList } = await import('../src/game/skillDraw.js');
+  const state = { inventory: { 引氣劍指: 2, 呢喃低語: 3, 八卦掌: 1, 初階技能書: 5 }, skills: { 八卦掌: 2 }, sortOrder: [] };
+  assert.deepEqual(bookProgress(state, '引氣劍指'), { have: 2, need: 3, level: 0, lack: 1, status: 'need' });
+  assert.equal(bookProgress(state, '呢喃低語').status, 'complete');
+  assert.equal(bookProgress(state, '八卦掌').status, 'learned');
+  assert.equal(bookProgress(state, '周天吐納法').lack, 3); // 還沒有任何一本
+  assert.deepEqual(bookProgressList(state).map((p) => p.name), ['引氣劍指', '呢喃低語', '八卦掌']); // 通用的「初階技能書」不是技能，不列入
+});

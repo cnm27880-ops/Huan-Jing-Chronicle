@@ -18,8 +18,8 @@ import {
 import {
   modifier, gather, craft, craftableTimes, keepsakeApplies, countOf,
 } from '../game/engine.js';
-import { SKILL_TABLE, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo } from '../game/skillTable.js';
-import { drawBooks, chooseDraw, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
+import { SKILL_TABLE, LEARN_BOOKS, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo } from '../game/skillTable.js';
+import { drawBooks, chooseDraw, bookProgress, bookProgressList, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
 import {
   allRecipes, allMaterials, USABLE_ITEMS, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
   specialMaxTimes, craftSpecial, useSpecialItem, gatherDaily, dailyDone, feedMeatball, harvestMeat,
@@ -270,31 +270,61 @@ export function createRestView({ root, getState, commit }) {
     sheet = openSheet(name, body, { tall: true });
   }
 
-  /** 抽取結果：每組 3 個技能選 1（選了就不能反悔，所以先確認） */
+  /** 往上找會捲動的外層（選完一組要重畫清單，重畫前記下捲動位置、之後還原，連續選才不會每次跳回最上面） */
+  const scrollerOf = (el) => {
+    for (let n = el?.parentElement; n; n = n.parentElement) {
+      const oy = getComputedStyle(n).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+    }
+    return null;
+  };
+
+  const PROGRESS_TEXT = {
+    need: (p) => `同名技能書 ${p.have}/${p.need}`,
+    complete: (p) => `同名技能書 ${p.have}/${p.need}`,
+    learned: (p) => `已學會 Lv${p.level}`,
+  };
+
+  /** 抽取結果：每組 3 個技能選 1。一次會開很多本，所以點了就選，不再二次確認；每個選項標出你目前的同名書進度 */
   function openDrawSheet() {
     let sheet;
+    function progressStrip(state) {
+      const list = bookProgressList(state);
+      if (!list.length) return null;
+      return h('div', { class: 'draw-progress' },
+        h('p', { class: 'field-label', text: '我的技能書進度' }),
+        h('div', { class: 'draw-progress__list' }, list.map((p) => h('span', { class: 'draw-chip', dataset: { status: p.status }, title: PROGRESS_TEXT[p.status](p), text: p.status === 'learned' ? `${p.name} ✓Lv${p.level}` : `${p.name} ${p.have}/${p.need}` }))));
+    }
     function body() {
-      const pending = getState().pendingDraws ?? [];
+      const state = getState();
+      const pending = state.pendingDraws ?? [];
       if (!pending.length) return h('p', { class: 'notice', text: '都選完了。到背包可以看到新的技能書。' });
       return h('div', { class: 'learn' },
+        progressStrip(state),
         pending.map((d, i) => h('section', { class: 'draw-set' },
           h('h3', { class: 'field-label', text: `${d.tier}技能書　第 ${i + 1} / ${pending.length} 組` }),
-          h('div', { class: 'draw-options' }, d.options.map((n) => h('div', { class: 'draw-option' },
-            h('strong', { text: n }),
-            h('small', { class: 'skill-tile__tag', text: skillTag(n) }),
-            h('p', { class: 'skill-info__text', text: SKILL_TABLE[n].text }),
-            h('button', {
-              type: 'button', class: 'btn btn--primary btn--small',
-              onclick: async (e) => {
-                if (!(await askConfirm(e.currentTarget, { title: `選「${n}」？`, lines: ['選了就不能改。'], okText: '選這個' }))) return;
-                const r = chooseDraw(getState(), i, n);
-                if (!r.ok) return toast(r.error);
-                toast(`得到 ${n} 技能書 ×1`);
-                logActivity(getState(), { cat: 'learn', text: `從抽取的技能書選了「${n}」`, lines: [`得到 ${n} 技能書 ×1`] });
-                commit();
-                sheet.refresh();
-              },
-            }, '選這個')))))));
+          h('div', { class: 'draw-options' }, d.options.map((n) => {
+            const p = bookProgress(state, n);
+            return h('div', { class: 'draw-option', dataset: { status: p.status } },
+              h('strong', { text: n }),
+              h('small', { class: 'skill-tile__tag', text: skillTag(n) }),
+              h('small', { class: 'draw-option__progress', dataset: { status: p.status }, text: PROGRESS_TEXT[p.status](p) }),
+              h('p', { class: 'skill-info__text', text: SKILL_TABLE[n].text }),
+              h('button', {
+                type: 'button', class: 'btn btn--primary btn--small',
+                onclick: (e) => {
+                  const scroller = scrollerOf(e.currentTarget);
+                  const top = scroller?.scrollTop ?? 0;
+                  const r = chooseDraw(getState(), i, n);
+                  if (!r.ok) return toast(r.error);
+                  toast(`得到 ${n} 技能書（${bookProgress(getState(), n).have} / ${LEARN_BOOKS}）`);
+                  logActivity(getState(), { cat: 'learn', text: `從抽取的技能書選了「${n}」`, lines: [`得到 ${n} 技能書 ×1`] });
+                  commit();
+                  sheet.refresh();
+                  if (scroller) scroller.scrollTop = top;
+                },
+              }, '選這個'));
+          })))));
     }
     sheet = openSheet(`選擇技能（${DRAW_CHOICES} 選 1）`, body, { tall: true });
   }

@@ -6,6 +6,7 @@
 // ============================================================
 import { SKILL_TABLE } from '../data/skills.js';
 import { countOf, removeItem, addItem } from './engine.js';
+import { LEARN_BOOKS } from './skillTable.js';
 
 export const DRAW_TIERS = ['初階', '進階', '大師', '傳說'];
 export const DRAW_CHOICES = 3;
@@ -40,4 +41,25 @@ export function chooseDraw(state, index, name) {
   addItem(state, name);
   state.pendingDraws = state.pendingDraws.filter((_, i) => i !== index);
   return { ok: true, name };
+}
+
+/**
+ * 某個技能的「同名技能書」進度（選技能時給玩家看，不用靠記憶）。學新技能要 LEARN_BOOKS（3）本同名書；
+ * 升級用的是「同階技能書」（不限同名），所以已經學會、或已經湊滿 3 本之後，再多的同名書沒有用處。
+ * status：'learned' 已學會（再選沒用）｜'complete' 已湊滿 3 本（再選沒用）｜'need' 還差 lack 本
+ */
+export function bookProgress(state, name) {
+  const have = countOf(state, name);
+  const level = Number(state.skills?.[name]) || 0;
+  const lack = Math.max(0, LEARN_BOOKS - have);
+  return { have, need: LEARN_BOOKS, level, lack, status: level > 0 ? 'learned' : lack === 0 ? 'complete' : 'need' };
+}
+
+/** 背包裡所有「抽出來的技能書」（物品名＝技能名）的進度：還差的排前面，已湊滿／已學會的排後面 */
+export function bookProgressList(state) {
+  const order = { need: 0, complete: 1, learned: 2 };
+  return Object.keys(state.inventory ?? {})
+    .filter((n) => n in SKILL_TABLE && countOf(state, n) > 0)
+    .map((name) => ({ name, ...bookProgress(state, name) }))
+    .sort((a, b) => order[a.status] - order[b.status] || a.lack - b.lack || a.name.localeCompare(b.name, 'zh-Hant'));
 }

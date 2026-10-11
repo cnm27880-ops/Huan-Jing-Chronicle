@@ -21,7 +21,7 @@ import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
-  MAX_PENDING_MAIL, MAX_PENDING_TRADES, MAX_MAIL_GOLD, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
+  MAX_PENDING_MAIL, MAX_PENDING_TRADES, MAX_MAIL_GOLD, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_REWARD_EXP, MAX_REWARD_TIME, MAX_REWARD_TARGETS, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -235,6 +235,7 @@ export class RoomCore {
       case 'specialSet': case 'specialDel': return this.onSpecial(user, msg, rid);
       case 'skillSet': case 'skillDel': return this.onSkillEdit(user, msg, rid);
       case 'mailSend': return this.onMailSend(user, msg, rid);
+      case 'reward': return this.onReward(user, msg, rid);
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'tradeList': return this.onTradeList(user, rid);
       case 'tradeRespond': return this.onTradeRespond(user, msg, rid);
@@ -417,6 +418,44 @@ export class RoomCore {
     this.db.exec('INSERT INTO mail(id, to_uid, t, json) VALUES (?, ?, ?, ?)', mail.id, to, mail.t, JSON.stringify(mail));
     out.push({ to: 'self', msg: { t: 'mailSent', rid, heal: mail.heal } }, { to: 'user', uid: to, msg: { t: 'mail', mails: [mail] } });
     return { out, close: null };
+  }
+
+  /**
+   * GM 發放獎勵（任務獎勵、補償）：給指定玩家物品（技能書…）、金幣、經驗、時間。走一般信箱（kind: 'reward'），不用扣任何人的背包；
+   * 不在線的上線才收到，只有 GM 能發。msg: { to: [uid…], items?: {名稱: 數量}, gold?, exp?, time?, note? }
+   */
+  onReward(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以發放獎勵。');
+    const gold = msg.gold == null ? 0 : msg.gold;
+    const exp = msg.exp == null ? 0 : msg.exp;
+    const time = msg.time == null ? 0 : msg.time;
+    if (!isInt(gold, 0, MAX_MAIL_GOLD) || !isInt(exp, 0, MAX_REWARD_EXP) || !isInt(time, 0, MAX_REWARD_TIME)) return err(rid, 'bad_reward', '金幣、經驗、時間要是 0 以上的整數（經驗上限一百萬、時間上限 1000）。');
+    const got = parseItems(msg.items, true);
+    if (got.error) return err(rid, 'bad_reward', got.error);
+    if (!Object.keys(got.items).length && !gold && !exp && !time) return err(rid, 'bad_reward', '請至少填一樣獎勵。');
+    const wanted = Array.isArray(msg.to) ? [...new Set(msg.to.map(String))] : [];
+    if (!wanted.length || wanted.length > MAX_REWARD_TARGETS) return err(rid, 'bad_reward', `請選擇要發給誰（最多 ${MAX_REWARD_TARGETS} 位）。`);
+    const names = [];
+    for (const uid of wanted) {
+      const name = UID.test(uid) && this.accessState(uid) === 'ok' ? this.memberName(uid) : null;
+      if (!name) return err(rid, 'bad_reward', '有玩家找不到（可能不在白名單，或還沒登入過），沒有發出任何獎勵。');
+      names.push([uid, name]);
+    }
+    const note = cleanStr(msg.note, 60);
+    const t = this.now();
+    const out = [];
+    this.db.tx(() => {
+      for (const [uid] of names) {
+        const mail = { id: this.uuid(), from: user.uid, fromName: 'GM', t, kind: 'reward', items: got.items, ...(gold ? { gold } : {}), ...(exp ? { exp } : {}), ...(time ? { time } : {}), ...(note ? { note } : {}) };
+        this.db.exec('INSERT INTO mail(id, to_uid, t, json) VALUES (?, ?, ?, ?)', mail.id, uid, t, JSON.stringify(mail));
+        out.push({ to: 'user', uid, msg: { t: 'mail', mails: [mail] } });
+      }
+    });
+    const what = [...Object.entries(got.items).map(([n, q]) => `${n} ×${q}`), gold ? `金幣 ${gold}` : '', exp ? `經驗 ${exp}` : '', time ? `時間 +${time}` : ''].filter(Boolean).join('、');
+    const label = `${user.name} 發放獎勵${note ? `「${note}」` : ''}給 ${names.length} 位玩家`;
+    const lines = [what, `對象：${names.map(([, n]) => n).join('、')}`];
+    const ev = this.record({ who: '系統', kind: 'note', label, lines }, user);
+    return { out: [{ to: 'self', msg: { t: 'rewardSent', rid, count: names.length } }, ...out, ...this.broadcastEvent(ev).out, ...this.sysActivity(user, label, lines)], close: null };
   }
 
   /** 領取：先刪先贏（兩個分頁同時收到，只有一個拿得到）。交易單不能這樣領（要用 tradeRespond 回覆，否則寄件人的東西就消失了） */
