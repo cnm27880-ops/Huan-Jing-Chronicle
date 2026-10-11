@@ -65,7 +65,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/botImport.js` | GM 專用的「匯入機器人存檔」面板（在跑團頁的房間區塊）：檔案只在瀏覽器讀取轉換，轉好才送伺服器（`charImport`）；`players_data.json` 永遠不能進 git |
 | `src/data/skills.js` | 技能目錄（**自動產生，不要手改**；試算表沒有的個人專屬技能放 `tools/extra-skills.json`）：119 個技能、每級累積數值、位階／類型／系別／效果文字、升級經驗表。由 `tools/extract-skills.py` 從 GM 的自動角色卡產生 |
 | `tools/extract-skills.py` | 更新技能目錄用（需要 openpyxl，只在技能資料改版時才跑）：`python3 tools/extract-skills.py 標準卡.xlsx [補充卡.xlsx …]` |
-| `src/game/skillTable.js` | 技能數值：查表、啟動類技能（武裝）、skills 模式（`statMode: 'skills'`）的規則、老狗識途與浮腫之軀的動態被動、GM 新增專屬技能的檢查與放進目錄（`validateCustomSkill`／`setCustomSkills`）（純函式） |
+| `src/game/skillTable.js` | 技能數值：查表、啟動類技能（武裝）、skills 模式（`statMode: 'skills'`）的規則、升級用的「肥料書」（抽出的書抵同階通用書 1 比 1；先已學會的多餘書、再沒保留且滿 3 本的；保留名單 `keepBooks`）、老狗識途與浮腫之軀的動態被動、GM 新增專屬技能的檢查與放進目錄（`validateCustomSkill`／`setCustomSkills`）（純函式） |
 | `src/game/skillDraw.js` | 抽取技能書（3 選 1，結果存 `pendingDraws`，選完前不能做其他事）（純函式） |
 | `src/game/special.js` | 特殊配方（內建 10 個）、特殊材料（每日 1 次）、餵肉球與收割（純函式）；GM 新增的配方與材料也在這裡檢查與合併（`allRecipes`／`allMaterials`，畫面一律用這兩個）；畫面在修整日「特殊」分頁 |
 | `src/ui/skillEdit.js`、`src/state/customSkills.js` | GM 專用的「專屬技能」面板（新增、修改、刪除；每級填累積屬性加成＋效果文字；內建技能不能改）；`customSkills.js` 是 GM 專屬技能的本機快取（載入角色前先放進目錄，免得生命上限算低、生命被砍）。指定給玩家在「玩家角色」面板 |

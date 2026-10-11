@@ -224,10 +224,39 @@ export const LEARN_BOOKS = 3;
 export const LEARN_GATE = { 初階: 0, 進階: 3000, 大師: 13000, 傳說: 33000 };
 export const bookOf = (name) => `${SKILL_TABLE[name].tier}技能書`;
 
+/** 保留名單（state.keepBooks）：打算學的技能，它的書就算湊滿 3 本也不會被當肥料 */
+export const isKeptBook = (state, name) => Boolean(state.keepBooks?.[name]);
+export function toggleKeepBook(state, name) {
+  const keep = { ...state.keepBooks };
+  if (keep[name]) delete keep[name]; else keep[name] = true;
+  state.keepBooks = keep;
+  return Boolean(keep[name]);
+}
+
+/**
+ * 升級時可以當「肥料」的抽出書（物品名＝技能名），1 本抵 1 本「同階」通用技能書；抽出書不能變回通用書（會無限抽）。
+ * 優先順序：1 已學會技能的多餘書　2 還沒學、已湊滿 3 本、且不在保留名單的書。其餘（沒湊滿、保留中）不動。
+ * learning = 這次正要從 0 級學起的技能：它的 3 本同名書要留給學習，只有超出的才算多餘。
+ * 回傳 [{ name, n, rank }]（依優先順序）
+ */
+export function fodderBooks(state, tier, learning = null) {
+  const out = [];
+  for (const [item, have] of Object.entries(state.inventory ?? {})) {
+    if (SKILL_TABLE[item]?.tier !== tier || !(have > 0)) continue;
+    const learned = (Number(state.skills?.[item]) || 0) > 0 || item === learning;
+    const n = item === learning ? have - LEARN_BOOKS : have;
+    if (n <= 0) continue;
+    if (learned) out.push({ name: item, n, rank: 1 });
+    else if (have >= LEARN_BOOKS && !isKeptBook(state, item)) out.push({ name: item, n, rank: 2 });
+  }
+  return out.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name, 'zh-Hant'));
+}
+
 /**
  * 從現在的等級一次升到 target 級要付的東西（不改任何資料）。
- * 回傳 { from, to, exp, books: { 物品名: 數量 }, haveExp, missing: { 經驗?, 物品名? }, ok }；不能升回 null。
+ * 回傳 { from, to, exp, books: { 物品名: 數量 }, fodder: { 技能名: 數量 }, haveExp, missing: { 經驗?, 物品名? }, ok }；不能升回 null。
  * 每一級各付一次：經驗 = EXP_TABLE 該級；書 = 0→1 付 3 本同名，其他級付「該級數」本同階。
+ * 同階通用書的需求先用肥料書抵（fodderBooks，1 比 1），抵不完的才留在 books 裡（要用通用書付）。
  */
 export function upgradePlan(state, name, target) {
   const tier = SKILL_TABLE[name]?.tier;
@@ -241,13 +270,23 @@ export function upgradePlan(state, name, target) {
     const [item, n] = lv === 1 ? [name, LEARN_BOOKS] : [bookOf(name), lv];
     books[item] = (books[item] ?? 0) + n;
   }
+  const fodder = {}; // 通用書不夠時優先用肥料抵，1 比 1，同階
+  const generic = bookOf(name);
+  let need = books[generic] ?? 0;
+  for (const f of need ? fodderBooks(state, tier, from === 0 ? name : null) : []) {
+    const take = Math.min(need, f.n);
+    fodder[f.name] = take;
+    need -= take;
+    if (!need) break;
+  }
+  if (generic in books) { if (need) books[generic] = need; else delete books[generic]; }
   const haveExp = Number(state.exp) || 0;
   const missing = {};
   const gate = from === 0 ? { need: LEARN_GATE[tier] ?? 0, have: Number(state.spentExp) || 0 } : null;
   if (gate && gate.have < gate.need) missing['累計花費經驗門檻'] = gate.need - gate.have;
   if (haveExp < exp) missing.經驗 = exp - haveExp;
   for (const [item, n] of Object.entries(books)) if (countOf(state, item) < n) missing[item] = n - countOf(state, item);
-  return { from, to, exp, books, haveExp, gate, missing, ok: Object.keys(missing).length === 0 };
+  return { from, to, exp, books, fodder, haveExp, gate, missing, ok: Object.keys(missing).length === 0 };
 }
 
 /** 目前資源最多能升到幾級（一級都升不了回現在的等級） */
@@ -270,8 +309,9 @@ export function upgradeSkillTo(state, name, target) {
   state.exp -= plan.exp;
   state.spentExp = (Number(state.spentExp) || 0) + plan.exp;
   for (const [item, n] of Object.entries(plan.books)) removeItem(state, item, n);
+  for (const [item, n] of Object.entries(plan.fodder)) removeItem(state, item, n);
   const swaps = setSkillLevel(state, name, plan.to);
-  return { ok: true, exp: plan.exp, books: plan.books, from: plan.from, level: plan.to, swaps };
+  return { ok: true, exp: plan.exp, books: plan.books, fodder: plan.fodder, from: plan.from, level: plan.to, swaps };
 }
 
 /** 升一級（等於 upgradeSkillTo 目前等級 + 1） */

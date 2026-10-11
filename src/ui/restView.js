@@ -18,7 +18,7 @@ import {
 import {
   modifier, gather, craft, craftableTimes, keepsakeApplies, countOf,
 } from '../game/engine.js';
-import { SKILL_TABLE, LEARN_BOOKS, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo } from '../game/skillTable.js';
+import { SKILL_TABLE, LEARN_BOOKS, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo, isKeptBook, toggleKeepBook } from '../game/skillTable.js';
 import { drawBooks, chooseDraw, bookProgress, bookProgressList, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
 import {
   allRecipes, allMaterials, USABLE_ITEMS, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
@@ -223,7 +223,7 @@ export function createRestView({ root, getState, commit }) {
     async function doUpgrade(plan, anchor) {
       if (blockedByDraw()) return;
       const state = getState();
-      const bookText = Object.entries(plan.books).map(([n, q]) => `${n} ×${q}`).join('、');
+      const bookText = [...Object.entries(plan.books).map(([n, q]) => `${n} ×${q}`), ...Object.entries(plan.fodder).map(([n, q]) => `${n} ×${q}（肥料）`)].join('、');
       const sure = await askConfirm(anchor, { title: `${name}：${plan.from ? `${plan.from} 級` : '學習'} → ${plan.to} 級`, lines: [`將消耗 ${fmt(plan.exp)} 經驗、${bookText}。`], okText: plan.from ? '升級' : '學習' });
       if (!sure || blockedByDraw()) return;
       const r = upgradeSkillTo(state, name, plan.to);
@@ -260,7 +260,8 @@ export function createRestView({ root, getState, commit }) {
         h('ul', { class: 'learn-cost' },
           plan.gate && plan.gate.need > 0 ? costRow('累計花費經驗（門檻）', plan.gate.need, plan.gate.have) : null,
           costRow('經驗', plan.exp, plan.haveExp),
-          Object.entries(plan.books).map(([n, q]) => costRow(`${iconOf(n)} ${n}`, q, getState().inventory[n] ?? 0))),
+          Object.entries(plan.books).map(([n, q]) => costRow(`${iconOf(n)} ${n}`, q, getState().inventory[n] ?? 0)),
+          Object.entries(plan.fodder).map(([n, q]) => costRow(`♻️ ${n}（肥料，抵 ${SKILL_TABLE[n].tier}技能書）`, q, getState().inventory[n] ?? 0))),
         swapAt.length ? h('p', { class: 'hint', text: `會在 ${swapAt.join('、')} 級自動對調「${FOOL_SWAPS[name][0]}」與「${FOOL_SWAPS[name][1]}」。` }) : null,
         h('button', {
           type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: (e) => doUpgrade(plan, e.currentTarget),
@@ -354,6 +355,24 @@ export function createRestView({ root, getState, commit }) {
           })));
   }
 
+  /** 保留名單：還沒學、背包有書的技能。保留的不會被當肥料（湊滿 3 本也不會）；沒保留又湊滿 3 本的，升級時會自動拿來抵同階通用書 */
+  function keepSection(state) {
+    const list = bookProgressList(state).filter((p) => p.status !== 'learned');
+    if (!list.length) return null;
+    return h('details', { class: 'add-box', open: ui.keepOpen, ontoggle: (e) => { ui.keepOpen = e.target.open; } },
+      h('summary', { text: `📌 技能書保留名單（${fmt(list.length)}）` }),
+      h('p', { class: 'hint', text: '升級時，通用技能書不夠的話，會先用肥料書抵（1 比 1、同階）：先用已學會技能的多餘書，再用「湊滿 3 本、沒保留」的書。打算學的技能請按成保留。' }),
+      h('div', { class: 'draw-progress__list' }, list.map((p) => {
+        const kept = isKeptBook(state, p.name);
+        const fodder = !kept && p.have >= p.need;
+        return h('button', {
+          type: 'button', class: 'chip', 'aria-pressed': String(kept),
+          title: kept ? '保留中：不會被當肥料' : fodder ? '會被當肥料（點一下改成保留）' : '還沒湊滿 3 本，不會被當肥料',
+          onclick: () => { toggleKeepBook(getState(), p.name); commit(); },
+        }, `${kept ? '📌 ' : fodder ? '♻️ ' : ''}${p.name} ${p.have}/${p.need}`);
+      })));
+  }
+
   function learnTile(state, name) {
     const lv = Number(state.skills?.[name]) || 0;
     const note = lv >= MAX_SKILL_LEVEL ? '已滿級' : maxAffordableLevel(state, name) > lv ? '可以升級' : '材料不足';
@@ -368,6 +387,7 @@ export function createRestView({ root, getState, commit }) {
     const unlearned = Object.keys(SKILL_TABLE).filter((n) => !(n in (state.skills ?? {}))).sort(byTier);
     return [drawSection(state), section('學習技能',
       h('p', { class: 'hint', text: `目前經驗 ${fmt(state.exp)}` }),
+      keepSection(state),
       h('h3', { class: 'field-label', text: `已學會（${fmt(learned.length)}）` }),
       learned.length ? h('div', { class: 'skill-tiles' }, learned.map((n) => learnTile(state, n))) : h('p', { class: 'notice', text: '還沒有學會技能。' }),
       h('details', { class: 'add-box', open: ui.learnOpen, ontoggle: (e) => { ui.learnOpen = e.target.open; } },

@@ -100,7 +100,7 @@ test('skillParts 只在 skills 模式有內容', () => {
 });
 
 // ---------- 愚者對調與技能升級 ----------
-import { setSkillLevel, upgradeSkill, upgradeSkillTo, upgradePlan, maxAffordableLevel, upgradeCost, markSwapsDone } from '../src/game/skillTable.js';
+import { setSkillLevel, upgradeSkill, upgradeSkillTo, upgradePlan, maxAffordableLevel, upgradeCost, markSwapsDone, fodderBooks, toggleKeepBook } from '../src/game/skillTable.js';
 
 test('愚者：升到 1 級先加屬性再對調，差額記進手動調整，同一級不重複', () => {
   const s = mk({}, { baseStats: { ...blankCharacter('x').baseStats, 體魄強韌: 10, 物理傷害: 30 } });
@@ -163,6 +163,37 @@ test('一次升到滿級：總共 3 + 2~10 = 57 本書，經驗 = 各級費用�
   poor.inventory.初階技能書 = 54;
   assert.equal(upgradeSkillTo(poor, '八卦掌', 10).level, 10);
   assert.equal(poor.skills.八卦掌, 10);
+});
+
+test('肥料書：抵同階通用書 1 比 1；先用已學會的多餘書，再用沒保留且湊滿 3 本的，最後才用通用書', () => {
+  // 八卦掌（初階）已 1 級，要升到 2 級＝付 2 本初階通用書
+  const s = mk({ 八卦掌: 1, 周天吐納法: 1 }, { exp: 9999, inventory: { 周天吐納法: 1, 呢喃低語: 3, 初階寶寶: 2, 初階技能書: 5, 劍心訣: 9 } });
+  const plan = upgradePlan(s, '八卦掌', 2);
+  assert.deepEqual(plan.fodder, { 周天吐納法: 1, 呢喃低語: 1 }); // 已學會的先，再來湊滿 3 本的；初階寶寶只有 2 本不動；進階的劍心訣不同階不動
+  assert.equal(plan.ok, true);
+  assert.equal(upgradeSkillTo(s, '八卦掌', 2).ok, true);
+  assert.equal(s.inventory.周天吐納法, undefined);
+  assert.equal(s.inventory.呢喃低語, 2);
+  assert.equal(s.inventory.初階技能書, 5); // 通用書沒動
+  assert.equal(s.inventory.劍心訣, 9);
+});
+
+test('肥料書：保留名單的不用；不夠的部分才扣通用書；學新技能時自己的 3 本同名書留給學習', () => {
+  const s = mk({ 八卦掌: 1 }, { exp: 9999, inventory: { 呢喃低語: 3, 初階技能書: 5 } });
+  toggleKeepBook(s, '呢喃低語');
+  assert.deepEqual(fodderBooks(s, '初階'), []);
+  assert.deepEqual(upgradePlan(s, '八卦掌', 2).fodder, {});
+  assert.equal(upgradePlan(s, '八卦掌', 2).books.初階技能書, 2);
+  toggleKeepBook(s, '呢喃低語'); // 取消保留
+  const p3 = upgradePlan(s, '八卦掌', 3); // 2 + 3 = 5 本：肥料 3 本、通用 2 本
+  assert.deepEqual(p3.fodder, { 呢喃低語: 3 });
+  assert.equal(p3.books.初階技能書, 2);
+  // 從 0 級學：3 本同名書留給學習，多的 2 本才是肥料
+  const t = mk({}, { exp: 9999, inventory: { 八卦掌: 5, 初階技能書: 0 } });
+  const p = upgradePlan(t, '八卦掌', 3); // 學習 3 本同名 + 2 級 2 本 + 3 級 3 本 = 通用需求 5，肥料只有多出的 2 本
+  assert.deepEqual(p.fodder, { 八卦掌: 2 });
+  assert.equal(p.books.八卦掌, 3);
+  assert.equal(p.books.初階技能書, 3);
 });
 
 test('浮腫之軀（夜見祈）：每個 5 級以上的神秘技能 +5 生命上限，自己 5 級以上也算；其他等級或系別不算', () => {
