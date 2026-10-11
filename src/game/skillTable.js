@@ -233,15 +233,20 @@ export function toggleKeepBook(state, name) {
   return Boolean(keep[name]);
 }
 
+/** 技能感悟：升級專用肥料，1 個抵 1 本同階通用技能書（最優先用）；不能拿來學新技能 */
+export const INSIGHT_TIERS = { 初階技能感悟: '初階', 進階技能感悟: '進階', 大師技能感悟: '大師', 傳說技能感悟: '傳說' };
+export const isInsight = (name) => Object.hasOwn(INSIGHT_TIERS, name);
+
 /**
  * 升級時可以當「肥料」的抽出書（物品名＝技能名），1 本抵 1 本「同階」通用技能書；抽出書不能變回通用書（會無限抽）。
- * 優先順序：1 已學會技能的多餘書　2 還沒學、已湊滿 3 本、且不在保留名單的書。其餘（沒湊滿、保留中）不動。
+ * 優先順序：0 同階技能感悟　1 已學會技能的多餘書　2 還沒學、已湊滿 3 本、且不在保留名單的書。其餘（沒湊滿、保留中）不動。
  * learning = 這次正要從 0 級學起的技能：它的 3 本同名書要留給學習，只有超出的才算多餘。
  * 回傳 [{ name, n, rank }]（依優先順序）
  */
 export function fodderBooks(state, tier, learning = null) {
   const out = [];
   for (const [item, have] of Object.entries(state.inventory ?? {})) {
+    if (INSIGHT_TIERS[item] === tier && have > 0) { out.push({ name: item, n: have, rank: 0 }); continue; }
     if (SKILL_TABLE[item]?.tier !== tier || !(have > 0)) continue;
     const learned = (Number(state.skills?.[item]) || 0) > 0 || item === learning;
     const n = item === learning ? have - LEARN_BOOKS : have;
