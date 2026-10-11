@@ -1990,4 +1990,5 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .resp__chip { padding: 0 8px; white-space: nowrap; font: inherit; font-size: 0.7rem; line-height: 1.6; color: var(--gold); background: var(--goldbg); border: 1px solid var(--gold2); border-radius: var(--r-pill); cursor: pointer; }
 .resp__chip[data-state='off'] { color: var(--faint); background: transparent; border-color: var(--line3); text-decoration: line-through; }
 .resp__chip[data-state='lack'] { color: var(--rose); background: transparent; border-color: var(--rose2); }
+.resp__chip[data-state='na'] { color: var(--faint); background: transparent; border-color: var(--line3); }
 .resp__chip:disabled { cursor: default; }

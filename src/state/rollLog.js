@@ -235,6 +235,9 @@ function onRoomMessage(msg) {
     case 'vitals':
       if (typeof msg.uid === 'string' && msg.v) { room.vitals = { ...room.vitals, [msg.uid]: msg.v }; notifyRoom(); }
       break;
+    case 'vitalsClear': // GM 把某位玩家換成空白角色：他舊的隊友狀態拿掉
+      if (typeof msg.uid === 'string' && room.vitals[msg.uid]) { const { [msg.uid]: _gone, ...rest } = room.vitals; room.vitals = rest; notifyRoom(); }
+      break;
     case 'presence':
       room.members = msg.members ?? room.members;
       notifyRoom();

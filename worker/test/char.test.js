@@ -143,3 +143,18 @@ test('異動紀錄：太多項時只列前 12 項並說明還有幾項；沒變�
   const same = send(core, GM, { t: 'charImport', rid: 'i', uid: '400', base: 1, data: { name: 'A', inventory: inv } });
   assert.deepEqual(same.out.find((o) => o.msg.t === 'event').msg.event.lines, ['沒有數值變更']);
 });
+
+test('GM 換成空白角色（reset）：角色被覆蓋，舊的隊友狀態清掉並通知所有人；沒帶 reset 不清', () => {
+  const core = room();
+  put(core, P2, 0, { name: '福德正神', hp: 5 });
+  send(core, P2, { t: 'vitals', v: { name: '福德正神', hp: 5, maxHp: 9, downed: false, res: {} } });
+  assert.equal(core.vitalsView()['400'].name, '福德正神');
+  const keep = send(core, GM, { t: 'charImport', rid: 'i', uid: '400', base: 1, data: { name: '玩家二', hp: 0 } });
+  assert.ok(!keep.out.some((o) => o.msg.t === 'vitalsClear'));
+  assert.equal(core.vitalsView()['400'].name, '福德正神');
+  const res = send(core, GM, { t: 'charImport', rid: 'i', uid: '400', base: 2, reset: true, data: { name: '玩家二', hp: 0 } });
+  assert.ok(res.out.some((o) => o.to === 'all' && o.msg.t === 'vitalsClear' && o.msg.uid === '400'));
+  assert.equal(core.vitalsView()['400'], undefined);
+  assert.equal(get(core, GM, '400').data.name, '玩家二');
+  assert.equal(reply(send(core, P1, { t: 'charImport', rid: 'x', uid: '400', base: 3, reset: true, data: { name: 'x', hp: 0 } })).code, 'forbidden'); // 玩家不能自己重設別人
+});
