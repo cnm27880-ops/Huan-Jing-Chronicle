@@ -21,8 +21,8 @@ import {
 import { SKILL_TABLE, LEARN_BOOKS, MAX_SKILL_LEVEL, FOOL_SWAPS, FOOL_LEVELS, usesSkillTable, inCatalog, upgradePlan, maxAffordableLevel, upgradeSkillTo, isKeptBook, toggleKeepBook, INSIGHT_TIERS } from '../game/skillTable.js';
 import { drawBooks, chooseDraw, bookProgress, bookProgressList, hasPendingDraw, DRAW_TIERS, MAX_DRAW_AT_ONCE, DRAW_CHOICES } from '../game/skillDraw.js';
 import {
-  allRecipes, allMaterials, USABLE_ITEMS, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
-  specialMaxTimes, craftSpecial, useSpecialItem, gatherDaily, dailyDone, feedMeatball, harvestMeat,
+  allRecipes, allMaterials, MEAT, MONSTER_MEAT, MEAT_PER_HARVEST, MEAT_FEED,
+  specialMaxTimes, craftSpecial, gatherDaily, dailyDone, feedMeatball, harvestMeat,
 } from '../game/special.js';
 import { openSheet } from './sheet.js';
 import { askConfirm } from './confirmPop.js';
@@ -469,7 +469,6 @@ export function createRestView({ root, getState, commit }) {
     const r = recipes[name];
     const max = specialMaxTimes(state, name);
     ui.times = Math.max(1, Math.min(ui.times, Math.max(max, 1)));
-    const usable = Object.keys(USABLE_ITEMS).filter((n) => countOf(state, n) > 0);
     return [
       section('特殊配方',
         h('div', { class: 'diff-grid', role: 'radiogroup' }, Object.entries(recipes).map(([n, x]) => h('button', {
@@ -492,13 +491,6 @@ export function createRestView({ root, getState, commit }) {
             kctx: { kind: 'special' }, label: `${ICONS[r.skill]} ${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 3, 5],
             onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSpecial(state, name, ui.times, [...ui.keepsakes]) }),
           })),
-      usable.length ? section('使用特殊物品', usable.map((n) => h('div', { class: 'special-card' },
-        h('div', { class: 'special-card__head' }, h('strong', { text: `${iconOf(n)} ${n}　有 ${fmt(countOf(state, n))}` }),
-          h('span', { class: 'hint', text: `使用 → ${Object.entries(USABLE_ITEMS[n].gives).map(([k, q]) => `${k} ×${q}`).join('、')}` })),
-        h('button', {
-          type: 'button', class: 'btn btn--primary btn--small',
-          onclick: () => { const x = useSpecialItem(getState(), n); if (!x.ok) return toast(x.error); pushResult({ kind: 'note', text: `使用 ${n}：${Object.entries(x.gives).map(([k, q]) => `${k} ×${q}`).join('、')}` }, 'item'); },
-        }, '使用 1 個')))) : null,
     ];
   }
 
