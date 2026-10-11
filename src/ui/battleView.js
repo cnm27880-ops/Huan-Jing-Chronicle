@@ -406,9 +406,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         const lacking = !off && !r.free && !usedNames.has(r.name);
         return h('button', {
           type: 'button', class: 'resp__chip', 'aria-pressed': String(!off && !lacking), disabled: r.free ? true : null, dataset: { state: off ? 'off' : lacking ? 'lack' : 'on' },
-          title: `${r.name}：造成${{ A: '物理', B: '能量', C: '靈魂' }[r.track]}傷害時${r.free ? '' : `，消耗 ${costText(r.cost)}`}，${r.tracks.join('')} 軌 +${r.dice} 顆傷害骰。${r.free ? '' : '點一下開／關。'}`,
+          title: `${r.name}：${lacking ? '資源不足，這次會略過。' : ''}造成${{ A: '物理', B: '能量', C: '靈魂' }[r.track]}傷害時${r.free ? '' : `，消耗 ${costText(r.cost)}`}，${r.tracks.join('')} 軌 +${r.dice} 顆傷害骰。${r.free ? '' : '點一下開／關。'}`,
           onclick: () => { if (off) sel.respOff.delete(r.name); else sel.respOff.add(r.name); rerender(); },
-        }, `${r.name} ${r.tracks.join('')}+${r.dice}${r.free ? '' : `（${costText(r.cost)}）`}${lacking ? '・不足' : ''}`);
+        }, r.name); // 只顯示名字；效果與消耗看 title（滑過），資源不足時膠囊變紅
       }));
   }
   const d2plan = (state, m) => planResponses(state, m, actionCost(state, m), [...sel.respOff]);

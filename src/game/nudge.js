@@ -29,13 +29,13 @@ export function usageOf(v) {
   return list.length ? list.reduce((a, x) => a + x, 0) / list.length : 0;
 }
 
-/** 資源條要畫的每一條：{ key, label, now, max, left }，left = 還剩多少（0~1）；毒性畫成「藥水空間」（還能喝多少），所以每條都是「還剩多少」 */
+/** 資源條要畫的每一條：{ key, label, now, max, left }，left = 填滿比例（0~1）；資源是還剩多少，毒性是已累積多少 */
 export function barsOf(v) {
   const bars = Object.entries(v?.res ?? {}).filter(([, [, max]]) => max > 0)
     .map(([key, [now, max]]) => ({ key, label: key.slice(0, 1), now, max, left: Math.min(1, Math.max(0, now / max)), text: `${key} ${now} / ${max}` }));
   if (typeof v?.tox === 'number') {
-    const room = Math.max(0, TOXICITY_MAX - v.tox);
-    bars.push({ key: '毒性', label: '毒', now: room, max: TOXICITY_MAX, left: room / TOXICITY_MAX, text: `毒性 ${v.tox} / ${TOXICITY_MAX}（還能喝 ${room} 點的藥水）` });
+    const tox = Math.min(TOXICITY_MAX, Math.max(0, v.tox)); // 毒性是「累積」：喝越多越滿（滿了＝不能再喝），跟其他資源「越用越空」方向相反
+    bars.push({ key: '毒性', label: '毒', now: tox, max: TOXICITY_MAX, left: tox / TOXICITY_MAX, text: `毒性 ${tox} / ${TOXICITY_MAX}（還能喝 ${TOXICITY_MAX - tox} 點的藥水）` });
   }
   return bars;
 }
