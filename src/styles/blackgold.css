@@ -1996,3 +1996,11 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 /* GM 發放獎勵：對象清單（人多時可捲動）與常用技能書快捷鈕 */
 .reward-targets { display: grid; gap: 4px; max-height: 200px; overflow-y: auto; padding: 4px 2px; }
 .reward-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+/* 抽技能書：選項上的同名書進度、頂端的進度列 */
+.draw-progress { display: grid; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.draw-progress__list { display: flex; flex-wrap: wrap; gap: 4px; }
+.draw-chip { padding: 0 8px; font-size: 0.72rem; line-height: 1.6; color: var(--gold); background: var(--goldbg); border: 1px solid var(--gold2); border-radius: var(--r-pill); }
+.draw-chip[data-status='complete'], .draw-chip[data-status='learned'] { color: var(--faint); background: transparent; border-color: var(--line3); }
+.draw-option__progress { color: var(--gold); }
+.draw-option__progress[data-status='complete'], .draw-option__progress[data-status='learned'] { color: var(--faint); }
+.draw-option[data-status='complete'], .draw-option[data-status='learned'] { opacity: 0.7; }
