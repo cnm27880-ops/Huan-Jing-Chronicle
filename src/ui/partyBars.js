@@ -13,13 +13,13 @@ const hpPct = (v) => (v.maxHp > 0 ? Math.max(0, Math.min(1, v.hp / v.maxHp)) : 0
 const hpState = (v) => (v.downed ? 'down' : hpPct(v) < 0.3 ? 'low' : hpPct(v) < 0.6 ? 'mid' : 'ok');
 
 /**
- * 資源小膠囊：底色是這種資源的顏色、填到「還剩多少」，名字在左、數字在右。
- * 毒性是「藥水空間」（還能喝多少），所以每個膠囊都是「填得越滿越有餘裕」。給隊友卡與提醒視窗共用。
+ * 資源小膠囊：底色是這種資源的顏色，名字在左、數字在右。資源填到「還剩多少」（空了＝用光，標紅）；
+ * 毒性相反，是一點一點「累積」上去（空＝沒中毒、滿＝不能再喝藥）。給隊友卡與提醒視窗共用。
  */
 export function resPill({ key, now, max, left, text }) {
-  return h('span', { class: `rpill${left <= 0 ? ' is-empty' : ''}`, dataset: { res: key }, title: text, role: 'img', 'aria-label': text },
+  return h('span', { class: `rpill${key !== '毒性' && left <= 0 ? ' is-empty' : ''}`, dataset: { res: key }, title: text, role: 'img', 'aria-label': text },
     h('span', { class: 'rpill__fill', style: `width:${Math.round(left * 100)}%` }),
-    h('span', { class: 'rpill__name', text: key === '毒性' ? '藥水空間' : key }),
+    h('span', { class: 'rpill__name', text: key }),
     h('span', { class: 'rpill__val num', text: `${fmt(now)}/${fmt(max)}` }));
 }
 

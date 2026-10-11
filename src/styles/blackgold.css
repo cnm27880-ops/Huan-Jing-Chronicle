@@ -1502,7 +1502,7 @@ input[type='number'], .amount__input { text-align: center; }
 .mate__use { flex: none; margin-left: auto; font-size: 0.7rem; color: var(--faint); }
 .mate__hpline { display: flex; align-items: center; gap: 8px; }
 .mate__bar { flex: 1; height: 6px; overflow: hidden; background: rgba(var(--ink-rgb), 0.1); border-radius: var(--r-pill); }
-.mate__fill { display: block; height: 100%; background: var(--ring); border-radius: inherit; transition: width 0.25s ease; }
+.mate__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--rose2), var(--rose)); border-radius: inherit; transition: width 0.25s ease; }
 .mate__hp { flex: none; font-size: 0.72rem; color: var(--ink2); }
 .mate__bars { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 3px 6px; }
 
@@ -1985,9 +1985,9 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 @media (prefers-reduced-motion: reduce) { .nudge, .nudge__icon { animation: none; } }
 
 /* 攻擊響應列（選中的招式裡）：點一下開／關 */
-.resp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.resp__title { font-size: 0.72rem; letter-spacing: 0.1em; color: var(--faint); }
-.resp__chip { padding: 2px 10px; font: inherit; font-size: 0.78rem; color: var(--gold); background: var(--goldbg); border: 1px solid var(--gold2); border-radius: var(--r-pill); cursor: pointer; }
+.resp { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.resp__title { font-size: 0.68rem; letter-spacing: 0.1em; color: var(--faint); }
+.resp__chip { padding: 0 8px; white-space: nowrap; font: inherit; font-size: 0.7rem; line-height: 1.6; color: var(--gold); background: var(--goldbg); border: 1px solid var(--gold2); border-radius: var(--r-pill); cursor: pointer; }
 .resp__chip[data-state='off'] { color: var(--faint); background: transparent; border-color: var(--line3); text-decoration: line-through; }
 .resp__chip[data-state='lack'] { color: var(--rose); background: transparent; border-color: var(--rose2); }
 .resp__chip:disabled { cursor: default; }

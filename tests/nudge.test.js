@@ -15,9 +15,10 @@ test('資源用量：用掉的比例平均（含毒性）；滿的是 0、沒有
   assert.equal(usageOf({ name: 'x', hp: 1, maxHp: 1, res: {} }), 0);
 });
 
-test('資源條：每條都是「還剩多少」，毒性畫成還能喝多少', () => {
+test('資源條：資源是「還剩多少」，毒性是一點一點累積（已中毒多少）', () => {
   const bars = barsOf(v({ res: { 魔力: [25, 100] }, tox: 6 }));
-  assert.deepEqual(bars.map((b) => [b.key, b.left]), [['魔力', 0.25], ['毒性', 0.6]]);
+  assert.deepEqual(bars.map((b) => [b.key, b.left]), [['魔力', 0.25], ['毒性', 0.4]]);
+  assert.deepEqual([bars[1].now, bars[1].max], [6, 15]);
   assert.match(bars[1].text, /還能喝 9 點/);
   assert.equal(barsOf(v({ res: { 靈氣: [0, 0] }, tox: undefined })).length, 0); // 上限 0 的不畫
 });
