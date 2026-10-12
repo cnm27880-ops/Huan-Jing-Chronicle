@@ -22,6 +22,8 @@
   --res-fight: #ee7a45;   --res-fight-rgb: 238, 122, 69;    /* 鬥氣：橙紅 */
   --res-calc: #45c7bd;    --res-calc-rgb: 69, 199, 189;     /* 算力：青 */
   --res-tox: #8fca5a;     --res-tox-rgb: 143, 202, 90;      /* 毒性：綠 */
+  --cloak: #8a6ee0;       --cloak-rgb: 138, 110, 224;       /* 暗影斗篷：暗紫 */
+  --cloak-deep: #0b0716;  --cloak-deep-rgb: 11, 7, 22;      /* 暗影斗篷：近黑的暗紫 */
   --on-gold: #1b1610;                                   /* 金底上的字 */
   --shadow: rgba(0, 0, 0, 0.35);
 

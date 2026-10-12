@@ -23,6 +23,7 @@ import {
 } from '../state/rollLog.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { battleSel as sel } from './battleSelect.js';
+import { playShadowFx } from './shadowFx.js';
 
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const pctOf = (cur, max) => (max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0);
@@ -274,6 +275,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     sel.dou = 0;
     sel.mage = 0;
     if (!online()) Object.keys(extraAbs).forEach((id) => spendEnemyB(state.encounter, id)); // 本機模式：蓄力用掉了（房間模式由伺服器扣）
+    if (r.reveal) playShadowFx('reveal', { n: r.burst }); // 暗影斗篷現身爆發
     r.hits.forEach((x) => playFx(x.target.id, x.result.total > 0 ? 'hit' : 'block')); // 打中＝晃動閃光；沒破防＝護盾擋下
     const multi = r.hits.length > 1;
     const lines = [];

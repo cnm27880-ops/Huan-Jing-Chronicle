@@ -95,6 +95,9 @@ export const SKILL_CATALOG = {
   // 暴徒的主動招式：造成能量與靈魂傷害。響應「每級 +2 個物理骰」因不能造成物理，轉成 B、C 各 +1（每級）——使用者確認。
   // 消耗：試算表沒有列，目前不花資源，需驗證
   暴徒: { school: '神秘', kind: 'attack', tracks: ['B', 'C'], targets: 1, cost: {}, extraAt: (lv) => ({ B: lv, C: lv }) },
+  // 暗影斗篷（個人專屬）的「現身」：造成能量傷害 1 個目標，爆發所有聚集的能量傷害（骰數見 shadowCloak.js，加在能量軌，明細寫「暗影斗篷」）。
+  // 進入隱身與每回合聚集不是招式，在戰鬥頁的暗影斗篷區塊操作
+  暗影斗篷: { school: '西幻', kind: 'attack', tracks: ['B'], targets: 1, cost: {}, extraAt: () => ({}) },
   萬物歸一: {
     school: '神秘', kind: 'attack', mode: 'all', tracks: ['A', 'B', 'C'], cost: {},
     extraAt: () => ({}),
