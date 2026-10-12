@@ -625,6 +625,7 @@ export class RoomCore {
         if (enc.locked) return err(rid, 'forbidden', 'GM 已經開打，不能再換位置。');
         const mine = (i) => enc.order[i].kind === 'player' && enc.order[i].uid === user.uid;
         if (!mine(a) && !mine(b)) return err(rid, 'forbidden', '只能換自己的位置。');
+        if (enc.order[a].kind !== 'player' || enc.order[b].kind !== 'player') return err(rid, 'forbidden', '只能和其他玩家換位置，不能和敵人或 NPC 換。'); // 使用者 2026-10-12
       }
       [enc.order[a], enc.order[b]] = [enc.order[b], enc.order[a]];
       this.saveEncounter(enc);

@@ -443,6 +443,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       const from = ui.swapFrom;
       ui.swapFrom = null;
       if (from === i) return rerender();
+      if (!gm && enc.order[i].kind !== 'player') { toast('只能和其他玩家換位置，不能和敵人或 NPC 換。'); return rerender(); }
       return act({ t: 'encSwap', a: from, b: i });
     };
     return h('div', { class: 'init' },

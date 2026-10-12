@@ -99,7 +99,7 @@ test('先攻：在線玩家（不含 GM）加還活著的怪物一起洗牌；�
   assert.notEqual(after.turn, target);
 });
 
-test('換位置：玩家開打前只能換自己的格子；開打後只有 GM 能換', () => {
+test('換位置：玩家開打前只能換自己的格子、只能和玩家換；開打後只有 GM 能換', () => {
   const core = room((n) => n);
   send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 1 } });
   const { order } = encOf(send(core, GM, { t: 'encInit' }, { online: ['300', '400'] }));
@@ -109,6 +109,7 @@ test('換位置：玩家開打前只能換自己的格子；開打後只有 GM �
   assert.equal(errorOf(send(core, P1, { t: 'encSwap', a: 0, b: 0 }))?.code, 'bad_enc');
   assert.equal(errorOf(send(core, P1, { t: 'encSwap', a: 0, b: 9 }))?.code, 'bad_enc');
   const mine = slot('300');
+  assert.match(errorOf(send(core, P1, { t: 'encSwap', a: mine, b: other })).message, /不能和敵人/); // 玩家不能跟敵人換
   const swapped = encOf(send(core, P1, { t: 'encSwap', a: mine, b: slot('400') }));
   assert.equal(swapped.order[slot('400')].uid, '300');
   assert.equal(swapped.order[mine].uid, '400');
