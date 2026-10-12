@@ -32,6 +32,7 @@ function upgrade(state) {
   }
   state.adjust = state.adjust ?? {}; // 手動調整與啟動中的技能（statMode 'skills' 的角色才用得到，見 skillTable.js）
   state.skillOn = state.skillOn ?? {};
+  state.moveUse = state.moveUse ?? {}; // 招式使用紀錄（名稱 → 次數），GM 的模擬戰讀這個，見 moveUse.js
   delete state.maxHp; // 最大生命改由數值面板計算
   fixItemAliases(state); // 打錯字的物品名（代金卷 → 代金券）併回正確的
   syncKeepsakes(state); // 紀念品效果以目錄為準（新增的紀念品、舊存檔都會補上）

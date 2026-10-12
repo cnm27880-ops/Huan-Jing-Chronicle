@@ -16,6 +16,7 @@ import {
 import { rollSum } from './dice.js';
 import { derivedStats, maxHp } from './stats.js';
 import { removeItem } from './engine.js';
+import { recordMoveUse } from './moveUse.js';
 import {
   passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS, douMult, attackResponses, dragonGain, hasCyberHacker, addCost, MAGE, mageApplies, titanCut,
 } from './skills.js';
@@ -345,6 +346,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   const notes = plan.skipped.map((r) => `響應「${r.name}」資源不足，略過`);
   if (mage) notes.push(`響應「大魔導師」：花 ${mage * MAGE.cost} 魔力，能量傷害骰 +${mage}`);
   pay(state, cost);
+  recordMoveUse(state, move.name); // 招式使用紀錄（GM 的模擬戰照實際常用的招式模擬）
 
   const potion = state.buffs.atk;
   const pooled = move.mode === 'all' || move.mode === 'abs';
@@ -444,6 +446,7 @@ export function useSupport(state, moveId, tier = 0, { self = true } = {}) {
   const lack = shortfall(state, cost);
   if (lack) return { error: `資源不足：${lack}（需要 ${costText(cost)}）` };
   pay(state, cost);
+  recordMoveUse(state, move.name);
   const lv = skillLevel(state, move.skill);
   const amount = Math.floor((maxHp(state) * t.pct) / 100);
   if (cat.kind === 'heal') {

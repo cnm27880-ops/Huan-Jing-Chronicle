@@ -400,6 +400,10 @@ export const deleteImage = (id) => request({ t: 'imgDel', id });
 /** msg = { t: 'presetList' } | { t: 'presetSave', name } | { t: 'presetDel', name } | { t: 'presetLoad', name }。回傳最新清單 [{ name, t, monsters }] */
 export const presetAction = async (msg) => (await request(msg)).list ?? [];
 
+// ---------- 範本版本（模擬戰；只有 GM 收得到） ----------
+/** msg = { t: 'tplList' } | { t: 'tplSave', id?, name, note, specs, snap? } | { t: 'tplDel', id }。回傳最新清單（新的在前）[{ id, name, note, created, t, specs, snap }] */
+export const templateAction = async (msg) => (await request(msg)).list ?? [];
+
 // ---------- 隊友狀態 ----------
 /** 回報自己的生命與資源（不用等回覆；沒連上房間就不送） */
 export function sendVitals(v) {
