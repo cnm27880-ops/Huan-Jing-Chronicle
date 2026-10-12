@@ -124,6 +124,7 @@ test('覆蓋：先吃兩份惜未央加時間，再用三份肉排蓋掉', () =>
 test('覆蓋：背包不夠就不蓋掉任何東西', () => {
   const s = fresh();
   s.inventory['惜未央'] = 2;
+  delete s.inventory['碳烤肉排'];
   eatPreset(s, ['惜未央', '惜未央'], 1, 'rest');
   assert.match(eatPreset(s, ['碳烤肉排', '碳烤肉排', '碳烤肉排'], 1, 'rest', { overwrite: true }), /不夠/);
   assert.equal(s.restStomach.length, 2);
