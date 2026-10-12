@@ -229,6 +229,27 @@ export function findJunk(state) {
   return junk;
 }
 
+/**
+ * 把背包裡已鑑定的裝備依「部位＋階級＋屬性」分組（數值不算），給畫面折疊用，不改存檔。
+ * 鑲了寶石、取過名字、記過備註的不併進組，各自單獨一組。
+ * 回傳 [{ key, items }]：items 由數值高到低；組的順序同輸入順序（第一次出現的位置）。
+ */
+export function groupGear(list) {
+  const total = (g) => g.effects.reduce((a, e) => a + e.value, 0);
+  const map = new Map();
+  for (const g of list) {
+    const solo = Boolean(g.gem || g.name || g.note);
+    const key = solo
+      ? `id:${g.id}`
+      : `${g.slot}:${g.tier}:${g.special ? 's' : 'n'}:${g.effects.map((e) => e.stat).sort().join('+')}`;
+    if (!map.has(key)) map.set(key, { key, items: [] });
+    map.get(key).items.push(g);
+  }
+  const groups = [...map.values()];
+  groups.forEach((x) => x.items.sort((a, b) => total(b) - total(a) || a.id - b.id));
+  return groups;
+}
+
 /** 背包中通用裝備與已鑑定裝備的總數，給畫面顯示 */
 export const genericCount = (state) => identifiable(state).reduce((a, x) => a + x.qty, 0);
 export { countOf };
@@ -274,4 +295,45 @@ export function addManualGear(state, spec) {
     }
   }
   return { ok: true, equipped, gear };
+}
+
+// ---------- 一次性：貼上清單批次放裝備（匯入完可連同 oneOffGearImport 一起刪） ----------
+const GEAR_LINE = /^(裝-)?(初階|低階|進階|大師|傳說)(武器|防具|飾品)[(（](特殊[-－])?([^\d()（）]+?)(\d+)[)）]$/;
+
+/** 把「傳說防具(抗性免疫17)」每行一件的文字轉成裝備規格。「裝-」開頭＝身上穿的，「特殊-」＝特殊飾品 */
+export function parseGearList(text) {
+  const items = [];
+  const errors = [];
+  String(text).split(/\r?\n/).forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line) return;
+    const m = line.match(GEAR_LINE);
+    if (!m) { errors.push({ line: i + 1, text: line, error: '格式看不懂' }); return; }
+    const slot = { 武器: 'weapon', 防具: 'armor', 飾品: 'accessory' }[m[3]];
+    items.push({ tier: m[2], slot, equip: Boolean(m[1]), special: Boolean(m[4]), effects: [{ stat: m[5], value: Number(m[6]) }], line: i + 1, text: line });
+  });
+  return { items, errors };
+}
+
+/**
+ * 把清單放進角色背包（只加不蓋）。有任何一行錯就整批不放。
+ * compensate：穿上時把效果從「手動調整」扣掉，面板數字不變。回傳 { ok, added, equipped, errors }
+ */
+export function importGearList(state, text, { compensate = true } = {}) {
+  const { items, errors } = parseGearList(text);
+  if (!items.length && !errors.length) return { ok: false, added: 0, equipped: 0, errors: [{ line: 0, text: '', error: '清單是空的' }] };
+  // 先在複本上試放，全部通過才真的放
+  const probe = JSON.parse(JSON.stringify(state));
+  for (const it of items) {
+    const r = addManualGear(probe, { tier: it.tier, slot: it.slot, effects: it.effects });
+    if (!r.ok) errors.push({ line: it.line, text: it.text, error: r.error });
+  }
+  if (errors.length) return { ok: false, added: 0, equipped: 0, errors };
+  let equipped = 0;
+  for (const it of items) {
+    const r = addManualGear(state, { tier: it.tier, slot: it.slot, effects: it.effects, equip: it.equip, compensate: it.equip && compensate });
+    if (it.special) r.gear.special = true;
+    if (r.equipped) equipped++;
+  }
+  return { ok: true, added: items.length, equipped, errors: [] };
 }

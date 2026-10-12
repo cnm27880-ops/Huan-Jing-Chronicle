@@ -101,6 +101,9 @@
 .owned__name { font-size: .84rem; }
 .owned__effect { color: var(--gold); font-size: .82rem; }
 .owned__btns { display: flex; gap: .3rem; }
+.owned-group__head { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .55rem; padding: 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.owned-group__caret { color: var(--gold); width: 1em; }
+.owned-group__list { flex: 1 1 100%; list-style: none; margin: .2rem 0 0; padding: 0 0 0 .7rem; display: flex; flex-direction: column; gap: .3rem; }
 .owned__note { flex: 1 1 100%; padding: .3rem .5rem; font-size: 14px; }
 
 /* ---------- 戰鬥頁 ---------- */
