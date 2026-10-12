@@ -267,7 +267,8 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
       const done = act(p, enc, rng);
       if (!done) continue;
       stat[i].actions++;
-      for (const h of done.r.hits) { stat[i].dmg += h.lost; if (h.lost > 0 && h.target.hp <= 0) stat[i].kills++; }
+      const killed = new Set(); // 多段招式（守密人）：同一隻怪只算一次擊殺
+      for (const h of done.r.hits) { stat[i].dmg += h.lost; if (h.lost > 0 && h.target.hp <= 0 && !killed.has(h.target)) { killed.add(h.target); stat[i].kills++; } }
     }
     markDowns();
     if (!alive().length) { outcome = 'win'; break; }

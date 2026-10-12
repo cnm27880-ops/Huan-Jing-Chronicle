@@ -2030,7 +2030,8 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .draw-option[data-status='complete'], .draw-option[data-status='learned'] { opacity: 0.7; }
 
 /* 檢定數值修正（裝備頁右欄）：一排 3～4 個技能，小小的好滑 */
-.adj-grid { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: 6px; }
+.adj-grid { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 6rem)); justify-content: start; gap: 6px; }
+@media (max-width: 480px) { .adj-grid { grid-template-columns: repeat(3, minmax(0, 6rem)); } }
 .adj-cell { display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-sm, 6px); background: rgba(var(--card-rgb), 0.5); min-width: 0; }
 .adj-cell strong { font-size: 0.85rem; white-space: nowrap; }
 .adj-cell small { font-size: 0.7rem; color: var(--faint); }

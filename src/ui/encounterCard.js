@@ -289,11 +289,12 @@ export function createEncounterCard({ getState, commit, rerender }) {
     }
     const multi = r.hits.length > 1;
     const lines = [];
-    r.hits.forEach((h2) => {
+    r.hits.forEach((h2, i) => {
+      const isLastOfTarget = !r.hits.slice(i + 1).some((y) => y.target.id === h2.target.id); // 多段招式：同一隻怪的血量變化只在最後一段寫一次
       if (multi) lines.push(targetLine(h2.stage ? `${h2.target.id} 第 ${h2.stage} 段` : h2.target.id, h2.result.total));
       lines.push(...trackLines(h2.result));
       if (h2.ignoreAbs) lines.push('終焉武裝：無視絕對防禦'); else if (h2.abs) lines.push(`敵人絕對防禦 ${h2.abs}${h2.extraAbs ? `（含 B 技能 +${h2.extraAbs}）` : ''}`);
-      lines.push(`${h2.target.id} 生命 ${fmt(befores.get(h2.target.id))} → ${fmt(h2.target.hp)} / ${fmt(h2.target.maxHp)}${h2.target.hp <= 0 ? '　倒下了！' : ''}`);
+      if (isLastOfTarget) lines.push(`${h2.target.id} 生命 ${fmt(befores.get(h2.target.id))} → ${fmt(h2.target.hp)} / ${fmt(h2.target.maxHp)}${h2.target.hp <= 0 ? '　倒下了！' : ''}`);
     });
     lines.push(...r.notes);
     if (r.potion) lines.push(`藥水加成：真實傷害 +${r.potion} 骰`);
@@ -302,7 +303,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     if (state.hp !== hpBefore) lines.push(`${state.name} 生命 ${fmt(hpBefore)} → ${fmt(state.hp)} / ${fmt(maxHp(state))}`);
     publish({
       who: state.name, kind: 'attack',
-      label: `${r.move.name} → ${r.hits.map((x) => (bosses.has(x.target.id) ? `${x.target.id}（${BOSS_DEF_MODES[modes[x.target.id]]}）` : x.target.id)).join('、')}`,
+      label: `${r.move.name} → ${[...new Map(r.hits.map((x) => [x.target.id, x])).values()].map((x) => (bosses.has(x.target.id) ? `${x.target.id}（${BOSS_DEF_MODES[modes[x.target.id]]}）` : x.target.id)).join('、')}`,
       big: r.hits.reduce((a, x) => a + x.result.total + (x.bonus ?? 0) + (x.yuwai ?? 0), 0),
       tone: r.hits.some((x) => x.result.total > 0) ? 'ok' : 'fail',
       lines,
