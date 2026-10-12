@@ -62,7 +62,7 @@ function trackHp(m) {
 function fxOf(id) {
   const f = fxTrack.get(id);
   const elapsed = f ? Date.now() - f.t0 : Infinity;
-  return elapsed < FX_MS * f.n ? { kind: f.kind, n: f.n, elapsed } : null;
+  return f && elapsed < FX_MS * f.n ? { kind: f.kind, n: f.n, elapsed } : null;
 }
 const playFx = (id, kind, n = 1) => fxTrack.set(id, { kind, n, t0: Date.now() });
 /** 打擊特效的種類：依這一下造成最多傷害的軌道——物理＝劈砍、能量＝爆裂、靈魂＝靈魂漩渦；沒破防＝護盾；單池招式（萬物歸一、大羅真仙）用通用的閃光 */
