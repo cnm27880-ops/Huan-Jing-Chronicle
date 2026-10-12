@@ -1824,6 +1824,22 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .dou__input::-webkit-outer-spin-button, .dou__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .dou__input:focus { outline: none; box-shadow: inset 0 0 0 1px var(--gold); }
 .dou__field[data-on='1'] .dou__input { color: var(--res-fight); }
+.dou__field[data-na='1'] { cursor: default; opacity: 0.55; }
+.dou__field[data-na='1'] .dou__label { color: var(--faint); }
+.dou__input:disabled { color: var(--faint); cursor: default; }
+
+/* 響應膠囊：跟上面的加骰列、下面的招式列各留一段距離（右邊同樣留出「✕」那一欄） */
+.resp { margin: 10px 36px 14px 0; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+
+/* GM 工具（房間區塊）：三組，每組小標題＋按鈕自動換行 */
+.room__tools { display: grid; gap: 10px; padding-top: 6px; border-top: 1px solid var(--line); }
+.room__group { display: grid; gap: 4px; }
+.room__group-title { font-size: 0.68rem; letter-spacing: 0.12em; color: var(--faint); }
+.room__group-btns { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 6px; }
+.room__group-btns .btn { margin: 0; min-height: 34px; white-space: nowrap; justify-content: center; }
+
+/* 面板右上的「收起／關閉」：大小、高度、圓角統一 */
+.sheet__close, .dossier__close { min-width: 64px; min-height: 36px; padding: 0 14px; font: inherit; font-size: 0.85rem; line-height: 1; white-space: nowrap; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
 .hold { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 
 /* 跑團頁「技能檢定」：各區塊之間留間距，優勢骰按鈕撐滿、胃袋格固定大小 */

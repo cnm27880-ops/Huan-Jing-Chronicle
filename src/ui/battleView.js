@@ -435,22 +435,24 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     return h('div', { class: 'dou' }, field);
   }
 
-  /** 大魔導師加骰：造成能量傷害時每花 5 魔力多 1 顆能量傷害骰，上限 12 顆；只在選中的招式有能量軌時出現，出招後歸零 */
+  /** 大魔導師加骰：造成能量傷害時每花 5 魔力多 1 顆能量傷害骰，上限 12 顆；學了就常駐（跟鬥氣加骰一樣），選中的招式沒有能量軌時變淡、不能填；出招後歸零 */
   function mageRow(state) {
+    if (skillLevel(state, '大魔導師') <= 0) { sel.mage = 0; return null; }
     const cur = state.moves.find((m) => m.id === sel.moveId);
-    if (!mageApplies(state, cur)) { sel.mage = 0; return null; }
-    const cap = Math.min(MAGE.max, Math.floor(resourceNow(state, '魔力') / MAGE.cost));
+    const fits = Boolean(mageApplies(state, cur));
+    if (!fits) sel.mage = 0;
+    const cap = fits ? Math.min(MAGE.max, Math.floor(resourceNow(state, '魔力') / MAGE.cost)) : 0;
     sel.mage = Math.max(0, Math.min(sel.mage, cap));
     const input = h('input', {
       class: 'dou__input', type: 'number', inputmode: 'numeric', min: '0', max: String(cap), step: '1', value: String(sel.mage), placeholder: '0',
-      'aria-label': '大魔導師加骰（顆數）',
+      'aria-label': '大魔導師加骰（顆數）', disabled: fits ? null : true,
       oninput: (e) => { sel.mage = Math.max(0, Math.min(cap, Math.floor(Number(e.target.value)) || 0)); field.dataset.on = sel.mage > 0 ? '1' : '0'; },
       onchange: (e) => { e.target.value = String(sel.mage); rerender(); },
       onfocus: (e) => e.target.select(),
     });
-    const field = h('label', { class: 'dou__field', dataset: { on: sel.mage > 0 ? '1' : '0' }, title: `每顆花 ${MAGE.cost} 魔力 +1 顆能量傷害骰，上限 ${MAGE.max} 顆；只對下一次出招有效` },
+    const field = h('label', { class: 'dou__field', dataset: { on: sel.mage > 0 ? '1' : '0', na: fits ? '0' : '1' }, title: fits ? `每顆花 ${MAGE.cost} 魔力 +1 顆能量傷害骰，上限 ${MAGE.max} 顆；只對下一次出招有效` : '大魔導師的響應只在「造成能量傷害」時生效，選中的招式沒有能量軌' },
       h('span', { class: 'dou__icon', 'aria-hidden': 'true', text: '🔮' }),
-      h('span', { class: 'dou__label', text: `大魔導師加骰（${MAGE.cost} 魔力／顆，最多 ${cap}）` }),
+      h('span', { class: 'dou__label', text: fits ? `大魔導師加骰（${MAGE.cost} 魔力／顆，最多 ${cap}）` : '大魔導師加骰（這個招式沒有能量傷害）' }),
       input);
     return h('div', { class: 'dou' }, field);
   }

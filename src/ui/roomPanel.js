@@ -37,21 +37,30 @@ export function mountRoomPanel(container) {
           r.members.length
             ? h('ul', { class: 'room__members' }, r.members.map((m) => h('li', { class: 'room__member', dataset: { online: m.online ? '1' : '0' }, text: m.name })))
             : null));
-      const btns = [];
+      // GM 工具分三組，每組一個小標題，免得十個按鈕擠成一團
+      const gmBtn = (text, onclick, main) => h('button', { type: 'button', class: `btn btn--small${main ? '' : ' btn--ghost'}`, onclick }, text);
+      const group = (title, list) => h('div', { class: 'room__group' },
+        h('span', { class: 'room__group-title', text: title }),
+        h('div', { class: 'room__group-btns' }, list));
       if (r.me?.isGm) {
-        btns.push(h('button', {
-          type: 'button', class: 'btn btn--small',
-          onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); },
-        }, '🆕 新戰鬥'));
-        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openBotImportSheet }, '匯入機器人存檔'));
-        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openSheetImportSheet }, '匯入角色卡'));
-        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openBackupRestoreSheet }, '從備份還原角色'));
-        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openGmCharEditor }, '玩家角色'));
-        btns.push(h('button', { type: 'button', class: 'btn btn--small', onclick: openRewardSheet }, '🎁 發放獎勵'));
-        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openSimPanel }, '模擬戰'));
-        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openSpecialEditor }, '特殊配方與材料'));
-        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openSkillEditor }, '專屬技能'));
+        parts.push(h('div', { class: 'room__tools' },
+          group('戰鬥', [
+            gmBtn('🆕 新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, true),
+            gmBtn('🎁 發放獎勵', openRewardSheet, true),
+            gmBtn('模擬戰', openSimPanel),
+          ]),
+          group('玩家', [
+            gmBtn('玩家角色', openGmCharEditor),
+            gmBtn('匯入機器人存檔', openBotImportSheet),
+            gmBtn('匯入角色卡', openSheetImportSheet),
+            gmBtn('從備份還原角色', openBackupRestoreSheet),
+          ]),
+          group('內容', [
+            gmBtn('特殊配方與材料', openSpecialEditor),
+            gmBtn('專屬技能', openSkillEditor),
+          ])));
       }
+      const btns = [];
       if (r.me?.isAdmin) {
         btns.push(r.gm.override
           ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => setGmOverride('release') }, '還給原 GM')
