@@ -54,8 +54,17 @@ export function castsAffordable(state, move) {
   return casts;
 }
 
-/** 續航最長的招式；一次都放不出來就用普攻；連普攻都沒有回傳 null */
+/**
+ * 玩家這一下用哪一招。
+ *   有出招優先順序（state.movePlan＝招式名稱陣列，模擬戰面板依「實戰紀錄」或 GM 手動設定放進複本）：照順序用第一個付得起的；
+ *     全部付不起就用普攻；順序裡的招式一個都不在清單裡（例如已經換掉了）就當沒設定。
+ *   沒有：續航最長的招式（資源能放最多次的）；一次都放不出來就用普攻；連普攻都沒有回傳 null
+ */
 export function pickMove(state) {
+  if (state.movePlan?.length) {
+    const found = state.movePlan.map((n) => state.moves.find((m) => m.name === n && !isSupport(m))).filter(Boolean);
+    if (found.length) return found.find((m) => castsAffordable(state, m) >= 1) ?? state.moves.find((m) => m.id === 'basic') ?? null;
+  }
   let best = null;
   for (const m of state.moves) {
     if (isSupport(m) || m.id === 'basic') continue;

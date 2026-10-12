@@ -39,15 +39,17 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/giftSheet.js` | 「贈送／交易」面板（背包頁按鈕，唯一入口，原「送給別人」）：上方三個分頁——🎁 贈送（對方不用同意）、🤝 交易（物品與／或金幣互換，先扣押在交易單上）、📥 待回覆（清單在 playerTrade.js）；戰鬥面板的「餵給隊友」用同一個信箱機制 |
 | `src/game/trade.js` | 玩家交易的付款檢查（純函式，含金幣）：兩邊付不付得起、扣押與退回（不夠＝交易失敗，伺服器退回 A 押的） |
 | `src/ui/playerTrade.js` | 「📥 待回覆」清單（給 giftSheet 用）：收到的交易（接受／拒絕）、我發出的交易（取消）；交易單存在伺服器（`room-core.js` 的 `tradeList`／`tradeRespond`），A 的東西與金幣先扣押在單子上 |
-| `src/game/simulate.js` | 模擬戰（階段 D，純函式）：續航最長招式、怪物隨機打人、自動喝藥與隊友救人、勝率／回合數／傷害／剩餘生命統計；不碰真實存檔 |
-| `src/ui/simPanel.js` | GM 專用「模擬戰」面板（跑團頁房間區塊）：選玩家＋敵人來源（自訂強度每場重抽／場上的敵人／預組，後兩種固定 A/B/C）＋場數，畫回合分布與剩餘生命條狀圖 |
+| `src/game/simulate.js` | 模擬戰（階段 D，純函式）：續航最長招式、怪物隨機打人、自動喝藥與隊友救人、勝率／回合數／傷害／剩餘生命統計；玩家複本可帶 `movePlan`（出招優先順序）；不碰真實存檔 |
+| `src/ui/simPanel.js` | GM 專用「模擬戰」面板（跑團頁房間區塊）：選玩家（每位可設「出招設定」：自動依實戰紀錄／手動排順序）＋敵人來源（自訂強度每場重抽／場上的敵人／預組，後兩種固定 A/B/C）＋場數，畫回合分布與剩餘生命條狀圖；自訂強度下有「範本調整影響分析」與「範本版本」（存／載入／比較） |
 | `src/game/enemy.js` | 敵人等級（普通／菁英 2 打／BOSS 3 打）與技能 A 攻擊強化、B 防禦強化（每回合歸零）、C 喝血（整場戰鬥 1 次）的次數與效果（伺服器與前端共用）（純函式） |
 | `src/game/nudge.js` | 戰鬥提醒與隊友資源條的判斷（純函式）：資源動用比例、資源條、隊伍摘要、偵測隊友倒地／危急／全隊吃緊、防連發、手上能做的事 |
 | `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄、房間上方；GM 不顯示）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示） |
 | `src/ui/confirmPop.js` | 網頁自己的對話框（取代瀏覽器的 confirm／prompt）：`askConfirm`／`askText`，有給按鈕貼在旁邊、沒給就置中；**全站不要再用 `confirm()`／`prompt()`／`alert()`** |
 | `src/game/fairness.js` | 模擬戰的公平性（純函式）：量每位玩家一次出手的傷害並排強弱、小怪血量依最弱玩家設、「第一名只出六成力」的情境（`FAIR` 常數可調） |
-| `src/game/design.js` | 模擬戰的「自動配置敵人」（純函式，只用在自訂強度）：搜尋小怪／菁英隻數與各級血量、攻擊、防禦（BOSS 固定 1 隻或沒有）；先量玩家的傷害曲線（`damageCurve`）再決定各級防禦與血量，用二分搜尋對準 2～3 回合與攻擊強度；`TEMPLATE` 是 10/12 實戰數值；`makeEvaluator` 是固定種子的評分模擬 |
-| `src/game/tuning.js` | 模擬戰的目標（2～3 回合、每場約耗一半資源）、評價與策略建議、自動調整（保守版／激進版兩個方案 `PLANS`）：先找回合數的結構下限、必要時拿掉最弱的怪，再二分搜尋血量與攻擊強度（自訂強度 `scaleSpecs`／固定敵人 `scaleEncounter` 都能調）；新增輸出占比評分 `shareInfo`（純函式；自訂強度改用 `design.js`） |
+| `src/game/sensitivity.js` | 模擬戰的「範本調整影響分析」（純函式，只用在自訂強度）：以 GM 的範本（9 小怪＋BOSS，`TEMPLATE`／`templateSpecs`）為基準，逐項微調（加減隻數、攻擊／防禦／血量 ±10%／±20%／±50%，`variations`），用同一批固定種子重跑（`makeEvaluator`），算出勝率、回合、資源消耗等的變化（`analyzeSensitivity`）與影響力排行（`topImpact`） |
+| `src/game/moveUse.js` | 招式使用紀錄（純函式）：`recordMoveUse`（玩家出招／用輔助成功後，在角色 `moveUse` 累計招式名稱次數，記在 `combat.js` 的 `playerAttack`／`useSupport`）、`usageList`、`usagePlan`（依紀錄排出模擬戰的出招優先順序）；GM 的模擬戰用 |
+| `src/game/templates.js`、`worker/src/templates.js` | 範本版本（模擬戰，GM 專用）：前端比較兩個版本的數值差異與結果差異（`diffSpecs`／`compareVersions`，用現在的玩家重跑）、命名與存檔當時成績；伺服器驗證敵人清單（`cleanSpecs`／`cleanSnap`），存在房間 meta 表（`room-core.js` 的 `tplList`／`tplSave`／`tplDel`，只有 GM） |
+| `src/game/tuning.js` | 模擬戰的目標（4～8 回合、勝率至少 75%、每場約耗一半資源）、評價與策略建議、自動調整（保守版／激進版兩個方案 `PLANS`）：先找回合數的結構下限、必要時拿掉最弱的怪，再二分搜尋血量與攻擊強度（自訂強度 `scaleSpecs`／固定敵人 `scaleEncounter` 都能調）；新增輸出占比評分 `shareInfo`（純函式） |
 | `src/game/activity.js`、`src/state/activityLog.js`、`src/ui/logsView.js` | 玩家日誌：內容格式（修整／學習／物品）、回報點（房間伺服器，離線存本機）、「日誌」大分頁（`#logs`，所有玩家都看得到每位玩家的）；伺服器端在 `room-core.js` 的 `actPost`／`actList`，每人留 500 筆 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`，立繪與隊友狀態在 `worker/test/images.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |

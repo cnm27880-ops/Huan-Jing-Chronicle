@@ -15,13 +15,14 @@ import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
 import { describeCharChange } from './audit.js';
+import { cleanSpecs, cleanSnap } from './templates.js';
 import { validateCustomRecipe, validateCustomMaterial, MAX_CUSTOM_RECIPES, MAX_CUSTOM_MATERIALS } from '../../src/game/special.js';
 import { validateCustomSkill, formatFxLine, MAX_CUSTOM_SKILLS } from '../../src/game/skillTable.js';
 import { serverRng } from './server-rng.js';
 import {
   DEFAULT_ROOM_ID, HISTORY_LIMIT, MAX_MESSAGE_CHARS, RATE_LIMIT_PER_SEC, RATE_ABUSE_PER_SEC,
   MAX_DRAW_DICE, MAX_DRAW_POOLS, DRAW_TTL_MS, MAX_PENDING_DRAWS_PER_USER, MAX_CHAR_MESSAGE_CHARS, MAX_CHAR_JSON_CHARS,
-  MAX_PENDING_MAIL, MAX_PENDING_TRADES, MAX_MAIL_GEAR, MAX_MAIL_GOLD, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_REWARD_EXP, MAX_REWARD_TIME, MAX_REWARD_TARGETS, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, ACTIVITY_PER_USER, ACTIVITY_PAGE,
+  MAX_PENDING_MAIL, MAX_PENDING_TRADES, MAX_MAIL_GEAR, MAX_MAIL_GOLD, MAX_MAIL_ITEM_KINDS, MAX_MAIL_ITEM_QTY, MAX_REWARD_EXP, MAX_REWARD_TIME, MAX_REWARD_TARGETS, MAX_IMAGES, MAX_IMAGE_B64_CHARS, MAX_PRESETS, MAX_TEMPLATES, ACTIVITY_PER_USER, ACTIVITY_PAGE,
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
@@ -271,6 +272,7 @@ export class RoomCore {
       case 'imgPut': return this.onImgPut(user, msg, rid);
       case 'imgDel': return this.onImgDel(user, msg, rid);
       case 'presetList': case 'presetSave': case 'presetDel': case 'presetLoad': return this.onPreset(user, msg, rid);
+      case 'tplList': case 'tplSave': case 'tplDel': return this.onTemplate(user, msg, rid);
       case 'vitals': return this.onVitals(user, msg);
       case 'actPost': return this.onActPost(user, msg);
       case 'actList': return this.onActList(user, msg, rid);
@@ -738,6 +740,44 @@ export class RoomCore {
     // 紀錄只寫登場的敵人，不寫預組名稱（名稱可能劇透）
     const ok = this.encOk(enc, rid, user, { label: `遭遇：敵人登場 ${monsters.map((m) => m.id).join('、')}` });
     return reply(ok.out.filter((o) => o.msg.t !== 'encOk'));
+  }
+
+  // ---------- 範本版本（模擬戰，GM 專用）：存在 meta 表，不廣播、不放進 hello ----------
+  templates() {
+    try { const v = JSON.parse(this.getMeta('sim_templates') ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+  }
+
+  /** tplList 讀清單；tplSave 新增（沒給 id）或更新（給 id：改名、改備註、用新的敵人清單覆蓋）一個版本；tplDel 刪除。回覆最新清單（新的在前） */
+  onTemplate(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以使用範本版本。');
+    let list = this.templates();
+    const reply = () => ({ out: [{ to: 'self', msg: { t: 'templates', rid, list: [...list].sort((a, b) => (b.t ?? 0) - (a.t ?? 0)) } }], close: null });
+    if (msg.t === 'tplList') return reply();
+    const id = typeof msg.id === 'string' && /^[A-Za-z0-9-]{1,40}$/.test(msg.id) ? msg.id : null;
+    const idx = id ? list.findIndex((x) => x.id === id) : -1;
+    if (msg.t === 'tplDel') {
+      if (idx < 0) return err(rid, 'bad_template', '沒有這個版本（可能已經被刪掉了）。');
+      list = list.filter((_, i) => i !== idx);
+      this.setMeta('sim_templates', JSON.stringify(list));
+      return reply();
+    }
+    // tplSave
+    if (msg.id !== undefined && idx < 0) return err(rid, 'bad_template', '沒有這個版本（可能已經被刪掉了）。');
+    const name = cleanStr(msg.name, 40);
+    if (!name) return err(rid, 'bad_template', '請輸入版本名稱。');
+    const c = cleanSpecs(msg.specs);
+    if (!c.ok) return err(rid, 'bad_template', c.error);
+    const t = this.now();
+    const base = { name, note: cleanStr(msg.note, 200), specs: c.specs, t };
+    if (idx < 0) {
+      if (list.length >= MAX_TEMPLATES) return err(rid, 'bad_template', `範本版本最多 ${MAX_TEMPLATES} 個，請先刪掉不用的。`);
+      list = [...list, { id: this.uuid(), created: t, ...base, snap: cleanSnap(msg.snap) }];
+    } else {
+      const old = list[idx];
+      list = list.map((x, i) => (i === idx ? { ...old, ...base, snap: msg.snap === undefined ? old.snap ?? null : cleanSnap(msg.snap) } : x));
+    }
+    this.setMeta('sim_templates', JSON.stringify(list));
+    return reply();
   }
 
   // ---------- 怪物立繪（GM 上傳；所有人用網址讀，見 room.js 的 GET /img/:id） ----------
