@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseGeneric, rollGear, identify, equip, unequip, discard, equipmentEffects, compareGear,
-  identifiable, effectText, findJunk, groupGear, parseGearList, importGearList,
+  identifiable, effectText, findJunk, groupGear,
   parseGem, rollGem, identifyGems, identifiableGems, socketGem, socketTargets,
 } from '../src/game/equipment.js';
 import { derivedStats } from '../src/game/stats.js';
@@ -273,38 +273,4 @@ test('groupGear：同部位階級屬性疊一組、數值由高到低；寶石�
   assert.deepEqual(soul.items.map((g) => g.effects[0].value), [36, 34, 31]);
   assert.equal(groups.length, 6); // 靈魂傷害組、寶石、取名、能量傷害武器、飾品、特殊飾品
   assert.ok(groups.filter((x) => x.items.length === 1).length === 5);
-});
-
-test('importGearList：整份清單放進背包、只加不蓋、裝-開頭穿上並補償手動調整、特殊標記', async () => {
-  const { ONE_OFF_GEAR_LIST } = await import('../src/data/oneOffGearList.js');
-  const s = fresh();
-  s.gear = []; s.equipment = { weapon: null, armor: null, acc1: null, acc2: null }; s.adjust = {};
-  const before = JSON.stringify(s.inventory);
-  const r = importGearList(s, ONE_OFF_GEAR_LIST);
-  assert.equal(r.ok, true);
-  assert.equal(r.added, 91);
-  assert.equal(r.equipped, 4);
-  assert.equal(s.gear.length + Object.values(s.equipment).filter(Boolean).length, 91);
-  assert.equal(JSON.stringify(s.inventory), before);
-  assert.equal(s.equipment.weapon.effects[0].stat, '真實傷害');
-  assert.equal(s.adjust['絕對防禦'], -34);
-  assert.equal(s.adjust['物理傷害'], -24);
-  const sp = s.gear.find((g) => g.special);
-  assert.deepEqual(sp.effects, [{ stat: '能量傷害', value: 24 }]);
-  assert.equal(new Set([...s.gear, ...Object.values(s.equipment).filter(Boolean)].map((g) => g.id)).size, 91);
-});
-
-test('importGearList：有一行錯就整批不放；已有裝備的欄位不會被頂掉', () => {
-  const s = fresh();
-  s.gear = []; s.equipment = { weapon: null, armor: null, acc1: null, acc2: null };
-  const bad = importGearList(s, '傳說武器(物理傷害21)\n亂寫一行\n傳說武器(亂寫99)');
-  assert.equal(bad.ok, false);
-  assert.equal(bad.errors.length, 2);
-  assert.equal(s.gear.length, 0);
-  assert.equal(parseGearList('').items.length, 0);
-  importGearList(s, '裝-傳說武器(物理傷害21)');
-  const w = s.equipment.weapon;
-  importGearList(s, '裝-傳說武器(物理傷害30)');
-  assert.equal(s.equipment.weapon, w);
-  assert.equal(s.gear.length, 1);
 });

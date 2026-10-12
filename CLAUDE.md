@@ -87,6 +87,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/statusBar.js` | 修整日的 HUD（時間、熟練、胃袋）與「吃東西」面板 |
 | `src/ui/bagView.js` | 背包頁面 |
 | `src/ui/gearView.js` | 裝備頁：面板、裝備欄（電腦版四件一排）、鑑定、寶石、背包裝備（不能丟棄，只能賣出）；右欄是「啟動型技能」勾選（其他已學技能到修整日學習看）與生活徽章 |
+| `src/ui/checkAdjustPanel.js` | 檢定數值修正（備用保險，裝備頁右欄）：玩家自己填每個生活技能／技藝的差額（±99），加進檢定明細的「手動修正」；規則在 `engine.js` 的 `setCheckAdjust`／`modifier` |
 | `src/ui/badgePanel.js` | 生活徽章面板（原本在修整日學習分頁，現在放裝備頁右欄）：製作、改名、「我已經做過了」 |
 | `src/ui/reveal.js` | 鑑定開獎動畫（翻牌、數值跳動；只是畫面，數值鑑定時就已存好） |
 | `src/ui/marketView.js` | 交易頁（交易大廳／黑市／特殊黑市）＋裝備頁「賣出」面板 |

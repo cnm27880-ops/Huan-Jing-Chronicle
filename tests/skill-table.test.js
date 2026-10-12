@@ -294,3 +294,28 @@ test('技能感悟：同階最優先抵通用書 1 比 1；不同階不動；學
   assert.deepEqual(learn.fodder, {});
   assert.equal(learn.missing['初階技能感悟'], undefined);
 });
+
+test('生活技能類技能升級：尋脈探靈手升級時，採藥技能一起增加；沒生效或往下調不動', async () => {
+  const { checkSkillGain } = await import('../src/game/skillTable.js');
+  const { setCheckAdjust, modifier } = await import('../src/game/engine.js');
+  const s = JSON.parse(JSON.stringify((await import('../src/data/sample/fude.js')).SAMPLE_CHARACTER));
+  s.statMode = 'skills'; s.skills = {}; s.lifeSkills = { ...s.lifeSkills, 採藥: 10 };
+  assert.deepEqual(checkSkillGain(s, '尋脈探靈手', 0, 1), { 採藥: 1 });
+  assert.deepEqual(checkSkillGain(s, '尋脈探靈手', 3, 4), { 採藥: 1 });
+  assert.deepEqual(checkSkillGain(s, '尋脈探靈手', 0, 10), { 採藥: 4 });
+  assert.deepEqual(checkSkillGain(s, '尋脈探靈手', 4, 3), {});
+  setSkillLevel(s, '尋脈探靈手', 4);
+  assert.equal(s.lifeSkills.採藥, 12);
+  setSkillLevel(s, '尋脈探靈手', 2); // 往下調不扣
+  assert.equal(s.lifeSkills.採藥, 12);
+  const old = JSON.parse(JSON.stringify(s)); delete old.statMode;
+  assert.deepEqual(checkSkillGain(old, '尋脈探靈手', 0, 4), {});
+  // 備用保險：手動修正加進檢定明細，上下限 ±99，0 = 清掉
+  assert.equal(setCheckAdjust(s, '採藥', 3), 3);
+  assert.ok(modifier(s, '採藥', 'rest').parts.some((p) => p.label === '手動修正' && p.value === 3));
+  assert.equal(setCheckAdjust(s, '採藥', 500), 99);
+  assert.equal(setCheckAdjust(s, '採藥', -500), -99);
+  assert.equal(setCheckAdjust(s, '採藥', 0), 0);
+  assert.equal(s.checkAdjust.採藥, undefined);
+  assert.equal(setCheckAdjust(s, '亂寫', 5), 0);
+});

@@ -4,7 +4,7 @@
 // rng 可以替換，測試時用固定值。
 // ============================================================
 import {
-  LIFE_SKILLS, GATHER_POOLS, gatherTier, RECIPES, CRAFT_COST_AMOUNT,
+  LIFE_SKILLS, ART_SKILLS, GATHER_POOLS, gatherTier, RECIPES, CRAFT_COST_AMOUNT,
   FOODS, STOMACH_SLOTS, REST_FOOD_CHECKS, BASE_PROFICIENCY, MAX_TIME,
 } from './rules.js';
 import { rollDie } from './dice.js';
@@ -74,6 +74,16 @@ export function keepsakeApplies(def, action, kctx) {
   return def.scope === 'rest' || (Array.isArray(def.scope) && def.scope.includes(action));
 }
 
+// 備用保險：技能值對不上時，玩家自己在裝備頁填差額（每個技能一個數字，擲骰明細會顯示「手動修正」）
+export const CHECK_ADJUST_MAX = 99;
+export function setCheckAdjust(state, skill, value) {
+  if (!LIFE_SKILLS.includes(skill) && !ART_SKILLS.includes(skill)) return 0;
+  const n = Math.max(-CHECK_ADJUST_MAX, Math.min(CHECK_ADJUST_MAX, Math.trunc(Number(value)) || 0));
+  state.checkAdjust = { ...state.checkAdjust };
+  if (n) state.checkAdjust[skill] = n; else delete state.checkAdjust[skill];
+  return n;
+}
+
 /**
  * 計算加值
  * 生活技能：技能值 + 熟練；非生活技能：技能值
@@ -83,6 +93,8 @@ export function modifier(state, skill, ctx, keepsakes = [], kctx) {
   const isLife = LIFE_SKILLS.includes(skill);
   const base = isLife ? state.lifeSkills[skill] ?? 0 : state.arts[skill] ?? 0;
   const parts = [{ label: skill, value: base }];
+  const fix = Number(state.checkAdjust?.[skill]) || 0; // 玩家自己填的備用修正（checkAdjustPanel.js）
+  if (fix) parts.push({ label: '手動修正', value: fix });
   if (isLife) {
     const prof = proficiency(state, ctx);
     parts.push({ label: '熟練', value: prof.total });
