@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gatherTier } from '../src/game/rules.js';
-import { proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, overwriteLoss } from '../src/game/engine.js';
+import { proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, overwriteLoss, fixItemAliases } from '../src/game/engine.js';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 
 const fresh = () => JSON.parse(JSON.stringify(SAMPLE_CHARACTER));
@@ -128,4 +128,16 @@ test('覆蓋：背包不夠就不蓋掉任何東西', () => {
   eatPreset(s, ['惜未央', '惜未央'], 1, 'rest');
   assert.match(eatPreset(s, ['碳烤肉排', '碳烤肉排', '碳烤肉排'], 1, 'rest', { overwrite: true }), /不夠/);
   assert.equal(s.restStomach.length, 2);
+});
+
+test('背包裡打錯字的「代金卷」併進「代金券」', () => {
+  const s = fresh();
+  s.inventory['代金券'] = 5;
+  s.inventory['代金卷'] = 20;
+  s.sortOrder.push('代金卷');
+  assert.equal(fixItemAliases(s), true);
+  assert.equal(s.inventory['代金券'], 25);
+  assert.equal(s.inventory['代金卷'], undefined);
+  assert.ok(!s.sortOrder.includes('代金卷'));
+  assert.equal(fixItemAliases(s), false); // 再跑一次沒有變動
 });
