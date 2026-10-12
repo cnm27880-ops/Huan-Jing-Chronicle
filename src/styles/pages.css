@@ -624,3 +624,14 @@ button.tile:hover { border-color: var(--bronze); border-left-color: var(--t); }
   .tab { padding: 0.4rem 0.5rem; }
 }
 @media (max-width: 440px) { .brand { display: none; } }
+
+/* 技能自選屬性（升級畫面下方） */
+.pick-block { margin-top: 0.8rem; }
+.pick-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pick-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pick-row--open { align-items: flex-start; padding: 0.4rem 0.5rem; border: 1px solid var(--line); border-radius: 8px; }
+.pick-body { flex: 1 1 12rem; display: grid; gap: 6px; min-width: 0; }
+.pick-points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; }
+.pick-line { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; margin: 0; }
+.pick-select { padding: 0.25rem 0.4rem; font-size: 0.82rem; min-width: 0; }
+.pick-body .chip[aria-pressed='true'] { color: var(--bronze); border-color: var(--bronze); }

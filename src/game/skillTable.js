@@ -12,6 +12,7 @@
 import { SKILL_TABLE, EXP_TABLE } from '../data/skills.js';
 import { countOf, removeItem } from './engine.js';
 import { ALL_STATS } from './rules.js';
+import { pickFx } from './skillPicks.js';
 
 export { SKILL_TABLE, EXP_TABLE };
 export const MAX_SKILL_LEVEL = 10;
@@ -143,6 +144,7 @@ export function skillParts(state) {
     if (!inCatalog(name) || !skillActive(state, name)) continue;
     const fx = { ...skillFx(name, level) };
     if (DYNAMIC_FX[name] && Number(level) >= 1) for (const [stat, value] of Object.entries(DYNAMIC_FX[name](state))) fx[stat] = (fx[stat] ?? 0) + value;
+    for (const [stat, value] of Object.entries(pickFx(state, name))) fx[stat] = (fx[stat] ?? 0) + value; // 自選屬性（skillPicks.js）
     for (const [stat, value] of Object.entries(fx)) (out[stat] ??= []).push({ label: name, value });
   }
   return out;
