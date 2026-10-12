@@ -1411,14 +1411,16 @@ input[type='number'], .amount__input { text-align: center; }
 .mob[data-fx='hit'], .mob[data-fx='block'] { animation: fx-shake 0.45s ease-out var(--fx-delay) both; }
 .mob[data-fx='strike'] { animation: fx-lunge 0.5s ease-out var(--fx-delay) both; }
 .mob::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; border-radius: inherit; }
-/* 依傷害種類的打擊特效：物理＝劈砍（一道斜光掃過）、能量＝爆裂（光圈炸開）、靈魂＝漩渦（紫色旋轉光暈）。--fx-n＝連打幾下（守密人 3 段就連播 3 次） */
-.boss__art[data-fx='slash'], .mob[data-fx='slash'], .boss__art[data-fx='burst'], .mob[data-fx='burst'], .boss__art[data-fx='soul'], .mob[data-fx='soul'] { animation: fx-shake 0.45s ease-out var(--fx-delay) var(--fx-n, 1) both; }
-.boss__art[data-fx='slash']::after, .mob[data-fx='slash']::after { background: linear-gradient(115deg, transparent 40%, rgba(var(--ink-rgb), 0.95) 48%, rgba(var(--gold-rgb), 0.95) 51%, transparent 60%) 120% 0 / 260% 100% no-repeat; animation: fx-slash 0.45s ease-out var(--fx-delay) var(--fx-n, 1) both; }
-.boss__art[data-fx='burst']::after, .mob[data-fx='burst']::after { background: radial-gradient(circle at 50% 50%, rgba(var(--ink-rgb), 0.9) 0, rgba(var(--res-energy-rgb), 0.85) 22%, rgba(var(--res-fight-rgb), 0.4) 45%, transparent 68%); animation: fx-burst 0.5s ease-out var(--fx-delay) var(--fx-n, 1) both; }
-.boss__art[data-fx='soul']::after, .mob[data-fx='soul']::after { background: conic-gradient(from 0deg, transparent, rgba(var(--lilac-rgb), 0.9), transparent 35%, rgba(var(--cloak-rgb), 0.8), transparent 70%, rgba(var(--lilac-rgb), 0.7), transparent); box-shadow: inset 0 0 30px rgba(var(--cloak-rgb), 0.7); animation: fx-soul 0.5s ease-out var(--fx-delay) var(--fx-n, 1) both; }
-@keyframes fx-slash { 0% { opacity: 0; background-position: 120% 0; } 15% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; background-position: -20% 0; } }
-@keyframes fx-burst { 0% { opacity: 1; transform: scale(0.2); } 100% { opacity: 0; transform: scale(1.5); } }
-@keyframes fx-soul { 0% { opacity: 0; transform: scale(0.4) rotate(0deg); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25) rotate(200deg); } }
+/* 依傷害種類的打擊特效（護眼：顏色柔和、不用大面積強閃光、動得慢一點）：物理＝劈砍（一道斜光掃過）、能量＝爆裂（光圈柔和炸開）、靈魂＝漩渦（紫色旋轉光暈）。
+   --fx-n＝連打幾下（守密人 3 段）：只有輕微震動會重複 n 次，光效只播一次 */
+.boss__art[data-fx='slash'], .mob[data-fx='slash'], .boss__art[data-fx='burst'], .mob[data-fx='burst'], .boss__art[data-fx='soul'], .mob[data-fx='soul'] { animation: fx-nudge 0.35s ease-out var(--fx-delay) var(--fx-n, 1) both; }
+.boss__art[data-fx='slash']::after, .mob[data-fx='slash']::after { background: linear-gradient(115deg, transparent 42%, rgba(var(--gold-rgb), 0.55) 49%, rgba(var(--ink-rgb), 0.7) 50.5%, transparent 58%) 120% 0 / 260% 100% no-repeat; animation: fx-slash 0.6s ease-out var(--fx-delay) both; }
+.boss__art[data-fx='burst']::after, .mob[data-fx='burst']::after { background: radial-gradient(circle at 50% 50%, rgba(var(--res-energy-rgb), 0.5) 0, rgba(var(--res-fight-rgb), 0.28) 35%, transparent 65%); animation: fx-burst 0.7s ease-out var(--fx-delay) both; }
+.boss__art[data-fx='soul']::after, .mob[data-fx='soul']::after { background: conic-gradient(from 0deg, transparent, rgba(var(--lilac-rgb), 0.5), transparent 35%, rgba(var(--cloak-rgb), 0.45), transparent 70%, rgba(var(--lilac-rgb), 0.4), transparent); box-shadow: inset 0 0 24px rgba(var(--cloak-rgb), 0.4); animation: fx-soul 0.8s ease-out var(--fx-delay) both; }
+@keyframes fx-nudge { 0% { transform: translate(0); } 25% { transform: translate(-4px, 1px); } 60% { transform: translate(3px, -1px); } 100% { transform: none; } }
+@keyframes fx-slash { 0% { opacity: 0; background-position: 120% 0; } 25% { opacity: 0.9; } 75% { opacity: 0.9; } 100% { opacity: 0; background-position: -20% 0; } }
+@keyframes fx-burst { 0% { opacity: 0; transform: scale(0.4); } 30% { opacity: 0.9; } 100% { opacity: 0; transform: scale(1.4); } }
+@keyframes fx-soul { 0% { opacity: 0; transform: scale(0.6) rotate(0deg); } 35% { opacity: 0.9; } 100% { opacity: 0; transform: scale(1.15) rotate(120deg); } }
 @keyframes fx-shake { 0% { transform: translate(0); } 15% { transform: translate(-9px, 3px) rotate(-1deg); } 30% { transform: translate(8px, -3px) rotate(1deg); } 50% { transform: translate(-5px, 2px); } 70% { transform: translate(3px); } 100% { transform: none; } }
 @keyframes fx-block { 0% { transform: scale(1); } 20% { transform: scale(0.97); } 100% { transform: none; } }
 @keyframes fx-lunge { 0% { transform: scale(1); } 30% { transform: scale(1.07) translateY(6px); } 100% { transform: none; } }
@@ -2026,3 +2028,10 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .draw-option__progress { color: var(--gold); }
 .draw-option__progress[data-status='complete'], .draw-option__progress[data-status='learned'] { color: var(--faint); }
 .draw-option[data-status='complete'], .draw-option[data-status='learned'] { opacity: 0.7; }
+
+/* 檢定數值修正（裝備頁右欄）：一排 3～4 個技能，小小的好滑 */
+.adj-grid { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: 6px; }
+.adj-cell { display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-sm, 6px); background: rgba(var(--card-rgb), 0.5); min-width: 0; }
+.adj-cell strong { font-size: 0.85rem; white-space: nowrap; }
+.adj-cell small { font-size: 0.7rem; color: var(--faint); }
+.adj-cell .field { width: 100%; min-height: 0; padding: 3px 4px; font-size: 0.85rem; text-align: center; }

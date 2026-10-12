@@ -10,7 +10,7 @@ import { roomRequest } from '../state/rollLog.js';
 import { askText } from './confirmPop.js';
 import { blankCharacter } from '../game/importBot.js';
 import { derivedStats } from '../game/stats.js';
-import { ALL_STATS, GEAR_TIERS, GEAR_SLOT_NAME, EQUIP_SLOTS, EQUIP_SLOT_LABEL } from '../game/rules.js';
+import { ALL_STATS, LIFE_SKILLS, ART_SKILLS, GEAR_TIERS, GEAR_SLOT_NAME, EQUIP_SLOTS, EQUIP_SLOT_LABEL } from '../game/rules.js';
 import { addManualGear, gearName, unequip } from '../game/equipment.js';
 import { hasPicks, resetPicks } from '../game/skillPicks.js';
 import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL, getCustomSkillNames, lifeBackfill, applyLifeBackfill } from '../game/skillTable.js';
@@ -154,6 +154,16 @@ export function openGmCharEditor() {
       }, '＋ 放進角色'));
   }
 
+  /** 生活技能與技藝的數值直接改（技能加成沒算進去、或數字跟角色卡對不上時，GM 直接填對的數字） */
+  function checkValuesSection(d) {
+    const cell = (bucket, skill) => h('li', { class: 'adj-cell' },
+      h('strong', { text: skill }),
+      h('input', { class: 'field', type: 'number', inputmode: 'numeric', value: Number(d[bucket]?.[skill]) || 0, 'aria-label': `${skill} 技能值`, onchange: (e) => { d[bucket] = { ...d[bucket], [skill]: int(e.target.value) }; ui.message = `「${skill}」改成 ${int(e.target.value)}，記得按「儲存到伺服器」。`; sheet.refresh(); } }));
+    return h('div', { class: 'add-box' },
+      h('p', { class: 'field-label', text: '生活技能與技藝數值（直接改）' }),
+      h('ul', { class: 'adj-grid' }, [...LIFE_SKILLS.map((x) => cell('lifeSkills', x)), ...ART_SKILLS.map((x) => cell('arts', x))]));
+  }
+
   /** 生活技能補算：技能的「+採藥」這類加成還沒算進生活技能數字的，逐一勾選補上（匯入的角色卡數字本來就含加成，不要全勾） */
   function backfillSection(d) {
     const rows = lifeBackfill(d);
@@ -211,6 +221,7 @@ export function openGmCharEditor() {
           : null))),
       addSkillRow(d),
       backfillSection(d),
+      checkValuesSection(d),
       gearSection(d),
       h('button', { type: 'button', class: 'btn btn--primary', disabled: ui.busy ? true : null, onclick: save }, ui.busy ? '儲存中…' : '儲存到伺服器'),
       ui.message ? h('p', { class: 'notice', text: ui.message }) : null);

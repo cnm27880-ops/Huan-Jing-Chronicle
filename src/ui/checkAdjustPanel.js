@@ -26,10 +26,10 @@ export function checkAdjustCard({ getState, commit }) {
         commit();
       },
     });
-    return h('li', { class: 'badge-row' }, h('strong', { text: `${skill}　技能 ${base}` }), input);
+    return h('li', { class: 'adj-cell' }, h('strong', { text: skill }), h('small', { text: `技能 ${base}` }), input);
   };
   return h('section', { class: 'card' },
     h('h2', { class: 'section-title', text: '檢定數值修正（備用）' }),
     h('p', { class: 'hint', text: `技能升級後數字沒變、或和你的角色卡對不上時，在這裡填差額（可填負數，範圍 ±${CHECK_ADJUST_MAX}）。會加進該技能的每次檢定，擲骰明細會寫「手動修正」，GM 看得到。` }),
-    h('ul', { class: 'badge-list' }, [...LIFE_SKILLS.map((s) => row(s, true)), ...ART_SKILLS.map((s) => row(s, false))]));
+    h('ul', { class: 'adj-grid' }, [...LIFE_SKILLS.map((s) => row(s, true)), ...ART_SKILLS.map((s) => row(s, false))]));
 }

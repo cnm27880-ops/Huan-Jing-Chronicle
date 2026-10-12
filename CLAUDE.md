@@ -80,7 +80,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/backupRestore.js` | GM 專用的「從備份還原角色」面板（跑團頁房間區塊）：選 R2 下載的每日備份 `.json.gz`（瀏覽器內解壓），挑玩家，用 `charImport` 寫回伺服器（會記異動）；備份檔含所有玩家資料，不能進 git |
 | `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |
 | `src/ui/rewardSheet.js` | GM 專用「🎁 發放獎勵」面板（跑團頁房間區塊）：勾選玩家（預設全員）＋物品（技能書快捷鈕）、金幣、經驗、時間、備註，一次發出；也拿來補償（例如玩家忘了喝惜未央，直接補時間）。伺服器 `room-core.js` 的 `onReward`（只有 GM，走信箱 `kind:'reward'`，不用扣任何人的背包，上限：經驗 100 萬、時間 1000、60 位玩家），玩家端 `mail.js` 的 `applyMail` 套用（時間沒有上限）並跳通知 |
-| `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：看並改玩家的手動調整、技能等級、啟動；「生活技能補算」（`skillTable.js` 的 `lifeBackfill`／`applyLifeBackfill`，升級時自動記 `lifeGainDone`，沒記錄的由 GM 逐一勾選補上） |
+| `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：看並改玩家的手動調整、技能等級、啟動；「生活技能補算」（`skillTable.js` 的 `lifeBackfill`／`applyLifeBackfill`，升級時自動記 `lifeGainDone`，沒記錄的由 GM 逐一勾選補上；也能直接改生活技能與技藝數值） |
 | `public/manifest.webmanifest`、`public/sw.js`、`public/icons/` | PWA（可加到主畫面）：manifest、Service Worker（只快取 /assets、/icons、/img，網頁與 API 不碰，改版後要讓舊快取失效就把 `sw.js` 的 `CACHE` 版本號 +1）、圖示（暫用，`tools/make-icons.py` 產生；換正式圖示：`python3 tools/make-icons.py --source 圖片.png`） |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |
@@ -90,7 +90,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/bagView.js` | 背包頁面 |
 | `src/ui/gearView.js` | 裝備頁：面板、裝備欄（電腦版四件一排）、鑑定、寶石、背包裝備（不能丟棄，只能賣出）；右欄是「啟動型技能」勾選（其他已學技能到修整日學習看）與生活徽章 |
 | `src/game/shadowCloak.js`、`src/state/shadowRound.js`、`src/ui/cloakCard.js`、`src/ui/shadowFx.js` | 暗影斗篷（個人專屬）：規則（進入隱身、跟遭遇戰回合自動聚集、現身爆發，純函式）、監聽房間回合、戰鬥頁招式分頁的操作區塊、特效（樣式 `src/styles/shadowfx.css`） |
-| `src/ui/checkAdjustPanel.js` | 檢定數值修正（備用保險，裝備頁右欄）：玩家自己填每個生活技能／技藝的差額（±99），加進檢定明細的「手動修正」；規則在 `engine.js` 的 `setCheckAdjust`／`modifier` |
+| `src/ui/checkAdjustPanel.js` | 檢定數值修正（備用保險，裝備頁右欄，小格子一排 3～4 個）：玩家自己填每個生活技能／技藝的差額（±99），加進檢定明細的「手動修正」；規則在 `engine.js` 的 `setCheckAdjust`／`modifier` |
 | `src/ui/badgePanel.js` | 生活徽章面板（原本在修整日學習分頁，現在放裝備頁右欄）：製作、改名、「我已經做過了」 |
 | `src/ui/reveal.js` | 鑑定開獎動畫（翻牌、數值跳動；只是畫面，數值鑑定時就已存好） |
 | `src/ui/marketView.js` | 交易頁（交易大廳／黑市／特殊黑市）＋裝備頁「賣出」面板 |
