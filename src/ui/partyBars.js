@@ -43,7 +43,7 @@ export function mateCard(v, { online = true, inBattle = false } = {}) {
 }
 
 const OPEN_KEY = 'huanjing:party:open:v1';
-const readOpen = () => { try { return localStorage.getItem(OPEN_KEY) !== '0'; } catch { return true; } };
+const readOpen = () => { try { return localStorage.getItem(OPEN_KEY) === '1'; } catch { return false; } }; // 預設收起，只有玩家自己展開過才記成開
 const saveOpen = (v) => { try { localStorage.setItem(OPEN_KEY, v ? '1' : '0'); } catch { /* 存不了就算了，下次照預設 */ } };
 
 /** 精簡列上的小頭像：環＝生命，收起來也看得到每位隊友的狀況；有 🔔 表示戰鬥中資源還很滿 */
@@ -71,6 +71,7 @@ export function createPartyPanel({ room = defaultRoom } = {}) {
   let open = readOpen();
   let lastDowned = 0;
   let lastDanger = false;
+  let seen = false; // 第一次畫只記下當時的狀況：切換頁面重建面板時，不能把「本來就倒著的人」當成新事件又彈開
 
   const apply = () => {
     pop.hidden = !open;
@@ -103,7 +104,8 @@ export function createPartyPanel({ room = defaultRoom } = {}) {
       : h('p', { class: 'hint', text: '隊友上線並操作過角色後，這裡會顯示他們的生命與資源。每一個膠囊都填到「還剩多少」，空了＝用光。' }));
     // 出事了就自動展開（有人新倒地、或有人生命危急）；已經展開的不動，收起來的偏好也不會被改掉
     const danger = mates.some(([, v]) => !v.downed && v.maxHp > 0 && v.hp / v.maxHp < NUDGE.danger);
-    if (!open && (d.downed > lastDowned || (danger && !lastDanger))) open = true;
+    if (seen && !open && (d.downed > lastDowned || (danger && !lastDanger))) open = true;
+    seen = true;
     lastDowned = d.downed;
     lastDanger = danger;
     apply();
