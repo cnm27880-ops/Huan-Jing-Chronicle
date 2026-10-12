@@ -5,10 +5,11 @@
 import { h, fmt } from './dom.js';
 import { iconOf } from './items.js';
 import { openSheet } from './sheet.js';
+import { askConfirm } from './confirmPop.js';
 import { itemTile, amountPicker, toast } from './controls.js';
 import { FOODS, STOMACH_SLOTS, MAX_TIME } from '../game/rules.js';
 import {
-  proficiency, newDay, eat, countOf, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, restQueue,
+  proficiency, newDay, eat, countOf, eatOrQueue, eatPreset, overwriteLoss, addPreset, presetLabel, clearQueue, restQueue,
 } from '../game/engine.js';
 import { logActivity } from '../state/activityLog.js';
 
@@ -41,6 +42,21 @@ export function openFoodSheet(state, ctx, commit) {
             err ? toast(err) : done(`${where}吃下菜單「${presetLabel(p)}」× ${sets} 組`);
           },
         }, `吃 ${sets} 組（${p.length * sets} 份）`),
+        h('button', {
+          type: 'button', class: 'btn btn--ghost',
+          onclick: async (e) => {
+            const lost = overwriteLoss(state, p, ctx);
+            if (!lost.length) return toast('胃袋還有空格，直接吃就好，不需要覆蓋。');
+            const ok = await askConfirm(e.currentTarget, {
+              title: '要覆蓋胃袋裡的料理嗎？',
+              lines: [`會蓋掉：${presetLabel(lost.map((s) => s.food))}`, '被蓋掉的料理不會退回。'],
+              okText: '覆蓋', danger: true,
+            });
+            if (!ok) return;
+            const err = eatPreset(state, p, sets, ctx, { overwrite: true });
+            err ? toast(err) : done(`${where}覆蓋吃下菜單「${presetLabel(p)}」× ${sets} 組（蓋掉 ${presetLabel(lost.map((s) => s.food))}）`);
+          },
+        }, '覆蓋吃'),
         h('button', { type: 'button', class: 'btn btn--ghost', 'aria-label': '刪除這組菜單', onclick: () => { presets.splice(i, 1); done('刪除一組菜單'); } }, '刪除')));
 
     const builder = h('div', { class: 'rest-field' },

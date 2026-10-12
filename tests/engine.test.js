@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gatherTier } from '../src/game/rules.js';
-import { proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue } from '../src/game/engine.js';
+import { proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, overwriteLoss } from '../src/game/engine.js';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 
 const fresh = () => JSON.parse(JSON.stringify(SAMPLE_CHARACTER));
@@ -104,4 +104,27 @@ test('跑團胃袋沒有佇列，菜單放不下就拒絕；佇列可退回背�
   for (let i = 0; i < 5; i++) eatOrQueue(s, '拉麵');
   assert.equal(clearQueue(s), 2);
   assert.equal(s.inventory['拉麵'], 3);
+});
+
+test('覆蓋：先吃兩份惜未央加時間，再用三份肉排蓋掉', () => {
+  const s = fresh();
+  s.inventory['惜未央'] = 2;
+  s.inventory['碳烤肉排'] = 3;
+  s.time = 5;
+  eatPreset(s, ['惜未央', '惜未央'], 1, 'rest');
+  assert.equal(s.time, 7);
+  const meat = ['碳烤肉排', '碳烤肉排', '碳烤肉排'];
+  assert.deepEqual(overwriteLoss(s, meat, 'rest').map((x) => x.food), ['惜未央', '惜未央']);
+  assert.equal(eatPreset(s, meat, 1, 'rest', { overwrite: true }), null);
+  assert.deepEqual(s.restStomach.map((x) => x.food), meat);
+  assert.equal(proficiency(s, 'rest').total, 10);
+  assert.equal(s.inventory['惜未央'] ?? 0, 0); // 被蓋掉的不退回
+});
+
+test('覆蓋：背包不夠就不蓋掉任何東西', () => {
+  const s = fresh();
+  s.inventory['惜未央'] = 2;
+  eatPreset(s, ['惜未央', '惜未央'], 1, 'rest');
+  assert.match(eatPreset(s, ['碳烤肉排', '碳烤肉排', '碳烤肉排'], 1, 'rest', { overwrite: true }), /不夠/);
+  assert.equal(s.restStomach.length, 2);
 });

@@ -154,8 +154,9 @@ export function presetLabel(foods) {
  * 一次吃 sets 組菜單。全有或全無：背包不夠、放不下就不動任何東西。
  * 修整：先填空格，其餘排進等候佇列；跑團：沒有佇列，只能填空格。回傳錯誤文字或 null
  */
-export function eatPreset(state, foods, sets, ctx) {
+export function eatPreset(state, foods, sets, ctx, { overwrite = false } = {}) {
   const all = Array.from({ length: sets }, () => foods).flat();
+  const lost = overwrite ? overwriteLoss(state, foods, ctx) : [];
   const need = {};
   all.forEach((f) => (need[f] = (need[f] ?? 0) + 1));
   for (const [f, n] of Object.entries(need)) {
@@ -163,11 +164,22 @@ export function eatPreset(state, foods, sets, ctx) {
     if (countOf(state, f) < n) return `背包裡的${f}不夠（要 ${n} 份，只有 ${countOf(state, f)} 份）。`;
   }
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
-  const free = STOMACH_SLOTS - stomach.length;
+  const free = STOMACH_SLOTS - stomach.length + lost.length;
   if (ctx !== 'rest' && all.length > free) return `跑團胃袋只剩 ${free} 格，吃不下 ${all.length} 份。`;
   if (ctx === 'rest' && all.length > free + QUEUE_MAX - restQueue(state).length) return `等候佇列放不下（最多 ${QUEUE_MAX} 份）。`;
+  stomach.splice(0, lost.length); // 覆蓋：被蓋掉的料理直接消失，不退回
   all.forEach((f) => eatOrQueueUnchecked(state, f, ctx));
   return null;
+}
+
+/**
+ * 覆蓋：胃袋空格不夠放這組菜單時，會從最舊（最前面）的料理開始蓋掉。
+ * 回傳會被蓋掉的胃袋內容（畫面拿來做二次確認）。例：[惜未央, 惜未央] 再覆蓋吃 3 份肉排 → 蓋掉 2 份惜未央
+ */
+export function overwriteLoss(state, foods, ctx) {
+  const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
+  const need = Math.min(foods.length, STOMACH_SLOTS) - (STOMACH_SLOTS - stomach.length);
+  return need > 0 ? stomach.slice(0, need) : [];
 }
 
 function eatOrQueueUnchecked(state, food, ctx) {
