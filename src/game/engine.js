@@ -23,6 +23,25 @@ export function addItem(state, item, n = 1) {
   if (isKeepsake(item)) (state.keepsakes ??= {})[item] = structuredClone(KEEPSAKES[item]); // 得到目錄裡的紀念品 → 效果跟著補上
   if (!state.sortOrder.includes(item)) state.sortOrder.push(item);
 }
+/** 玩家存檔時打錯字的物品名稱 → 正確名稱（例如「代金卷」會被網站當成紀念品，認不出是代金券） */
+export const ITEM_ALIASES = { 代金卷: '代金券' };
+
+/** 把背包裡打錯字的物品併進正確的物品（數量相加、排序清單與誤建的紀念品一併處理）。有改動回傳 true */
+export function fixItemAliases(state) {
+  let changed = false;
+  for (const [wrong, right] of Object.entries(ITEM_ALIASES)) {
+    if (state.inventory?.[wrong] !== undefined) {
+      const n = state.inventory[wrong];
+      delete state.inventory[wrong];
+      if (n > 0) addItem(state, right, n);
+      changed = true;
+    }
+    if (state.sortOrder?.includes(wrong)) state.sortOrder = state.sortOrder.filter((x) => x !== wrong);
+    if (state.keepsakes?.[wrong]) { delete state.keepsakes[wrong]; changed = true; }
+  }
+  return changed;
+}
+
 export function removeItem(state, item, n = 1) {
   const left = countOf(state, item) - n;
   if (left < 0) return false;

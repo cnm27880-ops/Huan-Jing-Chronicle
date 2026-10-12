@@ -165,7 +165,7 @@
 }
 .mini-slot--empty:hover { border-color: var(--bronze); color: var(--bronze); }
 .mini-slot--queue { font: inherit; font-size: 0.8rem; color: var(--bronze); cursor: pointer; }
-.mini-slot--menu { font: inherit; font-size: 0.7rem; letter-spacing: 0; color: var(--bronze); cursor: pointer; }
+.mini-slot--menu { font: inherit; font-size: 1.05rem; color: var(--bronze); cursor: pointer; }
 .mini-slot--menu:hover { border-color: var(--bronze); }
 
 /* 菜單（編輯與吃東西面板）：全部用小按鈕、一行一組，不佔版面 */
