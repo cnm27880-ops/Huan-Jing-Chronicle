@@ -164,6 +164,7 @@
   cursor: pointer;
 }
 .mini-slot--empty:hover { border-color: var(--bronze); color: var(--bronze); }
+.mini-slot--queue { font: inherit; font-size: 0.8rem; color: var(--bronze); cursor: pointer; }
 
 .status__num { margin-left: auto; }
 .status__num + .status__num { margin-left: 0; }

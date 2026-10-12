@@ -5,31 +5,77 @@
 import { h, fmt } from './dom.js';
 import { iconOf } from './items.js';
 import { openSheet } from './sheet.js';
-import { itemTile, toast } from './controls.js';
+import { itemTile, amountPicker, toast } from './controls.js';
 import { FOODS, STOMACH_SLOTS, MAX_TIME } from '../game/rules.js';
-import { proficiency, newDay, eat, countOf } from '../game/engine.js';
+import {
+  proficiency, newDay, eat, countOf, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, restQueue,
+} from '../game/engine.js';
 import { logActivity } from '../state/activityLog.js';
 
 export function openFoodSheet(state, ctx, commit) {
-  const sheet = openSheet(ctx === 'rest' ? '修整時吃東西' : '跑團時吃東西', (close) => {
-    const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
+  const rest = ctx === 'rest';
+  const where = rest ? '修整' : '跑團';
+  let sets = 1; // 快捷一次吃幾組
+  let draft = []; // 正在編輯的新快捷（食物名稱，最多 3 份）
+  const sheet = openSheet(rest ? '修整時吃東西' : '跑團時吃東西', (close) => {
+    const stomach = rest ? state.restStomach : state.sessionStomach;
+    const queue = rest ? restQueue(state) : [];
+    const presets = (state.foodPresets ??= []);
     const foods = Object.keys(FOODS).filter((f) => countOf(state, f) > 0);
+    const done = (text) => { toast(text); logActivity(state, { cat: 'item', text, lines: [] }); commit(); sheet.refresh(); };
+
+    const queueBox = rest && queue.length
+      ? h('div', { class: 'rest-field' },
+          h('p', { class: 'field-label', text: `等候中 ${queue.length} 份（胃袋有空格會自動補上，料理已先從背包扣掉）` }),
+          h('p', { class: 'hint', text: presetLabel(queue) }),
+          h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => done(`等候佇列退回背包 ${clearQueue(state)} 份`) }, '全部退回背包'))
+      : null;
+
+    const presetRows = presets.map((p, i) =>
+      h('div', { class: 'rest-field' },
+        h('p', { class: 'field-label', text: presetLabel(p) }),
+        h('button', {
+          type: 'button', class: 'btn btn--primary',
+          onclick: () => {
+            const err = eatPreset(state, p, sets, ctx);
+            err ? toast(err) : done(`${where}吃下快捷「${presetLabel(p)}」× ${sets} 組`);
+          },
+        }, `吃 ${sets} 組（${p.length * sets} 份）`),
+        h('button', { type: 'button', class: 'btn btn--ghost', 'aria-label': '刪除這組快捷', onclick: () => { presets.splice(i, 1); done('刪除一組快捷'); } }, '刪除')));
+
+    const builder = h('div', { class: 'rest-field' },
+      h('p', { class: 'field-label', text: `新增快捷：${draft.length ? presetLabel(draft) : '點下面的料理加入（最多 3 份）'}` }),
+      h('div', { class: 'tile-grid' }, Object.keys(FOODS).map((f) =>
+        itemTile(f, null, {
+          extra: h('span', { class: 'tile__note', text: FOODS[f].effect }),
+          onClick: () => { if (draft.length < STOMACH_SLOTS) draft.push(f); sheet.refresh(); },
+        }))),
+      h('button', { type: 'button', class: 'btn btn--ghost', disabled: !draft.length, onclick: () => { draft = []; sheet.refresh(); } }, '清除'),
+      h('button', {
+        type: 'button', class: 'btn btn--primary', disabled: !draft.length,
+        onclick: () => { const err = addPreset(state, draft); if (err) return toast(err); draft = []; done('新增一組快捷'); },
+      }, '儲存快捷'));
+
     return h('div', {},
-      h('p', { class: 'field-label', text: `胃袋 ${stomach.length} / ${STOMACH_SLOTS}` }),
+      h('p', { class: 'field-label', text: `胃袋 ${stomach.length} / ${STOMACH_SLOTS}${rest && stomach.length >= STOMACH_SLOTS ? '（滿了，再吃會排進等候）' : ''}` }),
+      queueBox,
       foods.length
         ? h('div', { class: 'tile-grid' }, foods.map((f) =>
             itemTile(f, countOf(state, f), {
               extra: h('span', { class: 'tile__note', text: FOODS[f].effect }),
               onClick: () => {
-                const err = eat(state, f, ctx);
+                const wasFull = stomach.length >= STOMACH_SLOTS;
+                const err = rest ? eatOrQueue(state, f) : eat(state, f, ctx);
                 if (err) return toast(err);
-                toast(`吃下${f}`);
-                logActivity(state, { cat: 'item', text: `吃下 ${f}（${ctx === 'rest' ? '修整' : '跑團'}胃袋）`, lines: [] });
-                commit();
-                stomach.length + 0 >= STOMACH_SLOTS ? close() : sheet.refresh();
+                done(`${wasFull ? '排入等候' : '吃下'}${f}（${where}）`);
               },
             })))
-        : h('p', { class: 'notice', text: '背包裡沒有料理。' }));
+        : h('p', { class: 'notice', text: '背包裡沒有料理。' }),
+      h('h3', { class: 'field-label', text: '快捷料理' }),
+      h('p', { class: 'field-label', text: '一次吃幾組' }),
+      amountPicker({ value: sets, quick: [1, 5, 10], onChange: (n) => { sets = n; sheet.refresh(); } }),
+      presets.length ? presetRows : h('p', { class: 'hint', text: '還沒有快捷。' }),
+      builder);
   });
 }
 
@@ -103,5 +149,9 @@ export function statusBar(state, commit, ctx = 'rest') {
         h('div', { class: 'hud-box__head' },
           h('span', { class: 'hud-box__label', text: ctx === 'rest' ? '修整熟練' : '跑團熟練' }),
           h('strong', { class: 'hud-box__value num', text: `+${prof.total}` })),
-        h('span', { class: 'mini-slots' }, slots))));
+        h('span', { class: 'mini-slots' }, slots,
+          ctx === 'rest' && restQueue(state).length
+            ? h('button', { type: 'button', class: 'mini-slot mini-slot--queue', title: '等候中的料理，點一下管理', onclick: () => openFoodSheet(state, ctx, commit) },
+                `＋${restQueue(state).length}`)
+            : null))));
 }

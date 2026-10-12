@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gatherTier } from '../src/game/rules.js';
-import { proficiency, modifier, eat, gather, craft } from '../src/game/engine.js';
+import { proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue } from '../src/game/engine.js';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 
 const fresh = () => JSON.parse(JSON.stringify(SAMPLE_CHARACTER));
@@ -64,4 +64,44 @@ test('採集時間用完就停止，製作不消耗時間', () => {
   const r = craft(s, '書寫', '普通', 1, [], fixed(20));
   assert.equal(r.rolls.length, 1);
   assert.equal(s.time, 0);
+});
+
+test('修整胃袋滿了會排隊，食物用完自動補上，連做 30 次熟練不中斷', () => {
+  const s = fresh();
+  s.inventory['碳烤肉排'] = 6;
+  for (let i = 0; i < 6; i++) assert.equal(eatOrQueue(s, '碳烤肉排'), null);
+  assert.equal(s.restStomach.length, 3);
+  assert.equal(s.restQueue.length, 3);
+  assert.equal(s.inventory['碳烤肉排'] ?? 0, 0);
+  s.time = 10;
+  const r = gather(s, '採藥', 10, [], fixed(10));
+  assert.equal(r.rolls.length, 10);
+  // 前 10 次吃完第一輪，補上第二輪
+  assert.equal(s.restQueue.length, 0);
+  assert.equal(s.restStomach.length, 3);
+  assert.equal(proficiency(s, 'rest').total, 10);
+});
+
+test('快捷料理：吃 N 組，全有或全無，順序固定', () => {
+  const s = fresh();
+  s.inventory['傳奇盛宴'] = 2;
+  s.inventory['碳烤肉排'] = 4;
+  assert.equal(addPreset(s, ['傳奇盛宴', '碳烤肉排', '碳烤肉排']), null);
+  assert.equal(addPreset(s, ['傳奇盛宴', '碳烤肉排', '碳烤肉排']), '已經有一樣的快捷了。');
+  assert.match(eatPreset(s, s.foodPresets[0], 3, 'rest'), /不夠/);
+  assert.equal(s.inventory['傳奇盛宴'], 2); // 失敗不動背包
+  assert.equal(eatPreset(s, s.foodPresets[0], 2, 'rest'), null);
+  assert.deepEqual(s.restStomach.map((x) => x.food), ['傳奇盛宴', '碳烤肉排', '碳烤肉排']);
+  assert.deepEqual(s.restQueue, ['傳奇盛宴', '碳烤肉排', '碳烤肉排']);
+  assert.equal(presetLabel(s.foodPresets[0]), '傳奇盛宴 ×1＋碳烤肉排 ×2');
+});
+
+test('跑團胃袋沒有佇列，快捷放不下就拒絕；佇列可退回背包', () => {
+  const s = fresh();
+  s.inventory['拉麵'] = 6;
+  assert.match(eatPreset(s, ['拉麵', '拉麵', '拉麵'], 2, 'session'), /吃不下/);
+  assert.equal(s.inventory['拉麵'], 6);
+  for (let i = 0; i < 5; i++) eatOrQueue(s, '拉麵');
+  assert.equal(clearQueue(s), 2);
+  assert.equal(s.inventory['拉麵'], 3);
 });

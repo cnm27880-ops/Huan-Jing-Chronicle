@@ -7,7 +7,7 @@ import { openSheet, closeSheet } from './sheet.js';
 import { itemTile, amountPicker, toast, rarityTag } from './controls.js';
 import { KNOWN_ITEMS, rarityOf, iconOf, plainName } from './items.js';
 import { FOODS, STOMACH_SLOTS } from '../game/rules.js';
-import { addItem, removeItem, countOf, eat, useKeepsake } from '../game/engine.js';
+import { addItem, removeItem, countOf, eat, eatOrQueue, useKeepsake } from '../game/engine.js';
 import { USABLE_ITEMS, useSpecialItem } from '../game/special.js';
 import { INSIGHT_TIERS } from '../game/skillTable.js';
 import { logActivity } from '../state/activityLog.js';
@@ -20,10 +20,11 @@ export function openItemSheet(state, name, commit) {
     const def = state.keepsakes[name];
     const food = FOODS[name];
     const doEat = (ctx) => {
-      const err = eat(state, name, ctx);
+      const wasFull = ctx === 'rest' && state.restStomach.length >= STOMACH_SLOTS;
+      const err = ctx === 'rest' ? eatOrQueue(state, name) : eat(state, name, ctx);
       if (err) return toast(err);
-      toast(`吃下${name}（${ctx === 'rest' ? '修整' : '跑團'}）`);
-      logActivity(state, { cat: 'item', text: `吃下 ${name}（${ctx === 'rest' ? '修整' : '跑團'}胃袋）`, lines: [] });
+      toast(`${wasFull ? '排入等候' : '吃下'}${name}（${ctx === 'rest' ? '修整' : '跑團'}）`);
+      logActivity(state, { cat: 'item', text: `${wasFull ? '排入等候' : '吃下'} ${name}（${ctx === 'rest' ? '修整' : '跑團'}胃袋）`, lines: [] });
       commit();
       sheet.refresh();
     };
@@ -65,8 +66,10 @@ export function openItemSheet(state, name, commit) {
         : null,
       food && have > 0
         ? h('div', { class: 'item-sheet__eat' },
-            h('button', { type: 'button', class: 'btn btn--ghost', disabled: state.restStomach.length >= STOMACH_SLOTS, onclick: () => doEat('rest') },
-              `修整時吃（${state.restStomach.length}/${STOMACH_SLOTS}）`),
+            h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => doEat('rest') },
+              state.restStomach.length >= STOMACH_SLOTS
+                ? `修整時排隊（等候 ${(state.restQueue ?? []).length}）`
+                : `修整時吃（${state.restStomach.length}/${STOMACH_SLOTS}）`),
             h('button', { type: 'button', class: 'btn btn--ghost', disabled: state.sessionStomach.length >= STOMACH_SLOTS, onclick: () => doEat('session') },
               `跑團時吃（${state.sessionStomach.length}/${STOMACH_SLOTS}）`))
         : null,
