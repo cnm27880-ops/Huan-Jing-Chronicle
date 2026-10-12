@@ -6,6 +6,9 @@ import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 import { TEMPLATE, DEF_GRID, damageCurve, rankFromCurve, makeEvaluator, buildSpecs, designEncounter } from '../src/game/design.js';
 import { penalty, assess, shareInfo } from '../src/game/tuning.js';
 import { simulateBattle, summarize, seededRng } from '../src/game/simulate.js';
+import { measureHits, rankPlayers, damagersOf } from '../src/game/fairness.js';
+import { blankCharacter } from '../src/game/importBot.js';
+import { moveFromCatalog } from '../src/game/skills.js';
 
 const hero = (k = 1) => {
   const c = JSON.parse(JSON.stringify(SAMPLE_CHARACTER));
@@ -75,7 +78,7 @@ test('自動配置：所有玩家都打不出傷害（資料沒填）時直接�
 
 test('輸出分配：最高占比太高、最低占比太低都會扣分並出現在評價；少於 3 人不算', () => {
   const mk = (shares) => ({
-    runs: 100, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: { 毒性: 0.5 },
+    runs: 100, win: 1, lose: 0, timeout: 0, avgRounds: 5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: { 毒性: 0.5 },
     downRate: shares.map((_, i) => ({ name: `p${i}`, rate: 0.1 })),
     perPlayer: shares.map((share, i) => ({ name: `p${i}`, share, kills: 1, taken: 0, takenPct: 0.1, drain: 0.3, downRound: 0, downRate: 0.1, hit: 2 })),
     rank: { strongest: 0, weakest: shares.length - 1, order: shares.map((_, i) => i) },
@@ -102,4 +105,39 @@ test('模擬戰：統計各等級怪物每一下打掉玩家多少比例的生�
   const sum = summarize([r, r]);
   assert.ok(sum.hitPct.mob > 0 && sum.hitPct.mob <= 1 && sum.hitPct.boss > 0 && sum.hitPct.boss <= 1);
   assert.equal(sum.hitPct.elite, null); // 沒有菁英
+});
+
+test('量傷害：萬物歸一的「現有生命 5%」不再被 10 億血的假怪物放大成 5000 萬', () => {
+  const p = hero(1);
+  p.skills = { ...p.skills, 萬物歸一: 3 };
+  p.moves = [...p.moves.filter((m) => m.id === 'basic'), moveFromCatalog('萬物歸一', 3)]; // 只剩這一招，模擬才一定會挑它
+  const spec = [{ kind: 'mob', count: 3, atkPower: 1, defPower: 0, hp: 1 }];
+  const raw = measureHits([p], spec, { runs: 4, refHp: 1e9 })[0]; // 不換算：5% × 10 億 ＝ 5000 萬（修正前的樣子）
+  assert.ok(raw.perTarget > 40000000);
+  const [h] = measureHits([p], spec, { runs: 4 });
+  assert.ok(h.perTarget > 0 && h.perTarget < 100000, `一次出手 ${h.perTarget}`);
+  assert.ok(h.total < 300000);
+});
+
+test('強弱排序：打不穿的輔助不當「最弱的輸出者」；全部都打不穿就全算', () => {
+  const hits = [{ perTarget: 500, total: 500 }, { perTarget: 0, total: 0 }, { perTarget: 100, total: 100 }];
+  assert.deepEqual(damagersOf(hits), [0, 2]);
+  const r = rankPlayers(hits);
+  assert.equal(r.strongest, 0);
+  assert.equal(r.weakest, 2);
+  assert.deepEqual(r.damagers, [0, 2]);
+  assert.deepEqual(damagersOf([{ perTarget: 0 }, { perTarget: 0.5 }]), [0, 1]);
+});
+
+test('自動配置：輔助型玩家（打不穿一般小怪）不拉低小怪血量，結果會說明誰被當成輔助', async () => {
+  const team = [hero(2), hero(1.2), hero(1), blankCharacter('輔助')];
+  const names = ['甲', '乙', '丙', '輔助'];
+  const curve = damageCurve(team, { runs: 4 });
+  assert.deepEqual(curve.damagers, [0, 1, 2]);
+  assert.ok(curve[0].weak >= 1); // 最弱的「輸出者」，不是 0
+  const rank = rankFromCurve(curve);
+  assert.deepEqual(rank.damagers, [0, 1, 2]);
+  assert.equal(rank.weakest, 2);
+  const out = await designEncounter({ players: team, names, boss: true, evaluate: makeEvaluator({ players: team, names, rank, runs: 6 }), curve, candidates: 3, yieldFn: async () => {} });
+  assert.match(out.notes.join(' '), /輔助 打不穿一般小怪/);
 });

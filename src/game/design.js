@@ -7,14 +7,14 @@
 // 這裡改成「搜尋整個敵人配置」（BOSS 固定 1 隻，或沒有 BOSS）：
 //   · 小怪、菁英的隻數
 //   · 小怪／菁英／BOSS 各自的防禦——由玩家的傷害曲線決定能不能打穿：小怪要給最弱的人打得動，菁英給中段，BOSS 讓大多數人還打得動
-//   · 小怪／菁英血量＝（對應玩家一次出手的傷害）× 倍數；BOSS 血量用來把回合數對準 2～3 回合
+//   · 小怪／菁英血量＝（對應玩家一次出手的傷害）× 倍數；BOSS 血量用來把回合數對準目標回合數
 //   · 怪物攻擊：在「還贏得了、資源沒爆」的前提下盡量兇（傷害是門檻函式，所以用二分搜尋，不盲調）
 // 每組候選都用固定種子的模擬評分（同樣的配置永遠算出同樣的結果）。
 // 預設數值（TEMPLATE）：小怪與 BOSS 是 GM 2026-10-12 實際跑團的敵人（小怪血 600／攻 360／防 270，BOSS 血 2000／攻 600／防 800）；
 // 菁英是我訂的（需驗證）。其餘門檻（輸出占比、倍數範圍）也是我訂的，需向 GM 確認。
 // ============================================================
 import { simulateBattle, summarize, seededRng } from './simulate.js';
-import { measureHits, rankPlayers, capsFor, FAIR } from './fairness.js';
+import { measureHits, rankPlayers, damagersOf, capsFor, FAIR } from './fairness.js';
 import { TARGET, penalty, assess, roundsOf, downMaxOf } from './tuning.js';
 
 export const TEMPLATE = {
@@ -24,30 +24,36 @@ export const TEMPLATE = {
 };
 
 /** 防禦強度的候選值（總和；會隨機分到三軌）。傷害曲線就是在這些點上量的 */
-export const DEF_GRID = [0, 40, 80, 120, 160, 200, 250, 300, 360, 430, 520, 620, 750, 900, 1100];
+export const DEF_GRID = [0, 40, 80, 120, 160, 200, 270, 330, 360, 430, 520, 620, 750, 900, 1100];
 const MOB_HP_MULT = [0.6, 1, 1.5, 2.2]; // 小怪血量＝最弱玩家一次出手 × 這個倍數
 const ELITE_HP_MULT = [1.2, 2, 3, 4]; // 菁英血量＝中位數玩家一次出手 × 這個倍數
 const KA = [0.05, 8]; // 攻擊倍率範圍（相對 TEMPLATE 的攻擊強度）
 const mid = (lo, hi) => Math.sqrt(lo * hi);
 
 const mobProbe = (d) => [{ kind: 'mob', count: 3, atkPower: 1, defPower: d, hp: 1 }];
-const stats = (hits) => {
-  const v = hits.map((h) => h.perTarget).sort((a, b) => a - b);
+const stats = (hits, damagers = null) => {
+  const v = hits.filter((_, i) => !damagers || damagers.includes(i)).map((h) => h.perTarget).sort((a, b) => a - b);
   return { weak: v[0] ?? 0, med: v[Math.floor(v.length / 2)] ?? 0, strong: v[v.length - 1] ?? 0 };
 };
 
-/** 傷害曲線：每個防禦候選值下，每位玩家一次出手（對單一目標）打得掉多少；回傳 [{ def, hits, weak, med, strong }] */
+/**
+ * 傷害曲線：每個防禦候選值下，每位玩家一次出手（對單一目標）打得掉多少；回傳 [{ def, hits, weak, med, strong }]，
+ * 陣列上另有 damagers：有輸出能力的人（打得穿一般小怪，防禦＝TEMPLATE.mob.defPower）。weak／med／strong 只算這些人——
+ * 輔助兼坦克、本來就不看傷害的玩家不拉低小怪血量。
+ */
 export function damageCurve(players, { supply = null, runs = 8, grid = DEF_GRID } = {}) {
-  return grid.map((def) => {
-    const hits = measureHits(players, mobProbe(def), { supply, runs });
-    return { def, hits, ...stats(hits) };
-  });
+  const raw = grid.map((def) => ({ def, hits: measureHits(players, mobProbe(def), { supply, runs }) }));
+  const ref = raw.reduce((a, c) => (Math.abs(c.def - TEMPLATE.mob.defPower) < Math.abs(a.def - TEMPLATE.mob.defPower) ? c : a), raw[0]);
+  const damagers = damagersOf(ref.hits);
+  const curve = raw.map((c) => ({ ...c, ...stats(c.hits, damagers) }));
+  curve.damagers = damagers;
+  return curve;
 }
 
 /** 每位玩家的強弱排序（用傷害曲線上防禦 100 附近的點；越強越前面）。回傳 rankPlayers 的結果 */
 export function rankFromCurve(curve) {
   const at = curve.reduce((a, c) => (Math.abs(c.def - 100) < Math.abs(a.def - 100) ? c : a), curve[0]);
-  return rankPlayers(at.hits);
+  return rankPlayers(at.hits, curve.damagers);
 }
 
 /**
@@ -123,7 +129,7 @@ const tooHard = (sum, t) => sum.win < t.winMin || downMaxOf(sum) > t.downMax || 
  */
 async function fitStructure(c, evaluate, target, tick) {
   const roundsMid = (target.roundsMin + target.roundsMax) / 2;
-  const khRange = c.boss ? [0.2, 60] : [0.2, 6];
+  const khRange = c.boss ? [0.2, 60] : [0.2, 20];
   const run = async (kh, ka) => { await tick(); return evaluate(buildSpecs(c, kh, ka), false); };
   const fitKh = async (ka, lo, hi, n) => {
     let kh = mid(lo, hi);
@@ -206,7 +212,9 @@ export async function designEncounter({
     results.push({ ...f, issues: assess(f.summary).items.filter((i) => i.status !== 'ok') });
   }
   if (results[0].penalty > 0) notes.push('找不到完全符合所有目標的配置，下面是最接近的；沒達標的項目列在各方案底下。');
-  const sp = stats(cv[0].hits);
+  const sit = names.filter((_, i) => !(cv.damagers ?? []).includes(i));
+  if (sit.length) notes.push(`${sit.join('、')} 打不穿一般小怪（防禦 ${TEMPLATE.mob.defPower}），視為輔助：小怪血量與輸出分配只依其他 ${(cv.damagers ?? []).length} 位的輸出計算，他們仍會被怪物攻擊、也會喝藥救人。`);
+  const sp = stats(cv[0].hits, cv.damagers);
   if (sp.weak > 0 && sp.strong / sp.weak > 4) notes.push(`玩家強弱差距很大（防禦 0 時，最強一次出手 ${Math.round(sp.strong)}、最弱 ${Math.round(sp.weak)}，差 ${(sp.strong / sp.weak).toFixed(1)} 倍）：配置會用「小怪給弱的人、BOSS 給強的人」去拉平，但差距這麼大時，最弱的玩家可能還是只能打小怪。`);
   onProgress(1);
   return { results, notes, curve: cv };

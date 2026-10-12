@@ -16,6 +16,7 @@ export const FAIR = {
   topBudget: 0.6, // 第一名只出這麼多比例的力（資源與毒性空間）
   weakKills: 0.5, // 最弱的玩家平均至少打倒幾隻（低於這個，他整場幾乎沒有貢獻）
   probeRuns: 24, // 量一次出手的傷害，每位玩家跑幾次
+  refHp: 600, // 量傷害時，「現有生命 N%」類的百分比傷害（萬物歸一）換算成對這麼多血的怪物（約一隻小怪；假怪物血量是 10 億，不換算的話 5% 就是 5000 萬）
   mobFloor: 0.25, // 最弱玩家打不穿小怪時，小怪血量至少是中位數玩家的這個比例（不然血量變 1）
 };
 
@@ -42,7 +43,9 @@ function dummyEncounter(source, rng) {
  * 量每位玩家一次出手的傷害（照模擬戰一樣的選招、加鬥氣、敵人 B 技能的絕對防禦）。
  * 回傳每位玩家 { perTarget（對第一隻的傷害）, total（所有目標加起來，群攻會高）}；source 是自訂強度的 specs 或固定敵人。
  */
-export function measureHits(players, source, { supply = null, runs = FAIR.probeRuns } = {}) {
+export function measureHits(players, source, { supply = null, runs = FAIR.probeRuns, refHp = FAIR.refHp } = {}) {
+  // 百分比傷害（萬物歸一，破防時額外扣現有生命 5%）是照目標血量算的，假怪物血量 10 億會讓它大到失真：換算成 refHp 血量的怪物
+  const dmg = (h) => (h.lost - (h.bonus ?? 0)) + ((h.bonus ?? 0) * refHp) / HUGE;
   return players.map((src, i) => {
     let per = 0; let tot = 0; let atk = 0; let def = 0; let n = 0;
     for (let k = 0; k < runs; k++) {
@@ -54,8 +57,8 @@ export function measureHits(players, source, { supply = null, runs = FAIR.probeR
       for (const m of enc.monsters) for (let u = 0; u < rankInfo(m).B.uses; u++) useEnemySkill(enc, m.id, 'B', rng);
       const done = act(p, enc, rng);
       if (!done) continue;
-      per += done.r.hits[0]?.lost ?? 0;
-      tot += done.r.hits.reduce((a, h) => a + h.lost, 0);
+      per += done.r.hits[0] ? dmg(done.r.hits[0]) : 0;
+      tot += done.r.hits.reduce((a, h) => a + dmg(h), 0);
       // 攻擊骰與敵人防禦骰（用到的軌道加總，含敵人防禦強化技能多出來的絕對防禦）：打不動時，拿來說明為什麼
       const tracks = done.r.move?.tracks ?? [];
       const sumOf = (d) => { const x = d?.dice ?? d; return typeof x === 'number' ? x : tracks.reduce((a, t) => a + (x?.[t] ?? 0), 0); };
@@ -88,15 +91,25 @@ export function splitBlank(players, names, hits) {
   };
 }
 
-/** 強弱排序：依一次出手的總傷害（群攻算進去）。回傳 { strongest, weakest（玩家位置）, order（由強到弱）, hits（每人量到的）} */
-export function rankPlayers(hits) {
-  let strongest = 0; let weakest = 0;
-  hits.forEach((h, i) => {
-    if (h.total > hits[strongest].total) strongest = i;
-    if (h.total < hits[weakest].total) weakest = i;
-  });
+/** 有輸出能力的玩家位置：一次出手對單一目標至少打得掉 1（輔助、坦克打不穿的人不算；全部都打不穿就全算） */
+export const damagersOf = (hits) => {
+  const ds = hits.map((h, i) => [h, i]).filter(([h]) => h.perTarget >= 1).map(([, i]) => i);
+  return ds.length ? ds : hits.map((_, i) => i);
+};
+
+/**
+ * 強弱排序：依一次出手的總傷害（群攻算進去）。回傳 { strongest, weakest（玩家位置）, order（由強到弱）, hits（每人量到的）, damagers（有輸出能力的人）}。
+ * strongest／weakest 只在有輸出能力的人之中挑：金先生這種輔助兼坦克、本來就不看傷害的人，不該被當成「最弱的輸出者」去拉低小怪血量。
+ */
+export function rankPlayers(hits, damagers = null) {
+  const ds = damagers ?? damagersOf(hits);
+  let strongest = ds[0]; let weakest = ds[0];
+  for (const i of ds) {
+    if (hits[i].total > hits[strongest].total) strongest = i;
+    if (hits[i].total < hits[weakest].total) weakest = i;
+  }
   const order = hits.map((_, i) => i).sort((a, b) => hits[b].total - hits[a].total); // 由強到弱的玩家位置（集火用）
-  return { strongest, weakest, order, hits };
+  return { strongest, weakest, order, hits, damagers: ds };
 }
 
 /**
