@@ -3,6 +3,7 @@
 import { askConfirm } from './confirmPop.js';
 import { h } from './dom.js';
 import { openBotImportSheet } from './botImport.js';
+import { openBackupRestoreSheet } from './backupRestore.js';
 import { openSheetImportSheet } from './sheetImport.js';
 import { openGmCharEditor } from './gmCharEdit.js';
 import { openRewardSheet } from './rewardSheet.js';
@@ -44,6 +45,7 @@ export function mountRoomPanel(container) {
         }, '🆕 新戰鬥'));
         btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openBotImportSheet }, '匯入機器人存檔'));
         btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openSheetImportSheet }, '匯入角色卡'));
+        btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openBackupRestoreSheet }, '從備份還原角色'));
         btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openGmCharEditor }, '玩家角色'));
         btns.push(h('button', { type: 'button', class: 'btn btn--small', onclick: openRewardSheet }, '🎁 發放獎勵'));
         btns.push(h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: openSimPanel }, '模擬戰'));

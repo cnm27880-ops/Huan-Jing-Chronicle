@@ -74,6 +74,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/keepsakes.js` | 紀念品目錄（13 種：加值、困難／史詩製作產出雙倍、直接使用、手動處理）與 `syncKeepsakes`（背包有同名物品就補上效果）（純資料與函式） |
 | `src/game/badges.js` | 生活技能徽章（神級、500 次）：判斷達標、製作後技能 +1（純函式） |
 | `src/game/importSheet.js` | 試算表角色卡（貼上的文字）→ 網站角色：用標題文字找位置，不看固定格子；算出「手動調整」（純函式） |
+| `src/ui/backupRestore.js` | GM 專用的「從備份還原角色」面板（跑團頁房間區塊）：選 R2 下載的每日備份 `.json.gz`（瀏覽器內解壓），挑玩家，用 `charImport` 寫回伺服器（會記異動）；備份檔含所有玩家資料，不能進 git |
 | `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |
 | `src/ui/rewardSheet.js` | GM 專用「🎁 發放獎勵」面板（跑團頁房間區塊）：勾選玩家（預設全員）＋物品（技能書快捷鈕）、金幣、經驗、時間、備註，一次發出；也拿來補償（例如玩家忘了喝惜未央，直接補時間）。伺服器 `room-core.js` 的 `onReward`（只有 GM，走信箱 `kind:'reward'`，不用扣任何人的背包，上限：經驗 100 萬、時間 1000、60 位玩家），玩家端 `mail.js` 的 `applyMail` 套用（時間沒有上限）並跳通知 |
 | `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：看並改玩家的手動調整、技能等級、啟動 |
