@@ -33,7 +33,7 @@ import { SAMPLE_CHARACTER } from './data/sample/fude.js';
 import { setCustomSpecial } from './game/special.js';
 import { setCustomSkills } from './game/skillTable.js';
 import { loadCachedCustomSkills, saveCachedCustomSkills } from './state/customSkills.js';
-import { loadCharacter, saveCharacter, resetCharacter, hasSavedCharacter, importCharacter, stashLocalCharacter, unstashLocalCharacter } from './state/store.js';
+import { loadCharacter, saveCharacter, hasSavedCharacter, importCharacter, stashLocalCharacter, unstashLocalCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
 import { createMailbox } from './state/mailbox.js';
 import { mountNudges } from './ui/nudgeModal.js';
@@ -99,10 +99,6 @@ async function init() {
       root: $('#view-bag'),
       getState,
       commit,
-      onReset: () => {
-        character = resetCharacter();
-        commit();
-      },
     }),
     gear: createGearView({ root: $('#view-gear'), getState, commit }),
     session: createSessionView({ root: $('#view-session'), getState, commit }),

@@ -2,7 +2,6 @@
 // 背包頁面：物品格排列，點物品打開面板調整數量或直接吃
 // 搜尋與「放進背包」固定在最上方
 // ============================================================
-import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { itemTile } from './controls.js';
 import { CATEGORIES, categoryOf } from './items.js';
@@ -13,7 +12,7 @@ import { countOf } from '../game/engine.js';
 // 紀念品與收藏放最前面，是玩家的特色
 const ORDER = ['keepsake', 'meal', 'potion', 'material', 'book', 'gear'];
 
-export function createBagView({ root, getState, commit, onReset }) {
+export function createBagView({ root, getState, commit }) {
   const ui = { query: '', collapsed: new Set() };
 
   function render() {
@@ -74,12 +73,7 @@ export function createBagView({ root, getState, commit, onReset }) {
             }, h('span', { text: g.name }), h('small', { text: `${g.items.length} 種` })),
             grid);
         }),
-        visible.length ? null : h('p', { class: 'empty', text: `背包裡沒有「${q}」。` }),
-        h('div', { class: 'bag-foot' },
-          h('button', {
-            type: 'button', class: 'btn btn--ghost btn--small',
-            onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: '還原成示範資料？', lines: ['目前的變更會消失。'], okText: '還原', danger: true })) onReset(); },
-          }, '還原示範資料')))
+        visible.length ? null : h('p', { class: 'empty', text: `背包裡沒有「${q}」。` }))
     );
     root.scrollTop = scrollY;
   }
