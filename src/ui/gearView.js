@@ -22,7 +22,7 @@ import { logActivity } from '../state/activityLog.js';
 import { openReveal } from './reveal.js';
 import { openGearSellSheet } from './marketView.js';
 import { badgeCard } from './badgePanel.js';
-import { oneOffGearEnabled, oneOffGearCard } from './oneOffGearImport.js';
+import { checkAdjustCard } from './checkAdjustPanel.js';
 
 const tierIndex = (g) => GEAR_TIERS.indexOf(g.tier);
 const SLOT_ICON = { weapon: '⚔️', armor: '🛡️', accessory: '💍' };
@@ -414,8 +414,8 @@ export function createGearView({ root, getState, commit }) {
     const scrollY = root.scrollTop;
     root.replaceChildren(
       h('div', { class: 'page-wrap gear-layout' },
-        h('div', { class: 'gear-col' }, slotsCard(state), identifyCard(state), gemCard(state), oneOffGearEnabled() ? oneOffGearCard({ getState, commit, rerender: render }) : null, ownedCard(state)), // 背包裝備放寶石下面，右欄技能表才不會太長
-        h('div', { class: 'gear-col' }, panelCard(state), skillCard(state), badgeCard({ getState, commit }))));
+        h('div', { class: 'gear-col' }, slotsCard(state), identifyCard(state), gemCard(state), ownedCard(state)), // 背包裝備放寶石下面，右欄技能表才不會太長
+        h('div', { class: 'gear-col' }, panelCard(state), skillCard(state), badgeCard({ getState, commit }), checkAdjustCard({ getState, commit }))));
     root.scrollTop = scrollY;
   }
 

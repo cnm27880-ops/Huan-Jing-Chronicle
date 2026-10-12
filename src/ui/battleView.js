@@ -22,6 +22,8 @@ import {
 import { countOf } from '../game/engine.js';
 import { iconOf } from './items.js';
 import { publish, rollWith } from '../state/rollLog.js';
+import { cloakCard } from './cloakCard.js';
+import { shadowOf, isHidden, STEALTH_ROUNDS } from '../game/shadowCloak.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
 import { battleSel as sel } from './battleSelect.js';
@@ -118,6 +120,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       state.buffs.atk ? h('span', { class: 'info-chip is-good', text: `下次攻擊 真傷 +${state.buffs.atk} 骰` }) : null,
       state.buffs.def ? h('span', { class: 'info-chip is-good', text: `下次防禦 絕防 +${state.buffs.def} 骰` }) : null,
       state.buffs.dragon ? h('span', { class: 'info-chip is-good', text: `🐉 龍：能量傷害 +${state.buffs.dragon}（戰鬥結束消失）` }) : null,
+      shadowOf(state) ? h('span', { class: 'info-chip is-good', text: isHidden(state) ? `🌑 隱身 ${shadowOf(state).rounds}/${STEALTH_ROUNDS}・聚集 +${shadowOf(state).gathered}（不能被優先指定）` : `🌑 暗影 +${shadowOf(state).gathered}（可現身爆發）` }) : null,
       state.toxicity >= TOXICITY_MAX ? h('span', { class: 'info-chip is-bad', text: '毒性已滿' }) : null,
     ].filter(Boolean);
   }
@@ -127,7 +130,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const keys = HUD_KEYS(state);
     const d = defenseDice(state).dice;
     const tags = statusTags(state);
-    return h('header', { class: 'bt-hud' },
+    return h('header', { class: `bt-hud${isHidden(state) ? ' is-cloaked' : ''}` },
       h('div', { class: 'bt-hud__top' },
         h('h2', { class: 'bt-hud__name', text: state.name }),
         h('span', { class: 'bt-hud__def', 'aria-label': `防禦骰 A ${d.A}、B ${d.B}、C ${d.C}` },
@@ -527,6 +530,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
             },
           }, `放棄行動・回復 ${WITCH_EXTRA_COST} 魔力`)
         : null,
+      cloakCard(state, { commit }),
       douRow(state),
       mageRow(state),
       respBar(state),

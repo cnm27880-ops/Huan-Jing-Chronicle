@@ -1,0 +1,103 @@
+/* ============================================================
+   暗影斗篷特效（src/ui/shadowFx.js）與隱身狀態的外觀。色碼只用 theme.css 的 --cloak 系列變數。
+   四種：enter 帷幕合攏、gather 能量漣漪、fade 帷幕散開、reveal 閃光撕開斗篷。全部不擋操作，減少動態效果時只留文字。
+   ============================================================ */
+.sfx { position: fixed; inset: 0; z-index: 97; pointer-events: none; overflow: hidden; animation: sfx-in 0.2s ease; }
+.sfx[data-phase='out'] { animation: sfx-out 0.45s ease forwards; }
+
+/* 四周暗角 */
+.sfx__veil {
+  position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 18%, rgba(var(--cloak-deep-rgb), 0.9) 100%);
+}
+.sfx[data-kind='enter'] .sfx__veil { animation: sfx-veil 2.3s ease-in-out forwards; }
+.sfx[data-kind='fade'] .sfx__veil { animation: sfx-veil 1.6s ease-in-out forwards reverse; }
+
+/* 斗篷：左右兩片披風（SVG，下擺三個尖角、布褶線、發光內緣），中間浮出兜帽人影 */
+.sfx__cloak { position: absolute; top: -1%; bottom: 0; width: 64%; height: 101%; opacity: 0; overflow: visible; }
+.sfx__cloak--l { left: 0; transform: translateX(-104%); transform-origin: 0 0; }
+.sfx__cloak--r { right: 0; transform: translateX(104%); transform-origin: 100% 0; }
+.sfx__stop--a { stop-color: var(--cloak-deep); stop-opacity: 0.99; }
+.sfx__stop--b { stop-color: var(--cloak-deep); stop-opacity: 0.93; }
+.sfx__stop--c { stop-color: var(--cloak); stop-opacity: 0.55; }
+.sfx__fold { fill: none; stroke: rgba(var(--cloak-rgb), 0.28); stroke-width: 2.2; stroke-linecap: round; }
+.sfx__rim { fill: none; stroke: var(--cloak); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(var(--cloak-rgb), 0.95)) drop-shadow(0 0 16px rgba(var(--cloak-rgb), 0.6)); }
+.sfx__figure { position: absolute; left: 50%; bottom: 0; width: min(34vw, 240px); height: auto; transform: translateX(-50%); opacity: 0; }
+.sfx__body { fill: rgba(var(--cloak-deep-rgb), 0.98); stroke: var(--cloak); stroke-width: 2; filter: drop-shadow(0 0 10px rgba(var(--cloak-rgb), 0.8)); }
+.sfx__eye { fill: var(--ink); filter: drop-shadow(0 0 6px var(--cloak)) drop-shadow(0 0 14px var(--cloak)); }
+.sfx[data-kind='enter'] .sfx__cloak--l { animation: sfx-close-l 2.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; }
+.sfx[data-kind='enter'] .sfx__cloak--r { animation: sfx-close-r 2.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; }
+.sfx[data-kind='enter'] .sfx__figure { animation: sfx-figure 2.3s ease-in-out forwards; }
+.sfx[data-kind='reveal'] .sfx__cloak--l { animation: sfx-flare-l 1.15s cubic-bezier(0.5, 0, 0.9, 0.4) forwards; }
+.sfx[data-kind='reveal'] .sfx__cloak--r { animation: sfx-flare-r 1.15s cubic-bezier(0.5, 0, 0.9, 0.4) forwards; }
+.sfx[data-kind='fade'] .sfx__cloak--l { animation: sfx-flare-l 1.5s ease-in forwards; }
+.sfx[data-kind='fade'] .sfx__cloak--r { animation: sfx-flare-r 1.5s ease-in forwards; }
+
+/* 霧氣 */
+.sfx__mist { position: absolute; inset: 0; opacity: 0; filter: blur(18px);
+  background:
+    radial-gradient(40% 30% at 20% 75%, rgba(var(--cloak-rgb), 0.5), transparent 70%),
+    radial-gradient(45% 32% at 78% 68%, rgba(var(--cloak-rgb), 0.4), transparent 70%); }
+.sfx[data-kind='enter'] .sfx__mist, .sfx[data-kind='gather'] .sfx__mist { animation: sfx-mist 2.2s ease-in-out forwards; }
+
+/* 漣漪（聚集）與衝擊環（現身） */
+.sfx__ring { position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; opacity: 0;
+  border: 3px solid var(--cloak); box-shadow: 0 0 30px rgba(var(--cloak-rgb), 0.7), inset 0 0 30px rgba(var(--cloak-rgb), 0.5); }
+.sfx[data-kind='gather'] .sfx__ring { animation: sfx-ring 1.3s ease-out forwards; }
+.sfx[data-kind='reveal'] .sfx__ring { animation: sfx-ring-big 1.2s ease-out 0.18s forwards; }
+
+/* 現身閃光 */
+.sfx__flash { position: absolute; inset: 0; opacity: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(var(--ink-rgb), 0.95), rgba(var(--cloak-rgb), 0.55) 35%, transparent 70%); }
+.sfx[data-kind='reveal'] .sfx__flash { animation: sfx-flash 0.9s ease-out 0.12s forwards; }
+
+/* 暗影光點：從畫面下緣升起 */
+.sfx__wisps { position: absolute; inset: 0; }
+.sfx__wisp { position: absolute; left: 50%; bottom: -20px; width: var(--s); height: var(--s); opacity: 0;
+  background: var(--cloak); box-shadow: 0 0 12px 2px rgba(var(--cloak-rgb), 0.8); transform: translateX(var(--x)) rotate(var(--r)); }
+.sfx[data-kind='enter'] .sfx__wisp, .sfx[data-kind='reveal'] .sfx__wisp { animation: sfx-wisp 2s ease-out var(--d) forwards; }
+.sfx[data-kind='gather'] .sfx__wisp { animation: sfx-wisp 1.4s ease-out var(--d) forwards; }
+
+/* 文字（進入／結束時人影在中間，字放上面免得蓋住臉） */
+.sfx[data-kind='enter'] .sfx__text, .sfx[data-kind='fade'] .sfx__text { top: 20%; }
+.sfx__text { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 6px; text-align: center; }
+.sfx__title { font-size: clamp(1.8rem, 6vw, 3rem); letter-spacing: 0.4em; padding-left: 0.4em; color: var(--ink); opacity: 0;
+  text-shadow: 0 0 18px rgba(var(--cloak-rgb), 0.95), 0 0 42px rgba(var(--cloak-rgb), 0.7); }
+.sfx__sub { font-size: clamp(1rem, 3.4vw, 1.5rem); letter-spacing: 0.22em; color: var(--cloak); opacity: 0; text-shadow: 0 0 14px rgba(var(--cloak-rgb), 0.8); }
+.sfx[data-kind='enter'] .sfx__title, .sfx[data-kind='fade'] .sfx__title { animation: sfx-title 2.1s ease-out 0.35s forwards; }
+.sfx[data-kind='enter'] .sfx__sub, .sfx[data-kind='fade'] .sfx__sub { animation: sfx-title 2.1s ease-out 0.6s forwards; }
+.sfx[data-kind='gather'] .sfx__sub { animation: sfx-rise 1.4s ease-out forwards; font-size: clamp(1.4rem, 5vw, 2.2rem); }
+.sfx[data-kind='reveal'] .sfx__title { animation: sfx-burst 1.8s cubic-bezier(0.2, 0.9, 0.2, 1.2) 0.2s forwards; }
+.sfx[data-kind='reveal'] .sfx__sub { animation: sfx-title 1.8s ease-out 0.45s forwards; }
+
+@keyframes sfx-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sfx-out { to { opacity: 0; } }
+@keyframes sfx-veil { 0% { opacity: 0; } 35% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes sfx-close-l { 0% { opacity: 1; transform: translateX(-104%) rotate(-6deg); } 34% { opacity: 1; transform: translateX(-6%) rotate(1.5deg); } 46% { opacity: 1; transform: translateX(0) rotate(0); } 72% { opacity: 1; transform: translateX(0) scale(1.02, 1); } 100% { opacity: 0; transform: translateX(0) translateY(-8%) scale(1.06, 1.1); filter: blur(10px); } }
+@keyframes sfx-close-r { 0% { opacity: 1; transform: translateX(104%) rotate(6deg); } 34% { opacity: 1; transform: translateX(6%) rotate(-1.5deg); } 46% { opacity: 1; transform: translateX(0) rotate(0); } 72% { opacity: 1; transform: translateX(0) scale(1.02, 1); } 100% { opacity: 0; transform: translateX(0) translateY(-8%) scale(1.06, 1.1); filter: blur(10px); } }
+@keyframes sfx-flare-l { 0% { opacity: 1; transform: translateX(0) rotate(0); } 100% { opacity: 0; transform: translateX(-112%) rotate(-14deg) skewY(-4deg); } }
+@keyframes sfx-flare-r { 0% { opacity: 1; transform: translateX(0) rotate(0); } 100% { opacity: 0; transform: translateX(112%) rotate(14deg) skewY(4deg); } }
+@keyframes sfx-figure { 0%, 40% { opacity: 0; transform: translateX(-50%) translateY(14%); } 58% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-4%); filter: blur(8px); } }
+@keyframes sfx-mist { 0% { opacity: 0; transform: translateY(8%); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6%); } }
+@keyframes sfx-ring { 0% { opacity: 0.9; transform: scale(0.3); } 100% { opacity: 0; transform: scale(3.2); } }
+@keyframes sfx-ring-big { 0% { opacity: 1; transform: scale(0.3); } 100% { opacity: 0; transform: scale(9); } }
+@keyframes sfx-flash { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes sfx-wisp { 0% { opacity: 0; transform: translate(var(--x), 0) rotate(var(--r)) scale(0.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(var(--x) * 0.7), -75vh) rotate(calc(var(--r) + 220deg)) scale(1.2); } }
+@keyframes sfx-title { 0% { opacity: 0; letter-spacing: 1em; filter: blur(8px); } 30% { opacity: 1; letter-spacing: 0.4em; filter: blur(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes sfx-rise { 0% { opacity: 0; transform: translateY(18px) scale(0.8); } 25% { opacity: 1; transform: translateY(0) scale(1.1); } 100% { opacity: 0; transform: translateY(-34px) scale(1); } }
+@keyframes sfx-burst { 0% { opacity: 0; transform: scale(2.4); filter: blur(10px); } 25% { opacity: 1; transform: scale(1); filter: blur(0); } 80% { opacity: 1; transform: scale(1.04); } 100% { opacity: 0; transform: scale(1.1); } }
+
+/* 隱身中的外觀：個人 HUD 披上暗紫光暈，暗影斗篷區塊亮紫邊 */
+.bt-hud.is-cloaked { border-color: var(--cloak); animation: cloak-shimmer 3.2s ease-in-out infinite;
+  background-image: linear-gradient(180deg, rgba(var(--cloak-rgb), 0.16), transparent 70%); }
+.bt-hud.is-cloaked .bt-hud__name { color: var(--cloak); text-shadow: 0 0 12px rgba(var(--cloak-rgb), 0.7); }
+.cloak.is-hidden { border-color: var(--cloak); box-shadow: 0 0 0 1px rgba(var(--cloak-rgb), 0.5), 0 0 24px rgba(var(--cloak-rgb), 0.25); }
+.cloak__now { margin: 0 0 .5rem; color: var(--cloak); font-weight: 700; }
+@keyframes cloak-shimmer { 0%, 100% { box-shadow: 0 0 0 1px rgba(var(--cloak-rgb), 0.35), 0 0 14px rgba(var(--cloak-rgb), 0.18); } 50% { box-shadow: 0 0 0 1px rgba(var(--cloak-rgb), 0.7), 0 0 30px rgba(var(--cloak-rgb), 0.4); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sfx, .sfx * { animation: none !important; }
+  .sfx__veil, .sfx__cloak, .sfx__figure, .sfx__mist, .sfx__ring, .sfx__flash, .sfx__wisps { display: none; }
+  .sfx__title, .sfx__sub { opacity: 1; }
+  .bt-hud.is-cloaked { animation: none; }
+}

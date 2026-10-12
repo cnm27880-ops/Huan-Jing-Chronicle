@@ -76,7 +76,8 @@ test('技能綁定：學過的主動技能（含技能表產生的）都能選',
   const names = bindableSkills(s);
   for (const n of ['八卦掌', '爆裂火球', '蕩魔雷音', '吞天噬血陣', '暴徒']) assert.equal(names.includes(n), true, n);
   assert.equal(names.includes('呼吸法'), false); // 純被動
-  assert.equal(names.includes('暗影斗篷'), false); // 非傷害技能
+  assert.equal(generatedAttack('暗影斗篷'), null); // 表上的文字是「聚集」，不會自動產生招式
+  assert.equal(names.includes('暗影斗篷'), true); // 但手寫目錄有「現身」招式（shadowCloak.js），可以綁定
   const fire = generatedAttack('爆裂火球');
   assert.deepEqual([fire.tracks, fire.cost, fire.targets], [['B'], { 魔力: 3 }, 1]);
   assert.deepEqual(fire.extraAt(9), { B: 7 }); // 響應 1、3、5、7、9 級 → 3、4、5、6、7 個

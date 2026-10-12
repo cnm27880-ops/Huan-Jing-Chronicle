@@ -230,8 +230,9 @@ export function createRestView({ root, getState, commit }) {
       const r = upgradeSkillTo(state, name, plan.to);
       if (!r.ok) return toast(r.error);
       const swapText = r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`).join('；');
-      toast(`${name} ${r.from ? `${r.from} 級升到` : '學會，升到'} ${r.level} 級${swapText ? `。${swapText}` : ''}`);
-      logActivity(state, { cat: 'learn', text: `${name}：${r.from ? `${r.from} 級 → ${r.level} 級` : `學會，升到 ${r.level} 級`}`, lines: [`消耗 ${fmt(plan.exp)} 經驗`, `技能書：${bookText || '無'}`, ...r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`)] });
+      const gainText = Object.entries(r.gains).map(([k, v]) => `${k}技能 +${v}`).join('、');
+      toast(`${name} ${r.from ? `${r.from} 級升到` : '學會，升到'} ${r.level} 級${swapText ? `。${swapText}` : ''}${gainText ? `。${gainText}` : ''}`);
+      logActivity(state, { cat: 'learn', text: `${name}：${r.from ? `${r.from} 級 → ${r.level} 級` : `學會，升到 ${r.level} 級`}`, lines: [`消耗 ${fmt(plan.exp)} 經驗`, `技能書：${bookText || '無'}`, ...r.swaps.map((x) => `${x.level} 級對調「${x.a}」與「${x.b}」`), ...(gainText ? [gainText] : [])] });
       pick.target = null;
       commit();
       sheet.refresh();

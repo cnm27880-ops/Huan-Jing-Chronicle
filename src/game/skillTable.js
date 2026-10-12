@@ -11,7 +11,7 @@
 // ============================================================
 import { SKILL_TABLE, EXP_TABLE } from '../data/skills.js';
 import { countOf, removeItem } from './engine.js';
-import { ALL_STATS } from './rules.js';
+import { ALL_STATS, LIFE_SKILLS, ART_SKILLS } from './rules.js';
 import { pickFx } from './skillPicks.js';
 
 export { SKILL_TABLE, EXP_TABLE };
@@ -194,6 +194,11 @@ export function markSwapsDone(state, name, level) {
 export function setSkillLevel(state, name, level) {
   const next = Math.max(0, Math.min(MAX_SKILL_LEVEL, Math.floor(Number(level)) || 0));
   const prev = Number(state.skills?.[name]) || 0;
+  // 升級讓生活技能／技藝增加（例如尋脈探靈手 +採藥）：技能值是匯入的總值，不會自動由技能加總，所以升級時把增加的差額直接加上去
+  for (const [skill, gain] of Object.entries(checkSkillGain(state, name, prev, next))) {
+    const bucket = LIFE_SKILLS.includes(skill) ? 'lifeSkills' : 'arts';
+    state[bucket] = { ...state[bucket], [skill]: (Number(state[bucket]?.[skill]) || 0) + gain };
+  }
   const swaps = [];
   if (usesSkillTable(state) && FOOL_SWAPS[name]) {
     const [a, b] = FOOL_SWAPS[name];
@@ -210,6 +215,23 @@ export function setSkillLevel(state, name, level) {
   }
   state.skills = { ...state.skills, [name]: next };
   return swaps;
+}
+
+/**
+ * 技能從 from 級升到 to 級時，會讓生活技能／技藝增加多少：{ 技能名: 增加量 }（只算往上升，往下調不扣；沒生效的啟動類技能不算）。
+ * 技能目錄的 fx 除了面板屬性，也會有「採藥+1」這種生活技能加成。
+ */
+export function checkSkillGain(state, name, from, to) {
+  if (!usesSkillTable(state) || !inCatalog(name) || !skillActive(state, name) || !(to > from)) return {};
+  const a = skillFx(name, from);
+  const b = skillFx(name, to);
+  const out = {};
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (!LIFE_SKILLS.includes(k) && !ART_SKILLS.includes(k)) continue;
+    const d = (b[k] ?? 0) - (a[k] ?? 0);
+    if (d) out[k] = d;
+  }
+  return out;
 }
 
 /** 升到下一級要付的經驗（單次費用，0→1 也要付）；已滿級或目錄沒有回 null */
@@ -317,8 +339,9 @@ export function upgradeSkillTo(state, name, target) {
   state.spentExp = (Number(state.spentExp) || 0) + plan.exp;
   for (const [item, n] of Object.entries(plan.books)) removeItem(state, item, n);
   for (const [item, n] of Object.entries(plan.fodder)) removeItem(state, item, n);
+  const gains = checkSkillGain(state, name, plan.from, plan.to);
   const swaps = setSkillLevel(state, name, plan.to);
-  return { ok: true, exp: plan.exp, books: plan.books, fodder: plan.fodder, from: plan.from, level: plan.to, swaps };
+  return { ok: true, exp: plan.exp, books: plan.books, fodder: plan.fodder, from: plan.from, level: plan.to, swaps, gains };
 }
 
 /** 升一級（等於 upgradeSkillTo 目前等級 + 1） */

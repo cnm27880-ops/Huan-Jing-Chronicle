@@ -20,6 +20,7 @@ import {
   passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS, douMult, attackResponses, dragonGain, hasCyberHacker, addCost, MAGE, mageApplies, titanCut,
 } from './skills.js';
 import { actionCost, shortfall, pay, costText } from './resources.js';
+import { SHADOW_SKILL, isHidden, gatheredOf, clearShadow } from './shadowCloak.js';
 
 /** 每 1 點 = 1 顆 D4 */
 export const rollTrack = (points, rng = Math.random) => rollSum(points, 4, rng);
@@ -58,6 +59,7 @@ export function attackDice(state, move, potionBonus = 0, douBonus = 0, respDice 
       { label: '鬥氣', value: douBonus }, // 花鬥氣換來的真實傷害骰（每條用到的軌道都加）
       { label: '響應', value: respDice[t] ?? 0 }, // 腦機協議、殘缺筆記…（見 skills.js 的 ATTACK_RESPONSES）
       { label: '龍', value: t === 'B' ? state.buffs?.dragon ?? 0 : 0 }, // 龍：造成能量傷害後累積的能量傷害，直到戰鬥結束
+      { label: SHADOW_SKILL, value: t === 'B' && move.skill === SHADOW_SKILL ? gatheredOf(state) : 0 }, // 現身爆發：隱身期間聚集的能量傷害（shadowCloak.js）
     ];
     parts[t] = list.filter((x, i) => i < 2 || x.value !== 0);
     dice[t] = list.reduce((a, x) => a + x.value, 0);
@@ -89,6 +91,7 @@ export function pooledAttack(state, move, potionBonus = 0, douBonus = 0, respDic
     { label: '鬥氣', value: douBonus },
     { label: '響應', value: tracks.reduce((a, t) => a + (respDice[t] ?? 0), 0) },
     { label: '龍', value: tracks.includes('B') ? state.buffs?.dragon ?? 0 : 0 },
+    { label: SHADOW_SKILL, value: tracks.includes('B') && move.skill === SHADOW_SKILL ? gatheredOf(state) : 0 },
   ];
   const parts = list.filter((x, i) => i <= tracks.length || x.value !== 0);
   return { dice: list.reduce((a, x) => a + x.value, 0), parts };
@@ -314,6 +317,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   if (move.kind === 'heal' || move.kind === 'shield') return { error: `${move.name}是輔助技能，請用「使用」按鈕。` };
   if (!first) return { error: picked && !opts.targetIds.length ? '先選目標。' : '找不到目標。' };
   if (isDowned(state)) return { error: '你已經倒地，無法出招。' };
+  if (isHidden(state) && move.skill !== SHADOW_SKILL) return { error: '隱身中無法使用其他攻擊，請先用「暗影斗篷」招式現身。' };
   const maxTargets = Math.max(1, move.targets ?? 1);
   let targets;
   if (picked) {
@@ -388,6 +392,13 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
     notes.push(`${d.name}：目標共損失 ${lost} 生命，回復 ${got}（上限 ${d.cap}）`);
   }
 
+  // 現身爆發：把聚集的能量傷害骰全打出去（已經加進這一招），隱身解除、點數歸零
+  const burst = move.skill === SHADOW_SKILL ? gatheredOf(state) : 0;
+  if (move.skill === SHADOW_SKILL) {
+    clearShadow(state);
+    notes.push(burst > 0 ? `現身！爆發暗影斗篷聚集的 ${burst} 顆能量傷害骰` : '現身（沒有聚集到能量傷害）');
+  }
+
   // 響應：龍（造成能量傷害後，自己的能量傷害 +3／級，直到戰鬥結束；這一下已經打完，從下一次出招開始算）
   const gain = dragonGain(state);
   const dealtEnergy = gain > 0 && hits.some((h) => h.result.tracks.some((t) => (t.track === 'B' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0));
@@ -414,7 +425,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   const h0 = hits[0];
   return {
     move, target: h0.target, mode, atk, def: h0.def, result: h0.result, potion, ignoreAbs: h0.ignoreAbs, abs: h0.abs,
-    hits, cost, healed, notes, dou, douDice, mage, respDice, responses, dragon, downed: isDowned(h0.target),
+    hits, cost, healed, notes, dou, douDice, mage, respDice, responses, dragon, burst, reveal: move.skill === SHADOW_SKILL, downed: isDowned(h0.target),
   };
 }
 
