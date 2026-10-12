@@ -173,7 +173,7 @@ export function openGmCharEditor() {
         h('input', { class: 'field', type: 'number', inputmode: 'numeric', value: d.adjust[s] ?? 0, 'aria-label': `${s} 手動調整`, onchange: (e) => { d.adjust[s] = int(e.target.value); sheet.refresh(); } }),
         h('small', { class: 'stat__detail', text: `面板 ${fmt(stats[s].total)}` })))),
       h('p', { class: 'field-label', text: `技能（${skills.length}）` }),
-      h('ul', { class: 'skill-list' }, skills.map(([n, lv]) => h('li', { class: 'skill-row' },
+      h('ul', { class: 'skill-list skill-list--grid' }, skills.map(([n, lv]) => h('li', { class: 'skill-row' },
         h('strong', { text: n }),
         h('label', { class: 'extra' }, h('span', { text: '等級' }),
           h('input', { class: 'field', type: 'number', min: 0, max: MAX_SKILL_LEVEL, value: lv, inputmode: 'numeric', onchange: (e) => { d.skills[n] = Math.max(0, Math.min(MAX_SKILL_LEVEL, int(e.target.value))); sheet.refresh(); } })),

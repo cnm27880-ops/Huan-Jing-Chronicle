@@ -1832,11 +1832,8 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .resp { margin: 10px 36px 14px 0; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 
 /* GM 工具（房間區塊）：三組，每組小標題＋按鈕自動換行 */
-.room__tools { display: grid; gap: 10px; padding-top: 6px; border-top: 1px solid var(--line); }
-.room__group { display: grid; gap: 4px; }
-.room__group-title { font-size: 0.68rem; letter-spacing: 0.12em; color: var(--faint); }
-.room__group-btns { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 6px; }
-.room__group-btns .btn { margin: 0; min-height: 34px; white-space: nowrap; justify-content: center; }
+.room__tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.room__tools .btn { margin: 0; min-height: 34px; padding: 0.3rem 0.4rem; font-size: 0.78rem; line-height: 1.25; justify-content: center; text-align: center; }
 
 /* 面板右上的「收起／關閉」：大小、高度、圓角統一 */
 .sheet__close, .dossier__close { min-width: 64px; min-height: 36px; padding: 0 14px; font: inherit; font-size: 0.85rem; line-height: 1; white-space: nowrap; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }

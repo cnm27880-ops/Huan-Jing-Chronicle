@@ -37,28 +37,19 @@ export function mountRoomPanel(container) {
           r.members.length
             ? h('ul', { class: 'room__members' }, r.members.map((m) => h('li', { class: 'room__member', dataset: { online: m.online ? '1' : '0' }, text: m.name })))
             : null));
-      // GM 工具分三組，每組一個小標題，免得十個按鈕擠成一團
+      // GM 工具：不分類，三個一排（排版在 blackgold.css 的 .room__tools）
       const gmBtn = (text, onclick, main) => h('button', { type: 'button', class: `btn btn--small${main ? '' : ' btn--ghost'}`, onclick }, text);
-      const group = (title, list) => h('div', { class: 'room__group' },
-        h('span', { class: 'room__group-title', text: title }),
-        h('div', { class: 'room__group-btns' }, list));
       if (r.me?.isGm) {
         parts.push(h('div', { class: 'room__tools' },
-          group('戰鬥', [
-            gmBtn('🆕 新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, true),
-            gmBtn('🎁 發放獎勵', openRewardSheet, true),
-            gmBtn('模擬戰', openSimPanel),
-          ]),
-          group('玩家', [
-            gmBtn('玩家角色', openGmCharEditor),
-            gmBtn('匯入機器人存檔', openBotImportSheet),
-            gmBtn('匯入角色卡', openSheetImportSheet),
-            gmBtn('從備份還原角色', openBackupRestoreSheet),
-          ]),
-          group('內容', [
-            gmBtn('特殊配方與材料', openSpecialEditor),
-            gmBtn('專屬技能', openSkillEditor),
-          ])));
+          gmBtn('🆕 新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, true),
+          gmBtn('🎁 發放獎勵', openRewardSheet, true),
+          gmBtn('模擬戰', openSimPanel),
+          gmBtn('玩家角色', openGmCharEditor),
+          gmBtn('匯入機器人存檔', openBotImportSheet),
+          gmBtn('匯入角色卡', openSheetImportSheet),
+          gmBtn('從備份還原角色', openBackupRestoreSheet),
+          gmBtn('特殊配方與材料', openSpecialEditor),
+          gmBtn('專屬技能', openSkillEditor)));
       }
       const btns = [];
       if (r.me?.isAdmin) {

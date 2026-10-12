@@ -165,6 +165,19 @@
 }
 .mini-slot--empty:hover { border-color: var(--bronze); color: var(--bronze); }
 .mini-slot--queue { font: inherit; font-size: 0.8rem; color: var(--bronze); cursor: pointer; }
+.mini-slot--menu { font: inherit; font-size: 0.7rem; letter-spacing: 0; color: var(--bronze); cursor: pointer; }
+.mini-slot--menu:hover { border-color: var(--bronze); }
+
+/* 菜單（編輯與吃東西面板）：全部用小按鈕、一行一組，不佔版面 */
+.menu-list { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; gap: 6px; }
+.menu-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.menu-row__name { flex: 1 1 8rem; min-width: 0; font-size: 0.88rem; overflow-wrap: anywhere; }
+.menu-row .btn { margin: 0; }
+.menu-sets, .menu-queue, .menu-actions, .menu-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 0.5rem; }
+.menu-sets .chip, .menu-chips .chip { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+.menu-sets .chip[aria-pressed='true'] { color: var(--bronze); border-color: var(--bronze); }
+.menu-sets__input { width: 4.5rem; padding: 0.25rem 0.5rem; font-size: 0.85rem; }
+.menu-queue .btn, .menu-actions .btn { margin: 0; }
 
 .status__num { margin-left: auto; }
 .status__num + .status__num { margin-left: 0; }
