@@ -40,9 +40,9 @@ function hpBar(cur, max, downed) {
 const HP_SLIDE_MS = 450; // 血條滑到新數值的時間
 const GHOST_DELAY_MS = 350; // 殘影（扣掉的那一段）等多久才開始縮
 const GHOST_SLIDE_MS = 700;
-const FX_MS = 650; // 出招／承受攻擊的動畫長度
+const FX_MS = 650; // 出招／承受攻擊的動畫長度（多段招式會依段數乘上去）
 const hpTrack = new Map(); // 怪物編號 → { from, to, t0 }（血量從 from 滑到 to，t0 是開始時間）
-const fxTrack = new Map(); // 怪物編號 → { kind: 'hit'|'block'|'strike', t0 }
+const fxTrack = new Map(); // 怪物編號 → { kind: 'hit'|'slash'|'burst'|'soul'|'block'|'strike', n: 連續幾下, t0 }
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 /** 記下這隻怪物的血量變化，回傳目前的動畫狀態 { from, to, elapsed }；沒有變化 elapsed 就是很大的數字 */
@@ -62,13 +62,19 @@ function trackHp(m) {
 function fxOf(id) {
   const f = fxTrack.get(id);
   const elapsed = f ? Date.now() - f.t0 : Infinity;
-  return elapsed < FX_MS ? { kind: f.kind, elapsed } : null;
+  return elapsed < FX_MS * f.n ? { kind: f.kind, n: f.n, elapsed } : null;
 }
-const playFx = (id, kind) => fxTrack.set(id, { kind, t0: Date.now() });
+const playFx = (id, kind, n = 1) => fxTrack.set(id, { kind, n, t0: Date.now() });
+/** 打擊特效的種類：依這一下造成最多傷害的軌道——物理＝劈砍、能量＝爆裂、靈魂＝靈魂漩渦；沒破防＝護盾；單池招式（萬物歸一、大羅真仙）用通用的閃光 */
+function hitKind(h) {
+  if (!(h.result.total > 0)) return 'block';
+  const best = h.result.tracks.filter((t) => t.damage > 0).sort((a, b) => b.damage - a.damage)[0]?.track;
+  return { A: 'slash', B: 'burst', C: 'soul' }[best] ?? 'hit';
+}
 /** 元素要加的屬性：data-fx 讓 CSS 播動畫，負的 animation-delay 讓重畫後從中途接著播 */
 const fxAttrs = (id, data = {}) => {
   const f = fxOf(id);
-  return { dataset: { ...data, ...(f ? { fx: f.kind } : {}) }, ...(f ? { style: `--fx-delay:-${Math.round(f.elapsed)}ms` } : {}) };
+  return { dataset: { ...data, ...(f ? { fx: f.kind } : {}) }, ...(f ? { style: `--fx-delay:-${Math.round(f.elapsed)}ms;--fx-n:${f.n}` } : {}) };
 };
 
 /** 把元素的寬度從 fromFrac 滑到 toFrac；已經過了 elapsed 毫秒就從中途接著滑 */
@@ -276,11 +282,15 @@ export function createEncounterCard({ getState, commit, rerender }) {
     sel.mage = 0;
     if (!online()) Object.keys(extraAbs).forEach((id) => spendEnemyB(state.encounter, id)); // 本機模式：蓄力用掉了（房間模式由伺服器扣）
     if (r.reveal) playShadowFx('reveal', { n: r.burst }); // 暗影斗篷現身爆發
-    r.hits.forEach((x) => playFx(x.target.id, x.result.total > 0 ? 'hit' : 'block')); // 打中＝晃動閃光；沒破防＝護盾擋下
+    // 打擊特效：同一個目標被連打好幾下（守密人）就連播好幾次，種類看第一下
+    for (const id of new Set(r.hits.map((x) => x.target.id))) {
+      const mine = r.hits.filter((x) => x.target.id === id);
+      playFx(id, mine.map(hitKind).find((k) => k !== 'block') ?? 'block', mine.length);
+    }
     const multi = r.hits.length > 1;
     const lines = [];
     r.hits.forEach((h2) => {
-      if (multi) lines.push(targetLine(h2.target.id, h2.result.total));
+      if (multi) lines.push(targetLine(h2.stage ? `${h2.target.id} 第 ${h2.stage} 段` : h2.target.id, h2.result.total));
       lines.push(...trackLines(h2.result));
       if (h2.ignoreAbs) lines.push('終焉武裝：無視絕對防禦'); else if (h2.abs) lines.push(`敵人絕對防禦 ${h2.abs}${h2.extraAbs ? `（含 B 技能 +${h2.extraAbs}）` : ''}`);
       lines.push(`${h2.target.id} 生命 ${fmt(befores.get(h2.target.id))} → ${fmt(h2.target.hp)} / ${fmt(h2.target.maxHp)}${h2.target.hp <= 0 ? '　倒下了！' : ''}`);
@@ -298,7 +308,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
       lines,
     }, { draw });
     if (online()) { // 怪物生命由伺服器改：回報這次打掉多少
-      const hits = r.hits.map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp), ...(extraAbs[x.target.id] ? { usedB: true } : {}), ...(x.absCut ? { absCut: x.absCut } : {}) })).filter((x) => x.dmg > 0 || x.usedB || x.absCut);
+      const hits = r.hits.filter((x, i) => r.hits.findIndex((y) => y.target.id === x.target.id) === i) // 同一個目標被連打好幾下：只回報一次（總共打掉多少）
+        .map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp), ...(extraAbs[x.target.id] ? { usedB: true } : {}), ...(x.absCut ? { absCut: x.absCut } : {}) })).filter((x) => x.dmg > 0 || x.usedB || x.absCut);
       if (hits.length) await act({ t: 'encHit', hits });
     }
     commit();

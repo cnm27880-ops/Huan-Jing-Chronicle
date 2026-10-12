@@ -463,3 +463,33 @@ test('暴徒主動招式：B、C 各 +1／級（物理骰轉成 B+C），不用 
   s.skills.暴徒 = 3;
   assert.equal(attackDice(s, m).dice.B, p.能量傷害.total + p.真實傷害.total + 3);
 });
+
+// ---------- 守密人：連續 3 段靈魂傷害（花費只付一次，第 1／2／3 段各 +2／+4／+6 顆骰） ----------
+const guardian = () => {
+  const s = fresh();
+  s.skills = { ...s.skills, 守密人: 1 };
+  s.moves.push({ id: 'g', name: '守密人', skill: '守密人', kind: 'attack', school: '神秘', tracks: ['C'], targets: 1, cost: { 生命: 24 }, extra: {} });
+  return s;
+};
+
+test('守密人：一次出招打 3 段，各段多加 2／4／6 顆靈魂傷害骰，生命只扣 24', () => {
+  const s = guardian();
+  const enc = newEncounter();
+  enc.monsters.push(dummy(100000));
+  const hp0 = s.hp;
+  const r = playerAttack(s, enc, 'g', '小怪1', 0, d4(1));
+  assert.ok(!r.error, r.error);
+  assert.equal(r.hits.length, 3);
+  const c = r.hits.map((h) => h.result.tracks.find((t) => t.track === 'C').atkDice);
+  assert.equal(c[1] - c[0], 2); assert.equal(c[2] - c[1], 2); // 加骰 2／4／6 → 每段比前一段多 2 顆
+  assert.equal(s.hp, hp0 - 24);
+  assert.deepEqual(r.hits.map((h) => h.stage), [1, 2, 3]);
+});
+
+test('守密人：目標中途倒下，後面的段數取消', () => {
+  const s = guardian();
+  const enc = newEncounter();
+  enc.monsters.push(dummy(1));
+  const r = playerAttack(s, enc, 'g', '小怪1', 0, d4(4));
+  assert.equal(r.hits.length, 1);
+});

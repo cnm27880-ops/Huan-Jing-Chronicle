@@ -57,7 +57,7 @@ export function measureHits(players, source, { supply = null, runs = FAIR.probeR
       for (const m of enc.monsters) for (let u = 0; u < rankInfo(m).B.uses; u++) useEnemySkill(enc, m.id, 'B', rng);
       const done = act(p, enc, rng);
       if (!done) continue;
-      per += done.r.hits[0] ? dmg(done.r.hits[0]) : 0;
+      per += done.r.hits.filter((h) => h.target === done.r.hits[0].target).reduce((a, h) => a + dmg(h), 0); // 多段招式（守密人）：同一個目標的每段都算
       tot += done.r.hits.reduce((a, h) => a + dmg(h), 0);
       // 攻擊骰與敵人防禦骰（用到的軌道加總，含敵人防禦強化技能多出來的絕對防禦）：打不動時，拿來說明為什麼
       const tracks = done.r.move?.tracks ?? [];

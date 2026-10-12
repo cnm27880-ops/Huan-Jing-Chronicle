@@ -199,6 +199,8 @@ export function setSkillLevel(state, name, level) {
     const bucket = LIFE_SKILLS.includes(skill) ? 'lifeSkills' : 'arts';
     state[bucket] = { ...state[bucket], [skill]: (Number(state[bucket]?.[skill]) || 0) + gain };
   }
+  // 記下「這個技能的生活技能加成已經算到幾級」，GM 補算（lifeBackfill）才不會重複加；只有真的算進去（技能目錄內、已生效）才記
+  if (usesSkillTable(state) && inCatalog(name) && skillActive(state, name) && next > prev) state.lifeGainDone = { ...state.lifeGainDone, [name]: next };
   const swaps = [];
   if (usesSkillTable(state) && FOOL_SWAPS[name]) {
     const [a, b] = FOOL_SWAPS[name];
@@ -232,6 +234,33 @@ export function checkSkillGain(state, name, from, to) {
     if (d) out[k] = d;
   }
   return out;
+}
+
+/**
+ * GM 補算用：哪些技能的生活技能／技藝加成還沒算進去，回傳 [{ name, level, from, gains }]。
+ * from = 已經算到幾級（state.lifeGainDone；沒記錄＝0）。注意：匯入的角色卡，生活技能數字本來就含技能加成，
+ * 沒記錄不代表沒加過——所以只能由 GM 逐一確認後再補（applyLifeBackfill），不能自動補。
+ */
+export function lifeBackfill(state) {
+  if (!usesSkillTable(state)) return [];
+  return Object.entries(state.skills ?? {})
+    .map(([name, lv]) => { const level = Number(lv) || 0; const from = Math.min(level, Number(state.lifeGainDone?.[name]) || 0); return { name, level, from, gains: checkSkillGain(state, name, from, level) }; })
+    .filter((x) => Object.keys(x.gains).length);
+}
+
+/** 補上 names 這幾個技能缺的生活技能／技藝加成並記錄；回傳實際補了什麼 { 技能名: gains } */
+export function applyLifeBackfill(state, names) {
+  const done = {};
+  for (const x of lifeBackfill(state)) {
+    if (!names.includes(x.name)) continue;
+    for (const [skill, gain] of Object.entries(x.gains)) {
+      const bucket = LIFE_SKILLS.includes(skill) ? 'lifeSkills' : 'arts';
+      state[bucket] = { ...state[bucket], [skill]: (Number(state[bucket]?.[skill]) || 0) + gain };
+    }
+    state.lifeGainDone = { ...state.lifeGainDone, [x.name]: x.level };
+    done[x.name] = x.gains;
+  }
+  return done;
 }
 
 /** 升到下一級要付的經驗（單次費用，0→1 也要付）；已滿級或目錄沒有回 null */
