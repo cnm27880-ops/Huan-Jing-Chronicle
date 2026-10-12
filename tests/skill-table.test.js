@@ -319,3 +319,25 @@ test('生活技能類技能升級：尋脈探靈手升級時，採藥技能一�
   assert.equal(s.checkAdjust.採藥, undefined);
   assert.equal(setCheckAdjust(s, '亂寫', 5), 0);
 });
+
+test('GM 補算：沒記錄的生活系技能補上差額並記錄；已經算過的不會重複加；一般升級會自動記錄', async () => {
+  const { lifeBackfill, applyLifeBackfill, setSkillLevel } = await import('../src/game/skillTable.js');
+  const s = mk({ 魔女秘飲: 5, 尋脈探靈手: 4 }); // 修正前學的：沒有 lifeGainDone 記錄
+  s.lifeSkills = { ...s.lifeSkills, 調劑: 10, 採藥: 10 };
+  const rows = lifeBackfill(s);
+  assert.deepEqual(rows.map((x) => x.name).sort(), ['尋脈探靈手', '魔女秘飲']);
+  const potion = rows.find((x) => x.name === '魔女秘飲');
+  assert.deepEqual(potion.gains, { 調劑: skillFx('魔女秘飲', 5).調劑 });
+  const done = applyLifeBackfill(s, ['魔女秘飲']); // 只補勾選的
+  assert.deepEqual(Object.keys(done), ['魔女秘飲']);
+  assert.equal(s.lifeSkills.調劑, 10 + potion.gains.調劑);
+  assert.equal(s.lifeSkills.採藥, 10);
+  assert.deepEqual(lifeBackfill(s).map((x) => x.name), ['尋脈探靈手']); // 補過的不再出現
+  applyLifeBackfill(s, ['魔女秘飲']);
+  assert.equal(s.lifeSkills.調劑, 10 + potion.gains.調劑); // 再補一次也不會重複加
+  // 一般升級：自動記錄，之後補算不會再算到
+  const t = mk({}); t.lifeSkills = { ...t.lifeSkills, 採藥: 0 };
+  setSkillLevel(t, '尋脈探靈手', 4);
+  assert.equal(t.lifeSkills.採藥, 2);
+  assert.deepEqual(lifeBackfill(t), []);
+});

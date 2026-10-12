@@ -1410,12 +1410,21 @@ input[type='number'], .amount__input { text-align: center; }
 .boss__art[data-fx='strike']::after { background: radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(var(--rose-rgb), 0.75) 100%); animation: fx-flash 0.6s ease-out var(--fx-delay) both; }
 .mob[data-fx='hit'], .mob[data-fx='block'] { animation: fx-shake 0.45s ease-out var(--fx-delay) both; }
 .mob[data-fx='strike'] { animation: fx-lunge 0.5s ease-out var(--fx-delay) both; }
+.mob::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; border-radius: inherit; }
+/* 依傷害種類的打擊特效：物理＝劈砍（一道斜光掃過）、能量＝爆裂（光圈炸開）、靈魂＝漩渦（紫色旋轉光暈）。--fx-n＝連打幾下（守密人 3 段就連播 3 次） */
+.boss__art[data-fx='slash'], .mob[data-fx='slash'], .boss__art[data-fx='burst'], .mob[data-fx='burst'], .boss__art[data-fx='soul'], .mob[data-fx='soul'] { animation: fx-shake 0.45s ease-out var(--fx-delay) var(--fx-n, 1) both; }
+.boss__art[data-fx='slash']::after, .mob[data-fx='slash']::after { background: linear-gradient(115deg, transparent 40%, rgba(var(--ink-rgb), 0.95) 48%, rgba(var(--gold-rgb), 0.95) 51%, transparent 60%) 120% 0 / 260% 100% no-repeat; animation: fx-slash 0.45s ease-out var(--fx-delay) var(--fx-n, 1) both; }
+.boss__art[data-fx='burst']::after, .mob[data-fx='burst']::after { background: radial-gradient(circle at 50% 50%, rgba(var(--ink-rgb), 0.9) 0, rgba(var(--res-energy-rgb), 0.85) 22%, rgba(var(--res-fight-rgb), 0.4) 45%, transparent 68%); animation: fx-burst 0.5s ease-out var(--fx-delay) var(--fx-n, 1) both; }
+.boss__art[data-fx='soul']::after, .mob[data-fx='soul']::after { background: conic-gradient(from 0deg, transparent, rgba(var(--lilac-rgb), 0.9), transparent 35%, rgba(var(--cloak-rgb), 0.8), transparent 70%, rgba(var(--lilac-rgb), 0.7), transparent); box-shadow: inset 0 0 30px rgba(var(--cloak-rgb), 0.7); animation: fx-soul 0.5s ease-out var(--fx-delay) var(--fx-n, 1) both; }
+@keyframes fx-slash { 0% { opacity: 0; background-position: 120% 0; } 15% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; background-position: -20% 0; } }
+@keyframes fx-burst { 0% { opacity: 1; transform: scale(0.2); } 100% { opacity: 0; transform: scale(1.5); } }
+@keyframes fx-soul { 0% { opacity: 0; transform: scale(0.4) rotate(0deg); } 25% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25) rotate(200deg); } }
 @keyframes fx-shake { 0% { transform: translate(0); } 15% { transform: translate(-9px, 3px) rotate(-1deg); } 30% { transform: translate(8px, -3px) rotate(1deg); } 50% { transform: translate(-5px, 2px); } 70% { transform: translate(3px); } 100% { transform: none; } }
 @keyframes fx-block { 0% { transform: scale(1); } 20% { transform: scale(0.97); } 100% { transform: none; } }
 @keyframes fx-lunge { 0% { transform: scale(1); } 30% { transform: scale(1.07) translateY(6px); } 100% { transform: none; } }
 @keyframes fx-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .boss__art[data-fx], .mob[data-fx], .boss__art[data-fx]::after, .lbar__pop, .lbar[data-broke='1'] .lbar__bars { animation: none; }
+  .boss__art[data-fx], .mob[data-fx], .boss__art[data-fx]::after, .mob[data-fx]::after, .lbar__pop, .lbar[data-broke='1'] .lbar__bars { animation: none; }
   .lbar__pop { opacity: 0; }
 }
 

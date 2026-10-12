@@ -92,6 +92,9 @@ export const SKILL_CATALOG = {
     extraAt: (lv) => ({ C: 2 * lv }), // 響應：每 1 級 +2 個靈魂傷害骰
     drain: { ratio: 0.5, capPct: 30 }, // 回復「目標扣除生命」的一半，總回復上限 = 玩家最大生命的 30%
   },
+  // 守密人（大師）：花 24 生命（整招只扣一次），對同一個目標連續造成 3 次靈魂傷害，第 1／2／3 次各額外 +2／+4／+6 顆靈魂傷害骰（stages，見 combat.js 的 playerAttack）。
+  // 響應「每 1 級 +2 顆」每一段都加（extraAt）；藥水與鬥氣的加骰也每段都算——都需驗證
+  守密人: { school: '神秘', kind: 'attack', tracks: ['C'], targets: 1, cost: { 生命: 24 }, extraAt: (lv) => ({ C: 2 * lv }), stages: [{ C: 2 }, { C: 4 }, { C: 6 }] },
   // 暴徒的主動招式：造成能量與靈魂傷害。響應「每級 +2 個物理骰」因不能造成物理，轉成 B、C 各 +1（每級）——使用者確認。
   // 消耗：試算表沒有列，目前不花資源，需驗證
   暴徒: { school: '神秘', kind: 'attack', tracks: ['B', 'C'], targets: 1, cost: {}, extraAt: (lv) => ({ B: lv, C: lv }) },

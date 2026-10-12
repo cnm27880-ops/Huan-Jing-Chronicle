@@ -351,8 +351,26 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   const potion = state.buffs.atk;
   const pooled = move.mode === 'all' || move.mode === 'abs';
   const atkMove = targets.length === 1 ? { ...move, single: true } : move; // 只打 1 個目標：用「單一目標」那組加骰
-  const atk = pooled ? pooledAttack(state, atkMove, potion, douDice, respDice) : attackDice(state, atkMove, potion, douDice, respDice);
-  const hits = targets.map((t) => resolveHit(state, move, t, opts.modes?.[t.id] ?? mode, atk, rng, opts.extraAbs?.[t.id] ?? 0));
+  // 多段招式（守密人）：同一個目標連續打好幾段，每段各自擲骰，第 N 段多加 stages[N-1] 的骰；花費只付一次。目標中途倒下就不打後面的段數
+  const stages = !pooled && targets.length === 1 ? catalogOf(move.skill ?? '')?.stages : null;
+  let atk;
+  let hits;
+  if (stages) {
+    hits = [];
+    stages.forEach((add, i) => {
+      if (i > 0 && targets[0].hp <= 0) return;
+      const plus = { ...respDice };
+      for (const [k, v] of Object.entries(add)) plus[k] = (plus[k] ?? 0) + v;
+      const a = attackDice(state, atkMove, potion, douDice, plus);
+      if (i === 0) atk = a;
+      const h = resolveHit(state, move, targets[0], opts.modes?.[targets[0].id] ?? mode, a, rng, opts.extraAbs?.[targets[0].id] ?? 0);
+      hits.push({ ...h, stage: i + 1, stageDice: add });
+    });
+    notes.push(hits.length < stages.length ? `${move.name}：連續 ${hits.length} 段（目標倒下，後面的段數取消）` : `${move.name}：連續 ${stages.length} 段，各段額外 +${stages.map((s) => Object.values(s)[0]).join('／+')} 顆傷害骰`);
+  } else {
+    atk = pooled ? pooledAttack(state, atkMove, potion, douDice, respDice) : attackDice(state, atkMove, potion, douDice, respDice);
+    hits = targets.map((t) => resolveHit(state, move, t, opts.modes?.[t.id] ?? mode, atk, rng, opts.extraAbs?.[t.id] ?? 0));
+  }
   for (const r of responses) notes.push(`響應「${r.name}」：${r.free ? '' : `花 ${costText(r.cost)}，`}${r.tracks.join('')} 軌 +${r.dice} 顆傷害骰`);
 
   // 響應：萬物歸一破防時，額外扣目標現有生命 %

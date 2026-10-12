@@ -80,7 +80,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/backupRestore.js` | GM 專用的「從備份還原角色」面板（跑團頁房間區塊）：選 R2 下載的每日備份 `.json.gz`（瀏覽器內解壓），挑玩家，用 `charImport` 寫回伺服器（會記異動）；備份檔含所有玩家資料，不能進 git |
 | `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |
 | `src/ui/rewardSheet.js` | GM 專用「🎁 發放獎勵」面板（跑團頁房間區塊）：勾選玩家（預設全員）＋物品（技能書快捷鈕）、金幣、經驗、時間、備註，一次發出；也拿來補償（例如玩家忘了喝惜未央，直接補時間）。伺服器 `room-core.js` 的 `onReward`（只有 GM，走信箱 `kind:'reward'`，不用扣任何人的背包，上限：經驗 100 萬、時間 1000、60 位玩家），玩家端 `mail.js` 的 `applyMail` 套用（時間沒有上限）並跳通知 |
-| `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：看並改玩家的手動調整、技能等級、啟動 |
+| `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：看並改玩家的手動調整、技能等級、啟動；「生活技能補算」（`skillTable.js` 的 `lifeBackfill`／`applyLifeBackfill`，升級時自動記 `lifeGainDone`，沒記錄的由 GM 逐一勾選補上） |
 | `public/manifest.webmanifest`、`public/sw.js`、`public/icons/` | PWA（可加到主畫面）：manifest、Service Worker（只快取 /assets、/icons、/img，網頁與 API 不碰，改版後要讓舊快取失效就把 `sw.js` 的 `CACHE` 版本號 +1）、圖示（暫用，`tools/make-icons.py` 產生；換正式圖示：`python3 tools/make-icons.py --source 圖片.png`） |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
 | `src/data/sample/fude.js` | 示範角色資料 |
@@ -97,7 +97,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/battleView.js` | 戰鬥的個人部分（跑團頁左欄常駐，原戰鬥面板拆開）：HUD（生命／資源／防禦三軌／狀態標籤）、手機膠囊 HUD、招式條（選中的有「出招」）、藥水、狀態與防禦骰 |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
 | `src/ui/sessionView.js` | 跑團頁的三欄工作台（版面規格見 `DESIGN.md`「跑團頁」）：左欄 HUD＋招式／藥水與狀態／技能檢定分頁、中欄遭遇戰舞台、右欄房間＋紀錄（全部／擲骰／戰鬥，新的在下）＋快速擲骰（擲完播 `diceFx.js` 特效）；平板與手機的底部抽屜與快捷列；離開頁面會停掉紀錄更新 |
-| `src/ui/encounterCard.js` | 遭遇戰舞台（跑團頁中欄）：先攻軸（隨機、玩家可交換、GM 開打後鎖定）、BOSS 大立繪與 3 段血條（只是視覺）、三種防禦（點選）與三種攻擊（點兩下＝承受，第一下只待命）同時列出、小怪矩陣、多選目標（上限＝招式目標數）、出招與承受攻擊、GM 的新增敵人／敵人管理／立繪庫（上傳前在瀏覽器縮成 WebP）。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
+| `src/ui/encounterCard.js` | 遭遇戰舞台（跑團頁中欄）：先攻軸（隨機、玩家可交換、GM 開打後鎖定）、BOSS 大立繪與 3 段血條（只是視覺）、三種防禦（點選）與三種攻擊（點兩下＝承受，第一下只待命）同時列出、小怪矩陣、多選目標（上限＝招式目標數）、出招與承受攻擊（打擊特效依傷害軌道：物理劈砍／能量爆裂／靈魂漩渦，多段招式連播，CSS 在 `blackgold.css` 的 `fx-slash`／`fx-burst`／`fx-soul`）、GM 的新增敵人／敵人管理／立繪庫（上傳前在瀏覽器縮成 WebP）。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
 | `src/ui/diceFx.js` | 擲骰特效（只是畫面）：骰子翻滾→落定→總和放大，1D20 的 20／1 有大成功／大失敗效果 |
 | `src/ui/battleSelect.js` | 跑團頁共用的「目前選擇」（出招招式、選中的目標、顯示哪隻 BOSS、怪物攻防模式），不存檔 |
 | `src/ui/rollFeed.js` | 擲骰紀錄的畫面：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要；`oldestFirst` 時新的在下並自動捲到底 |
