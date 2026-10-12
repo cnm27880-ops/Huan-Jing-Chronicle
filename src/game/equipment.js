@@ -229,6 +229,27 @@ export function findJunk(state) {
   return junk;
 }
 
+/**
+ * 把背包裡已鑑定的裝備依「部位＋階級＋屬性」分組（數值不算），給畫面折疊用，不改存檔。
+ * 鑲了寶石、取過名字、記過備註的不併進組，各自單獨一組。
+ * 回傳 [{ key, items }]：items 由數值高到低；組的順序同輸入順序（第一次出現的位置）。
+ */
+export function groupGear(list) {
+  const total = (g) => g.effects.reduce((a, e) => a + e.value, 0);
+  const map = new Map();
+  for (const g of list) {
+    const solo = Boolean(g.gem || g.name || g.note);
+    const key = solo
+      ? `id:${g.id}`
+      : `${g.slot}:${g.tier}:${g.special ? 's' : 'n'}:${g.effects.map((e) => e.stat).sort().join('+')}`;
+    if (!map.has(key)) map.set(key, { key, items: [] });
+    map.get(key).items.push(g);
+  }
+  const groups = [...map.values()];
+  groups.forEach((x) => x.items.sort((a, b) => total(b) - total(a) || a.id - b.id));
+  return groups;
+}
+
 /** 背包中通用裝備與已鑑定裝備的總數，給畫面顯示 */
 export const genericCount = (state) => identifiable(state).reduce((a, x) => a + x.qty, 0);
 export { countOf };

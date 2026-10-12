@@ -11,7 +11,7 @@ import {
   ATK_STATS, DEF_STATS, RESOURCE_STATS, EQUIP_SLOTS, EQUIP_SLOT_LABEL, GEAR_TIERS,
 } from '../game/rules.js';
 import {
-  identifiable, identify, equip, unequip, compareGear, findJunk, gearName, effectText, gearDiceText,
+  identifiable, identify, equip, unequip, compareGear, findJunk, groupGear, gearName, effectText, gearDiceText,
   identifiableGems, identifyGems, socketGem, socketTargets, gemDiceText, gemName,
 } from '../game/equipment.js';
 import { derivedStats } from '../game/stats.js';
@@ -39,7 +39,7 @@ const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const FILTERS = [['all', '全部'], ['weapon', '武器'], ['armor', '防具'], ['accessory', '飾品']];
 
 export function createGearView({ root, getState, commit }) {
-  const ui = { filter: 'all', batch: null, gemTarget: {}, newSkill: '', newSkillLv: 1, skillBoxOpen: false };
+  const ui = { filter: 'all', folded: true, openGroups: new Set(), batch: null, gemTarget: {}, newSkill: '', newSkillLv: 1, skillBoxOpen: false };
 
   const gearValue = (g) => g.effects.reduce((a, e) => a + e.value, 0);
 
@@ -362,11 +362,37 @@ export function createGearView({ root, getState, commit }) {
         }, '賣出')));
   }
 
+  // 折疊的一組（同部位、階級、屬性）：收合時一列，展開後列出每一件（數值由高到低）
+  function groupRow(state, grp, junk) {
+    const { key, items } = grp;
+    const top = items[0];
+    const open = ui.openGroups.has(key);
+    const single = top.effects.length === 1;
+    const vals = items.map((g) => g.effects[0].value);
+    const range = Math.max(...vals) === Math.min(...vals) ? `+${vals[0]}` : `+${Math.min(...vals)}～${Math.max(...vals)}`;
+    const spare = items.filter((g) => junk.has(g.id)).length;
+    return h('li', { class: 'owned owned-group rarity', dataset: { tier: tierIndex(top), rarity: tierIndex(top) } },
+      h('button', {
+        type: 'button', class: 'owned-group__head', 'aria-expanded': String(open),
+        onclick: () => { if (open) ui.openGroups.delete(key); else ui.openGroups.add(key); render(); },
+      },
+        h('span', { class: 'owned-group__caret', 'aria-hidden': 'true', text: open ? '▾' : '▸' }),
+        h('strong', { class: 'owned__name rarity__name', text: `${gearIcon(top)} ${gearName(top)}` }),
+        rarityTag(tierIndex(top)),
+        h('span', { class: 'owned__effect', text: single ? `${top.special ? '特殊：' : ''}${top.effects[0].stat} ${range}` : `最高 ${effectText(top)}` }),
+        h('span', { class: 'badge', dataset: { tone: 'neutral' }, text: `×${items.length}` }),
+        spare ? h('span', { class: 'badge', title: '同欄位同屬性已經有更高的，可以賣掉', text: `${spare} 件用不到` }) : null),
+      open ? h('ul', { class: 'owned-group__list' }, items.map((g) => ownedRow(state, g, junk))) : null);
+  }
+
   function ownedCard(state) {
     const junk = new Set(findJunk(state)); // 只用來標「用不到」，方便決定要賣哪些
     const list = state.gear
       .filter((g) => ui.filter === 'all' || g.slot === ui.filter)
       .sort((a, b) => SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot] || tierIndex(b) - tierIndex(a) || gearValue(b) - gearValue(a));
+    const rows = ui.folded
+      ? groupGear(list).map((grp) => (grp.items.length === 1 ? ownedRow(state, grp.items[0], junk) : groupRow(state, grp, junk)))
+      : list.map((g) => ownedRow(state, g, junk));
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: `背包裝備（${fmt(state.gear.length)} 件已鑑定）` }),
       h('div', { class: 'row owned-bar' },
@@ -374,8 +400,12 @@ export function createGearView({ root, getState, commit }) {
           FILTERS.map(([id, label]) => h('button', {
             type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.filter === id),
             onclick: () => { ui.filter = id; render(); },
-          }, label)))),
-      list.length ? h('ul', { class: 'owned-list' }, list.map((g) => ownedRow(state, g, junk))) : h('p', { class: 'empty', text: '這個分類沒有裝備。' }));
+          }, label))),
+        h('button', {
+          type: 'button', class: 'btn btn--ghost btn--small', title: '同部位、階級、屬性的裝備疊成一列，點開看每一件',
+          onclick: () => { ui.folded = !ui.folded; render(); },
+        }, ui.folded ? '全部展開' : '折疊同款')),
+      rows.length ? h('ul', { class: 'owned-list' }, rows) : h('p', { class: 'empty', text: '這個分類沒有裝備。' }));
   }
 
   function render() {
