@@ -7,10 +7,13 @@
 // ============================================================
 import { parseDiceExpr, rollExpr, rollDie, rollSum, MAX_SIDES } from '../../src/game/dice.js';
 import { d20 } from '../../src/game/engine.js';
-import { diceEvent, checkEvent } from '../../src/game/events.js';
+import { diceEvent, checkEvent, trackLine } from '../../src/game/events.js';
 import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/rules.js';
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
 import { useEnemySkill, spendEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
+import {
+  validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, insertRandom, alliesOf, findAlly, BABY, MAX_ALLIES, SUPPORT_KINDS,
+} from '../../src/game/ally.js';
 import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
@@ -48,6 +51,7 @@ const B64 = /^[A-Za-z0-9+/]+={0,2}$/;
 const VITAL_KEY = /^[\u4e00-\u9fff]{1,4}$/; // 資源名稱（靈氣、魔力…）
 
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
+const TRACKS_TEXT = (o) => ['A', 'B', 'C'].filter((t) => o?.[t] > 0).map((t) => `${o[t]}${t}`).join(' ') || '0';
 const cleanStr = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
 /** 物品清單（{ 名稱: 數量 }）驗證與整理：回傳 { items } 或 { error } */
 function parseItems(raw, allowEmpty = false) {
@@ -189,6 +193,7 @@ export class RoomCore {
       gm: this.gmInfo(),
       battleNo: this.battleNo(),
       encounter: this.encounter(),
+      blackMarket: this.blackMarket(),
       mail: this.pendingMail(user.uid),
       special: this.special(),
       skills: this.customSkills(),
@@ -268,12 +273,14 @@ export class RoomCore {
       case 'tradeList': return this.onTradeList(user, rid);
       case 'tradeRespond': return this.onTradeRespond(user, msg, rid);
       case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
+      case 'encAlly': case 'encAllyDel': case 'encAllyAtk': case 'encAllyTake': case 'encAllyHp': case 'encAllySup': return this.onAlly(user, msg, rid);
       case 'encImg': return this.onEncImg(user, msg, rid);
       case 'imgPut': return this.onImgPut(user, msg, rid);
       case 'imgDel': return this.onImgDel(user, msg, rid);
       case 'presetList': case 'presetSave': case 'presetDel': case 'presetLoad': return this.onPreset(user, msg, rid);
       case 'tplList': case 'tplSave': case 'tplDel': return this.onTemplate(user, msg, rid);
       case 'vitals': return this.onVitals(user, msg);
+      case 'blackMarket': return this.onBlackMarket(user, msg, rid);
       case 'actPost': return this.onActPost(user, msg);
       case 'actList': return this.onActList(user, msg, rid);
       default: return err(rid, 'unknown_type', '不認得的訊息類型。');
@@ -435,6 +442,16 @@ export class RoomCore {
         lines: [`回復 ${def.heal.n}D${def.heal.sides} = ${heal} 生命`, `毒性算在 ${toName} 身上（+${def.toxicity}）`],
       }, user);
       out.push({ to: 'all', msg: { t: 'event', event: ev } });
+    } else if (msg.kind === 'support' && msg.support === 'points') { // 固定點數的治療（浮腫之軀：花 X 生命換 2X 治療點分給隊友）
+      const skill = cleanStr(msg.skill, 20);
+      if (!skill || !isInt(msg.amount, 1, 100_000)) return err(rid, 'bad_mail', '技能資料錯誤。');
+      Object.assign(mail, { kind: 'support', skill, support: 'points', amount: msg.amount });
+      const who = this.vitalName(to) ?? toName;
+      const ev = this.record({
+        who: user.name, kind: 'skill', label: `${user.name} 對 ${who} 施放 ${skill}`, big: `+${msg.amount}`, srv: true,
+        lines: [`治療 ${msg.amount} 點生命`, '對方領取時自動套用'],
+      }, user);
+      out.push({ to: 'all', msg: { t: 'event', event: ev } });
     } else if (msg.kind === 'support') { // 隊友施放補血／護盾：伺服器只驗證與記錄，百分比由對方領取時依自己的最大生命計算
       const skill = cleanStr(msg.skill, 20);
       if (!skill || (msg.support !== 'heal' && msg.support !== 'shield') || !isInt(msg.pct, 1, 100)) return err(rid, 'bad_mail', '技能資料錯誤。');
@@ -540,11 +557,31 @@ export class RoomCore {
     return { out, close: null };
   }
 
+  // ---------- 黑市團（特殊黑市）：只有 GM 能開／關（使用者 2026-10-12），全員同步 ----------
+  // { open, id }：id 每開一次 +1，玩家端看到新的 id 就把本團的交易數歸零（見 src/game/market.js 的 syncBlackSession）
+  blackMarket() {
+    try { return JSON.parse(this.getMeta('black_market') ?? 'null') ?? { open: false, id: 0 }; } catch { return { open: false, id: 0 }; }
+  }
+
+  onBlackMarket(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以開始或結束黑市團。');
+    if (typeof msg.open !== 'boolean') return err(rid, 'bad_market', '格式錯誤。');
+    const cur = this.blackMarket();
+    if (cur.open === msg.open) return { out: [{ to: 'self', msg: { t: 'bmOk', rid, blackMarket: cur } }], close: null };
+    const bm = { open: msg.open, id: msg.open ? (cur.id ?? 0) + 1 : cur.id ?? 0 };
+    this.setMeta('black_market', JSON.stringify(bm));
+    const ev = this.record({ who: '系統', kind: 'note', label: bm.open ? '黑市團開始（特殊黑市開放）' : '黑市團結束（特殊黑市關閉）', lines: bm.open ? ['每人本團買＋賣合計 50 個，從 0 開始算。'] : [] }, user);
+    return {
+      out: [{ to: 'self', msg: { t: 'bmOk', rid, blackMarket: bm } }, { to: 'all', msg: { t: 'blackMarket', blackMarket: bm } }, { to: 'all', msg: { t: 'event', event: ev } }],
+      close: null,
+    };
+  }
+
   // ---------- 遭遇戰（階段 C） ----------
   // 怪物由 GM 建立，存在房間裡，所有人即時看到。怪物生命只有伺服器會改：
   // 玩家端算出傷害後回報「打了誰、扣多少」（和階段 1-B 一樣，傷害由前端算、伺服器負責保存與廣播）。
   // 先攻：GM 抽先攻 = 把在線玩家與怪物隨機洗成一排「位置」；GM 按開打之前，玩家可以討論並和別人交換自己的位置。
-  // 目前只顯示順序與輪到誰，不強制玩家只能在自己的回合行動。
+  // 開打（鎖定）後，玩家只能在自己的回合出招（前端擋，見 encounterCard.js 的 doAttack；承受攻擊、喝藥、輔助不限）。
   encounter() {
     const v = this.getMeta('encounter');
     return v ? JSON.parse(v) : { ...newEncounter(), round: 0, order: [], turn: 0, locked: false };
@@ -637,8 +674,14 @@ export class RoomCore {
       }
       const added = msg.kind === 'boss' ? addBosses(enc, spec, this.rng) : addMobs(enc, { ...spec, ...(msg.kind === 'elite' ? { rank: 'elite' } : {}) }, this.rng);
       if (this.hasImage(msg.img)) added.forEach((m) => { m.img = msg.img; }); // 建立時就指定立繪（選填）
+      // 增援（已經抽過先攻）：每隻新敵人插進先攻順序的隨機位置，不是堆在最後（使用者 2026-10-12）。
+      // 插在目前輪到的位置之前（含）的，這一回合已經錯過，下一回合才輪到；輪到的人不變
+      const placed = [];
+      if (enc.order?.length) {
+        for (const m of added) placed.push(`${m.id} 排在第 ${insertRandom(enc, { kind: 'monster', id: m.id }, this.rng) + 1} 位`);
+      }
       this.saveEncounter(enc);
-      return this.encOk(enc, rid, user, { label: `遭遇：新增 ${added.map((m) => m.id).join('、')}` });
+      return this.encOk(enc, rid, user, { label: `遭遇：${placed.length ? '增援' : '新增'} ${added.map((m) => m.id).join('、')}`, lines: placed.length ? [...placed.map((x) => `先攻：${x}（隨機）`), ...(enc.locked ? [`目前輪到第 ${enc.turn + 1} 位`] : [])] : [] });
     }
     if (msg.t === 'encRemove') {
       if (typeof msg.id !== 'string') return err(rid, 'bad_enc', '缺少敵人編號。');
@@ -648,30 +691,32 @@ export class RoomCore {
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user);
     }
-    if (msg.t === 'encClear') {
-      this.saveEncounter({ ...newEncounter(), round: 0, order: [], turn: 0, locked: false });
-      return this.encOk(this.encounter(), rid, user, { label: '遭遇：戰鬥結束，清空敵人' });
+    if (msg.t === 'encClear') { // 玩家的寶寶（活著的）留下：「持續到該寶寶被擊倒」；GM 的 NPC 一起清掉
+      const babies = alliesOf(enc).filter((a) => a.owner && !isDowned(a));
+      this.saveEncounter({ ...newEncounter(), round: 0, order: [], turn: 0, locked: false, allies: babies, next: { ...newEncounter().next, ally: enc.next?.ally ?? 1 } });
+      return this.encOk(this.encounter(), rid, user, { label: '遭遇：戰鬥結束，清空敵人', lines: babies.length ? [`留在場上：${babies.map((a) => a.name).join('、')}`] : [] });
     }
     if (msg.t === 'encInit') { // 先攻：在線玩家（不含 GM）與還活著的怪物，純隨機洗牌
       const players = this.db.exec('SELECT uid, name FROM members ORDER BY first_seen, uid')
         .filter((m) => online.includes(m.uid) && !this.isGm(m.uid) && this.accessState(m.uid) === 'ok')
         .map((m) => ({ kind: 'player', uid: m.uid, name: m.name }));
       const monsters = enc.monsters.filter((m) => !isDowned(m)).map((m) => ({ kind: 'monster', id: m.id }));
-      const order = [...players, ...monsters];
+      const allies = alliesOf(enc).filter((a) => !isDowned(a)).map((a) => ({ kind: 'ally', id: a.id, name: a.name })); // 友方 NPC 也有自己的回合
+      const order = [...players, ...allies, ...monsters];
       for (let i = order.length - 1; i > 0; i--) {
         const j = this.rng.int(i + 1) - 1;
         [order[i], order[j]] = [order[j], order[i]];
       }
       Object.assign(enc, { order, turn: 0, round: 0, locked: false });
       this.saveEncounter(enc);
-      const names = order.map((o, i) => `${i + 1}. ${o.kind === 'player' ? o.name : o.id}`);
+      const names = order.map((o, i) => `${i + 1}. ${o.kind === 'monster' ? o.id : o.name}`);
       return this.encOk(enc, rid, user, { label: '遭遇：先攻位置（隨機）', lines: [...names, '玩家可以討論並交換自己的位置，GM 按「開打」後鎖定。'] });
     }
     if (msg.t === 'encStart') {
       if (!enc.order.length) return err(rid, 'bad_enc', '還沒有先攻順序，請先抽先攻。');
       Object.assign(enc, { locked: true, turn: 0, round: 1 });
       this.saveEncounter(enc);
-      const names = enc.order.map((o, i) => `${i + 1}. ${o.kind === 'player' ? o.name : o.id}`);
+      const names = enc.order.map((o, i) => `${i + 1}. ${o.kind === 'monster' ? o.id : o.name}`);
       return this.encOk(enc, rid, user, { label: '遭遇：開打，先攻順序鎖定', lines: names });
     }
     // encNext：換下一位；已倒下的怪物自動跳過；繞完一圈回合數 +1
@@ -681,11 +726,96 @@ export class RoomCore {
       enc.turn += 1;
       if (enc.turn >= enc.order.length) { enc.turn = 0; enc.round += 1; }
       const cur = enc.order[enc.turn];
-      const m = cur.kind === 'monster' ? enc.monsters.find((x) => x.id === cur.id) : null;
-      if (cur.kind === 'player' || (m && !isDowned(m))) break;
+      const m = cur.kind === 'monster' ? enc.monsters.find((x) => x.id === cur.id) : cur.kind === 'ally' ? findAlly(enc, cur.id) : null;
+      if (cur.kind === 'player' || (m && !isDowned(m))) break; // 倒下的怪物、倒地的友方 NPC 自動跳過
     }
     this.saveEncounter(enc);
     return this.encOk(enc, rid, user);
+  }
+
+  // ---------- 友方 NPC（使用者 2026-10-12；規則在 src/game/ally.js） ----------
+  // GM 建立的 NPC 由 GM 操作；玩家的「初階寶寶」由擁有者操作（開打後非 GM 只能在寶寶自己的回合攻擊）。
+  onAlly(user, msg, rid) {
+    const enc = this.encounter();
+    const gm = this.isGm(user.uid);
+    if (msg.t === 'encAlly') {
+      if (alliesOf(enc).length >= MAX_ALLIES) return err(rid, 'bad_enc', `友方 NPC 最多 ${MAX_ALLIES} 位。`);
+      let ally;
+      if (msg.baby === true) { // 玩家放出初階寶寶（金幣由玩家端扣）
+        if (enc.locked) return err(rid, 'bad_enc', '戰鬥中（GM 已開打）不能放出寶寶。');
+        if (alliesOf(enc).some((a) => a.owner === user.uid && !isDowned(a))) return err(rid, 'bad_enc', '你已經有一隻寶寶在場上了（只能同時擁有 1 隻）。');
+        ally = { name: `${user.name}的寶寶`.slice(0, 20), hp: BABY.hp, maxHp: BABY.hp, atk: { ...BABY.atk }, def: { ...BABY.def }, abs: 0, support: null, owner: user.uid, ownerName: user.name };
+      } else {
+        if (!gm) return err(rid, 'forbidden', '只有 GM 可以新增友方 NPC。');
+        const v = validateAlly(msg.npc);
+        if (v.error) return err(rid, 'bad_enc', v.error);
+        ally = v.ally;
+      }
+      const a = addAlly(enc, ally);
+      const lines = [`生命 ${a.hp}　攻擊 ${TRACKS_TEXT(a.atk)}　防禦 ${TRACKS_TEXT(a.def)}${a.abs ? `　絕對防禦 ${a.abs}` : ''}`];
+      if (a.support) lines.push(`輔助：${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%`);
+      if (enc.order?.length) lines.push(`先攻：排在第 ${insertRandom(enc, { kind: 'ally', id: a.id, name: a.name }, this.rng) + 1} 位（隨機）`);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：友方 ${a.name} 加入戰鬥`, lines });
+    }
+    const a = typeof msg.id === 'string' ? findAlly(enc, msg.id) : null;
+    if (!a) return err(rid, 'bad_enc', '找不到這位友方 NPC，可能已被移除。');
+    const mine = gm || (a.owner && a.owner === user.uid);
+    if (!mine) return err(rid, 'forbidden', a.owner ? '只有寶寶的主人或 GM 可以操作。' : '只有 GM 可以操作友方 NPC。');
+    if (msg.t === 'encAllyDel') {
+      removeAlly(enc, a.id);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：友方 ${a.name} 離開戰鬥` });
+    }
+    if (msg.t === 'encAllyHp') {
+      if (!gm) return err(rid, 'forbidden', '只有 GM 可以直接改 NPC 的生命。');
+      if (!isInt(msg.hp, -10_000_000, 10_000_000)) return err(rid, 'bad_enc', '生命要是整數。');
+      const r = setAllyHp(enc, a.id, msg.hp);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：${a.name} 生命 ${r.before} → ${a.hp} / ${a.maxHp}` });
+    }
+    if (msg.t === 'encAllySup') { // 輔助：對玩家補血／上護盾，走信箱（百分比照對方的最大生命）
+      if (!gm) return err(rid, 'forbidden', '只有 GM 可以使用 NPC 的輔助能力。');
+      if (!a.support) return err(rid, 'bad_enc', `${a.name} 沒有輔助能力。`);
+      if (isDowned(a)) return err(rid, 'bad_enc', `${a.name} 倒地了，無法行動。`);
+      return this.onMailSend(user, { to: msg.to, kind: 'support', skill: a.name, support: a.support.kind, pct: a.support.pct, res: 0 }, rid);
+    }
+    // 攻擊與被打：先攻開打後，非 GM（寶寶的主人）只能在寶寶自己的回合攻擊
+    if (msg.t === 'encAllyAtk') {
+      if (!gm && enc.locked && enc.order?.length) {
+        const cur = enc.order[enc.turn];
+        if (!(cur?.kind === 'ally' && cur.id === a.id)) return err(rid, 'not_your_turn', `還沒輪到 ${a.name}。`);
+      }
+      if (typeof msg.target !== 'string' || !isInt(msg.mode ?? 0, 0, 2)) return err(rid, 'bad_enc', '缺少目標。');
+      const r = allyAttack(enc, a.id, msg.target, msg.mode ?? 0, this.rng);
+      if (r.error) return err(rid, 'bad_enc', r.error);
+      this.saveEncounter(enc);
+      const boss = r.monster.kind === 'boss';
+      const lines = [
+        ...r.result.tracks.filter((t) => t.atkDice > 0).map(trackLine),
+        r.abs ? `敵人絕對防禦 ${r.abs}${r.extraAbs ? `（含 B 技能 +${r.extraAbs}）` : ''}` : null,
+        `${r.monster.id} 生命 ${r.monster.hp + r.lost} → ${r.monster.hp} / ${r.monster.maxHp}${r.monster.hp <= 0 ? '　倒下了！' : ''}`,
+      ].filter(Boolean);
+      const ev = this.record({ who: a.name, kind: 'attack', label: `${a.name} → ${r.monster.id}${boss ? `（${['常規', '變換', '極限'][msg.mode ?? 0]}）` : ''}`, big: r.result.total, tone: r.result.total > 0 ? 'ok' : 'fail', lines, srv: true }, user);
+      return { out: [...this.encOk(enc, rid, user).out, { to: 'all', msg: { t: 'event', event: ev } }], close: null };
+    }
+    // encAllyTake：怪物攻擊 NPC（算怪物這回合的攻擊次數；A 蓄力自動加骰）
+    if (typeof msg.monster !== 'string' || !isInt(msg.mode ?? 0, 0, 2)) return err(rid, 'bad_enc', '缺少怪物。');
+    if (isDowned(a)) return err(rid, 'bad_enc', `${a.name} 已經倒地。`);
+    const spent = spendEnemyAttack(enc, msg.monster);
+    if (spent.error) return err(rid, 'bad_enc', spent.error);
+    const r = monsterHitsAlly(enc, msg.monster, a.id, msg.mode ?? 0, this.rng, spent.extraAtk);
+    if (r.error) return err(rid, 'bad_enc', r.error);
+    this.saveEncounter(enc);
+    const boss = r.monster.kind === 'boss';
+    const lines = [
+      spent.extraAtk ? `敵人 A 技能：這招每一軌各 +${spent.extraAtk} 顆攻擊骰` : null,
+      ...r.result.tracks.filter((t) => t.atkDice > 0).map(trackLine),
+      `${a.name} 生命 ${a.hp + r.result.total} → ${a.hp} / ${a.maxHp}`,
+      r.newlyDowned ? `${a.name} 倒地！` : null,
+    ].filter(Boolean);
+    const ev = this.record({ who: a.name, kind: 'defend', label: `${r.monster.id} 攻擊 ${a.name}${boss ? `（${['輕擊', '重擊', '絕殺'][msg.mode ?? 0]}）` : ''}`, big: r.result.total, tone: r.result.total > 0 ? 'fail' : 'ok', lines, srv: true }, user);
+    return { out: [...this.encOk(enc, rid, user).out, { to: 'all', msg: { t: 'event', event: ev } }], close: null };
   }
 
   /** GM 指定（或拿掉）某隻怪物的立繪：img = 立繪庫的編號，null = 拿掉 */
@@ -735,7 +865,8 @@ export class RoomCore {
     });
     const maxNo = (kind) => Math.max(0, ...monsters.filter((m) => m.kind === kind).map((m) => Number(String(m.id).replace(/\D/g, '')) || 0));
     const maxElite = Math.max(0, ...monsters.filter((m) => m.rank === 'elite').map((m) => Number(String(m.id).replace(/\D/g, '')) || 0));
-    const enc = { monsters, next: { mob: maxNo('mob') + 1, boss: maxNo('boss') + 1, elite: maxElite + 1 }, round: 0, order: [], turn: 0, locked: false };
+    const old = this.encounter(); // 友方 NPC 不是敵人預組的一部分：留在場上
+    const enc = { monsters, allies: alliesOf(old), next: { mob: maxNo('mob') + 1, boss: maxNo('boss') + 1, elite: maxElite + 1, ally: old.next?.ally ?? 1 }, round: 0, order: [], turn: 0, locked: false };
     this.saveEncounter(enc);
     // 紀錄只寫登場的敵人，不寫預組名稱（名稱可能劇透）
     const ok = this.encOk(enc, rid, user, { label: `遭遇：敵人登場 ${monsters.map((m) => m.id).join('、')}` });
@@ -908,7 +1039,7 @@ export class RoomCore {
   onVitals(user, msg) {
     const v = msg.v;
     const BIG = 10_000_000;
-    if (!v || typeof v !== 'object' || !isInt(v.hp, 0, BIG) || !isInt(v.maxHp, 0, BIG)) return err(undefined, 'bad_vitals', '狀態格式錯誤。');
+    if (!v || typeof v !== 'object' || !isInt(v.hp, -BIG, BIG) || !isInt(v.maxHp, 0, BIG)) return err(undefined, 'bad_vitals', '狀態格式錯誤。');
     const clean = { name: cleanStr(v.name, 40) || user.name, hp: v.hp, maxHp: v.maxHp, downed: v.downed === true, res: {} };
     if (isInt(v.shield, 1, BIG)) clean.shield = v.shield;
     if (isInt(v.tox, 0, 1000)) clean.tox = v.tox;

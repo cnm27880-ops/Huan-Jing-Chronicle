@@ -8,11 +8,11 @@ import { toast, rollFailed, rarityTag } from './controls.js';
 import { iconOf } from './items.js';
 import { openFoodSheet } from './statusBar.js';
 import {
-  ATK_STATS, DEF_STATS, RESOURCE_STATS, EQUIP_SLOTS, EQUIP_SLOT_LABEL, GEAR_TIERS,
+  ATK_STATS, DEF_STATS, RESOURCE_STATS, GEAR_TIERS,
 } from '../game/rules.js';
 import {
   identifiable, identify, equip, unequip, compareGear, findJunk, groupGear, gearName, effectText, gearDiceText,
-  identifiableGems, identifyGems, socketGem, socketTargets, gemDiceText, gemName,
+  identifiableGems, identifyGems, socketGem, socketTargets, gemDiceText, gemName, equipSlots, slotLabel, extraSlotsFor,
 } from '../game/equipment.js';
 import { derivedStats } from '../game/stats.js';
 import { RULE_SKILLS } from '../game/skills.js';
@@ -147,7 +147,7 @@ export function createGearView({ root, getState, commit }) {
     return h('div', { class: `gear-slot${g ? ' rarity' : ' is-empty'}`, dataset: { tier: g ? tierIndex(g) : 'none', rarity: g ? tierIndex(g) : 'none' } },
       h('span', { class: 'gear-slot__icon', 'aria-hidden': 'true', text: g ? gearIcon(g) : '＋' }),
       h('div', { class: 'gear-slot__head' },
-        h('span', { class: 'gear-slot__label', text: EQUIP_SLOT_LABEL[key] }),
+        h('span', { class: 'gear-slot__label', text: slotLabel(key) }),
         g ? h('strong', { class: 'gear-slot__name rarity__name', text: gearName(g) }) : h('span', { class: 'gear-slot__name', text: '空著' }),
         g ? rarityTag(tierIndex(g)) : null),
       g ? h('button', { type: 'button', class: 'btn btn--ghost btn--small gear-slot__off', onclick: () => { unequip(state, key); commit(); } }, '卸下') : null,
@@ -158,7 +158,8 @@ export function createGearView({ root, getState, commit }) {
   function slotsCard(state) {
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '裝備欄' }),
-      h('div', { class: 'gear-slots' }, EQUIP_SLOTS.map((k) => slotCard(state, k))));
+      // 基本 4 格＋奶龍寶庫的額外欄；技能等級掉了但還穿著的額外欄也列出來（才卸得下）
+      h('div', { class: 'gear-slots' }, [...new Set([...equipSlots(state), ...Object.keys(state.equipment).filter((k) => state.equipment[k])])].map((k) => slotCard(state, k))));
   }
 
   // ---------- 鑑定 ----------
@@ -356,6 +357,7 @@ export function createGearView({ root, getState, commit }) {
                  h('button', { type: 'button', class: 'btn btn--small', onclick: () => putOn('acc2') }, '換飾品 2')]
               : h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => putOn(state.equipment.acc1 ? 'acc2' : 'acc1') }, '裝備'))
           : h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => putOn(g.slot) }, '裝備'),
+        extraSlotsFor(state, g).map((k) => h('button', { type: 'button', class: 'btn btn--small', onclick: () => putOn(k) }, `裝到${slotLabel(k).split('（')[0]}`)), // 奶龍寶庫的額外欄
         // 裝備不能丟棄，只能到交易大廳／黑市賣掉（使用者 2026-10-07）；鑲了寶石的不能賣
         h('button', {
           type: 'button', class: 'btn btn--ghost btn--small', disabled: Boolean(g.gem), title: g.gem ? '鑲了寶石的裝備不能賣' : '',

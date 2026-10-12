@@ -9,11 +9,13 @@ import { toast, rollFailed } from './controls.js';
 import { TRACKS, POTIONS, TOXICITY_MAX } from '../game/rules.js';
 import {
   attackDice, pooledAttack, endBattle, monsterAbs, ATTACK_MODES, defenseDice, formatAbc, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
-  drinkPotion, useSupport, isDowned, planResponses, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES,
+  drinkPotion, useSupport, isDowned, planResponses, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES, resolveChosenTrack,
+  daoDunDice, useSwell,
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
   SKILL_CATALOG, bindableSkills, attackResponses, ATTACK_RESPONSES, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
+  choosableTracks, DAODUN, daoDunLeft, daoDunUses, SWELL, swellCap,
 } from '../game/skills.js';
 import {
   OTHER_RESOURCES, resourceMax, resourceNow, setResource, restoreAllResources, actionCost, shortfall, costText, witchRest,
@@ -23,13 +25,16 @@ import { countOf } from '../game/engine.js';
 import { iconOf } from './items.js';
 import { publish, rollWith } from '../state/rollLog.js';
 import { cloakCard } from './cloakCard.js';
-import { shadowOf, isHidden, STEALTH_ROUNDS } from '../game/shadowCloak.js';
+import { shadowOf, isHidden, STEALTH_ROUNDS, SHADOW_SKILL as SHADOW_SKILL_NAME } from '../game/shadowCloak.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
 import { battleSel as sel } from './battleSelect.js';
 import { teammates } from './giftSheet.js';
-import { sendMail } from '../state/rollLog.js';
+import { sendMail, getEncounter, encounterAction, getRoomStatus } from '../state/rollLog.js';
 import { takeItems, refundItems } from '../game/mail.js';
+import { SKILL_TABLE } from '../game/skillTable.js';
+import { equipSlots } from '../game/equipment.js';
+import { alliesOf, BABY } from '../game/ally.js';
 
 // 戰鬥紀錄只放戰鬥相關事件；黑市、鑑定、鑲嵌、一般檢定與自訂骰只出現在跑團頁
 const BATTLE_KINDS = new Set(['attack', 'defend', 'potion', 'skill', 'divider']);
@@ -56,6 +61,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     openMoves: new Set(), // 展開檔位按鈕的輔助技能 id
     openBoxes: new Set(), // 展開中的「＋新增」區塊：重畫後保持展開
     convert: { from: '靈氣', to: '生命', n: 1 }, // 資源轉換的表單
+    swell: { x: 1, give: {} }, // 浮腫之軀：X 與分給每位隊友的治療點
   };
 
   /** 可收合的「＋新增」區塊。記住展開狀態，按裡面的按鈕重畫後不會自己收起來 */
@@ -83,7 +89,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   function openAdjust(key, trigger) {
     const { now, max } = readout(getState(), key);
     openValueSheet({
-      title: `調整${key}`, now, max, trigger,
+      title: `調整${key}`, now, max, trigger, ...(key === '生命' ? { min: -9_999_999 } : {}), // 生命可以倒扣成負數
       focusAfter: () => [...document.querySelectorAll(`[data-hud="${key}"]`)].find((el) => el.offsetParent !== null),
       onConfirm: (v) => {
         const state = getState();
@@ -166,7 +172,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       h('h2', { class: 'section-title', text: '狀態' }),
       h('p', { class: 'hint', text: '點生命或資源條可以調整數值。招式會依「消耗資源」自動扣除，不夠就不能出招。' }),
       downed
-        ? h('p', { class: 'notice notice--bad', text: '倒地了。倒地不會死亡，但劇情可能走向不太好的結局。喝回血藥水或請 GM 處理。' })
+        ? h('p', { class: 'notice notice--bad', text: '倒地了（生命會倒扣成負數，要補回正數才能站起來、重新加入戰鬥）。倒地不會死亡，但劇情可能走向不太好的結局。喝回血藥水、請隊友餵藥或請 GM 處理。' })
         : null,
       state.toxicity >= TOXICITY_MAX ? h('p', { class: 'notice notice--bad', text: `毒性已達 ${TOXICITY_MAX}，不能再喝藥水。戰鬥結束後毒性歸零。` }) : null,
       h('div', { class: 'row' },
@@ -250,7 +256,8 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   }
 
   // ---------- 招式 ----------
-  function moveDetail(state, m) {
+  function moveDetail(state, m0) {
+    const m = resolveChosenTrack(state, m0, sel.trackPick[m0.id]); // 機甲駕駛員：預覽選到的那一軌
     const pooled = m.mode === 'all' || m.mode === 'abs';
     const support = m.kind === 'heal' || m.kind === 'shield';
     const cost = actionCost(state, m);
@@ -361,9 +368,10 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const lack = shortfall(state, support ? actionCost(state, m, SKILL_CATALOG[m.skill].tiers[0].cost) : d.cost);
     const armed = !support && m.id === sel.moveId;
     const open = support ? ui.openMoves.has(m.id) : armed;
-    const tracks = support ? [] : (m.mode === 'all' ? TRACKS : m.tracks ?? []);
+    const tracks = support ? [] : (m.mode === 'all' ? TRACKS : resolveChosenTrack(state, m, sel.trackPick[m.id]).tracks ?? []);
     const max = Math.max(1, m.targets ?? 1);
     const fire = armed ? fireInfo() : null;
+    const choices = armed ? choosableTracks(m) : null;
     return h('li', { class: `move${lack ? ' is-short' : ''}`, 'aria-current': String(armed), dataset: { open: String(open) } },
       h('div', { class: 'move__main' },
         h('button', {
@@ -381,6 +389,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         open ? h('small', { class: 'move__detail', text: d.text }) : null,
         lack ? h('small', { class: 'move__lack', text: `缺少：${lack}` }) : null),
         support && open ? supportButtons(state, m) : null,
+        choices ? trackChooser(state, m, choices) : null,
         armed
           ? h('button', {
               type: 'button', class: 'btn btn--primary move__fire', disabled: Boolean(lack) || !fire.ready || isDowned(state), onclick: () => onFire(),
@@ -392,6 +401,18 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       }, '✕'));
   }
 
+  /** 擇一軌的招式（機甲駕駛員）：出招前選這次打物理還是能量（沒選＝攻擊骰多的那一軌） */
+  function trackChooser(state, m, choices) {
+    const now = resolveChosenTrack(state, m, sel.trackPick[m.id]).tracks[0];
+    const NAMES = { A: '物理', B: '能量', C: '靈魂' };
+    return h('div', { class: 'toggle-row', role: 'group', 'aria-label': `${m.name}：選擇傷害軌道` },
+      h('span', { class: 'field-label', text: '這次造成' }),
+      choices.map((t) => h('button', {
+        type: 'button', class: 'toggle', 'aria-pressed': String(now === t),
+        onclick: () => { sel.trackPick[m.id] = t; rerender(); },
+      }, `${NAMES[t]}傷害（${t}）`)));
+  }
+
   /**
    * 攻擊響應列（常駐在鬥氣、大魔導師加骰下面，對所有招式一起生效）：你學過的響應（腦機協議、殘缺筆記…）。預設全開，點一下關掉（省資源）；
    * 出招時只有「符合選中招式的條件、付得起」的才會觸發，不符合的（例如招式系別不對）顯示淡色、付不起的顯示紅色。不花資源的（真龍九變圖）一定生效。
@@ -399,7 +420,8 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   function respBar(state) {
     const names = Object.keys(ATTACK_RESPONSES).filter((n) => skillLevel(state, n) > 0);
     if (!names.length) return null;
-    const cur = state.moves.find((m) => m.id === sel.moveId);
+    const cur0 = state.moves.find((m) => m.id === sel.moveId);
+    const cur = cur0 ? resolveChosenTrack(state, cur0, sel.trackPick[cur0.id]) : cur0;
     const fits = cur ? new Map(attackResponses(state, cur).map((r) => [r.name, r])) : null;
     const usedNames = cur ? new Set(planResponses(state, cur, actionCost(state, cur), [...sel.respOff]).used.map((r) => r.name)) : null;
     return h('div', { class: 'resp', role: 'group', 'aria-label': '響應' },
@@ -416,6 +438,115 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           onclick: () => { if (off) sel.respOff.delete(name); else sel.respOff.add(name); rerender(); },
         }, name);
       }));
+  }
+
+  // ---------- 獨特技能（使用者 2026-10-12：各玩家的獨特技能要出現在招式頁、可以啟用、要真的有效果） ----------
+  /** 已學會的獨特／個人專屬技能（含 GM 新增的專屬技能） */
+  const uniqueSkills = (state) => Object.keys(state.skills ?? {})
+    .filter((n) => skillLevel(state, n) > 0 && SKILL_TABLE[n] && (SKILL_TABLE[n].personal || SKILL_TABLE[n].school === '獨特'));
+
+  /** 把技能「使用」寫進紀錄（效果由 GM 依技能文字處理）：GM 新增、程式還沒辦法自動算的主動技能用 */
+  function announceSkill(state, n) {
+    publish({ who: state.name, kind: 'skill', label: `${state.name} 使用 ${n} Lv${skillLevel(state, n)}`, tone: 'ok', lines: [...String(SKILL_TABLE[n].text ?? '').split('\n').filter(Boolean), '（效果由 GM 依技能文字處理）'] });
+    toast(`已把「${n}」寫進紀錄，請 GM 處理效果。`);
+  }
+
+  /** 浮腫之軀：花 X 生命，2X 治療點分給隊友（不能給自己）；用信箱送出，對方上線時自動套用 */
+  async function castSwell(state, box) {
+    const cap = swellCap(state);
+    const x = Math.floor(Number(ui.swell.x));
+    if (!(x >= 1 && x <= cap)) return toast(`X 要是 1～${cap}。`);
+    const mates = teammates();
+    const alloc = Object.entries(ui.swell.give).map(([uid, n]) => [uid, Math.floor(Number(n)) || 0]).filter(([uid, n]) => n > 0 && mates.some((m) => m.uid === uid));
+    const total = alloc.reduce((a, [, n]) => a + n, 0);
+    if (!alloc.length) return toast('要把治療點分給至少一位隊友（不能給自己）。');
+    if (total !== 2 * x) return toast(`治療點要剛好分完：2 × ${x} = ${2 * x} 點，現在分了 ${total} 點。`);
+    if (!(await askConfirm(box, { title: `施放${SWELL}？`, lines: [`花 ${x} 點生命，分出 ${2 * x} 點治療：`, ...alloc.map(([uid, n]) => `${mates.find((m) => m.uid === uid)?.name ?? uid}：${n} 點`)], okText: '施放' }))) return;
+    const before = state.hp;
+    const r = useSwell(state, x);
+    if (r.error) return toast(r.error);
+    const sent = [];
+    let failed = '';
+    for (const [uid, n] of alloc) {
+      try { await sendMail({ to: uid, kind: 'support', skill: SWELL, support: 'points', amount: n }); sent.push(`${mates.find((m) => m.uid === uid)?.name ?? uid} +${n}`); } catch (e) { failed = e.message || '送不出去'; }
+    }
+    if (failed) toast(`有人沒送到：${failed}`);
+    publish({ who: state.name, kind: 'skill', label: `${SWELL}（X = ${x}）`, big: `${2 * x} 點`, tone: 'ok', lines: [`花費：${costText(r.cost)}，生命 ${before} → ${state.hp} / ${maxHp(state)}`, sent.length ? `治療：${sent.join('、')}` : '治療點沒有送出去'] });
+    ui.swell = { x: 1, give: {} };
+    commit();
+  }
+
+  function uniqueCard(state) {
+    const names = uniqueSkills(state);
+    if (!names.length) return null;
+    const online = getRoomStatus().phase === 'online';
+    const row = (n, ...controls) => {
+      const t = SKILL_TABLE[n];
+      return h('li', { class: 'unique' },
+        h('details', { class: 'unique__text' },
+          h('summary', {}, h('strong', { text: `${n} Lv${skillLevel(state, n)}` }), h('small', { class: 'hint', text: `　${t.tier}・${t.kind}・${t.school}${t.custom ? '・GM 專屬' : ''}` })),
+          h('p', { class: 'hint', style: 'white-space: pre-line;', text: t.text || '（沒有效果文字）' })),
+        ...controls);
+    };
+    const items = names.map((n) => {
+      if (n === DAODUN) {
+        const left = daoDunLeft(state);
+        const dd = daoDunDice(state);
+        if (left < 1) sel.daoDun = false;
+        return row(n,
+          h('button', {
+            type: 'button', class: 'toggle', 'aria-pressed': String(Boolean(sel.daoDun)), disabled: left < 1 ? true : null,
+            onclick: () => { sel.daoDun = !sel.daoDun; rerender(); },
+          }, sel.daoDun ? '✓ 下一次攻擊使用' : '下一次攻擊使用'),
+          h('small', { class: 'hint', text: `本次跑團還剩 ${left} / ${daoDunUses(state)} 次（結束本次跑團時恢復）・防具 1/5 → 物理 +${dd.A}、能量 +${dd.B}、靈魂 +${dd.C}、真實 +${dd.T} 骰（只加在招式用到的軌道）${state.equipment?.armor ? '' : '・沒有穿防具'}` }));
+      }
+      if (n === SWELL) {
+        const cap = swellCap(state);
+        const mates = teammates();
+        const x = Math.max(1, Math.min(cap, Math.floor(Number(ui.swell.x)) || 1));
+        return row(n,
+          h('small', { class: 'hint', text: '被動（神秘技能 5 級以上每個 +5 生命上限）已自動算進面板。主動：花 X 生命，得到 2X 治療點，分給自己以外的隊友。' }),
+          mates.length
+            ? h('div', { class: 'swell' },
+                h('label', { class: 'extra' }, h('span', { text: `X（1～${cap}）` }),
+                  h('input', { class: 'field', type: 'number', min: 1, max: cap, inputmode: 'numeric', value: x, style: 'max-width: 5em;', onchange: (e) => { ui.swell.x = e.target.value; rerender(); } })),
+                h('p', { class: 'field-label', text: `分配 ${2 * x} 點治療` }),
+                mates.map((m) => h('label', { class: 'extra' }, h('span', { text: m.name }),
+                  h('input', { class: 'field', type: 'number', min: 0, max: 2 * x, inputmode: 'numeric', value: ui.swell.give[m.uid] ?? '', placeholder: '0', style: 'max-width: 5em;', oninput: (e) => { ui.swell.give[m.uid] = e.target.value; } }))),
+                h('button', { type: 'button', class: 'btn btn--primary btn--small', disabled: isDowned(state) ? true : null, onclick: (e) => castSwell(state, e.currentTarget) }, `施放（花 ${x} 生命）`))
+            : h('small', { class: 'hint', text: '要加入房間、有隊友在才能施放（治療點不能給自己）。' }));
+      }
+      if (n === BABY.skill) {
+        const enc = getEncounter();
+        const me = getRoomStatus().me;
+        const mine = alliesOf(enc).find((a) => a.owner === me?.uid && !isDowned(a));
+        const why = !online ? '要加入房間才能放出寶寶。' : mine ? `${mine.name} 在場上（生命 ${mine.hp} / ${mine.maxHp}），在中間的「友方」操作。` : enc?.locked ? '戰鬥中（GM 已開打）不能放出寶寶。' : (state.gold ?? 0) < BABY.gold ? `金幣不夠（要 ${BABY.gold}）。` : '';
+        return row(n,
+          h('button', {
+            type: 'button', class: 'btn btn--small', disabled: why ? true : null, title: why,
+            onclick: async (e) => {
+              if (!(await askConfirm(e.currentTarget, { title: `花 ${BABY.gold} 金幣放出寶寶？`, lines: [`寶寶血 ${BABY.hp}、攻防 1A1B1C，有自己的回合（在中間的「友方」操作），持續到被擊倒。`], okText: '放出' }))) return;
+              if ((state.gold ?? 0) < BABY.gold) return toast('金幣不夠。');
+              try { await encounterAction({ t: 'encAlly', baby: true }); } catch (err) { return toast(err.message || '操作失敗。'); }
+              state.gold -= BABY.gold;
+              commit();
+            },
+          }, `🐣 放出寶寶（${BABY.gold} 金幣）`),
+          why ? h('small', { class: 'hint', text: why }) : null,
+          h('small', { class: 'hint', text: '寶寶裝備武器與防具的部分還沒做（需要時請 GM 直接調整寶寶的數值）。' }));
+      }
+      if (n === SHADOW_SKILL_NAME) return row(n, h('small', { class: 'hint', text: '操作在上方的「暗影斗篷」區塊；現身爆發要綁成招式（下面「新增自訂招式」）。' }));
+      if (n === '奶龍寶庫') return row(n, h('small', { class: 'hint', text: `被動：額外裝備欄在「裝備」頁（目前 ${equipSlots(state).length - 4} 個），生命上限已自動算進面板。` }));
+      if (n === '老狗識途') return row(n, h('small', { class: 'hint', text: '被動：屬性加成已自動算進面板（裝備頁看得到明細）。' }));
+      const t = SKILL_TABLE[n];
+      const active = t.kind !== '被動';
+      return row(n,
+        h('small', { class: 'hint', text: `${Object.keys(t.fx?.[skillLevel(state, n) - 1] ?? {}).length ? '數值加成已自動算進面板。' : ''}${active ? '主動效果程式還不會自動算：按「使用」寫進紀錄，由 GM 處理。' : ''}` }),
+        active ? h('button', { type: 'button', class: 'btn btn--small', disabled: isDowned(state) ? true : null, onclick: () => announceSkill(state, n) }, '📣 使用') : null);
+    });
+    return h('section', { class: 'unique-skills' },
+      h('p', { class: 'field-label', text: '獨特技能' }),
+      h('ul', { class: 'skill-list' }, items));
   }
 
   /** 鬥氣加骰：直接輸入這次出招花幾點鬥氣（不能超過現有的），每點 +1 顆真實傷害骰（冠軍勇士每點 4 顆）；出招後歸零 */
@@ -441,7 +572,8 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   /** 大魔導師加骰：造成能量傷害時每花 5 魔力多 1 顆能量傷害骰，上限 12 顆；學了就常駐（跟鬥氣加骰一樣），選中的招式沒有能量軌時變淡、不能填；出招後歸零 */
   function mageRow(state) {
     if (skillLevel(state, '大魔導師') <= 0) { sel.mage = 0; return null; }
-    const cur = state.moves.find((m) => m.id === sel.moveId);
+    const cur0 = state.moves.find((m) => m.id === sel.moveId);
+    const cur = cur0 ? resolveChosenTrack(state, cur0, sel.trackPick[cur0.id]) : cur0;
     const fits = Boolean(mageApplies(state, cur));
     if (!fits) sel.mage = 0;
     const cap = fits ? Math.min(MAGE.max, Math.floor(resourceNow(state, '魔力') / MAGE.cost)) : 0;
@@ -531,6 +663,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           }, `放棄行動・回復 ${WITCH_EXTRA_COST} 魔力`)
         : null,
       cloakCard(state, { commit }),
+      uniqueCard(state),
       douRow(state),
       mageRow(state),
       respBar(state),

@@ -234,3 +234,84 @@ test('預組換上場：技能次數與蓄力清掉，菁英編號接得上', ()
   assert.equal(m.charge, undefined);
   assert.equal(encOf(send(core, GM, { t: 'encAdd', kind: 'elite', spec: { ...SPEC, count: 1 } })).monsters.at(-1).id, '菁英2');
 });
+
+// ---------- 2026-10-12 正式跑團後的修正 ----------
+test('增援：開打後新增的敵人插進先攻順序的隨機位置（不是堆在最後），輪到的人不變', () => {
+  const front = room(() => 1); // int 一律抽 1：插入位置＝最前面
+  send(front, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 1 } });
+  send(front, GM, { t: 'encInit' }, { online: ['300', '400'] });
+  send(front, GM, { t: 'encStart' });
+  send(front, GM, { t: 'encNext' }); // 輪到第 2 位；插到最前面後輪到的人往後移一格，還是同一位
+  const was = front.encounter();
+  const who = JSON.stringify(was.order[was.turn]);
+  const res = send(front, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 1 } });
+  const enc = encOf(res);
+  assert.equal(enc.order[0].id, '小怪2');
+  assert.equal(enc.order.length, 4);
+  assert.equal(JSON.stringify(enc.order[enc.turn]), who);
+  assert.match(res.out.find((o) => o.msg.t === 'event').msg.event.label, /增援/);
+});
+
+test('友方 NPC：只有 GM 能建立；GM 攻擊、承受攻擊（算怪物攻擊次數）、改生命、輔助走信箱、移除；先攻抽得到 NPC', () => {
+  const core = room((n) => n);
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { count: 1, atkPower: 0, defPower: 0, hp: 100 } });
+  const npc = { name: '傭兵', hp: 40, atk: '10A', def: '0A', abs: 0, support: { kind: 'heal', pct: 20 } };
+  assert.equal(errorOf(send(core, P1, { t: 'encAlly', npc }))?.code, 'forbidden');
+  const added = encOf(send(core, GM, { t: 'encAlly', npc }));
+  assert.equal(added.allies[0].id, '友軍1');
+  const atk = send(core, GM, { t: 'encAllyAtk', id: '友軍1', target: '小怪1' });
+  assert.ok(encOf(atk).monsters[0].hp < 100);
+  assert.equal(atk.out.find((o) => o.msg.t === 'event').msg.event.who, '傭兵');
+  assert.equal(errorOf(send(core, P1, { t: 'encAllyAtk', id: '友軍1', target: '小怪1' }))?.code, 'forbidden');
+  const take = send(core, GM, { t: 'encAllyTake', id: '友軍1', monster: '小怪1' });
+  assert.equal(errorOf(take), undefined);
+  assert.match(errorOf(send(core, GM, { t: 'encAllyTake', id: '友軍1', monster: '小怪1' })).message, /已經攻擊 1 次/); // 普通一回合 1 打
+  assert.equal(encOf(send(core, GM, { t: 'encAllyHp', id: '友軍1', hp: -3 })).allies[0].hp, -3);
+  assert.match(errorOf(send(core, GM, { t: 'encAllySup', id: '友軍1', to: '300' })).message, /倒地/);
+  send(core, GM, { t: 'encAllyHp', id: '友軍1', hp: 40 });
+  const sup = send(core, GM, { t: 'encAllySup', id: '友軍1', to: '300' });
+  const mail = sup.out.find((o) => o.to === 'user' && o.uid === '300').msg.mails[0];
+  assert.deepEqual([mail.kind, mail.support, mail.pct, mail.skill], ['support', 'heal', 20, '傭兵']);
+  const { order } = encOf(send(core, GM, { t: 'encInit' }, { online: ['300'] }));
+  assert.ok(order.some((o) => o.kind === 'ally' && o.id === '友軍1' && o.name === '傭兵'));
+  assert.equal(encOf(send(core, GM, { t: 'encAllyDel', id: '友軍1' })).allies.length, 0);
+});
+
+test('初階寶寶：玩家自己放出（一人一隻、開打後不能放），主人只能在寶寶的回合攻擊；結束戰鬥時活著的寶寶留下', () => {
+  const core = room((n) => n);
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { count: 1, atkPower: 0, defPower: 0, hp: 100 } });
+  const enc = encOf(send(core, P1, { t: 'encAlly', baby: true }));
+  const baby = enc.allies[0];
+  assert.deepEqual([baby.name, baby.hp, baby.owner], ['玩家一的寶寶', 10, '300']);
+  assert.match(errorOf(send(core, P1, { t: 'encAlly', baby: true })).message, /只能同時擁有 1 隻/);
+  assert.equal(errorOf(send(core, P2, { t: 'encAllyAtk', id: baby.id, target: '小怪1' }))?.code, 'forbidden'); // 不是主人
+  send(core, GM, { t: 'encInit' }, { online: ['300'] });
+  send(core, GM, { t: 'encStart' });
+  const e = core.encounter();
+  const babyTurn = e.order.findIndex((o) => o.kind === 'ally');
+  if (e.turn !== babyTurn) assert.equal(errorOf(send(core, P1, { t: 'encAllyAtk', id: baby.id, target: '小怪1' }))?.code, 'not_your_turn');
+  assert.match(errorOf(send(core, P2, { t: 'encAlly', baby: true })).message, /戰鬥中/);
+  const cleared = encOf(send(core, GM, { t: 'encClear' }));
+  assert.equal(cleared.allies.length, 1);
+  assert.equal(cleared.monsters.length, 0);
+});
+
+test('黑市團：只有 GM 能開／關，全員廣播、hello 看得到；每開一次 id +1', () => {
+  const core = room();
+  assert.equal(errorOf(send(core, P1, { t: 'blackMarket', open: true }))?.code, 'forbidden');
+  const res = send(core, GM, { t: 'blackMarket', open: true, rid: 'b1' });
+  assert.deepEqual(res.out.find((o) => o.msg.t === 'blackMarket').msg.blackMarket, { open: true, id: 1 });
+  assert.equal(res.out.find((o) => o.msg.t === 'bmOk').msg.rid, 'b1');
+  assert.deepEqual(core.hello(P1).blackMarket, { open: true, id: 1 });
+  send(core, GM, { t: 'blackMarket', open: false });
+  send(core, GM, { t: 'blackMarket', open: true });
+  assert.deepEqual(core.hello(P2).blackMarket, { open: true, id: 2 });
+});
+
+test('浮腫之軀：固定點數治療走信箱（support: points）', () => {
+  const core = room();
+  const res = send(core, P1, { t: 'mailSend', to: '400', kind: 'support', skill: '浮腫之軀', support: 'points', amount: 6 });
+  const mail = res.out.find((o) => o.to === 'user' && o.uid === '400').msg.mails[0];
+  assert.deepEqual([mail.support, mail.amount], ['points', 6]);
+  assert.equal(errorOf(send(core, P1, { t: 'mailSend', to: '400', kind: 'support', skill: '浮腫之軀', support: 'points', amount: 0 }))?.code, 'bad_mail');
+});

@@ -23,7 +23,7 @@
 // ============================================================
 import {
   newEncounter, addMobs, addBosses, playerAttack, monsterAttack, defenseDice, attackDice, isDowned,
-  drinkPotion, giveHealPotion, monsterDef, monsterAbs, monsterAtk, pooledAttack,
+  drinkPotion, giveHealPotion, monsterDef, monsterAbs, monsterAtk, pooledAttack, resolveChosenTrack,
 } from './combat.js';
 import { POTIONS, TOXICITY_MAX, TRACKS } from './rules.js';
 import { maxHp } from './stats.js';
@@ -70,7 +70,7 @@ export function pickMove(state) {
     if (isSupport(m) || m.id === 'basic') continue;
     const casts = castsAffordable(state, m);
     if (casts < 1) continue;
-    const power = sum(attackDice(state, m).dice);
+    const power = sum(attackDice(state, resolveChosenTrack(state, m)).dice); // 機甲駕駛員：擇一軌（攻擊骰多的那軌）
     if (!best || casts > best.casts || (casts === best.casts && power > best.power)) best = { move: m, casts, power };
   }
   return best?.move ?? state.moves.find((m) => m.id === 'basic') ?? null;
@@ -106,7 +106,8 @@ const healPotions = (state) => Object.keys(POTIONS).filter((n) => POTIONS[n].hea
   .sort((a, b) => POTIONS[b].heal.n * (POTIONS[b].heal.sides + 1) - POTIONS[a].heal.n * (POTIONS[a].heal.sides + 1)); // 大瓶的在前
 
 /** 這一招對這隻怪的預期傷害（每顆 1D4 平均 2.5；bonus = 藥水加成顆數） */
-function expectedDamage(p, move, target, bonus, extraAbs) {
+function expectedDamage(p, move0, target, bonus, extraAbs) {
+  const move = resolveChosenTrack(p, move0); // 機甲駕駛員：擇一軌，和 playerAttack 沒選軌道時一樣
   const abs = (passivesOf(p).ignoreAbs ? 0 : monsterAbs(target)) + extraAbs;
   const base = monsterDef(target, bestDefMode(target, move));
   if (move.mode === 'all') return Math.max(0, 2.5 * (pooledAttack(p, move, bonus, 0).dice - (base.A + base.B + base.C + abs)));
@@ -305,9 +306,9 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
     outcome, rounds, monsterHp, monsterCount: enc.monsters.length, playerCount: team.length,
     drain, drainAvg: drainVals.reduce((a, v) => a + v, 0) / (drainVals.length || 1),
     damage: monsterHp - enc.monsters.reduce((a, m) => a + m.hp, 0) + healed, healed,
-    hpLeft: team.reduce((a, p) => a + p.hp, 0), hpMax: team.reduce((a, p) => a + maxHp(p), 0),
+    hpLeft: team.reduce((a, p) => a + Math.max(0, p.hp), 0), hpMax: team.reduce((a, p) => a + maxHp(p), 0),
     downs, potions, hitKinds,
-    perPlayer: team.map((p, i) => ({ ...stat[i], takenPct: stat[i].taken / maxHp(p), drain: ownDrain(p), hpLeft: p.hp / maxHp(p) })),
+    perPlayer: team.map((p, i) => ({ ...stat[i], takenPct: stat[i].taken / maxHp(p), drain: ownDrain(p), hpLeft: Math.max(0, p.hp) / maxHp(p) })),
   };
 }
 

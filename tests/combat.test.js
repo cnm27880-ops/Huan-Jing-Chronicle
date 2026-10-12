@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseAbc, formatAbc, attackDice, defenseDice, clash, generateAbcSplit, newEncounter, addMobs, addBosses,
-  playerAttack, monsterAttack, drinkPotion, isDowned, endBattle,
+  playerAttack, monsterAttack, drinkPotion, isDowned, endBattle, healPlayer,
 } from '../src/game/combat.js';
 import { derivedStats, maxHp } from '../src/game/stats.js';
 import { eat } from '../src/game/engine.js';
@@ -120,14 +120,22 @@ test('玩家出招：扣怪物血量，消耗「下次攻擊」藥水加成', ()
   assert.equal(s.buffs.atk, 0);
 });
 
-test('怪物攻擊玩家：扣血，HP 歸零只是倒地不會消失', () => {
+test('怪物攻擊玩家：扣血，生命倒扣成負數（倒地不會消失）；補回正數才站得起來', () => {
   const s = fresh();
   s.hp = 10;
   const enc = newEncounter();
   enc.monsters.push({ id: '小怪1', kind: 'mob', hp: 5, maxHp: 5, atk: { A: 500, B: 0, C: 0 }, def: { A: 0, B: 0, C: 0 } });
   const r = monsterAttack(s, enc, '小怪1', 0, d4(4));
   assert.ok(r.result.total > 10);
+  assert.equal(s.hp, 10 - r.result.total); // 倒扣
+  assert.ok(s.hp < 0);
+  const minus = s.hp;
+  healPlayer(s, -minus); // 補到 0：還是倒地
   assert.equal(s.hp, 0);
+  assert.equal(isDowned(s), true);
+  healPlayer(s, 1);
+  assert.equal(isDowned(s), false); // 回到正數才站起來
+  s.hp = minus;
   assert.equal(isDowned(s), true);
   assert.equal(r.newlyDowned, true);
   assert.equal(playerAttack(s, enc, 'm1', '小怪1').error, '你已經倒地，無法出招。');

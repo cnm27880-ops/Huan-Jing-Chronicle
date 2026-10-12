@@ -359,19 +359,20 @@ export function createRestView({ root, getState, commit }) {
           })));
   }
 
-  /** 保留名單：還沒學、背包有書的技能。保留的不會被當肥料（湊滿 3 本也不會）；沒保留又湊滿 3 本的，升級時會自動拿來抵同階通用書 */
+  /** 保留名單：還沒學、背包有書的技能。保留的不會被當肥料；沒保留的（湊滿 3 本的先、沒湊滿的最後），升級時會自動拿來抵同階通用書 */
   function keepSection(state) {
     const list = bookProgressList(state).filter((p) => p.status !== 'learned');
     if (!list.length) return null;
     return h('details', { class: 'add-box', open: ui.keepOpen, ontoggle: (e) => { ui.keepOpen = e.target.open; } },
       h('summary', { text: `📌 技能書保留名單（${fmt(list.length)}）` }),
-      h('p', { class: 'hint', text: '升級時，通用技能書不夠的話，會先用肥料書抵（1 比 1、同階）：先用已學會技能的多餘書，再用「湊滿 3 本、沒保留」的書。打算學的技能請按成保留。' }),
+      h('p', { class: 'hint', text: '升級時，通用技能書不夠的話，會先用肥料書抵（1 比 1、同階）：先用已學會技能的多餘書，再用「湊滿 3 本、沒保留」的書，最後才用「沒湊滿 3 本、沒保留」的書。打算學的技能請按成保留。' }),
       h('div', { class: 'draw-progress__list' }, list.map((p) => {
         const kept = isKeptBook(state, p.name);
-        const fodder = !kept && p.have >= p.need;
+        const fodder = !kept; // 沒保留的都會被當肥料（沒湊滿 3 本的排最後）
+        const late = fodder && p.have < p.need;
         return h('button', {
           type: 'button', class: 'chip', 'aria-pressed': String(kept),
-          title: kept ? '保留中：不會被當肥料' : fodder ? '會被當肥料（點一下改成保留）' : '還沒湊滿 3 本，不會被當肥料',
+          title: kept ? '保留中：不會被當肥料' : late ? '還沒湊滿 3 本：最後才會被當肥料（點一下改成保留）' : '會被當肥料（點一下改成保留）',
           onclick: () => { toggleKeepBook(getState(), p.name); commit(); },
         }, `${kept ? '📌 ' : fodder ? '♻️ ' : ''}${p.name} ${p.have}/${p.need}`);
       })));

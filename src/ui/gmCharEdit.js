@@ -10,8 +10,8 @@ import { roomRequest } from '../state/rollLog.js';
 import { askText } from './confirmPop.js';
 import { blankCharacter } from '../game/importBot.js';
 import { derivedStats } from '../game/stats.js';
-import { ALL_STATS, LIFE_SKILLS, ART_SKILLS, GEAR_TIERS, GEAR_SLOT_NAME, EQUIP_SLOTS, EQUIP_SLOT_LABEL } from '../game/rules.js';
-import { addManualGear, gearName, unequip } from '../game/equipment.js';
+import { ALL_STATS, LIFE_SKILLS, ART_SKILLS, GEAR_TIERS, GEAR_SLOT_NAME } from '../game/rules.js';
+import { addManualGear, gearName, unequip, equipSlots, slotLabel } from '../game/equipment.js';
 import { hasPicks, resetPicks } from '../game/skillPicks.js';
 import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL, getCustomSkillNames, lifeBackfill, applyLifeBackfill } from '../game/skillTable.js';
 
@@ -116,7 +116,7 @@ export function openGmCharEditor() {
     const slotLine = (key) => {
       const g = d.equipment?.[key];
       return h('li', { class: 'skill-row' },
-        h('span', { text: `${EQUIP_SLOT_LABEL[key]}：` }),
+        h('span', { text: `${slotLabel(key)}：` }),
         g
           ? [h('strong', { text: `${gearName(g)}（${g.tier}）` }), h('small', { class: 'hint', text: effectText(g) }),
              h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { unequip(d, key); sheet.refresh(); } }, '卸下（面板數值會變）')]
@@ -124,7 +124,7 @@ export function openGmCharEditor() {
     };
     return h('div', {},
       h('p', { class: 'field-label', text: '裝備（試算表上已穿著、機器人背包沒有的，在這裡放進去）' }),
-      h('ul', { class: 'skill-list' }, EQUIP_SLOTS.map(slotLine)),
+      h('ul', { class: 'skill-list' }, equipSlots(d).map(slotLine)),
       d.gear?.length ? h('p', { class: 'hint', text: `背包裡的裝備：${d.gear.map((g) => `${gearName(g)}（${effectText(g)}）`).join('；')}` }) : null,
       h('div', { class: 'row' },
         h('input', { class: 'field', type: 'text', maxlength: 40, placeholder: '裝備名稱（選填，例如 奶綠大劍）', value: f.name, oninput: (e) => { f.name = e.target.value; } }),

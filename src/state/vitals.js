@@ -18,7 +18,8 @@ export function vitalsOf(state) {
     const max = int(resourceMax(state, r));
     if (max > 0) res[r] = [int(resourceNow(state, r)), max];
   }
-  const v = { name: String(state.name ?? '').slice(0, 40), hp: int(state.hp), maxHp: int(maxHp(state)), downed: isDowned(state), res };
+  const v = { name: String(state.name ?? '').slice(0, 40), hp: Math.floor(Number(state.hp)) || 0, // 生命可以是負數（倒扣）
+    maxHp: int(maxHp(state)), downed: isDowned(state), res };
   if (typeof state.toxicity === 'number') v.tox = int(state.toxicity);
   if (state.shield?.hp > 0) v.shield = int(state.shield.hp);
   return v;

@@ -86,7 +86,8 @@ test('隊友狀態：回報後廣播給所有人、hello 也有；不合法的�
   assert.equal(msg.to, 'all');
   assert.deepEqual(msg.msg, { t: 'vitals', uid: '300', v: { name: '福德', hp: 120, maxHp: 300, downed: false, tox: 2, res: { 靈氣: [10, 50] } } });
   assert.equal(core.hello(GM).vitals['300'].hp, 120);
-  assert.equal(errorOf(send(core, P1, { t: 'vitals', v: { hp: -1, maxHp: 10 } }))?.code, 'bad_vitals');
+  assert.equal(errorOf(send(core, P1, { t: 'vitals', v: { hp: -1, maxHp: 10 } })), undefined); // 生命可以倒扣成負數
+  assert.equal(errorOf(send(core, P1, { t: 'vitals', v: { hp: -20_000_000, maxHp: 10 } }))?.code, 'bad_vitals');
   assert.equal(errorOf(send(core, P1, { t: 'vitals', v: { hp: 1.5, maxHp: 10 } }))?.code, 'bad_vitals');
   send(core, P1, { t: 'vitals', v: { name: '福德', hp: 0, maxHp: 300, downed: true } });
   assert.equal(core.vitalsView()['300'].downed, true);

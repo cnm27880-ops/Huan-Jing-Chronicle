@@ -15,9 +15,9 @@ import {
   VOUCHER, HALL_DAILY_LIMIT, HALL_BUY, HALL_SELL, BLACK_BUY, BLACK_SELL, BLACK_BUY_DICE, BLACK_SELL_DICE,
   LABOR_GOLD_PER_TIME, VOUCHER_EXCHANGE_DAILY, SPECIAL_BUY, SPECIAL_SELL, SPECIAL_SESSION_LIMIT,
   marketToday, hallLeft, exchangeLeft, specialLeft, hallQuote, hallTrade, blackBuy, blackSell,
-  exchangeVouchers, setBlackSession, specialTrade, gearPriceName,
+  exchangeVouchers, specialTrade, gearPriceName, syncBlackSession,
 } from '../game/market.js';
-import { publish, rollWith } from '../state/rollLog.js';
+import { publish, rollWith, getBlackMarket, setBlackMarket, getRoomStatus } from '../state/rollLog.js';
 import { logActivity } from '../state/activityLog.js';
 
 const diceText = (d) => `${d.n}D${d.sides}+${d.add}`;
@@ -194,11 +194,11 @@ export function createMarketView({ root, getState, commit }) {
   }
 
   function specialPane(state) {
-    const open = marketToday(state).session.open;
+    const open = Boolean(getBlackMarket()?.open) && marketToday(state).session.open;
     const left = specialLeft(state);
     if (!open) {
-      return [section('特殊黑市', '只在黑市團期間開放。GM 宣布黑市團開始時，按上方的「黑市團」開關。',
-        h('p', { class: 'notice', text: '目前不是黑市團。' }))];
+      return [section('特殊黑市', '只在黑市團期間開放，由 GM 在交易頁上方開始／結束黑市團（要加入房間）。',
+        h('p', { class: 'notice', text: getBlackMarket() ? '目前不是黑市團。' : '沒有加入房間：特殊黑市要等 GM 開黑市團才能用。' }))];
     }
     return [
       section('特殊黑市・購買', `固定價，付代金券。本次黑市團買＋賣合計 ${SPECIAL_SESSION_LIMIT} 個，還剩 ${left} 個。`,
@@ -224,24 +224,39 @@ export function createMarketView({ root, getState, commit }) {
       stat('時間', `${state.time} / ${MAX_TIME}`, state.time < 0 ? 'bad' : ''),
       stat('今日原價', `${hallLeft(state)} / ${HALL_DAILY_LIMIT}`),
       stat('今日可換', `${fmt(exchangeLeft(state))}`),
-      h('label', { class: `mk-session${m.session.open ? ' is-on' : ''}` },
-        h('input', {
-          type: 'checkbox', checked: m.session.open ? true : null,
-          onchange: async (e) => {
-            const box = e.target;
-            const on = box.checked;
-            if (on) {
-              box.checked = false; // 先還原，確認後才真的打勾
-              if (!(await askConfirm(box, { title: '開始黑市團？', lines: ['本團的特殊黑市交易數會從 0 開始算（上限 50 個）。'], okText: '開始' }))) return;
-            }
-            setBlackSession(state, on); commit();
-          },
-        }),
-        h('span', { text: m.session.open ? `黑市團中（剩 ${specialLeft(state)}）` : '黑市團' })));
+      sessionToggle(state, m));
+  }
+
+  /**
+   * 黑市團開關（使用者 2026-10-12：只有 GM 能開）：GM 在房間裡開／關，全員同步；玩家只看得到狀態。
+   * 沒加入房間就沒有黑市團（特殊黑市關閉）
+   */
+  function sessionToggle(state, m) {
+    const bm = getBlackMarket();
+    const on = Boolean(bm?.open) && m.session.open;
+    const text = on ? `黑市團中（剩 ${specialLeft(state)}）` : '黑市團：未開始';
+    if (!bm || !getRoomStatus().me?.isGm) return h('span', { class: `mk-session${on ? ' is-on' : ''}`, title: '黑市團由 GM 開始／結束', text });
+    return h('label', { class: `mk-session${on ? ' is-on' : ''}` },
+      h('input', {
+        type: 'checkbox', checked: bm.open ? true : null,
+        onchange: async (e) => {
+          const box = e.target;
+          const want = box.checked;
+          box.checked = !want; // 先還原，伺服器確認後才真的改
+          const ok = await askConfirm(box, want
+            ? { title: '開始黑市團？', lines: ['所有玩家的特殊黑市開放，本團交易數從 0 開始算（每人上限 50 個）。'], okText: '開始' }
+            : { title: '結束黑市團？', lines: ['所有玩家的特殊黑市關閉。'], okText: '結束' });
+          if (!ok) return;
+          try { await setBlackMarket(want); } catch (err) { toast(err.message || '操作失敗。'); }
+        },
+      }),
+      h('span', { text: `${bm.open ? `黑市團中（GM，剩 ${specialLeft(state)}）` : '黑市團（GM 開關）'}` }));
   }
 
   function render() {
     const state = getState();
+    const bm = getBlackMarket();
+    if (bm) syncBlackSession(state, bm); // 房間的黑市團狀態 → 自己的特殊黑市（新的一團交易數歸零；跟著下一次存檔保存）
     const tabs = [['hall', '交易大廳'], ['black', '黑市'], ['special', '特殊黑市']];
     const pane = ui.tab === 'hall' ? hallPane(state) : ui.tab === 'black' ? blackPane(state) : specialPane(state);
     const scrollY = root.scrollTop;

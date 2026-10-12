@@ -97,7 +97,7 @@ test('C 喝血：只能在自己的回合（有先攻時）、回復 ND16（普�
   assert.match(useEnemySkill(f, '小怪1', 'A').error ?? '', /^$/); // A、B 不限回合（沒有錯誤）
 });
 
-test('C 喝血整場戰鬥只有 1 次（換回合不恢復）；A、B 每回合歸零', () => {
+test('C 喝血每回合 1 次（到新回合就重置，使用者 2026-10-12）；A、B 也每回合歸零', () => {
   const e = enc();
   e.monsters[0].hp = 10;
   e.round = 1;
@@ -105,8 +105,10 @@ test('C 喝血整場戰鬥只有 1 次（換回合不恢復）；A、B 每回合
   assert.equal(useEnemySkill(e, '小怪1', 'C', rng).ok, true);
   assert.equal(useEnemySkill(e, '小怪1', 'A').ok, true);
   nextRound(e);
-  assert.match(useEnemySkill(e, '小怪1', 'C', rng).error, /這場戰鬥.*每場/); // C 不隨回合歸零
+  assert.equal(enemyLeft(e, e.monsters[0]).C, 1); // 新回合 C 重置
+  assert.equal(useEnemySkill(e, '小怪1', 'C', rng).ok, true);
   assert.equal(enemyLeft(e, e.monsters[0]).C, 0);
+  assert.match(useEnemySkill(e, '小怪1', 'C', rng).error, /這回合.*用完了/);
   assert.equal(useEnemySkill(e, '小怪1', 'A').ok, true); // A 新回合又有 1 次
   assert.equal(enemyLeft(e, e.monsters[0]).A, 0);
 });

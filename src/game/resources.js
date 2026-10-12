@@ -14,7 +14,7 @@ export const resourceNow = (state, r) => (r === '生命' ? state.hp : state.reso
 
 export function setResource(state, r, v) {
   const max = resourceMax(state, r);
-  const val = Math.max(0, Math.min(max, Math.floor(v)));
+  const val = Math.max(r === '生命' ? -Infinity : 0, Math.min(max, Math.floor(v))); // 生命可以倒扣成負數（回到正數才站得起來）
   if (r === '生命') state.hp = val;
   else state.resources = { ...state.resources, [r]: val };
 }
