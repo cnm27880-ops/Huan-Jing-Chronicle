@@ -13,23 +13,25 @@
 .sfx[data-kind='enter'] .sfx__veil { animation: sfx-veil 2.3s ease-in-out forwards; }
 .sfx[data-kind='fade'] .sfx__veil { animation: sfx-veil 1.6s ease-in-out forwards reverse; }
 
-/* 斗篷：左右兩片帷幕，下擺是波浪形，布紋用細直條 */
-.sfx__cloak {
-  position: absolute; top: -4%; bottom: 7%; width: 54%; opacity: 0;
-  background:
-    repeating-linear-gradient(90deg, rgba(var(--cloak-rgb), 0.16) 0 2px, transparent 2px 26px),
-    linear-gradient(180deg, rgba(var(--cloak-deep-rgb), 0.97), rgba(var(--cloak-deep-rgb), 0.82) 70%, rgba(var(--cloak-rgb), 0.35));
-  clip-path: polygon(0 0, 100% 0, 100% 94%, 88% 100%, 75% 94%, 62% 100%, 50% 94%, 38% 100%, 25% 94%, 12% 100%, 0 94%);
-  box-shadow: inset 0 -40px 60px rgba(var(--cloak-rgb), 0.28);
-}
-.sfx__cloak--l { left: 0; transform: translateX(-102%); }
-.sfx__cloak--r { right: 0; transform: translateX(102%); clip-path: polygon(0 0, 100% 0, 100% 94%, 88% 100%, 75% 94%, 62% 100%, 50% 94%, 38% 100%, 25% 94%, 12% 100%, 0 94%); }
-.sfx[data-kind='enter'] .sfx__cloak--l { animation: sfx-close-l 2.3s var(--ease) forwards; }
-.sfx[data-kind='enter'] .sfx__cloak--r { animation: sfx-close-r 2.3s var(--ease) forwards; }
-.sfx[data-kind='reveal'] .sfx__cloak--l { animation: sfx-tear-l 1.1s cubic-bezier(0.6, 0, 0.9, 0.4) forwards; }
-.sfx[data-kind='reveal'] .sfx__cloak--r { animation: sfx-tear-r 1.1s cubic-bezier(0.6, 0, 0.9, 0.4) forwards; }
-.sfx[data-kind='fade'] .sfx__cloak--l { animation: sfx-tear-l 1.4s ease-in forwards; }
-.sfx[data-kind='fade'] .sfx__cloak--r { animation: sfx-tear-r 1.4s ease-in forwards; }
+/* 斗篷：左右兩片披風（SVG，下擺三個尖角、布褶線、發光內緣），中間浮出兜帽人影 */
+.sfx__cloak { position: absolute; top: -1%; bottom: 0; width: 64%; height: 101%; opacity: 0; overflow: visible; }
+.sfx__cloak--l { left: 0; transform: translateX(-104%); transform-origin: 0 0; }
+.sfx__cloak--r { right: 0; transform: translateX(104%); transform-origin: 100% 0; }
+.sfx__stop--a { stop-color: var(--cloak-deep); stop-opacity: 0.99; }
+.sfx__stop--b { stop-color: var(--cloak-deep); stop-opacity: 0.93; }
+.sfx__stop--c { stop-color: var(--cloak); stop-opacity: 0.55; }
+.sfx__fold { fill: none; stroke: rgba(var(--cloak-rgb), 0.28); stroke-width: 2.2; stroke-linecap: round; }
+.sfx__rim { fill: none; stroke: var(--cloak); stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(var(--cloak-rgb), 0.95)) drop-shadow(0 0 16px rgba(var(--cloak-rgb), 0.6)); }
+.sfx__figure { position: absolute; left: 50%; bottom: 0; width: min(34vw, 240px); height: auto; transform: translateX(-50%); opacity: 0; }
+.sfx__body { fill: rgba(var(--cloak-deep-rgb), 0.98); stroke: var(--cloak); stroke-width: 2; filter: drop-shadow(0 0 10px rgba(var(--cloak-rgb), 0.8)); }
+.sfx__eye { fill: var(--ink); filter: drop-shadow(0 0 6px var(--cloak)) drop-shadow(0 0 14px var(--cloak)); }
+.sfx[data-kind='enter'] .sfx__cloak--l { animation: sfx-close-l 2.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; }
+.sfx[data-kind='enter'] .sfx__cloak--r { animation: sfx-close-r 2.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; }
+.sfx[data-kind='enter'] .sfx__figure { animation: sfx-figure 2.3s ease-in-out forwards; }
+.sfx[data-kind='reveal'] .sfx__cloak--l { animation: sfx-flare-l 1.15s cubic-bezier(0.5, 0, 0.9, 0.4) forwards; }
+.sfx[data-kind='reveal'] .sfx__cloak--r { animation: sfx-flare-r 1.15s cubic-bezier(0.5, 0, 0.9, 0.4) forwards; }
+.sfx[data-kind='fade'] .sfx__cloak--l { animation: sfx-flare-l 1.5s ease-in forwards; }
+.sfx[data-kind='fade'] .sfx__cloak--r { animation: sfx-flare-r 1.5s ease-in forwards; }
 
 /* 霧氣 */
 .sfx__mist { position: absolute; inset: 0; opacity: 0; filter: blur(18px);
@@ -56,7 +58,8 @@
 .sfx[data-kind='enter'] .sfx__wisp, .sfx[data-kind='reveal'] .sfx__wisp { animation: sfx-wisp 2s ease-out var(--d) forwards; }
 .sfx[data-kind='gather'] .sfx__wisp { animation: sfx-wisp 1.4s ease-out var(--d) forwards; }
 
-/* 文字 */
+/* 文字（進入／結束時人影在中間，字放上面免得蓋住臉） */
+.sfx[data-kind='enter'] .sfx__text, .sfx[data-kind='fade'] .sfx__text { top: 20%; }
 .sfx__text { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 6px; text-align: center; }
 .sfx__title { font-size: clamp(1.8rem, 6vw, 3rem); letter-spacing: 0.4em; padding-left: 0.4em; color: var(--ink); opacity: 0;
   text-shadow: 0 0 18px rgba(var(--cloak-rgb), 0.95), 0 0 42px rgba(var(--cloak-rgb), 0.7); }
@@ -70,10 +73,11 @@
 @keyframes sfx-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sfx-out { to { opacity: 0; } }
 @keyframes sfx-veil { 0% { opacity: 0; } 35% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes sfx-close-l { 0% { opacity: 1; transform: translateX(-102%); } 32% { opacity: 1; transform: translateX(0); } 70% { opacity: 1; transform: translateX(0) scaleY(1); } 100% { opacity: 0; transform: translateX(0) translateY(-6%); } }
-@keyframes sfx-close-r { 0% { opacity: 1; transform: translateX(102%); } 32% { opacity: 1; transform: translateX(0); } 70% { opacity: 1; transform: translateX(0) scaleY(1); } 100% { opacity: 0; transform: translateX(0) translateY(-6%); } }
-@keyframes sfx-tear-l { 0% { opacity: 1; transform: translateX(0) skewY(0); } 100% { opacity: 0.6; transform: translateX(-110%) skewY(-4deg); } }
-@keyframes sfx-tear-r { 0% { opacity: 1; transform: translateX(0) skewY(0); } 100% { opacity: 0.6; transform: translateX(110%) skewY(4deg); } }
+@keyframes sfx-close-l { 0% { opacity: 1; transform: translateX(-104%) rotate(-6deg); } 34% { opacity: 1; transform: translateX(-6%) rotate(1.5deg); } 46% { opacity: 1; transform: translateX(0) rotate(0); } 72% { opacity: 1; transform: translateX(0) scale(1.02, 1); } 100% { opacity: 0; transform: translateX(0) translateY(-8%) scale(1.06, 1.1); filter: blur(10px); } }
+@keyframes sfx-close-r { 0% { opacity: 1; transform: translateX(104%) rotate(6deg); } 34% { opacity: 1; transform: translateX(6%) rotate(-1.5deg); } 46% { opacity: 1; transform: translateX(0) rotate(0); } 72% { opacity: 1; transform: translateX(0) scale(1.02, 1); } 100% { opacity: 0; transform: translateX(0) translateY(-8%) scale(1.06, 1.1); filter: blur(10px); } }
+@keyframes sfx-flare-l { 0% { opacity: 1; transform: translateX(0) rotate(0); } 100% { opacity: 0; transform: translateX(-112%) rotate(-14deg) skewY(-4deg); } }
+@keyframes sfx-flare-r { 0% { opacity: 1; transform: translateX(0) rotate(0); } 100% { opacity: 0; transform: translateX(112%) rotate(14deg) skewY(4deg); } }
+@keyframes sfx-figure { 0%, 40% { opacity: 0; transform: translateX(-50%) translateY(14%); } 58% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-4%); filter: blur(8px); } }
 @keyframes sfx-mist { 0% { opacity: 0; transform: translateY(8%); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6%); } }
 @keyframes sfx-ring { 0% { opacity: 0.9; transform: scale(0.3); } 100% { opacity: 0; transform: scale(3.2); } }
 @keyframes sfx-ring-big { 0% { opacity: 1; transform: scale(0.3); } 100% { opacity: 0; transform: scale(9); } }
@@ -93,7 +97,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sfx, .sfx * { animation: none !important; }
-  .sfx__veil, .sfx__cloak, .sfx__mist, .sfx__ring, .sfx__flash, .sfx__wisps { display: none; }
+  .sfx__veil, .sfx__cloak, .sfx__figure, .sfx__mist, .sfx__ring, .sfx__flash, .sfx__wisps { display: none; }
   .sfx__title, .sfx__sub { opacity: 1; }
   .bt-hud.is-cloaked { animation: none; }
 }
