@@ -310,7 +310,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
   }
 
   const STATUS_LABEL = { ok: '達標', low: '偏低', high: '偏高' };
-  /** 評價與策略：對照 GM 的目標（回合 2～3、每場耗約一半資源）；自訂強度時可以一鍵自動調整 */
+  /** 評價與策略：對照 GM 的目標（回合 4～8、勝率至少 75%、每場耗約一半資源）；自訂強度時可以一鍵自動調整 */
   function assessmentView(r) {
     const a = assess(r);
     return h('div', { class: 'simassess' },
@@ -329,7 +329,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     if (ui.source !== 'custom') return null;
     return h('div', { class: 'simdesign' },
       h('h3', { class: 'section-title', text: '自動配置敵人' }),
-      h('p', { class: 'hint', text: '不需要先加敵人。模擬會自己找小怪、菁英的隻數，以及小怪／菁英／BOSS 各自的血量、攻擊、防禦（目標 2～3 回合）：小怪給最弱的人打得動，BOSS 讓強的人也要花力氣，大家都有戲份。一次約 30～60 秒。' }),
+      h('p', { class: 'hint', text: '不需要先加敵人。模擬會自己找小怪、菁英的隻數，以及小怪／菁英／BOSS 各自的血量、攻擊、防禦（目標 4～8 回合、勝率至少 75%）：小怪給最弱的輸出者打得動，BOSS 讓強的人也要花力氣，大家都有戲份。一次約 30～60 秒。' }),
       h('div', { class: 'toggle-row' }, [[true, '有 BOSS（1 隻）'], [false, '沒有 BOSS']].map(([v, label]) => h('button', {
         type: 'button', class: 'toggle', 'aria-pressed': String(ui.withBoss === v), disabled: ui.tuning ? true : null, onclick: () => { ui.withBoss = v; ui.tuneResults = null; sheet.refresh(); },
       }, label))),
@@ -366,7 +366,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     if (!list || ui.tuneKind !== 'plans') return null;
     return h('div', { class: 'simtune' },
       blockedNotice(),
-      h('p', { class: 'hint', text: '兩個方案都以目標為範圍（2～3 回合、第一名省力也要贏、最弱的也能打倒小怪）：小怪血量依最弱玩家一次出手的傷害設，BOSS 血量補足回合數，怪物攻擊盡量拉高讓血藥有存在感。保守版偏輕鬆、激進版偏緊繃；預估每組只跑了少數場次，套用後會用 200 場重新確認。' }),
+      h('p', { class: 'hint', text: '兩個方案都以目標為範圍（回合 4～8、勝率 75% 以上、第一名省力也要贏、最弱的也能打倒小怪）：小怪血量依最弱玩家一次出手的傷害設，BOSS 血量補足回合數，怪物攻擊盡量拉高讓血藥有存在感。保守版偏輕鬆、激進版偏緊繃；預估每組只跑了少數場次，套用後會用 200 場重新確認。' }),
       list.map((t) => {
         const a = assess(t.summary);
         const exact = penalty(t.summary, t.plan) === 0;
@@ -423,7 +423,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     if (!ui.skipped.length && !stillBlocked.length) return null;
     return h('div', { class: 'notice notice--bad' },
       ui.skipped.length ? h('p', { text: `已略過 ${ui.skipped.length} 位沒有攻擊力的玩家：${ui.skipped.join('、')}（角色資料可能還沒填；模擬只算有資料的玩家）。` }) : null,
-      stillBlocked.map((b) => h('p', { text: `${b.name}：${b.why}。` })));
+      stillBlocked.map((b) => h('p', { text: `${b.name}：${b.why}。（自動配置會把他當輔助：不拉低小怪血量、不算進輸出分配。）` })));
   }
 
   function skipCard() {

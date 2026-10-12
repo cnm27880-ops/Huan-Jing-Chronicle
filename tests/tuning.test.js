@@ -7,11 +7,11 @@ import { blankCharacter } from '../src/game/importBot.js';
 import { moveFromCatalog } from '../src/game/skills.js';
 
 const sum = (o = {}) => ({
-  runs: 200, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5,
+  runs: 200, win: 1, lose: 0, timeout: 0, avgRounds: 5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5,
   drainBy: { 魔力: 0.5, 毒性: 0.5 }, downRate: [{ name: 'a', rate: 0.1 }], ...o,
 });
 
-test('評價：2～3 回合、每場耗約一半、勝率夠高 → 全部達標', () => {
+test('評價：4～8 回合、每場耗約一半、勝率夠高 → 全部達標', () => {
   const a = assess(sum());
   assert.equal(a.ok, true);
   assert.equal(penalty(sum()), 0);
@@ -20,9 +20,9 @@ test('評價：2～3 回合、每場耗約一半、勝率夠高 → 全部達標
 });
 
 test('評價：回合太長／太短都會給血量建議，數字依每回合傷害計算', () => {
-  const slow = assess(sum({ avgRounds: 5, avgDamagePerRound: 400, avgMonsterHp: 2000 }));
+  const slow = assess(sum({ avgRounds: 10, avgDamagePerRound: 400, avgMonsterHp: 4000 }));
   assert.equal(slow.items[0].status, 'high');
-  assert.match(slow.advice.join(' '), /800～1,200/);
+  assert.match(slow.advice.join(' '), /1,600～3,200/); // 每回合 400 × 目標 4～8 回合
   const fast = assess(sum({ avgRounds: 1, avgDamagePerRound: 1000, avgMonsterHp: 1000 }));
   assert.equal(fast.items[0].status, 'low');
   assert.match(fast.advice.join(' '), /實際更高/);
@@ -62,13 +62,13 @@ test('模擬戰：回報每場的資源與毒性消耗；沒有用途的資源�
   assert.equal(summary.avgMonsterHp, 100000);
 });
 
-test('扣分：幾乎每場都有人倒地、回合數顯示 3.0（內部 3.04）都不算超標', () => {
-  const base = { runs: 200, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [{ name: 'a', rate: 0.1 }] };
+test('扣分：幾乎每場都有人倒地、回合數顯示 8.0（內部 8.04）都不算超標', () => {
+  const base = { runs: 200, win: 1, lose: 0, timeout: 0, avgRounds: 5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [{ name: 'a', rate: 0.1 }] };
   assert.equal(penalty(base), 0);
   assert.ok(penalty({ ...base, downRate: [{ name: 'a', rate: 0.95 }] }) > 1);
-  assert.equal(penalty({ ...base, avgRounds: 3.04 }), 0);
-  assert.equal(assess({ ...base, avgRounds: 3.04 }).items[0].status, 'ok');
-  assert.equal(assess({ ...base, avgRounds: 3.06 }).items[0].status, 'high');
+  assert.equal(penalty({ ...base, avgRounds: 8.04 }), 0);
+  assert.equal(assess({ ...base, avgRounds: 8.04 }).items[0].status, 'ok');
+  assert.equal(assess({ ...base, avgRounds: 8.06 }).items[0].status, 'high');
 });
 
 test('保守版／激進版：都落在總目標內，各自偏向一邊；同一組數字對兩邊的罰分不同', () => {
@@ -77,10 +77,10 @@ test('保守版／激進版：都落在總目標內，各自偏向一邊；同�
     assert.ok(p.drain - p.drainTol >= TARGET.drain - TARGET.drainTol - 1e-9 && p.drain + p.drainTol <= TARGET.drain + TARGET.drainTol + 1e-9); // 小數誤差
     assert.ok(p.winMin >= TARGET.winMin && p.downMax <= TARGET.downMax);
   }
-  const slow = sum({ avgRounds: 2.9, avgDrain: 0.45, win: 0.97 }); // 偏輕鬆
+  const slow = sum({ avgRounds: 7.5, avgDrain: 0.45, win: 0.97 }); // 偏輕鬆
   assert.equal(penalty(slow, PLANS.conservative), 0);
   assert.ok(penalty(slow, PLANS.aggressive) > 0);
-  const tight = sum({ avgRounds: 2.1, avgDrain: 0.55, win: 0.92, downRate: [{ name: 'a', rate: 0.5 }] }); // 偏緊繃
+  const tight = sum({ avgRounds: 4.5, avgDrain: 0.55, win: 0.8, downRate: [{ name: 'a', rate: 0.5 }] }); // 偏緊繃
   assert.equal(penalty(tight, PLANS.aggressive), 0);
   assert.ok(penalty(tight, PLANS.conservative) > 0);
   assert.equal(penalty(slow), 0); // 沒指定方案：照原本的總目標
@@ -117,14 +117,14 @@ test('自動調整：怪物太多的結構下限——血量調到最低回合�
     const hp = specs.reduce((a, s) => a + s.hp * s.count, 0);
     return sum({ avgRounds: Math.max(n, hp / 400), avgDrain: Math.min(1, specs[0].atkPower / 200), win: 1 });
   };
-  const specs = [{ kind: 'boss', count: 1, hp: 1000, atkPower: 20 }, { kind: 'mob', count: 6, hp: 100, atkPower: 20 }];
+  const specs = [{ kind: 'boss', count: 1, hp: 1000, atkPower: 20 }, { kind: 'mob', count: 12, hp: 100, atkPower: 20 }];
   const out = await autoTune({ specs, evaluate, target: PLANS.conservative, yieldFn: async () => {} });
-  assert.equal(out.specs[1].count, 2); // 7 隻拿到只剩 BOSS＋2 隻 → 3 回合（保守版上限）
-  assert.equal(out.removed, 4);
+  assert.equal(out.specs[1].count, 7); // 13 隻拿到只剩 BOSS＋7 隻 → 8 回合（保守版上限）
+  assert.equal(out.removed, 5);
   assert.equal(out.specs[0].count, 1); // BOSS 不會被拿掉
   assert.equal(out.penalty, 0);
-  assert.match(out.notes.join(' '), /拿掉了 4 隻/);
-  assert.equal(specs[1].count, 6); // 原資料不變
+  assert.match(out.notes.join(' '), /拿掉了 5 隻/);
+  assert.equal(specs[1].count, 12); // 原資料不變
 });
 
 test('shrinkSpecs／shrinkEncounter：先拿小怪、再拿菁英、BOSS 不動，沒得拿回傳 null', () => {
@@ -140,9 +140,9 @@ test('shrinkSpecs／shrinkEncounter：先拿小怪、再拿菁英、BOSS 不動�
 });
 
 test('評價：怪物比玩家多很多時，說明回合數有結構下限（只調血量降不下來）', () => {
-  const a = assess(sum({ avgRounds: 7, avgRoundsWin: 7, avgMonsters: 7, playerCount: 1 }));
-  assert.match(a.advice.join(' '), /最快也要約 7 回合/);
-  const b = assess(sum({ avgRounds: 7, avgRoundsWin: 7, avgMonsters: 2, playerCount: 4 })); // 怪不多：照血量建議
+  const a = assess(sum({ avgRounds: 11, avgRoundsWin: 11, avgMonsters: 11, playerCount: 1 }));
+  assert.match(a.advice.join(' '), /最快也要約 11 回合/);
+  const b = assess(sum({ avgRounds: 11, avgRoundsWin: 11, avgMonsters: 2, playerCount: 4 })); // 怪不多：照血量建議
   assert.doesNotMatch(b.advice.join(' '), /最快也要/);
 });
 
@@ -153,5 +153,5 @@ test('回合數只算打贏的場次；同一批種子，結果每次都一樣',
   const mixed = summarize([{ outcome: 'win', rounds: 4, downs: [], drain: {} }, { outcome: 'lose', rounds: 1, downs: [], drain: {} }]);
   assert.equal(mixed.avgRounds, 2.5);
   assert.equal(mixed.avgRoundsWin, 4);
-  assert.equal(penalty({ ...sum(), avgRounds: 2.5, avgRoundsWin: 4 }) > 0, true); // 輸得快不算回合達標
+  assert.equal(penalty({ ...sum(), avgRounds: 5, avgRoundsWin: 2 }) > 0, true); // 看的是打贏的場次（2 回合，不到 4），不是全部場次的平均
 });

@@ -91,7 +91,7 @@ test('怪物攻擊分配：平均分散＝被打次數相差不超過 1；受傷
   const gap = (runs) => runs.reduce((a, r) => a + (Math.max(...r.perPlayer.map((p) => p.hit)) - Math.min(...r.perPlayer.map((p) => p.hit))), 0) / runs.length;
   assert.ok(gap(spreadRuns) < gap(rnd)); // 分散的差距比隨機小
   const { assess } = await import('../src/game/tuning.js');
-  const base = { runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgRoundsWin: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [] };
+  const base = { runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 5, avgRoundsWin: 5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [] };
   const conc = assess({ ...base, perPlayer: [{ name: '甲', takenPct: 0.9 }, { name: '乙', takenPct: 0.1 }, { name: '丙', takenPct: 0.1 }] });
   assert.equal(conc.items.find((i) => i.key === 'spread').status, 'high');
   assert.match(conc.advice.join(' '), /甲 受的傷是全隊平均的/);
@@ -108,7 +108,7 @@ test('集火第一名：怪物先打最強的人，他倒了才打下一個；�
   assert.ok(r.perPlayer[1].hit > 0 && r.perPlayer[1].hit >= r.perPlayer[2].hit && r.perPlayer[2].hit >= r.perPlayer[0].hit);
   if (r.perPlayer[1].firstDown) assert.ok(r.perPlayer[1].firstDown >= 1 && r.perPlayer[1].firstDown <= 4);
   const { assess, penalty } = await import('../src/game/tuning.js');
-  const base = { runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgRoundsWin: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [{ name: '甲', rate: 0.1 }, { name: '乙', rate: 1 }] };
+  const base = { runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 5, avgRoundsWin: 5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [{ name: '甲', rate: 0.1 }, { name: '乙', rate: 1 }] };
   const perPlayer = [{ name: '甲', takenPct: 0.1, downRound: 0, downRate: 0.1, share: 0.3 }, { name: '乙', takenPct: 0.6, downRound: 1, downRate: 1, share: 0.1 }];
   const focused = { ...base, focus: 'strongest', rank: { strongest: 1, weakest: 0 }, perPlayer };
   assert.equal(assess(focused).items.find((i) => i.key === 'topSurvive').status, 'low'); // 第 1 回合就倒
@@ -127,7 +127,7 @@ test('第一名開場就倒：隊伍勝率檢查（評價、扣分、模擬的 d
   const win = (downed) => summarize(Array.from({ length: 30 }, (_, i) => simulateBattle(players, boss, { rng: seededRng(i + 1), downed })), []).win;
   assert.ok(win([0]) <= win([]));
   const { assess, penalty } = await import('../src/game/tuning.js');
-  const base = { runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 2.5, avgRoundsWin: 2.5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [{ name: '甲', rate: 0 }, { name: '乙', rate: 0 }], focus: 'strongest', rank: { strongest: 0, weakest: 1 },
+  const base = { runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 5, avgRoundsWin: 5, avgDamagePerRound: 400, avgMonsterHp: 1000, avgDrain: 0.5, drainBy: {}, downRate: [{ name: '甲', rate: 0 }, { name: '乙', rate: 0 }], focus: 'strongest', rank: { strongest: 0, weakest: 1 },
     perPlayer: [{ name: '甲', takenPct: 0.2, downRound: 0, downRate: 0, share: 0.4, drain: 0.3 }, { name: '乙', takenPct: 0.2, downRound: 0, downRate: 0, share: 0.6, drain: 0.3 }] };
   assert.equal(penalty({ ...base, outWin: 0.7 }), 0);
   assert.ok(penalty({ ...base, outWin: 0.1 }) > 3);
@@ -162,7 +162,7 @@ test('資料還沒填的玩家：偵測出來並略過，其他人照常；打�
 
 test('自動調整：結果不合理（血量被壓到下限）就標記，不建議套用', async () => {
   const { autoTune: tune, PLANS: P } = await import('../src/game/tuning.js');
-  const evaluate = () => ({ runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 7, avgRoundsWin: 7, avgDamagePerRound: 100, avgMonsterHp: 700, avgDrain: 0.5, drainBy: {}, downRate: [] });
+  const evaluate = () => ({ runs: 10, win: 1, lose: 0, timeout: 0, avgRounds: 12, avgRoundsWin: 12, avgDamagePerRound: 100, avgMonsterHp: 700, avgDrain: 0.5, drainBy: {}, downRate: [] });
   const out = await tune({ specs: [{ kind: 'boss', count: 1, hp: 1000, atkPower: 100 }], evaluate, target: P.conservative, yieldFn: async () => {} });
   assert.equal(out.degenerate, true);
   assert.match(out.notes.join(' '), /不建議套用/);

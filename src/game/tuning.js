@@ -1,17 +1,17 @@
 // ============================================================
 // 戰鬥強度的評價、策略與自動調整（純函式，給 GM 的模擬戰面板用）。
-// GM 的目標（使用者 2026-10-10 口述）：一場戰鬥 2～3 回合內結束；一次跑團約 2 場戰鬥，
+// GM 的目標：一場戰鬥最多 8 回合（使用者 2026-10-12 改；原本 2026-10-10 口述的 2～3 回合太嚴，實戰範本是 8 回合、勝率 72%）；一次跑團約 2 場戰鬥，
 // 所以每場戰鬥大約耗掉玩家一半的資源（每人的魔力、能量等資源與毒性都用掉約一半）。
 // 「一半」是每一場戰鬥的消耗（兩場剛好用完）— 這是我的解讀，需向 GM 確認；改這裡的 TARGET 就能調整。
-// 勝率門檻（至少 90%）是我補的，需驗證。
+// 勝率至少 75%（使用者 2026-10-12）。
 // ============================================================
 export const TARGET = {
-  roundsMin: 2, roundsMax: 3, // 平均回合數
+  roundsMin: 4, roundsMax: 8, // 平均回合數（使用者 2026-10-12：實戰範本跑出 8 回合、勝率 72%，不該糾結 2～3 回合，最多 8；下限 4 是我訂的，需驗證）
   // 資源消耗只要「合理」就好（使用者 2026-10-10：不用一定耗到一半）。假設玩家的毒性 15 都在喝血藥，怪物可以兇一點，所以消耗落在 25～75% 都算合理
   drain: 0.5, drainTol: 0.25,
-  winMin: 0.9, // 玩家勝率至少
+  winMin: 0.75, // 玩家勝率至少（使用者 2026-10-12：75～100%）
   downMax: 0.6, // 任何一位玩家「至少倒地一次」的機率上限（我補的，需驗證）
-  capWinMin: 0.85, // 第一名只出六成力時，隊伍勝率至少（公平性，我訂的，需驗證）
+  capWinMin: 0.7, // 第一名只出六成力時，隊伍勝率至少（公平性，我訂的，需驗證）
   topDrainMax: 0.7, // 第一名自己的資源消耗上限（不要每次都被逼著全力，需驗證）
   weakKills: 0.5, // 最弱的玩家平均至少打倒幾隻（需驗證）
   topDownRoundMin: 2, // 怪物集火第一名時，他平均至少要撐到第幾回合才倒（太早倒，團隊就少了最大的輸出；需驗證）
@@ -29,8 +29,8 @@ export const TARGET = {
  *   激進版：偏緊繃（快攻戰）——回合偏短（2～2.5）、勝率 90% 以上、怪物攻擊兇、倒地機率可以高一些，血藥有存在感。
  */
 export const PLANS = {
-  conservative: { key: 'conservative', label: '保守版', note: '偏輕鬆：回合 2.5～3、勝率 95% 以上、第一名只出六成力也穩贏', roundsMin: 2.5, roundsMax: 3, drain: 0.4, drainTol: 0.15, winMin: 0.95, downMax: 0.4, capWinMin: 0.9, topDrainMax: 0.6, weakKills: 0.5, outWinMin: 0.6 },
-  aggressive: { key: 'aggressive', label: '激進版', note: '偏緊繃（快攻）：回合 2～2.5、勝率 90% 以上、怪物攻擊兇、血藥有存在感', roundsMin: 2, roundsMax: 2.5, drain: 0.6, drainTol: 0.15, winMin: 0.9, downMax: 0.6, capWinMin: 0.8, topDrainMax: 0.7, weakKills: 0.5, outWinMin: 0.4 },
+  conservative: { key: 'conservative', label: '保守版', note: '偏輕鬆：回合 6～8、勝率 90% 以上、第一名只出六成力也穩贏', roundsMin: 6, roundsMax: 8, drain: 0.4, drainTol: 0.15, winMin: 0.9, downMax: 0.4, capWinMin: 0.8, topDrainMax: 0.6, weakKills: 0.5, outWinMin: 0.6 },
+  aggressive: { key: 'aggressive', label: '激進版', note: '偏緊繃（快攻）：回合 4～6、勝率 75% 以上、怪物攻擊兇、血藥有存在感', roundsMin: 4, roundsMax: 6, drain: 0.6, drainTol: 0.15, winMin: 0.75, downMax: 0.6, capWinMin: 0.65, topDrainMax: 0.7, weakKills: 0.5, outWinMin: 0.4 },
 };
 
 /** 判斷回合數用「打贏的場次」（沒有這欄位就用全部）；一位小數，和畫面顯示一致 */
@@ -49,8 +49,10 @@ const fmtN = (v) => Math.round(v).toLocaleString('zh-TW');
  * 輸出分配：全隊輸出占比最高的人不要太高、最低的人不要太低（強弱差太大，第一名秒殺一切、最弱的打不到東西）。
  * 3 人以上才算；回傳 { top, weak, topMax, weakMin }，沒有資料回傳 null。
  */
+const damagerList = (sum) => (sum.perPlayer && sum.rank?.damagers ? sum.perPlayer.filter((_, i) => sum.rank.damagers.includes(i)) : sum.perPlayer);
+
 export function shareInfo(sum, t = TARGET) {
-  const ps = sum.perPlayer;
+  const ps = damagerList(sum); // 只算有輸出能力的人（輔助兼坦克不算）
   if (!ps || ps.length < 3) return null;
   const n = ps.length;
   return {
@@ -236,7 +238,7 @@ export function shrinkEncounter(enc) {
   return null;
 }
 
-const KH = [0.02, 6]; // 血量倍率搜尋範圍
+const KH = [0.02, 20]; // 血量倍率搜尋範圍（回合目標放寬到 8 回合，血量要能設得更高）
 const KA = [0.05, 8]; // 攻擊倍率搜尋範圍
 const mid = (lo, hi) => Math.sqrt(lo * hi); // 倍率用對數二分
 
@@ -312,7 +314,7 @@ export async function autoTune({
   }
   // 結果不合理就不要推薦：血量被壓到搜尋下限（像 BOSS 只剩 21 血）、或拿掉的怪超過一半，通常是輸入有問題（玩家打不出傷害、怪物防禦太高）
   const monsterTotal = (Array.isArray(specs) ? specs.reduce((a, x) => a + (x.count ?? 0), 0) : (specs.monsters ?? []).length) || 1;
-  const degenerate = final.kh <= KH[0] * 1.05 || removed > monsterTotal / 2;
+  const degenerate = final.kh <= KH[0] * 1.1 || removed > monsterTotal / 2;
   if (degenerate) notes.push('這組結果不合理（血量被壓到下限，或拿掉太多怪），不建議套用：請先確認玩家的角色資料都填好了、怪物防禦不要比玩家攻擊高太多。');
   return { specs: upon(base, final.kh, final.ka), hpScale: final.kh, atkScale: final.ka, summary: final.sum, penalty: final.pen, removed, notes, degenerate };
 }
