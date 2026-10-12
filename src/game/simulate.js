@@ -226,6 +226,7 @@ function ownDrain(p) {
  * opts.supply：假設每人備足這種血藥（毒性 15 喝滿）；opts.caps：每位玩家只出幾成力（陣列，1＝全力）；opts.downed：一開場就倒地的玩家位置（隊友仍可以餵藥拉起來；檢驗「第一名倒了，隊伍還贏不贏」）；opts.focus：怪物怎麼挑目標（'random' 隨機｜'spread' 平均分散｜'strongest' 集火第一名，要配 opts.focusOrder）
  * 回傳 { outcome: 'win' | 'lose' | 'timeout', rounds, damage, monsterHp, hpLeft, hpMax, downs: [每位玩家倒地幾次], potions,
  *        drain: { 靈氣: 0~1, 魔力: …, 毒性: … }（這場結束時，全隊平均用掉了多少比例；沒有這種資源的玩家不算）, drainAvg,
+ *        hitKinds: { mob|elite|boss: { n 打了幾下, frac 每下占玩家生命上限的比例加總 } },
  *        perPlayer: [{ dmg 打出的傷害, kills 打倒幾隻, taken 承受的傷害, actions 出招次數, potions 喝掉的藥水, drain 自己的消耗, hpLeft 剩餘生命比例 }] }
  */
 export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS, rng = Math.random, encounter = null, supply = null, caps = [], focus = 'random', focusOrder = [], downed = [] } = {}) {
@@ -239,6 +240,7 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
   const stat = team.map(() => ({ dmg: 0, kills: 0, taken: 0, actions: 0, potions: 0, hit: 0, firstDown: 0 }));
   let potions = 0;
   let healed = 0; // 敵人喝血回復的總量（算每回合傷害時要加回去）
+  const hitKinds = { mob: { n: 0, frac: 0 }, elite: { n: 0, frac: 0 }, boss: { n: 0, frac: 0 } }; // 各等級怪物：每一下打掉玩家多少比例的生命上限
   let rounds = 0;
   let outcome = 'timeout';
   const alive = () => enc.monsters.filter((m) => !isDowned(m));
@@ -273,6 +275,8 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
         const before = victim.hp;
         monsterAttack(victim, enc, m.id, bestAtkMode(m, victim), rng, { extraAtk: spent.extraAtk });
         stat[team.indexOf(victim)].taken += before - victim.hp;
+        const hk = hitKinds[m.kind === 'boss' ? 'boss' : m.rank === 'elite' ? 'elite' : 'mob'];
+        hk.n++; hk.frac += (before - victim.hp) / Math.max(1, maxHp(victim));
         markDowns();
       }
     }
@@ -292,7 +296,7 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
     drain, drainAvg: drainVals.reduce((a, v) => a + v, 0) / (drainVals.length || 1),
     damage: monsterHp - enc.monsters.reduce((a, m) => a + m.hp, 0) + healed, healed,
     hpLeft: team.reduce((a, p) => a + p.hp, 0), hpMax: team.reduce((a, p) => a + maxHp(p), 0),
-    downs, potions,
+    downs, potions, hitKinds,
     perPlayer: team.map((p, i) => ({ ...stat[i], takenPct: stat[i].taken / maxHp(p), drain: ownDrain(p), hpLeft: p.hp / maxHp(p) })),
   };
 }
@@ -334,6 +338,11 @@ export function summarize(results, names = []) {
     avgMonsterHp: avg((r) => r.monsterHp), avgDrain: avg((r) => r.drainAvg ?? 0),
     drainBy: Object.fromEntries([...new Set(results.flatMap((r) => Object.keys(r.drain ?? {})))].map((k) => [k, avg((r) => r.drain?.[k] ?? 0)])),
     roundHist, hpHist,
+    // 各等級怪物每一下平均打掉玩家多少比例的生命上限（沒打過就是 null）；GM 用來對照手感：小怪一下掉 10%、BOSS 一下掉 30%…
+    hitPct: Object.fromEntries(['mob', 'elite', 'boss'].map((k) => {
+      const n = results.reduce((a, r) => a + (r.hitKinds?.[k].n ?? 0), 0);
+      return [k, n ? results.reduce((a, r) => a + (r.hitKinds?.[k].frac ?? 0), 0) / n : null];
+    })),
     perPlayer: perPlayerSummary(results, names),
     downRate: (names.length ? names : (results[0]?.downs ?? []).map((_, i) => `玩家${i + 1}`)).map((name, i) => ({ name, rate: results.filter((r) => r.downs[i] > 0).length / (n || 1) })),
   };
