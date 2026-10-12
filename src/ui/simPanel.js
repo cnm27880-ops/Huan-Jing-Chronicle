@@ -11,12 +11,16 @@ import { simulateBattle, summarize, seededRng, DEFAULT_MAX_ROUNDS } from '../gam
 import { measureHits, rankPlayers, suggestMobHp, capsFor, blockedPlayers, splitBlank, FAIR } from '../game/fairness.js';
 import { POTIONS } from '../game/rules.js';
 import { assess, autoTune, penalty, scaleEncounter, shrinkEncounter, PLANS, TARGET } from '../game/tuning.js';
+import { TEMPLATE, damageCurve, makeEvaluator, designEncounter } from '../game/design.js';
 import { getEncounter, presetAction } from '../state/rollLog.js';
 import { formatAbc } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 
 const RUNS = 200; // 每次模擬的場數（固定）
 const TUNE_RUNS = 40; // 自動調整時，每組候選數值只跑這麼多場（要試很多組，跑 200 場太慢）；每次都用同一批種子，結果才不會被運氣干擾
+const DESIGN_CANDIDATES = 24; // 自動配置：試幾組隻數／防禦的結構（越多越準、越慢）
+const DESIGN_SEARCH_RUNS = 24; // 自動配置搜尋時，每組候選跑幾場
+const DESIGN_FINAL_RUNS = 60; // 前幾名最後重算跑幾場
 const BATCH = 25; // 每算幾場讓畫面喘口氣，進度才會動
 const pct = (v) => `${(v * 100).toFixed(v > 0 && v < 0.1 ? 1 : 0)}%`;
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
@@ -32,7 +36,8 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     source: 'custom', // 敵人來源：custom 自訂強度（每場重抽 A/B/C）｜stage 場上的敵人｜preset:名稱 敵人預組（固定）
     presetList: [],
     list: null, error: '', picked: new Set(), cache: new Map(), loading: false,
-    specs: [], form: { kind: 'mob', count: 1, atkPower: 100, defPower: 100, hp: 1000, absDef: 0, atkMod: '', defMod: '' },
+    specs: [], form: { kind: 'mob', count: 1, atkPower: TEMPLATE.mob.atkPower, defPower: TEMPLATE.mob.defPower, hp: TEMPLATE.mob.hp, absDef: 0, atkMod: '', defMod: '' },
+    withBoss: true, tuneKind: 'plans', // 自動配置要不要放 1 隻 BOSS；tuneResults 裡放的是哪一種結果（plans 保守／激進｜design 敵人配置）
     running: false, progress: 0, result: null, names: [],
     tuning: false, tuneProgress: 0, tuneResults: null, // tuneResults：[{ plan, specs, summary, penalty }]（保守版、激進版各一）；固定敵人時 specs 是調整後的 { monsters }
     tuneFrom: null,
@@ -169,8 +174,8 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     if (!ui.picked.size) return toast('至少選一位玩家。');
     const fixed = ui.source === 'custom' ? null : fixedEnemies();
     if (ui.source !== 'custom' && !fixed) return toast('場上沒有敵人，或找不到這個預組。');
-    if (!fixed && !ui.specs.length) return toast('至少加一組敵人。');
-    ui.tuning = true; ui.tuneProgress = 0; ui.tuneResults = null; sheet.refresh();
+    if (!fixed) return design(); // 自訂強度：搜尋整個敵人配置（隻數、血量、攻擊、防禦）
+    ui.tuning = true; ui.tuneProgress = 0; ui.tuneResults = null; ui.tuneKind = 'plans'; sheet.refresh();
     try {
       const { players, names, rank } = await prepareTeam(fixed ?? ui.specs);
       if (rank.hits.every((h) => h.perTarget < 1)) throw new Error('所有玩家對這組敵人都打不出傷害，調整數值沒有意義。請先確認角色資料與怪物防禦。');
@@ -192,6 +197,39 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
     ui.tuning = false;
     sheet.refresh();
     if (ui.tuneResults) scrollTo('.simtune');
+  }
+
+  /**
+   * 自動配置敵人（自訂強度）：小怪／菁英隻數與各級的血量、攻擊、防禦都由模擬去找（規則見 src/game/design.js）。
+   * 不需要先加敵人；BOSS 固定 1 隻或沒有。
+   */
+  async function design() {
+    if (ui.running || ui.tuning) return;
+    if (!ui.picked.size) return toast('至少選一位玩家。');
+    ui.tuning = true; ui.tuneProgress = 0; ui.tuneResults = null; ui.tuneKind = 'design'; sheet.refresh();
+    try {
+      const { players, names, rank } = await prepareTeam([{ kind: 'mob', count: 3, ...TEMPLATE.mob }]);
+      const supply = ui.supply || null;
+      const curve = damageCurve(players, { supply });
+      const evaluate = makeEvaluator({ players, names, rank, supply, focus: ui.focus, runs: DESIGN_SEARCH_RUNS });
+      const evaluateFinal = makeEvaluator({ players, names, rank, supply, focus: ui.focus, runs: DESIGN_FINAL_RUNS });
+      const out = await designEncounter({
+        players, names, boss: ui.withBoss, evaluate, evaluateFinal, supply, curve, candidates: DESIGN_CANDIDATES,
+        onProgress: (p) => { ui.tuneProgress = p; sheet.refresh(); },
+      });
+      if (!out.results.length) throw new Error(out.notes[0] || '找不到可行的配置。');
+      ui.tuneResults = out;
+      ui.tuneFrom = null;
+    } catch (e) { toast(e.message || '自動配置失敗。'); }
+    ui.tuning = false;
+    sheet.refresh();
+    if (ui.tuneResults) scrollTo('.simtune');
+  }
+
+  function applyDesign(r) {
+    ui.specs = r.specs.filter((x) => x.count > 0).map((x) => ({ ...x }));
+    ui.tuneResults = null;
+    run(); // 套用後馬上用 200 場確認
   }
 
   function applyTune(plan) {
@@ -254,6 +292,10 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         h('label', { class: 'extra' }, h('span', { text: '攻擊補正（選填）' }), h('input', { class: 'field', type: 'text', placeholder: '5A 3C', value: f.atkMod, onchange: (e) => { f.atkMod = e.target.value; } })),
         h('label', { class: 'extra' }, h('span', { text: '防禦補正（選填）' }), h('input', { class: 'field', type: 'text', placeholder: '2B', value: f.defMod, onchange: (e) => { f.defMod = e.target.value; } }))),
       h('button', {
+        type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.running ? true : null,
+        onclick: () => { ui.specs = [{ kind: 'mob', count: 9, ...TEMPLATE.mob, absDef: 0, atkMod: '', defMod: '' }, { kind: 'boss', count: 1, ...TEMPLATE.boss, absDef: 0, atkMod: '', defMod: '' }]; sheet.refresh(); },
+      }, '載入 10/12 實戰範本（9 小怪＋BOSS）'),
+      h('button', {
         type: 'button', class: 'btn btn--small', disabled: ui.running ? true : null,
         onclick: () => {
           if (f.count > 20) return toast('一組最多 20 隻。');
@@ -278,14 +320,50 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         h('span', { class: 'badge', dataset: { tone: i.status === 'ok' ? 'good' : 'bad' }, text: `${STATUS_LABEL[i.status]}・${i.text}` })))),
       h('h3', { class: 'section-title', text: '策略建議' }),
       h('ul', { class: 'simassess__advice' }, a.advice.map((t) => h('li', { text: t }))),
-      h('button', { type: 'button', class: 'btn btn--small', disabled: ui.running || ui.tuning ? true : null, onclick: tune }, ui.tuning ? `調整中… ${Math.round(ui.tuneProgress * 100)}%` : '🎯 自動調整數值（保守／激進兩個方案）'),
-      tuneView());
+      ui.source === 'custom' ? null : h('button', { type: 'button', class: 'btn btn--small', disabled: ui.running || ui.tuning ? true : null, onclick: tune }, ui.tuning ? `調整中… ${Math.round(ui.tuneProgress * 100)}%` : '🎯 自動調整數值（保守／激進兩個方案）'),
+      ui.source === 'custom' ? null : tuneView());
+  }
+
+  /** 「自動配置敵人」區塊（只在自訂強度）：選有沒有 BOSS、按下去由模擬找最好的小怪／菁英隻數與各級數值 */
+  function designCard() {
+    if (ui.source !== 'custom') return null;
+    return h('div', { class: 'simdesign' },
+      h('h3', { class: 'section-title', text: '自動配置敵人' }),
+      h('p', { class: 'hint', text: '不需要先加敵人。模擬會自己找小怪、菁英的隻數，以及小怪／菁英／BOSS 各自的血量、攻擊、防禦（目標 2～3 回合）：小怪給最弱的人打得動，BOSS 讓強的人也要花力氣，大家都有戲份。一次約 30～60 秒。' }),
+      h('div', { class: 'toggle-row' }, [[true, '有 BOSS（1 隻）'], [false, '沒有 BOSS']].map(([v, label]) => h('button', {
+        type: 'button', class: 'toggle', 'aria-pressed': String(ui.withBoss === v), disabled: ui.tuning ? true : null, onclick: () => { ui.withBoss = v; ui.tuneResults = null; sheet.refresh(); },
+      }, label))),
+      h('button', { type: 'button', class: 'btn btn--primary btn--go', disabled: ui.running || ui.tuning ? true : null, onclick: design },
+        ui.tuning && ui.tuneKind === 'design' ? `配置中… ${Math.round(ui.tuneProgress * 100)}%` : '🎯 自動配置敵人'),
+      ui.tuneResults && ui.tuneKind === 'design' ? designView() : null);
+  }
+
+  /** 自動配置的結果：最多三個方案（小怪／菁英隻數不同），列出各級數值與預估成績，按「套用」才會放進敵人清單 */
+  function designView() {
+    const { results, notes } = ui.tuneResults;
+    const nameOf = { mob: '👾 小怪', elite: '👺 菁英', boss: '👹 BOSS' };
+    return h('div', { class: 'simtune' },
+      blockedNotice(),
+      notes?.length ? h('ul', { class: 'simassess__advice' }, notes.map((n) => h('li', { text: n }))) : null,
+      results.map((r, i) => {
+        const sm = r.summary;
+        const title = r.specs.map((x) => `${nameOf[x.kind].slice(3)} ${x.count}${x.kind === 'boss' ? '' : ' 隻'}`).join('＋');
+        const hit = ['mob', 'elite', 'boss'].filter((k) => sm.hitPct?.[k] != null).map((k) => `${nameOf[k].slice(3)}一下 ${pct(sm.hitPct[k])}`).join('、');
+        return h('section', { class: 'simtune__plan' },
+          h('h4', { class: 'field-label', text: `方案 ${i + 1}：${title}` }),
+          h('ul', { class: 'import-list' }, r.specs.map((x) => h('li', { class: 'import-row' },
+            h('span', { text: `${nameOf[x.kind]} ×${x.count}　血 ${fmt(x.hp)}・攻 ${fmt(x.atkPower)}・防 ${fmt(x.defPower)}` })))),
+          h('p', { class: 'hint', text: `預估：${(sm.avgRoundsWin ?? sm.avgRounds).toFixed(1)} 回合・勝率 ${pct(sm.win)}・資源消耗 ${pct(sm.avgDrain)}・剩餘生命 ${pct(sm.avgHpLeft)}${hit ? `・怪物${hit}（占玩家生命）` : ''}` }),
+          sm.perPlayer?.length ? h('p', { class: 'hint', text: `各玩家輸出占比：${sm.perPlayer.map((p) => `${p.name} ${pct(p.share)}`).join('、')}` }) : null,
+          r.issues?.length ? h('ul', { class: 'simassess__advice' }, r.issues.map((x) => h('li', { text: `${x.label}：${x.value}（目標 ${x.target}）— ${x.text}` }))) : h('p', { class: 'notice', text: '所有目標都達標。' }),
+          h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => applyDesign(r) }, `套用方案 ${i + 1}，並用 ${RUNS} 場重新模擬`));
+      }));
   }
 
   /** 自動調整的結果：保守版與激進版各一張卡，列出調整前後的數值與預估成績，GM 按「套用」才會真的改 */
   function tuneView() {
     const list = ui.tuneResults;
-    if (!list) return null;
+    if (!list || ui.tuneKind !== 'plans') return null;
     return h('div', { class: 'simtune' },
       blockedNotice(),
       h('p', { class: 'hint', text: '兩個方案都以目標為範圍（2～3 回合、第一名省力也要贏、最弱的也能打倒小怪）：小怪血量依最弱玩家一次出手的傷害設，BOSS 血量補足回合數，怪物攻擊盡量拉高讓血藥有存在感。保守版偏輕鬆、激進版偏緊繃；預估每組只跑了少數場次，套用後會用 200 場重新確認。' }),
@@ -368,7 +446,8 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         stat('每回合傷害', fmt(Math.round(r.avgDamagePerRound)), '全隊對怪物'),
         stat('剩餘生命', pct(r.avgHpLeft), '每場結束時全隊平均'),
         stat('資源消耗', pct(r.avgDrain), `合理範圍 ${pct(TARGET.drain - TARGET.drainTol)}～${pct(TARGET.drain + TARGET.drainTol)}（每人的資源與毒性）`),
-        stat('用掉藥水', r.avgPotions.toFixed(1), '每場平均瓶數')),
+        stat('用掉藥水', r.avgPotions.toFixed(1), '每場平均瓶數'),
+        stat('怪物每下傷害', ['mob', 'elite', 'boss'].filter((k) => r.hitPct?.[k] != null).map((k) => `${{ mob: '小怪', elite: '菁英', boss: 'BOSS' }[k]} ${pct(r.hitPct[k])}`).join('・') || '—', '一下平均打掉玩家多少比例的生命上限')),
       h('p', { class: 'field-label', text: '各項消耗（全隊平均，毒性以上限 15 計）' }),
       h('div', { class: 'toggle-row' }, Object.entries(r.drainBy).map(([k, v]) => h('span', { class: 'badge', dataset: { tone: '' }, text: `${k} ${pct(v)}` }))),
       assessmentView(r),
@@ -397,6 +476,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       h('h3', { class: 'section-title', text: '1. 選玩家' }), playersCard(),
       h('h3', { class: 'section-title', text: '2. 敵人' }), sourceCard(),
       h('h3', { class: 'section-title', text: '3. 血藥與攻擊分配' }), supplyCard(), focusCard(), skipCard(),
+      designCard(),
       h('button', { type: 'button', class: 'btn btn--primary btn--go', disabled: ui.running || ui.tuning ? true : null, onclick: run },
         ui.running ? `模擬中… ${Math.round(ui.progress * 100)}%` : `▶ 開始模擬（${RUNS} 場）`),
       resultView());

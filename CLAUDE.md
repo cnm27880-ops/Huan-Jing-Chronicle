@@ -46,7 +46,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄、房間上方；GM 不顯示）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示） |
 | `src/ui/confirmPop.js` | 網頁自己的對話框（取代瀏覽器的 confirm／prompt）：`askConfirm`／`askText`，有給按鈕貼在旁邊、沒給就置中；**全站不要再用 `confirm()`／`prompt()`／`alert()`** |
 | `src/game/fairness.js` | 模擬戰的公平性（純函式）：量每位玩家一次出手的傷害並排強弱、小怪血量依最弱玩家設、「第一名只出六成力」的情境（`FAIR` 常數可調） |
-| `src/game/tuning.js` | 模擬戰的目標（2～3 回合、每場約耗一半資源）、評價與策略建議、自動調整（保守版／激進版兩個方案 `PLANS`）：先找回合數的結構下限、必要時拿掉最弱的怪，再二分搜尋血量與攻擊強度（自訂強度 `scaleSpecs`／固定敵人 `scaleEncounter` 都能調）（純函式） |
+| `src/game/design.js` | 模擬戰的「自動配置敵人」（純函式，只用在自訂強度）：搜尋小怪／菁英隻數與各級血量、攻擊、防禦（BOSS 固定 1 隻或沒有）；先量玩家的傷害曲線（`damageCurve`）再決定各級防禦與血量，用二分搜尋對準 2～3 回合與攻擊強度；`TEMPLATE` 是 10/12 實戰數值；`makeEvaluator` 是固定種子的評分模擬 |
+| `src/game/tuning.js` | 模擬戰的目標（2～3 回合、每場約耗一半資源）、評價與策略建議、自動調整（保守版／激進版兩個方案 `PLANS`）：先找回合數的結構下限、必要時拿掉最弱的怪，再二分搜尋血量與攻擊強度（自訂強度 `scaleSpecs`／固定敵人 `scaleEncounter` 都能調）；新增輸出占比評分 `shareInfo`（純函式；自訂強度改用 `design.js`） |
 | `src/game/activity.js`、`src/state/activityLog.js`、`src/ui/logsView.js` | 玩家日誌：內容格式（修整／學習／物品）、回報點（房間伺服器，離線存本機）、「日誌」大分頁（`#logs`，所有玩家都看得到每位玩家的）；伺服器端在 `room-core.js` 的 `actPost`／`actList`，每人留 500 筆 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`，立繪與隊友狀態在 `worker/test/images.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |

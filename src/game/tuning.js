@@ -17,6 +17,8 @@ export const TARGET = {
   topDownRoundMin: 2, // 怪物集火第一名時，他平均至少要撐到第幾回合才倒（太早倒，團隊就少了最大的輸出；需驗證）
   outWinMin: 0.5, // 集火第一名時，第一名開場就倒，隊伍至少還要有這麼高的勝率（不要完全靠他；需驗證）
   concentrationMax: 1.6, // 受傷占生命比例最高的人，不要超過全隊平均的這麼多倍（攻擊集中打少數人，需驗證）
+  topShareMult: 1.8, // 輸出占比最高的人，不要超過「平均占比（1/人數）」的這麼多倍（強弱差太大時第一名會秒殺一切；3 人以上才算，需驗證）
+  weakShareMult: 0.4, // 輸出占比最低的人，至少要有「平均占比」的這麼多（需驗證）
   battlesPerSession: 2,
 };
 
@@ -32,16 +34,30 @@ export const PLANS = {
 };
 
 /** 判斷回合數用「打贏的場次」（沒有這欄位就用全部）；一位小數，和畫面顯示一致 */
-const roundsOf = (sum) => Math.round((sum.avgRoundsWin ?? sum.avgRounds) * 10) / 10;
+export const roundsOf = (sum) => Math.round((sum.avgRoundsWin ?? sum.avgRounds) * 10) / 10;
 
 /** 倒地機率的最高值；怪物集火第一名時，第一名一定會倒，不算在內 */
-const downMaxOf = (sum) => {
+export const downMaxOf = (sum) => {
   const f = sum.focus === 'strongest' && sum.rank;
   return Math.max(0, ...(sum.downRate ?? []).filter((_, i) => !(f && i === sum.rank.strongest)).map((d) => d.rate));
 };
 
 const pct = (v) => `${Math.round(v * 100)}%`;
 const fmtN = (v) => Math.round(v).toLocaleString('zh-TW');
+
+/**
+ * 輸出分配：全隊輸出占比最高的人不要太高、最低的人不要太低（強弱差太大，第一名秒殺一切、最弱的打不到東西）。
+ * 3 人以上才算；回傳 { top, weak, topMax, weakMin }，沒有資料回傳 null。
+ */
+export function shareInfo(sum, t = TARGET) {
+  const ps = sum.perPlayer;
+  if (!ps || ps.length < 3) return null;
+  const n = ps.length;
+  return {
+    top: Math.max(...ps.map((p) => p.share)), weak: Math.min(...ps.map((p) => p.share)),
+    topMax: (t.topShareMult ?? TARGET.topShareMult) / n, weakMin: (t.weakShareMult ?? TARGET.weakShareMult) / n,
+  };
+}
 
 /** 偏離目標的程度（0 = 三項都達標）；自動調整就是找讓它最小的敵人數值 */
 export function penalty(sum, t = TARGET) {
@@ -59,7 +75,11 @@ export function penalty(sum, t = TARGET) {
   const topP = focusTop ? sum.perPlayer?.[sum.rank.strongest] : null;
   const ps = topP && topP.downRound > 0 ? Math.max(0, (t.topDownRoundMin ?? TARGET.topDownRoundMin) - topP.downRound) / 1 : 0;
   const po = sum.outWin == null ? 0 : Math.max(0, (t.outWinMin ?? TARGET.outWinMin) - sum.outWin) / 0.1; // 第一名倒了隊伍就贏不了：太依賴他
-  return pr + pc + pw + pd + pf + pt + ps + po;
+  const sh = shareInfo(sum, t);
+  const pShare = sh ? Math.max(0, sh.top - sh.topMax) / 0.1 + Math.max(0, sh.weakMin - sh.weak) / 0.05 : 0; // 輸出分配不均
+  const weakP = sum.rank && sum.perPlayer?.length > 1 ? sum.perPlayer[sum.rank.weakest] : null;
+  const pKill = weakP && Number.isFinite(weakP.kills) ? Math.max(0, (t.weakKills ?? TARGET.weakKills) - weakP.kills) / 0.5 : 0; // 最弱的人整場沒打倒東西
+  return pr + pc + pw + pd + pf + pt + ps + po + pShare + pKill;
 }
 
 /**
@@ -130,6 +150,20 @@ export function assess(sum) {
       text: wStatus2 === 'ok' ? '有參與感' : '幾乎沒貢獻，小怪血量或防禦對他太高',
     });
     if (wStatus2 === 'low') advice.push(`最弱的 ${weak.name} 平均只打倒 ${weak.kills.toFixed(1)} 隻：小怪血量調到他一次出手能打倒的程度（自動調整會這樣做），或降低小怪防禦。`);
+  }
+
+  // 輸出分配：強弱差距太大時，第一名秒殺一切、最弱的打不到東西（3 人以上才算）
+  const sh = shareInfo(sum);
+  if (sh) {
+    const hiStatus = sh.top > sh.topMax ? 'high' : 'ok';
+    const loStatus = sh.weak < sh.weakMin ? 'low' : 'ok';
+    items.push({
+      key: 'share', label: '輸出分配（最高／最低占比）', value: `${pct(sh.top)}／${pct(sh.weak)}`, target: `最高不超過 ${pct(sh.topMax)}、最低至少 ${pct(sh.weakMin)}`,
+      status: hiStatus !== 'ok' ? hiStatus : loStatus,
+      text: hiStatus !== 'ok' ? '有人包辦太多輸出（強弱差距大）' : loStatus !== 'ok' ? '有人幾乎沒輸出' : '大家都有戲份',
+    });
+    if (hiStatus !== 'ok') advice.push(`輸出最高的人占了全隊 ${pct(sh.top)}（平均 ${pct(1 / sum.perPlayer.length)}）：強弱差距大，單靠血量與攻擊調不平。用「自動配置敵人」讓小怪、菁英、BOSS 各有不同的血量與防禦，各自對應不同強度的玩家。`);
+    if (loStatus !== 'ok') advice.push(`輸出最低的人只占 ${pct(sh.weak)}：他可能打不穿多數敵人的防禦，降低小怪的防禦，或多放幾隻他打得動的小怪。`);
   }
 
   // 集火第一名（GM 現在的打法）：他撐到第幾回合、倒地前打出多少輸出
