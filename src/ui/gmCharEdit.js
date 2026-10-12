@@ -12,6 +12,7 @@ import { blankCharacter } from '../game/importBot.js';
 import { derivedStats } from '../game/stats.js';
 import { ALL_STATS, GEAR_TIERS, GEAR_SLOT_NAME, EQUIP_SLOTS, EQUIP_SLOT_LABEL } from '../game/rules.js';
 import { addManualGear, gearName, unequip } from '../game/equipment.js';
+import { hasPicks, resetPicks } from '../game/skillPicks.js';
 import { SKILL_TABLE, inCatalog, needsActivation, usesSkillTable, MAX_SKILL_LEVEL, getCustomSkillNames } from '../game/skillTable.js';
 
 /** 把角色資料存成 JSON 檔下載（覆蓋前的備份） */
@@ -173,7 +174,7 @@ export function openGmCharEditor() {
         h('input', { class: 'field', type: 'number', inputmode: 'numeric', value: d.adjust[s] ?? 0, 'aria-label': `${s} 手動調整`, onchange: (e) => { d.adjust[s] = int(e.target.value); sheet.refresh(); } }),
         h('small', { class: 'stat__detail', text: `面板 ${fmt(stats[s].total)}` })))),
       h('p', { class: 'field-label', text: `技能（${skills.length}）` }),
-      h('ul', { class: 'skill-list' }, skills.map(([n, lv]) => h('li', { class: 'skill-row' },
+      h('ul', { class: 'skill-list skill-list--grid' }, skills.map(([n, lv]) => h('li', { class: 'skill-row' },
         h('strong', { text: n }),
         h('label', { class: 'extra' }, h('span', { text: '等級' }),
           h('input', { class: 'field', type: 'number', min: 0, max: MAX_SKILL_LEVEL, value: lv, inputmode: 'numeric', onchange: (e) => { d.skills[n] = Math.max(0, Math.min(MAX_SKILL_LEVEL, int(e.target.value))); sheet.refresh(); } })),
@@ -181,6 +182,9 @@ export function openGmCharEditor() {
           ? h('label', { class: 'check' },
               h('input', { type: 'checkbox', checked: d.skillOn?.[n] ? true : null, onchange: (e) => { d.skillOn = { ...d.skillOn, [n]: e.target.checked }; sheet.refresh(); } }),
               h('span', { text: `啟動（算力上限 −${SKILL_TABLE[n].activate.算力}）` }))
+          : null,
+        hasPicks(n) && d.skillPicks?.[n]
+          ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { resetPicks(d, n); ui.message = `已清掉「${n}」的自選屬性，記得按「儲存到伺服器」；玩家可以重選。`; sheet.refresh(); } }, '重設自選')
           : null))),
       addSkillRow(d),
       gearSection(d),

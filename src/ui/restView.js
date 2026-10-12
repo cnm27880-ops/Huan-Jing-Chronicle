@@ -27,6 +27,7 @@ import {
 import { openSheet } from './sheet.js';
 import { askConfirm } from './confirmPop.js';
 import { skillTile, skillInfoBlock, skillTag } from './skillTile.js';
+import { skillPicksBlock } from './skillPicks.js';
 
 const ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -240,7 +241,8 @@ export function createRestView({ root, getState, commit }) {
       const state = getState();
       const lv = Number(state.skills?.[name]) || 0;
       const info = skillInfoBlock(name);
-      if (lv >= MAX_SKILL_LEVEL) return h('div', { class: 'learn' }, info, h('p', { class: 'notice', text: `${name} 已經滿級。` }));
+      const picks = skillPicksBlock(state, name, { commit, refresh: () => sheet.refresh() }); // 孕育等要自選屬性的技能
+      if (lv >= MAX_SKILL_LEVEL) return h('div', { class: 'learn' }, info, h('p', { class: 'notice', text: `${name} 已經滿級。` }), picks);
       const best = maxAffordableLevel(state, name);
       if (!pick.target || pick.target <= lv || pick.target > MAX_SKILL_LEVEL) pick.target = Math.max(best, lv + 1);
       const plan = upgradePlan(state, name, pick.target);
@@ -265,7 +267,8 @@ export function createRestView({ root, getState, commit }) {
         swapAt.length ? h('p', { class: 'hint', text: `會在 ${swapAt.join('、')} 級自動對調「${FOOL_SWAPS[name][0]}」與「${FOOL_SWAPS[name][1]}」。` }) : null,
         h('button', {
           type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: (e) => doUpgrade(plan, e.currentTarget),
-        }, plan.ok ? `${lv ? '升級' : '學習'}到 ${plan.to} 級` : '材料不夠'));
+        }, plan.ok ? `${lv ? '升級' : '學習'}到 ${plan.to} 級` : '材料不夠'),
+        picks);
     }
 
     sheet = openSheet(name, body, { tall: true });

@@ -5,7 +5,7 @@
 import { h, fmt } from './dom.js';
 import { openSheet, closeSheet } from './sheet.js';
 import { itemTile, amountPicker, toast, rarityTag } from './controls.js';
-import { KNOWN_ITEMS, rarityOf, iconOf, plainName } from './items.js';
+import { KNOWN_ITEMS, skillBookNames, rarityOf, iconOf, plainName } from './items.js';
 import { FOODS, STOMACH_SLOTS } from '../game/rules.js';
 import { addItem, removeItem, countOf, eat, eatOrQueue, useKeepsake } from '../game/engine.js';
 import { USABLE_ITEMS, useSpecialItem } from '../game/special.js';
@@ -105,6 +105,8 @@ export function openAddSheet(state, commit) {
   let query = '';
   const sheet = openSheet('放進背包', () => {
     const list = KNOWN_ITEMS.filter((n) => !query || n.includes(query));
+    const books = skillBookNames().filter((n) => !query || n.includes(query));
+    const pickItem = (n) => { closeSheet(); setTimeout(() => openItemSheet(state, n, commit), 230); };
     const custom = h('input', { class: 'field', placeholder: '自創物品名稱，例如：月月的魚頭', maxlength: 40, 'aria-label': '自創物品名稱' });
     const search = h('input', {
       class: 'field', type: 'search', placeholder: '搜尋遊戲物品', value: query, 'aria-label': '搜尋遊戲物品',
@@ -137,7 +139,14 @@ export function openAddSheet(state, commit) {
           list.map((n) => itemTile(n, countOf(state, n) || null, {
             onClick: () => { closeSheet(); setTimeout(() => openItemSheet(state, n, commit), 230); },
           }))),
-        list.length ? null : h('p', { class: 'hint', text: `沒有符合「${query}」的遊戲物品。` }))
+        list.length || books.length ? null : h('p', { class: 'hint', text: `沒有符合「${query}」的遊戲物品。` })),
+      books.length
+        ? h('section', {},
+            h('h3', { class: 'section-title', text: '有名字的技能書' }),
+            h('p', { class: 'hint', text: '物品名稱就是技能名，例如機器人存檔裡的「大成真仙」。點一下選數量放進背包。' }),
+            h('div', { class: 'menu-chips' }, books.map((n) =>
+              h('button', { type: 'button', class: 'chip', onclick: () => pickItem(n) }, `📜 ${n}${countOf(state, n) ? `（有 ${fmt(countOf(state, n))}）` : ''}`))))
+        : null
     );
   });
 }

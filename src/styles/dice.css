@@ -159,6 +159,12 @@
 .res-row__input { width: 100%; }
 .skill-list { list-style: none; padding: 0; margin: 0 0 0.5rem; display: grid; gap: 0.4rem; }
 .skill-row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+/* GM 玩家角色面板：技能三個一排，名稱在上、等級輸入在下 */
+.skill-list--grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.skill-list--grid .skill-row { flex-direction: column; align-items: stretch; gap: 0.2rem; padding: 0.35rem 0.4rem; border: 1px solid var(--line); border-radius: 8px; }
+.skill-list--grid .skill-row strong { font-size: 0.8rem; overflow-wrap: anywhere; }
+.skill-list--grid .extra { flex-direction: row; align-items: center; gap: 0.3rem; }
+.skill-list--grid .extra .field { width: 100%; min-width: 0; }
 .move__main { flex: 1; min-width: 0; display: grid; gap: 0.4rem; }
 .move__cost { display: block; opacity: 0.8; }
 .support-btns { flex-wrap: wrap; gap: 0.4rem; }

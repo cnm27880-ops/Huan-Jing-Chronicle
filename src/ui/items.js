@@ -95,3 +95,6 @@ export const categoryOf = (name) => CATEGORIES.find((c) => c.test(name)).id;
 export const KNOWN_ITEMS = [...new Set([
   ...flat(GATHER_POOLS), ...RECIPE_LIST.map((r) => r.cost), ...RECIPE_LIST.flatMap((r) => r.rewards),
 ])];
+
+/** 有名字的技能書（物品名 = 技能名）：「放進背包」用，補機器人存檔偵測不到的背包技能書。每次呼叫都重算，GM 新增的專屬技能才會跟著出現 */
+export const skillBookNames = () => Object.keys(SKILL_TABLE);
