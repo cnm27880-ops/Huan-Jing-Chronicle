@@ -82,12 +82,12 @@ test('修整胃袋滿了會排隊，食物用完自動補上，連做 30 次熟�
   assert.equal(proficiency(s, 'rest').total, 10);
 });
 
-test('快捷料理：吃 N 組，全有或全無，順序固定', () => {
+test('菜單：吃 N 組，全有或全無，順序固定', () => {
   const s = fresh();
   s.inventory['傳奇盛宴'] = 2;
   s.inventory['碳烤肉排'] = 4;
   assert.equal(addPreset(s, ['傳奇盛宴', '碳烤肉排', '碳烤肉排']), null);
-  assert.equal(addPreset(s, ['傳奇盛宴', '碳烤肉排', '碳烤肉排']), '已經有一樣的快捷了。');
+  assert.equal(addPreset(s, ['傳奇盛宴', '碳烤肉排', '碳烤肉排']), '已經有一樣的菜單了。');
   assert.match(eatPreset(s, s.foodPresets[0], 3, 'rest'), /不夠/);
   assert.equal(s.inventory['傳奇盛宴'], 2); // 失敗不動背包
   assert.equal(eatPreset(s, s.foodPresets[0], 2, 'rest'), null);
@@ -96,7 +96,7 @@ test('快捷料理：吃 N 組，全有或全無，順序固定', () => {
   assert.equal(presetLabel(s.foodPresets[0]), '傳奇盛宴 ×1＋碳烤肉排 ×2');
 });
 
-test('跑團胃袋沒有佇列，快捷放不下就拒絕；佇列可退回背包', () => {
+test('跑團胃袋沒有佇列，菜單放不下就拒絕；佇列可退回背包', () => {
   const s = fresh();
   s.inventory['拉麵'] = 6;
   assert.match(eatPreset(s, ['拉麵', '拉麵', '拉麵'], 2, 'session'), /吃不下/);

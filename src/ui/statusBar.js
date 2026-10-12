@@ -15,8 +15,8 @@ import { logActivity } from '../state/activityLog.js';
 export function openFoodSheet(state, ctx, commit) {
   const rest = ctx === 'rest';
   const where = rest ? '修整' : '跑團';
-  let sets = 1; // 快捷一次吃幾組
-  let draft = []; // 正在編輯的新快捷（食物名稱，最多 3 份）
+  let sets = 1; // 菜單一次吃幾組
+  let draft = []; // 正在編輯的新菜單（食物名稱，最多 3 份）
   const sheet = openSheet(rest ? '修整時吃東西' : '跑團時吃東西', (close) => {
     const stomach = rest ? state.restStomach : state.sessionStomach;
     const queue = rest ? restQueue(state) : [];
@@ -38,13 +38,13 @@ export function openFoodSheet(state, ctx, commit) {
           type: 'button', class: 'btn btn--primary',
           onclick: () => {
             const err = eatPreset(state, p, sets, ctx);
-            err ? toast(err) : done(`${where}吃下快捷「${presetLabel(p)}」× ${sets} 組`);
+            err ? toast(err) : done(`${where}吃下菜單「${presetLabel(p)}」× ${sets} 組`);
           },
         }, `吃 ${sets} 組（${p.length * sets} 份）`),
-        h('button', { type: 'button', class: 'btn btn--ghost', 'aria-label': '刪除這組快捷', onclick: () => { presets.splice(i, 1); done('刪除一組快捷'); } }, '刪除')));
+        h('button', { type: 'button', class: 'btn btn--ghost', 'aria-label': '刪除這組菜單', onclick: () => { presets.splice(i, 1); done('刪除一組菜單'); } }, '刪除')));
 
     const builder = h('div', { class: 'rest-field' },
-      h('p', { class: 'field-label', text: `新增快捷：${draft.length ? presetLabel(draft) : '點下面的料理加入（最多 3 份）'}` }),
+      h('p', { class: 'field-label', text: `新增菜單：${draft.length ? presetLabel(draft) : '點下面的料理加入（最多 3 份）'}` }),
       h('div', { class: 'tile-grid' }, Object.keys(FOODS).map((f) =>
         itemTile(f, null, {
           extra: h('span', { class: 'tile__note', text: FOODS[f].effect }),
@@ -53,8 +53,8 @@ export function openFoodSheet(state, ctx, commit) {
       h('button', { type: 'button', class: 'btn btn--ghost', disabled: !draft.length, onclick: () => { draft = []; sheet.refresh(); } }, '清除'),
       h('button', {
         type: 'button', class: 'btn btn--primary', disabled: !draft.length,
-        onclick: () => { const err = addPreset(state, draft); if (err) return toast(err); draft = []; done('新增一組快捷'); },
-      }, '儲存快捷'));
+        onclick: () => { const err = addPreset(state, draft); if (err) return toast(err); draft = []; done('新增一組菜單'); },
+      }, '儲存菜單'));
 
     return h('div', {},
       h('p', { class: 'field-label', text: `胃袋 ${stomach.length} / ${STOMACH_SLOTS}${rest && stomach.length >= STOMACH_SLOTS ? '（滿了，再吃會排進等候）' : ''}` }),
@@ -71,10 +71,10 @@ export function openFoodSheet(state, ctx, commit) {
               },
             })))
         : h('p', { class: 'notice', text: '背包裡沒有料理。' }),
-      h('h3', { class: 'field-label', text: '快捷料理' }),
+      h('h3', { class: 'field-label', text: '菜單' }),
       h('p', { class: 'field-label', text: '一次吃幾組' }),
       amountPicker({ value: sets, quick: [1, 5, 10], onChange: (n) => { sets = n; sheet.refresh(); } }),
-      presets.length ? presetRows : h('p', { class: 'hint', text: '還沒有快捷。' }),
+      presets.length ? presetRows : h('p', { class: 'hint', text: '還沒有菜單。' }),
       builder);
   });
 }

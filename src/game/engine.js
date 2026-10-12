@@ -130,20 +130,20 @@ export function tickRestStomach(state) {
   while (q.length && state.restStomach.length < STOMACH_SLOTS) enterStomach(state, q.shift(), 'rest');
 }
 
-// ---------- 快捷料理（一組最多 3 份，例如 1 傳奇盛宴 + 2 碳烤肉排） ----------
-/** 檢查並新增快捷。foods：食物名稱陣列（1～3 份）。回傳錯誤文字或 null */
+// ---------- 菜單（一組最多 3 份，例如 1 傳奇盛宴 + 2 碳烤肉排） ----------
+/** 檢查並新增菜單。foods：食物名稱陣列（1～3 份）。回傳錯誤文字或 null */
 export function addPreset(state, foods) {
   const list = (state.foodPresets ??= []);
   if (!foods.length) return '至少要選 1 份料理。';
   if (foods.length > STOMACH_SLOTS) return `一組最多 ${STOMACH_SLOTS} 份。`;
   if (foods.some((f) => !FOODS[f])) return '有不是食物的東西。';
-  if (list.length >= PRESET_MAX) return `快捷最多 ${PRESET_MAX} 組，先刪掉一組。`;
-  if (list.some((p) => p.join() === foods.join())) return '已經有一樣的快捷了。';
+  if (list.length >= PRESET_MAX) return `菜單最多 ${PRESET_MAX} 組，先刪掉一組。`;
+  if (list.some((p) => p.join() === foods.join())) return '已經有一樣的菜單了。';
   list.push([...foods]);
   return null;
 }
 
-/** 快捷的顯示名稱：同種合併，例如「傳奇盛宴 ×1＋碳烤肉排 ×2」 */
+/** 菜單的顯示名稱：同種合併，例如「傳奇盛宴 ×1＋碳烤肉排 ×2」 */
 export function presetLabel(foods) {
   const count = {};
   foods.forEach((f) => (count[f] = (count[f] ?? 0) + 1));
@@ -151,7 +151,7 @@ export function presetLabel(foods) {
 }
 
 /**
- * 一次吃 sets 組快捷。全有或全無：背包不夠、放不下就不動任何東西。
+ * 一次吃 sets 組菜單。全有或全無：背包不夠、放不下就不動任何東西。
  * 修整：先填空格，其餘排進等候佇列；跑團：沒有佇列，只能填空格。回傳錯誤文字或 null
  */
 export function eatPreset(state, foods, sets, ctx) {
