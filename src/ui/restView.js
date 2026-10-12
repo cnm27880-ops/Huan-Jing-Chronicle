@@ -488,7 +488,7 @@ export function createRestView({ root, getState, commit }) {
       ...(max <= 0
         ? [h('p', { class: 'notice notice--bad', text: `${name}的材料不足，先去取材料或採集。` })]
         : runBlock(state, r.skill, {
-            kctx: { kind: 'special' }, label: `${ICONS[r.skill]} ${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 3, 5],
+            kctx: { kind: 'special' }, label: `${ICONS[r.skill]} ${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 5, 10],
             onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSpecial(state, name, ui.times, [...ui.keepsakes]) }),
           })),
     ];

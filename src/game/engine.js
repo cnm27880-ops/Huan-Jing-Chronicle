@@ -80,21 +80,113 @@ export function modifier(state, skill, ctx, keepsakes = [], kctx) {
 }
 
 // ---------- 胃袋 ----------
+/** 食物真正進胃袋（背包已先扣好）。惜未央：吃下時獲得 1 時間，每次刷新之間最多 2 次（RULES_OVERVIEW §9） */
+function enterStomach(state, food, ctx) {
+  const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
+  stomach.push(ctx === 'rest' ? { food, left: REST_FOOD_CHECKS } : { food });
+  if (food === '惜未央' && (state.xiweiTime ?? 0) < 2) { state.time += 1; state.xiweiTime = (state.xiweiTime ?? 0) + 1; }
+}
+
 export function eat(state, food, ctx) {
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
   if (!FOODS[food]) return '這不是可以吃的食物。';
   if (stomach.length >= STOMACH_SLOTS) return '胃袋已滿，最多 3 份。';
   if (!removeItem(state, food)) return `背包裡沒有${food}。`;
-  stomach.push(ctx === 'rest' ? { food, left: REST_FOOD_CHECKS } : { food });
-  // 惜未央：吃下時獲得 1 時間，每次刷新之間最多 2 次（RULES_OVERVIEW §9）
-  if (food === '惜未央' && (state.xiweiTime ?? 0) < 2) { state.time += 1; state.xiweiTime = (state.xiweiTime ?? 0) + 1; }
+  enterStomach(state, food, ctx);
   return null;
 }
 
-/** 每次修整檢定後呼叫：修整胃袋每份扣 1 次 */
+// ---------- 修整等候佇列（預先吃料理） ----------
+// 修整胃袋滿了的時候，料理先排在 restQueue 等候（背包當下就扣掉）；
+// 胃袋有空格（食物用完 10 次）時，會自動從佇列依序補進去，連做 30、40 次也不會中途斷糧。
+export const QUEUE_MAX = 99;
+export const PRESET_MAX = 10;
+
+export const restQueue = (state) => (state.restQueue ??= []);
+
+/** 修整時吃：有空格直接進胃袋，滿了就排進等候佇列 */
+export function eatOrQueue(state, food) {
+  if (!FOODS[food]) return '這不是可以吃的食物。';
+  if (state.restStomach.length < STOMACH_SLOTS) return eat(state, food, 'rest');
+  if (restQueue(state).length >= QUEUE_MAX) return `等候佇列已滿，最多 ${QUEUE_MAX} 份。`;
+  if (!removeItem(state, food)) return `背包裡沒有${food}。`;
+  restQueue(state).push(food);
+  return null;
+}
+
+/** 清空等候佇列，料理退回背包。回傳退回的份數 */
+export function clearQueue(state) {
+  const q = restQueue(state);
+  q.forEach((f) => addItem(state, f));
+  state.restQueue = [];
+  return q.length;
+}
+
+/** 每次修整檢定後呼叫：修整胃袋每份扣 1 次，有空格就從佇列補上 */
 export function tickRestStomach(state) {
   state.restStomach.forEach((s) => (s.left -= 1));
   state.restStomach = state.restStomach.filter((s) => s.left > 0);
+  const q = restQueue(state);
+  while (q.length && state.restStomach.length < STOMACH_SLOTS) enterStomach(state, q.shift(), 'rest');
+}
+
+// ---------- 菜單（一組最多 3 份，例如 1 傳奇盛宴 + 2 碳烤肉排） ----------
+/** 檢查並新增菜單。foods：食物名稱陣列（1～3 份）。回傳錯誤文字或 null */
+export function addPreset(state, foods) {
+  const list = (state.foodPresets ??= []);
+  if (!foods.length) return '至少要選 1 份料理。';
+  if (foods.length > STOMACH_SLOTS) return `一組最多 ${STOMACH_SLOTS} 份。`;
+  if (foods.some((f) => !FOODS[f])) return '有不是食物的東西。';
+  if (list.length >= PRESET_MAX) return `菜單最多 ${PRESET_MAX} 組，先刪掉一組。`;
+  if (list.some((p) => p.join() === foods.join())) return '已經有一樣的菜單了。';
+  list.push([...foods]);
+  return null;
+}
+
+/** 菜單的顯示名稱：同種合併，例如「傳奇盛宴 ×1＋碳烤肉排 ×2」 */
+export function presetLabel(foods) {
+  const count = {};
+  foods.forEach((f) => (count[f] = (count[f] ?? 0) + 1));
+  return Object.entries(count).map(([f, n]) => `${f} ×${n}`).join('＋');
+}
+
+/**
+ * 一次吃 sets 組菜單。全有或全無：背包不夠、放不下就不動任何東西。
+ * 修整：先填空格，其餘排進等候佇列；跑團：沒有佇列，只能填空格。回傳錯誤文字或 null
+ */
+export function eatPreset(state, foods, sets, ctx, { overwrite = false } = {}) {
+  const all = Array.from({ length: sets }, () => foods).flat();
+  const lost = overwrite ? overwriteLoss(state, foods, ctx) : [];
+  const need = {};
+  all.forEach((f) => (need[f] = (need[f] ?? 0) + 1));
+  for (const [f, n] of Object.entries(need)) {
+    if (!FOODS[f]) return '有不是食物的東西。';
+    if (countOf(state, f) < n) return `背包裡的${f}不夠（要 ${n} 份，只有 ${countOf(state, f)} 份）。`;
+  }
+  const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
+  const free = STOMACH_SLOTS - stomach.length + lost.length;
+  if (ctx !== 'rest' && all.length > free) return `跑團胃袋只剩 ${free} 格，吃不下 ${all.length} 份。`;
+  if (ctx === 'rest' && all.length > free + QUEUE_MAX - restQueue(state).length) return `等候佇列放不下（最多 ${QUEUE_MAX} 份）。`;
+  stomach.splice(0, lost.length); // 覆蓋：被蓋掉的料理直接消失，不退回
+  all.forEach((f) => eatOrQueueUnchecked(state, f, ctx));
+  return null;
+}
+
+/**
+ * 覆蓋：胃袋空格不夠放這組菜單時，會從最舊（最前面）的料理開始蓋掉。
+ * 回傳會被蓋掉的胃袋內容（畫面拿來做二次確認）。例：[惜未央, 惜未央] 再覆蓋吃 3 份肉排 → 蓋掉 2 份惜未央
+ */
+export function overwriteLoss(state, foods, ctx) {
+  const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
+  const need = Math.min(foods.length, STOMACH_SLOTS) - (STOMACH_SLOTS - stomach.length);
+  return need > 0 ? stomach.slice(0, need) : [];
+}
+
+function eatOrQueueUnchecked(state, food, ctx) {
+  removeItem(state, food);
+  const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
+  if (stomach.length < STOMACH_SLOTS) enterStomach(state, food, ctx);
+  else restQueue(state).push(food);
 }
 
 export function endSession(state) {
