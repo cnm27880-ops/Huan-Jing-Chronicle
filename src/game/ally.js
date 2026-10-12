@@ -1,21 +1,18 @@
 // ============================================================
 // 友方 NPC（使用者 2026-10-12：「加入友方 NPC 輔助玩家戰鬥（攻防血量＋輔助能力）」；純函式，伺服器與前端共用）。
 // 存在遭遇戰的 enc.allies（只在房間模式；本機模式沒有）：
-//   { id: '友軍1', name, hp, maxHp, atk: {A,B,C}, def: {A,B,C}, abs, support: { kind: 'heal'|'shield', pct } | null, owner?, ownerName? }
-// 操作的人：GM（GM 建立的 NPC），或擁有者（玩家的「初階寶寶」）。規則比照怪物與玩家（每 1 點 = 1D4，同軌相減，三軌相加）：
+//   { id: '友軍1', name, hp, maxHp, atk: {A,B,C}, def: {A,B,C}, abs, support: { kind: 'heal'|'shield', pct } | null }
+// 操作的人：GM。規則比照怪物與玩家（每 1 點 = 1D4，同軌相減，三軌相加）：
 //   攻擊：NPC 的 A/B/C 攻擊對怪物的 A/B/C 防禦；怪物的絕對防禦（含 B 技能蓄力）加在 NPC 有攻擊骰的每一軌（和玩家出招一樣）。
 //   被打：怪物的攻擊（BOSS 選輕擊／重擊／絕殺，A 技能蓄力多加骰）對 NPC 的三軌防禦＋絕對防禦。算怪物這回合的攻擊次數。
 //   生命和玩家一樣會倒扣成負數，回到正數才站得起來（倒地的 NPC 不能行動，先攻輪到時自動跳過）。
 //   輔助：GM 設定「補血 N%」或「護盾 N%」，對玩家施放＝走信箱（和納米醫療蜂、生生造化印一樣，百分比照對方自己的最大生命）。
-// 玩家的「初階寶寶」（獨特技能）：花 500 金幣放出，血 10、攻防 1A1B1C，一人一隻，戰鬥中（GM 開打後）不能放出；
-//   打倒前一直留著（GM 結束戰鬥清空敵人時，活著的寶寶留下）。可以裝備武器與防具的部分還沒做。
 // ============================================================
 import { TRACKS } from './rules.js';
 import { clash, monsterAtk, monsterDef, monsterAbs, isDowned, parseAbc } from './combat.js';
 import { spendEnemyB } from './enemy.js';
 
 export const MAX_ALLIES = 12;
-export const BABY = { skill: '初階寶寶', gold: 500, hp: 10, atk: { A: 1, B: 1, C: 1 }, def: { A: 1, B: 1, C: 1 } };
 export const SUPPORT_KINDS = { heal: '補血', shield: '護盾' };
 
 export const alliesOf = (enc) => (Array.isArray(enc?.allies) ? enc.allies : []);

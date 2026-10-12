@@ -28,7 +28,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/engine.js` | 規則邏輯：加值、熟練、胃袋、採集、製作、跑團檢定（純函式） |
 | `src/game/dice.js` | 骰子基礎：擲骰、自訂骰式解析（rng 可替換） |
 | `src/game/stats.js` | 數值面板：基礎 + 裝備 + 食物，附明細 |
-| `src/game/equipment.js` | 裝備：鑑定骰式、裝備欄（`equipSlots`：基本 4 格＋奶龍寶庫的額外欄）、比較、整理；寶石鑑定與鑲嵌（純函式） |
+| `src/game/equipment.js` | 裝備：鑑定骰式、裝備欄、比較、整理；寶石鑑定與鑲嵌（純函式） |
 | `src/game/market.js` | 交易：交易大廳（每日原價 5 個）、黑市（擲骰溢價／壓價、勞動抵債、代金券換金幣）、特殊黑市（黑市團只有 GM 能開，房間同步：`syncBlackSession`；伺服器 `room-core.js` 的 `onBlackMarket`；50 個）（純函式） |
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
 | `src/game/mail.js` | 送東西與餵藥（純函式）：打包扣背包（已鑑定裝備整件送：`takeGear`／`refundGear`／`receiveGear`，收到換新編號，鑲的寶石跟著走；交易單的裝備只放「我給出」這邊，欄位 `giveGear`；伺服器 `parseGear` 只留已知欄位、一次最多 10 件）、收到時套用（禮物進背包、藥水回復＋毒性算收件人、毒性滿了退回） |
@@ -42,7 +42,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/simulate.js` | 模擬戰（階段 D，純函式）：續航最長招式、怪物隨機打人、自動喝藥與隊友救人、勝率／回合數／傷害／剩餘生命統計；玩家複本可帶 `movePlan`（出招優先順序）；不碰真實存檔 |
 | `src/ui/simPanel.js` | GM 專用「模擬戰」面板（跑團頁房間區塊）：選玩家（每位可設「出招設定」：自動依實戰紀錄／手動排順序）＋敵人來源（自訂強度每場重抽／場上的敵人／預組，後兩種固定 A/B/C）＋場數，畫回合分布與剩餘生命條狀圖；自訂強度下有「範本調整影響分析」與「範本版本」（存／載入／比較） |
 | `src/game/enemy.js` | 敵人等級（普通／菁英 2 打／BOSS 3 打）與技能 A 攻擊強化、B 防禦強化、C 喝血（三種都每回合歸零）的次數與效果（伺服器與前端共用）（純函式） |
-| `src/game/ally.js` | 友方 NPC（純函式，伺服器與前端共用）：檢查輸入、攻擊怪物、被怪物打（生命倒扣）、改生命、移除、插進先攻隨機位置（`insertRandom`，增援也用）；玩家的初階寶寶（`BABY`）。伺服器在 `room-core.js` 的 `onAlly`，畫面在 `encounterCard.js` 的「友方」 |
+| `src/game/ally.js` | 友方 NPC（純函式，伺服器與前端共用）：檢查輸入、攻擊怪物、被怪物打（生命倒扣）、改生命、移除、插進先攻隨機位置（`insertRandom`，增援也用）；只有 GM 操作。伺服器在 `room-core.js` 的 `onAlly`，畫面在 `encounterCard.js` 的「友方」 |
 | `src/game/nudge.js` | 戰鬥提醒與隊友資源條的判斷（純函式）：資源動用比例、資源條、隊伍摘要、偵測隊友倒地／危急／全隊吃緊、防連發、手上能做的事 |
 | `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄、房間上方；GM 不顯示）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示） |
 | `src/ui/confirmPop.js` | 網頁自己的對話框（取代瀏覽器的 confirm／prompt）：`askConfirm`／`askText`，有給按鈕貼在旁邊、沒給就置中；**全站不要再用 `confirm()`／`prompt()`／`alert()`** |

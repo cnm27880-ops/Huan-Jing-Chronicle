@@ -223,8 +223,8 @@ function eatOrQueueUnchecked(state, food, ctx) {
 // ---------- 福瑞保溫針織袋（特殊配方，RULES_OVERVIEW §9；使用者 2026-10-12 要求放在跑團頁「技能檢定」的跑團胃袋下方） ----------
 // 原文：不需裝備、可擁有多個；可裝下一個吐出來的料理，未用完的次數保留。非熟練料理只要在語音跑團中使用過，不管吐沒吐出，跑團結束時都會消耗。
 // 做法：背包有幾個袋子就有幾格（state.foodBags = [{ food }]）。跑團胃袋的料理可以「吐進袋子」（空出胃袋格子），
-//   之後再「放回胃袋」（不算重新吃，惜未央不會再加時間）。結束本次跑團時：胃袋清空；袋子裡的熟練料理留著下次用，
-//   非熟練料理（滿漢全席等）已經在跑團中用過，一起消耗。袋子變少（送人、賣掉）時，多出來的料理只能拿出來、不能再放。
+//   之後再「放回胃袋」（不算重新吃，惜未央不會再加時間）。結束本次跑團時：胃袋和袋子裡的料理全部清空，不分熟練（使用者 2026-10-12）。
+//   袋子變少（送人、賣掉）時，多出來的料理只能拿出來、不能再放。
 export const FOOD_BAG = '福瑞保溫針織袋';
 export const foodBagSlots = (state) => countOf(state, FOOD_BAG);
 export const foodBags = (state) => (Array.isArray(state.foodBags) ? state.foodBags : (state.foodBags = []));
@@ -251,13 +251,12 @@ export function takeFromBag(state, index) {
   return null;
 }
 
-/** 結束本次跑團：胃袋清空；保溫針織袋裡的非熟練料理一起消耗（熟練料理留著）。回傳被消耗的袋中料理名稱 */
+/** 結束本次跑團：胃袋與保溫針織袋裡的料理全部清空（不分熟練）。回傳被清掉的袋中料理名稱 */
 export function endSession(state) {
   state.sessionStomach = [];
   state.daoDunUsed = 0; // 我的刀盾：使用次數是「一次跑團」的
-  const bags = foodBags(state);
-  const gone = bags.filter((s) => !FOODS[s.food]?.proficiency).map((s) => s.food);
-  state.foodBags = bags.filter((s) => FOODS[s.food]?.proficiency);
+  const gone = foodBags(state).map((s) => s.food);
+  state.foodBags = [];
   return gone;
 }
 

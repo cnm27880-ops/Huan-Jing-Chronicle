@@ -30,11 +30,9 @@ import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
 import { battleSel as sel } from './battleSelect.js';
 import { teammates } from './giftSheet.js';
-import { sendMail, getEncounter, encounterAction, getRoomStatus } from '../state/rollLog.js';
+import { sendMail } from '../state/rollLog.js';
 import { takeItems, refundItems } from '../game/mail.js';
 import { SKILL_TABLE } from '../game/skillTable.js';
-import { equipSlots } from '../game/equipment.js';
-import { alliesOf, BABY } from '../game/ally.js';
 
 // 戰鬥紀錄只放戰鬥相關事件；黑市、鑑定、鑲嵌、一般檢定與自訂骰只出現在跑團頁
 const BATTLE_KINDS = new Set(['attack', 'defend', 'potion', 'skill', 'divider']);
@@ -441,9 +439,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   }
 
   // ---------- 獨特技能（使用者 2026-10-12：各玩家的獨特技能要出現在招式頁、可以啟用、要真的有效果） ----------
-  /** 已學會的獨特／個人專屬技能（含 GM 新增的專屬技能） */
+  /** 角色身上的獨特／個人專屬技能（含 GM 新增的專屬技能）；等級 0 的也列出來（提示請 GM 設等級，免得找不到） */
   const uniqueSkills = (state) => Object.keys(state.skills ?? {})
-    .filter((n) => skillLevel(state, n) > 0 && SKILL_TABLE[n] && (SKILL_TABLE[n].personal || SKILL_TABLE[n].school === '獨特'));
+    .filter((n) => SKILL_TABLE[n] && (SKILL_TABLE[n].personal || SKILL_TABLE[n].school === '獨特'));
 
   /** 把技能「使用」寫進紀錄（效果由 GM 依技能文字處理）：GM 新增、程式還沒辦法自動算的主動技能用 */
   function announceSkill(state, n) {
@@ -479,7 +477,6 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   function uniqueCard(state) {
     const names = uniqueSkills(state);
     if (!names.length) return null;
-    const online = getRoomStatus().phase === 'online';
     const row = (n, ...controls) => {
       const t = SKILL_TABLE[n];
       return h('li', { class: 'unique' },
@@ -489,6 +486,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         ...controls);
     };
     const items = names.map((n) => {
+      if (skillLevel(state, n) < 1) return row(n, h('small', { class: 'hint', text: '等級是 0，還不能用：請 GM 在跑團頁「玩家角色」把這個技能的等級設好。' }));
       if (n === DAODUN) {
         const left = daoDunLeft(state);
         const dd = daoDunDice(state);
@@ -516,27 +514,8 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
                 h('button', { type: 'button', class: 'btn btn--primary btn--small', disabled: isDowned(state) ? true : null, onclick: (e) => castSwell(state, e.currentTarget) }, `施放（花 ${x} 生命）`))
             : h('small', { class: 'hint', text: '要加入房間、有隊友在才能施放（治療點不能給自己）。' }));
       }
-      if (n === BABY.skill) {
-        const enc = getEncounter();
-        const me = getRoomStatus().me;
-        const mine = alliesOf(enc).find((a) => a.owner === me?.uid && !isDowned(a));
-        const why = !online ? '要加入房間才能放出寶寶。' : mine ? `${mine.name} 在場上（生命 ${mine.hp} / ${mine.maxHp}），在中間的「友方」操作。` : enc?.locked ? '戰鬥中（GM 已開打）不能放出寶寶。' : (state.gold ?? 0) < BABY.gold ? `金幣不夠（要 ${BABY.gold}）。` : '';
-        return row(n,
-          h('button', {
-            type: 'button', class: 'btn btn--small', disabled: why ? true : null, title: why,
-            onclick: async (e) => {
-              if (!(await askConfirm(e.currentTarget, { title: `花 ${BABY.gold} 金幣放出寶寶？`, lines: [`寶寶血 ${BABY.hp}、攻防 1A1B1C，有自己的回合（在中間的「友方」操作），持續到被擊倒。`], okText: '放出' }))) return;
-              if ((state.gold ?? 0) < BABY.gold) return toast('金幣不夠。');
-              try { await encounterAction({ t: 'encAlly', baby: true }); } catch (err) { return toast(err.message || '操作失敗。'); }
-              state.gold -= BABY.gold;
-              commit();
-            },
-          }, `🐣 放出寶寶（${BABY.gold} 金幣）`),
-          why ? h('small', { class: 'hint', text: why }) : null,
-          h('small', { class: 'hint', text: '寶寶裝備武器與防具的部分還沒做（需要時請 GM 直接調整寶寶的數值）。' }));
-      }
-      if (n === SHADOW_SKILL_NAME) return row(n, h('small', { class: 'hint', text: '操作在上方的「暗影斗篷」區塊；現身爆發要綁成招式（下面「新增自訂招式」）。' }));
-      if (n === '奶龍寶庫') return row(n, h('small', { class: 'hint', text: `被動：額外裝備欄在「裝備」頁（目前 ${equipSlots(state).length - 4} 個），生命上限已自動算進面板。` }));
+      if (n === SHADOW_SKILL_NAME) return row(n, cloakCard(state, { commit })); // 進入隱身、現身爆發都在這裡（原本在招式頁最上面，玩家找不到）
+      if (n === '奶龍寶庫') return row(n, h('small', { class: 'hint', text: '被動：額外的裝備欄位由 GM 放在手動調整裡；生命上限已自動算進面板。' }));
       if (n === '老狗識途') return row(n, h('small', { class: 'hint', text: '被動：屬性加成已自動算進面板（裝備頁看得到明細）。' }));
       const t = SKILL_TABLE[n];
       const active = t.kind !== '被動';
@@ -545,7 +524,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         active ? h('button', { type: 'button', class: 'btn btn--small', disabled: isDowned(state) ? true : null, onclick: () => announceSkill(state, n) }, '📣 使用') : null);
     });
     return h('section', { class: 'unique-skills' },
-      h('p', { class: 'field-label', text: '獨特技能' }),
+      h('h3', { class: 'section-title', text: '✨ 獨特技能' }),
       h('ul', { class: 'skill-list' }, items));
   }
 
@@ -662,7 +641,6 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
             },
           }, `放棄行動・回復 ${WITCH_EXTRA_COST} 魔力`)
         : null,
-      cloakCard(state, { commit }),
       uniqueCard(state),
       douRow(state),
       mageRow(state),

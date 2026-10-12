@@ -251,11 +251,11 @@ export function createEncounterCard({ getState, commit, rerender }) {
   }
 
   /**
-   * 回合限制（使用者 2026-10-12）：房間裡 GM 已經「開打」鎖定先攻後，玩家只能在輪到自己時出招。
+   * 回合限制（使用者 2026-10-12）：房間裡 GM 一抽先攻就開始限制（不用等「開打」），玩家只能在輪到自己時出招。
    * 承受攻擊、喝藥水、輔助技能不限；GM 不受限；沒抽先攻、沒開打、或自己不在先攻順序裡（晚加入）時也不限。回傳不能出招的原因，或 null
    */
   function turnBlock(enc) {
-    if (!online() || isGm() || !enc.locked || !enc.order?.length) return null;
+    if (!online() || isGm() || !enc.order?.length) return null;
     const uid = getRoomStatus().me?.uid;
     if (!enc.order.some((o) => o.kind === 'player' && o.uid === uid)) return null; // 抽先攻之後才加入的人不在順序裡：不擋（GM 重抽先攻就會排進去）
     const cur = enc.order[enc.turn];
@@ -710,11 +710,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
 
   // ---------- 友方 NPC（房間模式；規則在 game/ally.js、伺服器 room-core.js 的 onAlly） ----------
   const abcText = (o) => formatAbc(o ?? {});
-  /** 友方 NPC 卡片：GM（或寶寶的主人）可以攻擊選中的目標、承受怪物攻擊；GM 另外可以輔助玩家、改生命、移除 */
+  /** 友方 NPC 卡片：GM 可以攻擊選中的目標、承受怪物攻擊、輔助玩家、改生命、移除；玩家只看得到狀態 */
   function allyCard(state, enc, a) {
-    const me = getRoomStatus().me;
     const gm = isGm();
-    const mine = gm || (a.owner && a.owner === me?.uid);
+    const mine = gm;
     const down = isDowned(a);
     const foes = enc.monsters.filter((m) => !isDowned(m));
     const foe = foes.some((m) => m.id === ui.allyFoe[a.id]) ? ui.allyFoe[a.id] : foes[0]?.id ?? '';
@@ -723,11 +722,11 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const target = sel.targets[0];
     return h('li', { class: `mob${down ? ' is-downed' : ''}`, dataset: { ally: '1' } },
       h('div', { class: 'mob__pick', 'aria-label': `${a.name}，生命 ${a.hp} / ${a.maxHp}` },
-        h('span', { class: 'portrait--empty', 'aria-hidden': 'true', text: a.owner ? '🐣' : '🤝' }),
+        h('span', { class: 'portrait--empty', 'aria-hidden': 'true', text: '🤝' }),
         h('strong', { text: a.name }),
         down ? h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒地' }) : null,
         hpBar(a.hp, a.maxHp, down),
-        h('small', { class: 'hint', text: `攻 ${abcText(a.atk)}・防 ${abcText(a.def)}${a.abs ? `・絕防 ${fmt(a.abs)}` : ''}${a.support ? `・輔助：${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%` : ''}${a.ownerName ? `・主人 ${a.ownerName}` : ''}` })),
+        h('small', { class: 'hint', text: `攻 ${abcText(a.atk)}・防 ${abcText(a.def)}${a.abs ? `・絕防 ${fmt(a.abs)}` : ''}${a.support ? `・輔助：${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%` : ''}` })),
       mine && !down
         ? h('div', { class: 'row' },
             h('button', {

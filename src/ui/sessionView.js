@@ -15,7 +15,7 @@ import { mountRoomPanel } from './roomPanel.js';
 import { mountFeed, readFaces } from './rollFeed.js';
 import { playDiceFx } from './diceFx.js';
 import { openFoodSheet } from './statusBar.js';
-import { LIFE_SKILLS, ART_SKILLS, STOMACH_SLOTS, FOODS } from '../game/rules.js';
+import { LIFE_SKILLS, ART_SKILLS, STOMACH_SLOTS } from '../game/rules.js';
 import { modifier, proficiency, endSession, countOf, removeItem, FOOD_BAG, foodBagSlots, foodBags, spitToBag, takeFromBag } from '../game/engine.js';
 import { parseDiceExpr, MAX_DICE } from '../game/dice.js';
 import { rollDice, rollCheck, clearLog, getRoomStatus, subscribeRoom, getEncounter } from '../state/rollLog.js';
@@ -151,12 +151,11 @@ export function createSessionView({ root, getState, commit }) {
                 onclick: () => openFoodSheet(state, 'session', commit),
               }, '＋')))),
       bagRow(state),
-      stomach.length || bagged.some((s) => !FOODS[s.food]?.proficiency)
+      stomach.length || bagged.length
         ? h('button', {
             type: 'button', class: 'btn btn--ghost btn--small',
             onclick: async (e) => {
-              const lose = bagged.filter((s) => !FOODS[s.food]?.proficiency).map((s) => s.food);
-              const lines = ['跑團胃袋會清空。', ...(lose.length ? [`${FOOD_BAG}裡的非熟練料理也會消耗：${lose.join('、')}`] : []), ...(bagged.length > lose.length ? [`${FOOD_BAG}裡的熟練料理留著下次用。`] : [])];
+              const lines = ['跑團胃袋會清空。', ...(bagged.length ? [`${FOOD_BAG}裡的料理也會清空：${bagged.map((s) => s.food).join('、')}`] : [])];
               if (!(await askConfirm(e.currentTarget, { title: '結束本次跑團？', lines, okText: '結束', danger: true }))) return;
               endSession(state); commit();
             },
@@ -170,7 +169,7 @@ export function createSessionView({ root, getState, commit }) {
 
   /**
    * 福瑞保溫針織袋（跑團胃袋下方）：背包有幾個就幾格。上面胃袋的料理點一下＝吐進袋子；這裡的料理點一下＝放回胃袋。
-   * 結束本次跑團時，非熟練料理一起消耗、熟練料理留著（engine.js 的 endSession）
+   * 結束本次跑團時，袋子裡的料理全部清空（engine.js 的 endSession）
    */
   function bagRow(state) {
     const slots = foodBagSlots(state);
@@ -183,7 +182,7 @@ export function createSessionView({ root, getState, commit }) {
         const s = bagged[i];
         if (!s) return h('span', { class: 'mini-slot mini-slot--empty', title: `空的${FOOD_BAG}（點上面胃袋的料理吐進來）`, 'aria-label': `空的${FOOD_BAG}` }, '·');
         return h('button', {
-          type: 'button', class: 'mini-slot', title: `${s.food}（${FOODS[s.food]?.proficiency ? '熟練料理，跑團結束後留著' : '非熟練料理，跑團結束時消耗'}；點一下放回胃袋）`,
+          type: 'button', class: 'mini-slot', title: `${s.food}（點一下放回胃袋；結束本次跑團時清空）`,
           'aria-label': `${s.food}，點一下放回跑團胃袋`, disabled: state.sessionStomach.length >= STOMACH_SLOTS ? true : null,
           onclick: () => { const e = takeFromBag(state, i); if (e) return toast(e); commit(); },
         }, h('span', { 'aria-hidden': 'true', text: iconOf(s.food) || '🍽️' }));

@@ -4,7 +4,7 @@
 // ============================================================
 import {
   GEAR_TIERS, GEAR_TIER_ALIAS, GEAR_SLOT_NAME, GEAR_BONUS, WEAPON_STATS, ARMOR_STATS,
-  ACC_STATS, ACC_VALUES, ACC_SPECIAL_ROLL, EQUIP_SLOTS, EQUIP_SLOT_LABEL, GEM_DICE, GEM_SOCKET_TIER, ALL_STATS,
+  ACC_STATS, ACC_VALUES, ACC_SPECIAL_ROLL, EQUIP_SLOTS, GEM_DICE, GEM_SOCKET_TIER, ALL_STATS,
 } from './rules.js';
 import { rollDie, rollSum } from './dice.js';
 import { removeItem, countOf } from './engine.js';
@@ -80,38 +80,13 @@ export function identify(state, genericName, times, rng = Math.random) {
 
 export const findGear = (state, id) => state.gear.find((g) => g.id === id) ?? null;
 
-/**
- * 奶龍寶庫（獨特、被動）的額外裝備欄：1、5、9 級各多一個「初階武器欄」，10 級多一個「進階飾品欄」（使用者 2026-10-12 要求做出效果）。
- * 額外欄只能放該等級的裝備（「初階武器欄位」＝只放初階武器，需驗證）。技能等級掉了，那一欄的裝備不算數值，可以卸下。
- */
-export const EXTRA_SLOTS = [
-  { key: 'weapon2', slot: 'weapon', tier: '初階', level: 1, label: '武器 2（初階・奶龍寶庫）' },
-  { key: 'weapon3', slot: 'weapon', tier: '初階', level: 5, label: '武器 3（初階・奶龍寶庫）' },
-  { key: 'weapon4', slot: 'weapon', tier: '初階', level: 9, label: '武器 4（初階・奶龍寶庫）' },
-  { key: 'acc3', slot: 'accessory', tier: '進階', level: 10, label: '飾品 3（進階・奶龍寶庫）' },
-];
-const extraOf = (key) => EXTRA_SLOTS.find((x) => x.key === key) ?? null;
-/** 這個角色現在有的裝備欄（基本 4 格＋奶龍寶庫的額外欄） */
-export function equipSlots(state) {
-  const lv = Number(state.skills?.奶龍寶庫) || 0;
-  return [...EQUIP_SLOTS, ...EXTRA_SLOTS.filter((x) => lv >= x.level).map((x) => x.key)];
-}
-/** 欄位名稱 */
-export const slotLabel = (key) => EQUIP_SLOT_LABEL[key] ?? extraOf(key)?.label ?? key;
-/** 這一欄放哪一種裝備（weapon／armor／accessory） */
-export const slotKind = (key) => extraOf(key)?.slot ?? (key.startsWith('acc') ? 'accessory' : key);
-/** 這件裝備可以放進的額外欄（已經有的、類型與等級都符合） */
-export const extraSlotsFor = (state, g) => equipSlots(state).filter((k) => extraOf(k) && extraOf(k).slot === g.slot && extraOf(k).tier === g.tier);
-
 /** 裝備這一件：欄位可以是 weapon / armor / acc1 / acc2。回傳錯誤文字或 null */
 export function equip(state, id, slotKey) {
   const g = findGear(state, id);
   if (!g) return '找不到這件裝備。';
-  if (!equipSlots(state).includes(slotKey)) return '沒有這個裝備欄。';
-  const want = slotKind(slotKey);
+  if (!EQUIP_SLOTS.includes(slotKey)) return '沒有這個裝備欄。';
+  const want = slotKey.startsWith('acc') ? 'accessory' : slotKey;
   if (g.slot !== want) return `這件不能放進${GEAR_SLOT_NAME[want]}欄。`;
-  const extra = extraOf(slotKey);
-  if (extra && g.tier !== extra.tier) return `${slotLabel(slotKey)}只能放${extra.tier}${GEAR_SLOT_NAME[want]}。`;
   state.gear = state.gear.filter((x) => x.id !== id);
   const old = state.equipment[slotKey];
   if (old) state.gear.push(old);
@@ -137,8 +112,7 @@ export function discard(state, ids) {
 /** 目前身上裝備提供的數值：{ 屬性: 加成 }（含鑲在裝備上的寶石） */
 export function equipmentEffects(state) {
   const out = {};
-  for (const key of equipSlots(state)) { // 只算現在有的欄位（奶龍寶庫等級掉了，額外欄的裝備不算）
-    const g = state.equipment?.[key];
+  for (const g of Object.values(state.equipment)) {
     if (!g) continue;
     for (const e of g.effects) out[e.stat] = (out[e.stat] ?? 0) + e.value;
     if (g.gem) out[g.gem.stat] = (out[g.gem.stat] ?? 0) + g.gem.value;

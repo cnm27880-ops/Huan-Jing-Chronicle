@@ -12,7 +12,7 @@ import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/r
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
 import { useEnemySkill, spendEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
 import {
-  validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, insertRandom, alliesOf, findAlly, BABY, MAX_ALLIES, SUPPORT_KINDS,
+  validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, insertRandom, alliesOf, findAlly, MAX_ALLIES, SUPPORT_KINDS,
 } from '../../src/game/ally.js';
 import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
@@ -691,10 +691,9 @@ export class RoomCore {
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user);
     }
-    if (msg.t === 'encClear') { // 玩家的寶寶（活著的）留下：「持續到該寶寶被擊倒」；GM 的 NPC 一起清掉
-      const babies = alliesOf(enc).filter((a) => a.owner && !isDowned(a));
-      this.saveEncounter({ ...newEncounter(), round: 0, order: [], turn: 0, locked: false, allies: babies, next: { ...newEncounter().next, ally: enc.next?.ally ?? 1 } });
-      return this.encOk(this.encounter(), rid, user, { label: '遭遇：戰鬥結束，清空敵人', lines: babies.length ? [`留在場上：${babies.map((a) => a.name).join('、')}`] : [] });
+    if (msg.t === 'encClear') { // 友方 NPC 一起清掉
+      this.saveEncounter({ ...newEncounter(), round: 0, order: [], turn: 0, locked: false });
+      return this.encOk(this.encounter(), rid, user, { label: '遭遇：戰鬥結束，清空敵人' });
     }
     if (msg.t === 'encInit') { // 先攻：在線玩家（不含 GM）與還活著的怪物，純隨機洗牌
       const players = this.db.exec('SELECT uid, name FROM members ORDER BY first_seen, uid')
@@ -734,24 +733,15 @@ export class RoomCore {
   }
 
   // ---------- 友方 NPC（使用者 2026-10-12；規則在 src/game/ally.js） ----------
-  // GM 建立的 NPC 由 GM 操作；玩家的「初階寶寶」由擁有者操作（開打後非 GM 只能在寶寶自己的回合攻擊）。
+  // 只有 GM 能建立與操作友方 NPC。
   onAlly(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以操作友方 NPC。');
     const enc = this.encounter();
-    const gm = this.isGm(user.uid);
     if (msg.t === 'encAlly') {
       if (alliesOf(enc).length >= MAX_ALLIES) return err(rid, 'bad_enc', `友方 NPC 最多 ${MAX_ALLIES} 位。`);
-      let ally;
-      if (msg.baby === true) { // 玩家放出初階寶寶（金幣由玩家端扣）
-        if (enc.locked) return err(rid, 'bad_enc', '戰鬥中（GM 已開打）不能放出寶寶。');
-        if (alliesOf(enc).some((a) => a.owner === user.uid && !isDowned(a))) return err(rid, 'bad_enc', '你已經有一隻寶寶在場上了（只能同時擁有 1 隻）。');
-        ally = { name: `${user.name}的寶寶`.slice(0, 20), hp: BABY.hp, maxHp: BABY.hp, atk: { ...BABY.atk }, def: { ...BABY.def }, abs: 0, support: null, owner: user.uid, ownerName: user.name };
-      } else {
-        if (!gm) return err(rid, 'forbidden', '只有 GM 可以新增友方 NPC。');
-        const v = validateAlly(msg.npc);
-        if (v.error) return err(rid, 'bad_enc', v.error);
-        ally = v.ally;
-      }
-      const a = addAlly(enc, ally);
+      const v = validateAlly(msg.npc);
+      if (v.error) return err(rid, 'bad_enc', v.error);
+      const a = addAlly(enc, v.ally);
       const lines = [`生命 ${a.hp}　攻擊 ${TRACKS_TEXT(a.atk)}　防禦 ${TRACKS_TEXT(a.def)}${a.abs ? `　絕對防禦 ${a.abs}` : ''}`];
       if (a.support) lines.push(`輔助：${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%`);
       if (enc.order?.length) lines.push(`先攻：排在第 ${insertRandom(enc, { kind: 'ally', id: a.id, name: a.name }, this.rng) + 1} 位（隨機）`);
@@ -760,32 +750,23 @@ export class RoomCore {
     }
     const a = typeof msg.id === 'string' ? findAlly(enc, msg.id) : null;
     if (!a) return err(rid, 'bad_enc', '找不到這位友方 NPC，可能已被移除。');
-    const mine = gm || (a.owner && a.owner === user.uid);
-    if (!mine) return err(rid, 'forbidden', a.owner ? '只有寶寶的主人或 GM 可以操作。' : '只有 GM 可以操作友方 NPC。');
     if (msg.t === 'encAllyDel') {
       removeAlly(enc, a.id);
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user, { label: `遭遇：友方 ${a.name} 離開戰鬥` });
     }
     if (msg.t === 'encAllyHp') {
-      if (!gm) return err(rid, 'forbidden', '只有 GM 可以直接改 NPC 的生命。');
       if (!isInt(msg.hp, -10_000_000, 10_000_000)) return err(rid, 'bad_enc', '生命要是整數。');
       const r = setAllyHp(enc, a.id, msg.hp);
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user, { label: `遭遇：${a.name} 生命 ${r.before} → ${a.hp} / ${a.maxHp}` });
     }
     if (msg.t === 'encAllySup') { // 輔助：對玩家補血／上護盾，走信箱（百分比照對方的最大生命）
-      if (!gm) return err(rid, 'forbidden', '只有 GM 可以使用 NPC 的輔助能力。');
       if (!a.support) return err(rid, 'bad_enc', `${a.name} 沒有輔助能力。`);
       if (isDowned(a)) return err(rid, 'bad_enc', `${a.name} 倒地了，無法行動。`);
       return this.onMailSend(user, { to: msg.to, kind: 'support', skill: a.name, support: a.support.kind, pct: a.support.pct, res: 0 }, rid);
     }
-    // 攻擊與被打：先攻開打後，非 GM（寶寶的主人）只能在寶寶自己的回合攻擊
     if (msg.t === 'encAllyAtk') {
-      if (!gm && enc.locked && enc.order?.length) {
-        const cur = enc.order[enc.turn];
-        if (!(cur?.kind === 'ally' && cur.id === a.id)) return err(rid, 'not_your_turn', `還沒輪到 ${a.name}。`);
-      }
       if (typeof msg.target !== 'string' || !isInt(msg.mode ?? 0, 0, 2)) return err(rid, 'bad_enc', '缺少目標。');
       const r = allyAttack(enc, a.id, msg.target, msg.mode ?? 0, this.rng);
       if (r.error) return err(rid, 'bad_enc', r.error);

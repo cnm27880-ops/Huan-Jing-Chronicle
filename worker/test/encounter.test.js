@@ -277,25 +277,6 @@ test('友方 NPC：只有 GM 能建立；GM 攻擊、承受攻擊（算怪物攻
   assert.equal(encOf(send(core, GM, { t: 'encAllyDel', id: '友軍1' })).allies.length, 0);
 });
 
-test('初階寶寶：玩家自己放出（一人一隻、開打後不能放），主人只能在寶寶的回合攻擊；結束戰鬥時活著的寶寶留下', () => {
-  const core = room((n) => n);
-  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { count: 1, atkPower: 0, defPower: 0, hp: 100 } });
-  const enc = encOf(send(core, P1, { t: 'encAlly', baby: true }));
-  const baby = enc.allies[0];
-  assert.deepEqual([baby.name, baby.hp, baby.owner], ['玩家一的寶寶', 10, '300']);
-  assert.match(errorOf(send(core, P1, { t: 'encAlly', baby: true })).message, /只能同時擁有 1 隻/);
-  assert.equal(errorOf(send(core, P2, { t: 'encAllyAtk', id: baby.id, target: '小怪1' }))?.code, 'forbidden'); // 不是主人
-  send(core, GM, { t: 'encInit' }, { online: ['300'] });
-  send(core, GM, { t: 'encStart' });
-  const e = core.encounter();
-  const babyTurn = e.order.findIndex((o) => o.kind === 'ally');
-  if (e.turn !== babyTurn) assert.equal(errorOf(send(core, P1, { t: 'encAllyAtk', id: baby.id, target: '小怪1' }))?.code, 'not_your_turn');
-  assert.match(errorOf(send(core, P2, { t: 'encAlly', baby: true })).message, /戰鬥中/);
-  const cleared = encOf(send(core, GM, { t: 'encClear' }));
-  assert.equal(cleared.allies.length, 1);
-  assert.equal(cleared.monsters.length, 0);
-});
-
 test('黑市團：只有 GM 能開／關，全員廣播、hello 看得到；每開一次 id +1', () => {
   const core = room();
   assert.equal(errorOf(send(core, P1, { t: 'blackMarket', open: true }))?.code, 'forbidden');

@@ -1,11 +1,11 @@
 // 執行方式：npm test
-// 2026-10-12 正式跑團後的修正：恐怖機甲、機甲駕駛員、我的刀盾、浮腫之軀、奶龍寶庫、生命倒扣、保溫針織袋、黑市團同步、友方 NPC
+// 2026-10-12 正式跑團後的修正：恐怖機甲、機甲駕駛員、我的刀盾、浮腫之軀、抽書不含獨特技能、生命倒扣、保溫針織袋、黑市團同步、友方 NPC
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newEncounter, playerAttack, attackDice, damagePlayer, healPlayer, isDowned, daoDunDice, useSwell, resolveChosenTrack } from '../src/game/combat.js';
 import { moveFromCatalog, daoDunLeft } from '../src/game/skills.js';
 import { endSession, spitToBag, takeFromBag, foodBags, FOOD_BAG } from '../src/game/engine.js';
-import { equip, equipSlots, equipmentEffects } from '../src/game/equipment.js';
+import { drawPool } from '../src/game/skillDraw.js';
 import { syncBlackSession, marketToday, specialLeft, specialTrade, SPECIAL_BUY } from '../src/game/market.js';
 import { applyMail } from '../src/game/mail.js';
 import { validateAlly, addAlly, allyAttack, monsterHitsAlly, removeAlly, insertRandom } from '../src/game/ally.js';
@@ -106,25 +106,13 @@ test('生命倒扣：受傷可以變負數，回血從負數往上加', () => {
   assert.equal(isDowned(s), true);
 });
 
-test('奶龍寶庫：1／5／9 級各多一個初階武器欄、10 級多一個進階飾品欄；額外欄只放該等級；等級掉了不算數值', () => {
-  const s = fresh();
-  s.skills = { 奶龍寶庫: 5 };
-  assert.deepEqual(equipSlots(s), ['weapon', 'armor', 'acc1', 'acc2', 'weapon2', 'weapon3']);
-  s.gear = [
-    { id: 1, tier: '初階', slot: 'weapon', effects: [{ stat: '物理傷害', value: 3 }] },
-    { id: 2, tier: '大師', slot: 'weapon', effects: [{ stat: '物理傷害', value: 9 }] },
-  ];
-  assert.match(equip(s, 2, 'weapon2'), /只能放初階武器/);
-  assert.equal(equip(s, 1, 'weapon2'), null);
-  assert.equal(equipmentEffects(s).物理傷害, 3);
-  assert.match(equip(s, 2, 'weapon4'), /沒有這個裝備欄/);
-  s.skills.奶龍寶庫 = 0;
-  assert.equal(equipmentEffects(s).物理傷害, undefined); // 欄位沒了：不算
-  s.skills.奶龍寶庫 = 10;
-  assert.ok(equipSlots(s).includes('acc3'));
+test('抽技能書抽不到獨特技能（初階寶寶、奶龍寶庫、我的刀盾、老狗識途）', () => {
+  const pool = drawPool('初階');
+  for (const n of ['初階寶寶', '奶龍寶庫', '我的刀盾', '老狗識途', '浮腫之軀', '暗影斗篷']) assert.equal(pool.includes(n), false, n);
+  assert.ok(pool.length > 10);
 });
 
-test('福瑞保溫針織袋：有幾個就幾格；胃袋吐進袋子、放回胃袋；結束本次跑團時非熟練料理消耗、熟練料理留著', () => {
+test('福瑞保溫針織袋：有幾個就幾格；胃袋吐進袋子、放回胃袋；結束本次跑團時所有料理清空（不分熟練）', () => {
   const s = fresh();
   s.inventory = { ...s.inventory, [FOOD_BAG]: 2 };
   s.sessionStomach = [{ food: '碳烤肉排' }, { food: '滿漢全席' }, { food: '拉麵' }];
@@ -137,8 +125,8 @@ test('福瑞保溫針織袋：有幾個就幾格；胃袋吐進袋子、放回�
   assert.deepEqual(s.sessionStomach.map((x) => x.food), ['拉麵', '碳烤肉排']);
   assert.equal(spitToBag(s, 1), null);
   const gone = endSession(s);
-  assert.deepEqual(gone, ['滿漢全席']);
-  assert.deepEqual(foodBags(s).map((x) => x.food), ['碳烤肉排']);
+  assert.deepEqual(gone, ['滿漢全席', '碳烤肉排']);
+  assert.deepEqual(foodBags(s), []);
   assert.deepEqual(s.sessionStomach, []);
   const none = fresh(); none.inventory = {}; none.sessionStomach = [{ food: '拉麵' }];
   assert.match(spitToBag(none, 0), /沒有/);
