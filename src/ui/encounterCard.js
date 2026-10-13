@@ -24,6 +24,8 @@ import {
 import { trackLine, targetLine } from '../game/events.js';
 import { battleSel as sel } from './battleSelect.js';
 import { playShadowFx } from './shadowFx.js';
+import { alliesOf, SUPPORT_KINDS } from '../game/ally.js';
+import { teammates } from './giftSheet.js';
 
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const pctOf = (cur, max) => (max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0);
@@ -164,6 +166,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
     armed: null, // 承受攻擊的二次確認：第一次點只「待命」，3 秒內再點同一個才真的承受
     presets: null, // GM 的敵人預組清單（第一次打開 GM 工具時向伺服器要）
     presetName: '',
+    allyForm: { name: '', hp: 100, atk: '', def: '', abs: 0, sup: '', pct: 10 }, // GM 新增友方 NPC
+    allyFoe: {}, // 友方 NPC id → 要承受哪隻怪物的攻擊
+    allyTo: {}, // 友方 NPC id → 輔助對象（玩家 uid）
+    allyHp: {}, // 友方 NPC id → GM 要改成的生命
   };
   let armTimer = null;
   /** 承受攻擊要點兩次：第一次點亮「再點一次確認」，3 秒內再點同一個才執行，點別的或逾時就取消 */
@@ -244,10 +250,26 @@ export function createEncounterCard({ getState, commit, rerender }) {
     rerender();
   }
 
+  /**
+   * 回合限制（使用者 2026-10-12）：房間裡 GM 一抽先攻就開始限制（不用等「開打」），玩家只能在輪到自己時出招。
+   * 承受攻擊、喝藥水、輔助技能不限；GM 不受限；沒抽先攻、沒開打、或自己不在先攻順序裡（晚加入）時也不限。回傳不能出招的原因，或 null
+   */
+  function turnBlock(enc) {
+    if (!online() || isGm() || !enc.order?.length) return null;
+    const uid = getRoomStatus().me?.uid;
+    if (!enc.order.some((o) => o.kind === 'player' && o.uid === uid)) return null; // 抽先攻之後才加入的人不在順序裡：不擋（GM 重抽先攻就會排進去）
+    const cur = enc.order[enc.turn];
+    if (cur?.kind === 'player' && cur.uid === uid) return null;
+    const who = cur ? (cur.kind === 'monster' ? cur.id : cur.name) : '別人';
+    return `還沒輪到你（現在輪到 ${who}），只能在自己的回合出招。`;
+  }
+
   /** 左欄「出招」按鈕要顯示的目標 */
   function fireInfo() {
     const state = getState();
     pruneTargets(state);
+    const blocked = turnBlock(currentEnc(state));
+    if (blocked) return { text: blocked, ready: false };
     if (sel.targets.length) return { text: sel.targets.join('、'), ready: true };
     return { text: currentEnc(state).monsters.some((m) => !isDowned(m)) ? '先在中間選目標' : '場上沒有敵人', ready: false };
   }
@@ -257,6 +279,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
   async function doAttack() {
     const state = getState();
     pruneTargets(state);
+    const blocked = turnBlock(currentEnc(state));
+    if (blocked) return toast(blocked);
     if (!sel.targets.length) return toast('先在中間點選目標。');
     const targetIds = [...sel.targets];
     const modes = Object.fromEntries(targetIds.map((id) => [id, defModeOf(id)]));
@@ -273,13 +297,14 @@ export function createEncounterCard({ getState, commit, rerender }) {
       ({ r, draw, befores, bosses } = await withRoomEncounter(state, async () => {
         const before = new Map(state.encounter.monsters.map((x) => [x.id, x.hp]));
         const boss = new Set(state.encounter.monsters.filter((x) => x.kind === 'boss').map((x) => x.id));
-        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, sel.moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai, targetIds, modes, dou, extraAbs, respOff: [...sel.respOff], mage: sel.mage }));
+        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, sel.moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai, targetIds, modes, dou, extraAbs, respOff: [...sel.respOff], mage: sel.mage, track: sel.trackPick[sel.moveId], daoDun: sel.daoDun }));
         return { ...res, befores: before, bosses: boss };
       }));
     } catch (e) { return rollFailed(e); }
     if (r.error) return toast(r.error);
     sel.dou = 0;
     sel.mage = 0;
+    sel.daoDun = false;
     if (!online()) Object.keys(extraAbs).forEach((id) => spendEnemyB(state.encounter, id)); // 本機模式：蓄力用掉了（房間模式由伺服器扣）
     if (r.reveal) playShadowFx('reveal', { n: r.burst }); // 暗影斗篷現身爆發
     // 打擊特效：同一個目標被連打好幾下（守密人）就連播好幾次，種類看第一下
@@ -405,8 +430,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
     if (!enc.order?.length) return null;
     const me = getRoomStatus().me;
     const gm = isGm();
-    const icon = (o) => (o.kind === 'player' ? '🧑' : enc.monsters.find((m) => m.id === o.id)?.kind === 'boss' ? '👹' : '👾');
-    const name = (o) => (o.kind === 'player' ? o.name : o.id);
+    const icon = (o) => (o.kind === 'player' ? '🧑' : o.kind === 'ally' ? '🤝' : enc.monsters.find((m) => m.id === o.id)?.kind === 'boss' ? '👹' : '👾');
+    const name = (o) => (o.kind === 'monster' ? o.id : o.name);
     const canSwap = !enc.locked || gm;
     const mine = (o) => o.kind === 'player' && o.uid === me?.uid;
     const pick = (i) => {
@@ -418,12 +443,14 @@ export function createEncounterCard({ getState, commit, rerender }) {
       const from = ui.swapFrom;
       ui.swapFrom = null;
       if (from === i) return rerender();
+      if (!gm && enc.order[i].kind !== 'player') { toast('只能和其他玩家換位置，不能和敵人或 NPC 換。'); return rerender(); }
       return act({ t: 'encSwap', a: from, b: i });
     };
     return h('div', { class: 'init' },
       h('p', { class: 'init__label', text: enc.locked ? `第 ${enc.round} 回合・輪到 ${name(enc.order[enc.turn])}` : '先攻位置（隨機）：玩家可以點選交換，GM 按「開打」後鎖定' }),
       h('ol', { class: 'init__list' }, enc.order.map((o, i) => {
-        const down = o.kind === 'monster' && isDowned(enc.monsters.find((m) => m.id === o.id) ?? { hp: 1 });
+        const down = (o.kind === 'monster' && isDowned(enc.monsters.find((m) => m.id === o.id) ?? { hp: 1 }))
+          || (o.kind === 'ally' && isDowned(alliesOf(enc).find((a) => a.id === o.id) ?? { hp: 1 }));
         return h('li', { class: 'init__item' },
           h('button', {
             type: 'button', class: 'init__btn', dataset: { kind: o.kind, down: down ? '1' : '0', mine: mine(o) ? '1' : '0' },
@@ -457,7 +484,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
   const SKILL_TIPS = {
     A: '攻擊強化：用了之後，他的下一次攻擊每一軌各 +20 顆攻擊骰（一回合 1 次）',
     B: '防禦強化：用了之後，他下一次被打時絕對防禦多 20 顆（BOSS 30 顆）；普通 1 次、菁英與 BOSS 一回合 2 次',
-    C: '喝血：只能在他自己的回合用，回復 ND16 生命（普通 10、菁英 20、BOSS 30 顆）；整場戰鬥只能 1 次（換回合不會恢復）',
+    C: '喝血：只能在他自己的回合用，回復 ND16 生命（普通 10、菁英 20、BOSS 30 顆）；一回合 1 次（到他的新回合就重置）',
   };
   /** 敵人用技能（GM；本機模式是自己）。房間模式由伺服器處理並寫紀錄 */
   function useSkill(state, m, skill) {
@@ -682,6 +709,107 @@ export function createEncounterCard({ getState, commit, rerender }) {
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => removeEnemy(state, m) }, '移除')))));
   }
 
+  // ---------- 友方 NPC（房間模式；規則在 game/ally.js、伺服器 room-core.js 的 onAlly） ----------
+  const abcText = (o) => formatAbc(o ?? {});
+  /** 友方 NPC 卡片：GM 可以攻擊選中的目標、承受怪物攻擊、輔助玩家、改生命、移除；玩家只看得到狀態 */
+  function allyCard(state, enc, a) {
+    const gm = isGm();
+    const mine = gm;
+    const down = isDowned(a);
+    const foes = enc.monsters.filter((m) => !isDowned(m));
+    const foe = foes.some((m) => m.id === ui.allyFoe[a.id]) ? ui.allyFoe[a.id] : foes[0]?.id ?? '';
+    const mates = teammates();
+    const to = mates.some((m) => m.uid === ui.allyTo[a.id]) ? ui.allyTo[a.id] : mates[0]?.uid ?? '';
+    const target = sel.targets[0];
+    return h('li', { class: `mob${down ? ' is-downed' : ''}`, dataset: { ally: '1' } },
+      h('div', { class: 'mob__pick', 'aria-label': `${a.name}，生命 ${a.hp} / ${a.maxHp}` },
+        h('span', { class: 'portrait--empty', 'aria-hidden': 'true', text: '🤝' }),
+        h('strong', { text: a.name }),
+        down ? h('span', { class: 'badge', dataset: { tone: 'bad' }, text: '倒地' }) : null,
+        hpBar(a.hp, a.maxHp, down),
+        h('small', { class: 'hint', text: `攻 ${abcText(a.atk)}・防 ${abcText(a.def)}${a.abs ? `・絕防 ${fmt(a.abs)}` : ''}${a.support ? `・輔助：${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%` : ''}` })),
+      mine && !down
+        ? h('div', { class: 'row' },
+            h('button', {
+              type: 'button', class: 'btn btn--small', disabled: !target,
+              title: target ? `攻擊中間選中的第一個目標（${target}）` : '先在上面點選一個敵人當目標',
+              onclick: () => act({ t: 'encAllyAtk', id: a.id, target, mode: defModeOf(target) }),
+            }, target ? `⚔️ 攻擊 ${target}` : '⚔️ 攻擊（先選目標）'),
+            foes.length
+              ? h('select', { class: 'field', 'aria-label': `哪隻怪物攻擊 ${a.name}`, onchange: (e) => { ui.allyFoe[a.id] = e.target.value; } },
+                  foes.map((m) => h('option', { value: m.id, selected: m.id === foe ? true : null, text: m.id })))
+              : null,
+            foes.length
+              ? h('button', {
+                  type: 'button', class: 'btn btn--ghost btn--small', dataset: { armed: ui.armed === `ally:${a.id}` ? '1' : '0' },
+                  onclick: () => confirmHit(`ally:${a.id}`, () => act({ t: 'encAllyTake', id: a.id, monster: foe, mode: sel.modes[foe]?.atk ?? 0 })),
+                }, ui.armed === `ally:${a.id}` ? '再點一次：承受' : `🛡️ 承受 ${foe} 的攻擊`)
+              : null)
+        : null,
+      gm && a.support && !down && mates.length
+        ? h('div', { class: 'row' },
+            h('select', { class: 'field', 'aria-label': `${a.name} 的輔助對象`, onchange: (e) => { ui.allyTo[a.id] = e.target.value; } },
+              mates.map((m) => h('option', { value: m.uid, selected: m.uid === to ? true : null, text: m.name }))),
+            h('button', {
+              type: 'button', class: 'btn btn--small',
+              onclick: async () => { try { await encounterAction({ t: 'encAllySup', id: a.id, to }); toast(`${a.name} 對 ${mates.find((m) => m.uid === to)?.name ?? '隊友'} 施放了${SUPPORT_KINDS[a.support.kind]}。`); } catch (e) { toast(e.message || '操作失敗。'); } },
+            }, `✚ ${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%`))
+        : null,
+      gm
+        ? h('div', { class: 'row' },
+            h('input', {
+              class: 'field', type: 'number', inputmode: 'numeric', max: a.maxHp, value: ui.allyHp[a.id] ?? a.hp, style: 'max-width: 7em;', 'aria-label': `${a.name} 的生命`,
+              oninput: (e) => { ui.allyHp[a.id] = e.target.value; },
+            }),
+            h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { const v = Math.floor(Number(ui.allyHp[a.id] ?? a.hp)); delete ui.allyHp[a.id]; act({ t: 'encAllyHp', id: a.id, hp: Number.isFinite(v) ? v : a.hp }); } }, '設定生命'))
+        : null,
+      mine
+        ? h('button', {
+            type: 'button', class: 'btn btn--ghost btn--small',
+            onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: `讓 ${a.name} 離開戰鬥？`, okText: '移除', danger: true })) act({ t: 'encAllyDel', id: a.id }); },
+          }, '移除')
+        : null);
+  }
+
+  function alliesSection(state, enc) {
+    if (!online()) return null;
+    const list = alliesOf(enc);
+    if (!list.length) return null;
+    return h('section', { class: 'allies', 'aria-label': '友方' },
+      h('h3', { class: 'tray__title', text: `友方（${list.length}）` }),
+      h('ul', { class: 'mobs' }, list.map((a) => allyCard(state, enc, a))));
+  }
+
+  /** GM：新增友方 NPC（攻防血量＋輔助能力） */
+  function allyForm() {
+    if (!online() || !isGm()) return null;
+    const f = ui.allyForm;
+    const field = (label, key, attrs = {}) => h('label', { class: 'extra' },
+      h('span', { text: label }),
+      h('input', { class: 'field', value: f[key], ...attrs, oninput: (e) => { f[key] = e.target.value; } }));
+    return h('section', { class: 'gm-tools__sec' },
+      h('h3', { class: 'tray__title', text: '新增友方 NPC' }),
+      h('p', { class: 'hint', text: '幫玩家打仗的 NPC：攻擊與防禦直接填 A/B/C（例如「30A 20B」），規則跟怪物一樣（每點 1D4、同軌相減）。輔助能力＝對玩家補血或上護盾（照對方最大生命的 %）。開打後新增的會隨機插進先攻順序。' }),
+      field('名稱', 'name', { type: 'text', maxlength: 20, placeholder: '例如：傭兵隊長' }),
+      field('血量', 'hp', { type: 'number', min: 1, inputmode: 'numeric' }),
+      field('攻擊（A/B/C）', 'atk', { type: 'text', maxlength: 40, placeholder: '例如 30A 20B' }),
+      field('防禦（A/B/C）', 'def', { type: 'text', maxlength: 40, placeholder: '例如 20A 20B 20C' }),
+      field('絕對防禦', 'abs', { type: 'number', min: 0, inputmode: 'numeric' }),
+      h('label', { class: 'extra' },
+        h('span', { text: '輔助能力' }),
+        h('select', { class: 'field', onchange: (e) => { f.sup = e.target.value; rerender(); } },
+          h('option', { value: '', selected: !f.sup ? true : null, text: '沒有' }),
+          Object.entries(SUPPORT_KINDS).map(([k, v]) => h('option', { value: k, selected: f.sup === k ? true : null, text: v })))),
+      f.sup ? field('百分比（1～100）', 'pct', { type: 'number', min: 1, max: 100, inputmode: 'numeric' }) : null,
+      h('button', {
+        type: 'button', class: 'btn btn--primary btn--small',
+        onclick: async () => {
+          const npc = { name: f.name, hp: Math.floor(Number(f.hp)), atk: f.atk, def: f.def, abs: Math.floor(Number(f.abs) || 0), ...(f.sup ? { support: { kind: f.sup, pct: Math.floor(Number(f.pct)) } } : {}) };
+          try { await encounterAction({ t: 'encAlly', npc }); ui.allyForm = { ...f, name: '' }; toast(`${npc.name} 加入戰鬥。`); } catch (e) { toast(e.message || '操作失敗。'); }
+        },
+      }, '加入戰鬥'));
+  }
+
   // ---------- 敵人預組（GM 備團）：把場上抽好的整團存起來，跑團時一鍵換上；模擬戰也能選 ----------
   async function presetDo(msg, done) {
     try { ui.presets = await presetAction(msg); if (done) toast(done); } catch (e) { toast(e.message || '操作失敗。'); }
@@ -781,6 +909,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       enc.monsters.length ? resultBox(state) : null,
       bosses.length ? bossHero(state, bosses) : null,
       mobs.length ? h('ul', { class: 'mobs', 'aria-label': '敵方隨從' }, mobs.map((m) => mobCard(state, m))) : null,
+      alliesSection(state, enc),
       enc.monsters.length
         ? null
         : h('p', { class: 'notice stage__empty', text: online() ? '場上沒有敵人，等 GM 建立。' : '還沒有敵人。從下面新增。' }),
@@ -791,7 +920,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
             h('span', { text: '域外魔祖：這次攻擊花 30 靈氣，追加扣目標現有生命 10%' }))
         : null,
       canEdit
-        ? addBox('gm', online() ? '⚙️ 敵人與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), manageBox(state, enc), presetBox(enc), libraryBox()))
+        ? addBox('gm', online() ? '⚙️ 敵人、友方 NPC 與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), allyForm(), manageBox(state, enc), presetBox(enc), libraryBox()))
         : null);
   }
 

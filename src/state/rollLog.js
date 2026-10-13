@@ -100,6 +100,7 @@ const room = {
   members: [],
   battleNo: 0,
   encounter: null, // GM 建立、全員共享的遭遇戰（階段 C）；本機模式是 null
+  blackMarket: null, // 黑市團（特殊黑市）{ open, id }：只有 GM 能開；本機模式是 null
   skills: null, // GM 新增的專屬技能 { 名稱: 定義 }；本機模式是 null（只有內建的）
   special: null, // GM 新增的特殊配方與材料 { recipes, materials }；本機模式是 null（只有內建的）
   images: [], // GM 上傳的怪物立繪清單 [{ id, name, t }]（圖片本身用 imageUrl(id) 讀）
@@ -201,7 +202,7 @@ function onRoomMessage(msg) {
   switch (msg.t) {
     case 'hello':
       roomLog = Array.isArray(msg.history) ? msg.history.slice(0, MAX_ROOM_LOG) : [];
-      setPhase('online', { me: msg.me, gm: msg.gm, members: msg.members ?? [], battleNo: msg.battleNo ?? 0, encounter: msg.encounter ?? null, special: msg.special ?? null, skills: msg.skills ?? null, images: msg.images ?? [], vitals: msg.vitals ?? {}, roomId: msg.room ?? room.roomId, notice: '' });
+      setPhase('online', { me: msg.me, gm: msg.gm, members: msg.members ?? [], battleNo: msg.battleNo ?? 0, encounter: msg.encounter ?? null, blackMarket: msg.blackMarket ?? null, special: msg.special ?? null, skills: msg.skills ?? null, images: msg.images ?? [], vitals: msg.vitals ?? {}, roomId: msg.room ?? room.roomId, notice: '' });
       deliverMail(msg.mail); // 要等狀態變成「已加入」才能領信（領信要走房間連線）
       break;
     case 'event':
@@ -218,6 +219,10 @@ function onRoomMessage(msg) {
       break;
     case 'enc':
       room.encounter = msg.encounter ?? null;
+      notifyRoom();
+      break;
+    case 'blackMarket':
+      room.blackMarket = msg.blackMarket ?? null;
       notifyRoom();
       break;
     case 'skills':
@@ -247,7 +252,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'rewardSent': case 'mailClaimed': case 'trades': case 'tradeOk': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': case 'presets': case 'acts': {
+    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'rewardSent': case 'mailClaimed': case 'trades': case 'tradeOk': case 'specialOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': case 'presets': case 'acts': case 'bmOk': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;
@@ -311,7 +316,7 @@ export function stopRoom() {
   client?.close(); client = null;
   failPending('已離開房間。');
   roomLog = [];
-  if (room.phase !== 'local') setPhase('local', { me: null, members: [], gm: { uids: [], override: null, names: {} }, battleNo: 0, encounter: null, special: null, skills: null, notice: '' });
+  if (room.phase !== 'local') setPhase('local', { me: null, members: [], gm: { uids: [], override: null, names: {} }, battleNo: 0, encounter: null, blackMarket: null, special: null, skills: null, notice: '' });
 }
 
 /**
@@ -384,6 +389,10 @@ export function setGmOverride(action) {
 
 /** 房間裡的遭遇戰（怪物、先攻）；不在房間（本機模式）時是 null，畫面改用角色自己的 state.encounter */
 export const getEncounter = () => (isOnline() ? room.encounter : null);
+/** 黑市團狀態 { open, id }；不在房間裡是 null */
+export const getBlackMarket = () => (isOnline() ? room.blackMarket ?? { open: false, id: 0 } : null);
+/** GM 開始／結束黑市團 */
+export const setBlackMarket = (open) => request({ t: 'blackMarket', open });
 
 /** 遭遇戰操作：GM 的 encAdd／encRemove／encClear／encInit／encNext／encImg，玩家的 encHit。失敗丟 RollError */
 export const encounterAction = (msg) => request(msg);

@@ -88,6 +88,15 @@ export function applyMail(state, mail) {
       ],
     };
   }
+  if (mail.kind === 'support' && mail.support === 'points') { // 固定點數的治療（浮腫之軀）
+    const amount = Number(mail.amount);
+    const skill = String(mail.skill ?? '技能');
+    if (!Number.isInteger(amount) || amount < 1) return { title: `${from} 的技能無法使用`, lines: [] };
+    const wasDowned = isDowned(state);
+    const before = state.hp;
+    healPlayer(state, amount);
+    return { title: `${from} 對你施放了 ${skill}`, lines: [`治療 ${amount} 點，回復 ${state.hp - before} 生命${wasDowned && !isDowned(state) ? '，你站起來了！' : wasDowned ? '（還沒回到正數，仍然倒地）' : ''}`] };
+  }
   if (mail.kind === 'support') { // 隊友對你施放補血／護盾技能：照「你自己的最大生命」算百分比
     const pct = Number(mail.pct);
     if (!['heal', 'shield'].includes(mail.support) || !Number.isFinite(pct) || pct <= 0 || pct > 100) return { title: `${from} 的技能無法使用`, lines: [] };

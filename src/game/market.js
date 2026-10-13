@@ -178,6 +178,18 @@ export function setBlackSession(state, open) {
   m.session = { open: Boolean(open), used: open ? 0 : m.session.used };
 }
 
+/**
+ * 房間的黑市團狀態（GM 開關，使用者 2026-10-12）→ 自己的特殊黑市：bm = { open, id }。
+ * 看到新的一團（id 不同）就把本團交易數歸零；同一團重新連線不會歸零。回傳有沒有改到存檔
+ */
+export function syncBlackSession(state, bm) {
+  const m = marketToday(state);
+  const before = JSON.stringify(m.session);
+  if (bm?.open) m.session = m.session.id === bm.id ? { ...m.session, open: true } : { open: true, used: 0, id: bm.id };
+  else m.session = { ...m.session, open: false };
+  return JSON.stringify(m.session) !== before;
+}
+
 /** 特殊黑市（固定價、代金券）：只在黑市團期間；買＋賣合計每團 50 個 */
 export function specialTrade(state, side, item, qty, gearIds = null) {
   const m = marketToday(state);

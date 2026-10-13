@@ -12,13 +12,13 @@ let uid = 0;
  * title：標題；now / max：目前值與上限；trigger：觸發的按鈕（關閉後把焦點還給它）
  * onConfirm(newValue)：按「確定」才呼叫；focusAfter()：畫面重畫後，回傳要接手焦點的新元素（選填）
  */
-export function openValueSheet({ title, now, max, trigger, onConfirm, focusAfter }) {
-  const clamp = (n) => Math.max(0, Math.min(max, Math.floor(Number(n)) || 0));
+export function openValueSheet({ title, now, max, min = 0, trigger, onConfirm, focusAfter }) {
+  const clamp = (n) => Math.max(min, Math.min(max, Math.floor(Number(n)) || 0)); // min：生命可以是負數（倒扣），其他是 0
   let draft = clamp(now);
   const titleId = `vsheet-title-${++uid}`;
 
   const input = h('input', {
-    class: 'field vsheet__input', type: 'number', inputmode: 'numeric', min: 0, max, value: draft, 'aria-label': `${title}（目前值）`,
+    class: 'field vsheet__input', type: 'number', inputmode: 'numeric', min, max, value: draft, 'aria-label': `${title}（目前值）`,
     oninput: (e) => { draft = clamp(e.target.value); },
     onchange: () => { input.value = draft; },
   });

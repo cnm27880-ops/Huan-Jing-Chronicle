@@ -12,7 +12,8 @@ export const DRAW_TIERS = ['初階', '進階', '大師', '傳說'];
 export const DRAW_CHOICES = 3;
 export const MAX_DRAW_AT_ONCE = 20;
 
-export const drawPool = (tier) => Object.keys(SKILL_TABLE).filter((n) => SKILL_TABLE[n].tier === tier && !SKILL_TABLE[n].personal);
+// 獨特系（初階寶寶、奶龍寶庫、我的刀盾、老狗識途…）是個人專屬，抽不到（使用者 2026-10-12）
+export const drawPool = (tier) => Object.keys(SKILL_TABLE).filter((n) => SKILL_TABLE[n].tier === tier && !SKILL_TABLE[n].personal && SKILL_TABLE[n].school !== '獨特');
 export const hasPendingDraw = (state) => (state.pendingDraws?.length ?? 0) > 0;
 
 /** 用掉 times 本 tier 技能書，產生 times 組選項放進 state.pendingDraws */

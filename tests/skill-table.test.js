@@ -169,7 +169,10 @@ test('肥料書：抵同階通用書 1 比 1；先用已學會的多餘書，再
   // 八卦掌（初階）已 1 級，要升到 2 級＝付 2 本初階通用書
   const s = mk({ 八卦掌: 1, 周天吐納法: 1 }, { exp: 9999, inventory: { 周天吐納法: 1, 呢喃低語: 3, 初階寶寶: 2, 初階技能書: 5, 劍心訣: 9 } });
   const plan = upgradePlan(s, '八卦掌', 2);
-  assert.deepEqual(plan.fodder, { 周天吐納法: 1, 呢喃低語: 1 }); // 已學會的先，再來湊滿 3 本的；初階寶寶只有 2 本不動；進階的劍心訣不同階不動
+  assert.deepEqual(plan.fodder, { 周天吐納法: 1, 呢喃低語: 1 }); // 已學會的先，再來湊滿 3 本的；初階寶寶只有 2 本排最後（這次用不到）；進階的劍心訣不同階不動
+  // 需要更多時，沒湊滿 3 本、沒保留的書最後也會被拿來當肥料（使用者 2026-10-12）
+  assert.deepEqual(upgradePlan(s, '八卦掌', 3).fodder, { 周天吐納法: 1, 呢喃低語: 3, 初階寶寶: 1 });
+  assert.deepEqual(fodderBooks(s, '初階').map((f) => [f.name, f.rank]), [['周天吐納法', 1], ['呢喃低語', 2], ['初階寶寶', 3]]);
   assert.equal(plan.ok, true);
   assert.equal(upgradeSkillTo(s, '八卦掌', 2).ok, true);
   assert.equal(s.inventory.周天吐納法, undefined);

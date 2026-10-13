@@ -225,6 +225,7 @@ async function init() {
   }
   sync.onWaitingChange(() => showView());
   let lastSpecial;
+  let lastBm = '';
   let lastSkills = getRoomStatus().skills;
   subscribeRoom(() => {
     applyWait();
@@ -234,6 +235,11 @@ async function init() {
       setCustomSkills(status.skills);
       saveCachedCustomSkills(status.skills);
       if (currentView !== 'map') views[currentView]?.render();
+    }
+    const bm = JSON.stringify(status.phase === 'online' ? status.blackMarket ?? null : null);
+    if (bm !== lastBm) { // GM 開／關黑市團：交易頁重畫（同步到自己的特殊黑市在 marketView 裡做）
+      lastBm = bm;
+      if (currentView === 'market') views.market.render();
     }
     const special = status.phase === 'online' ? status.special : null;
     if (special !== lastSpecial) { // GM 新增／修改了特殊配方或材料（或離開房間）：換成最新的資料並重畫修整日

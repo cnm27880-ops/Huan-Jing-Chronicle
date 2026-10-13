@@ -29,7 +29,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/dice.js` | 骰子基礎：擲骰、自訂骰式解析（rng 可替換） |
 | `src/game/stats.js` | 數值面板：基礎 + 裝備 + 食物，附明細 |
 | `src/game/equipment.js` | 裝備：鑑定骰式、裝備欄、比較、整理；寶石鑑定與鑲嵌（純函式） |
-| `src/game/market.js` | 交易：交易大廳（每日原價 5 個）、黑市（擲骰溢價／壓價、勞動抵債、代金券換金幣）、特殊黑市（黑市團、50 個）（純函式） |
+| `src/game/market.js` | 交易：交易大廳（每日原價 5 個）、黑市（擲骰溢價／壓價、勞動抵債、代金券換金幣）、特殊黑市（黑市團只有 GM 能開，房間同步：`syncBlackSession`；伺服器 `room-core.js` 的 `onBlackMarket`；50 個）（純函式） |
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
 | `src/game/mail.js` | 送東西與餵藥（純函式）：打包扣背包（已鑑定裝備整件送：`takeGear`／`refundGear`／`receiveGear`，收到換新編號，鑲的寶石跟著走；交易單的裝備只放「我給出」這邊，欄位 `giveGear`；伺服器 `parseGear` 只留已知欄位、一次最多 10 件）、收到時套用（禮物進背包、藥水回復＋毒性算收件人、毒性滿了退回） |
 | `src/state/mailbox.js` | 信箱：收到伺服器的信 → 領取（只有第一個分頁拿得到）→ 套用到自己的角色 → 存檔 → 跳通知；不在線寄來的上線才收到 |
@@ -41,7 +41,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/playerTrade.js` | 「📥 待回覆」清單（給 giftSheet 用）：收到的交易（接受／拒絕）、我發出的交易（取消）；交易單存在伺服器（`room-core.js` 的 `tradeList`／`tradeRespond`），A 的東西與金幣先扣押在單子上 |
 | `src/game/simulate.js` | 模擬戰（階段 D，純函式）：續航最長招式、怪物隨機打人、自動喝藥與隊友救人、勝率／回合數／傷害／剩餘生命統計；玩家複本可帶 `movePlan`（出招優先順序）；不碰真實存檔 |
 | `src/ui/simPanel.js` | GM 專用「模擬戰」面板（跑團頁房間區塊）：選玩家（每位可設「出招設定」：自動依實戰紀錄／手動排順序）＋敵人來源（自訂強度每場重抽／場上的敵人／預組，後兩種固定 A/B/C）＋場數，畫回合分布與剩餘生命條狀圖；自訂強度下有「範本調整影響分析」與「範本版本」（存／載入／比較） |
-| `src/game/enemy.js` | 敵人等級（普通／菁英 2 打／BOSS 3 打）與技能 A 攻擊強化、B 防禦強化（每回合歸零）、C 喝血（整場戰鬥 1 次）的次數與效果（伺服器與前端共用）（純函式） |
+| `src/game/enemy.js` | 敵人等級（普通／菁英 2 打／BOSS 3 打）與技能 A 攻擊強化、B 防禦強化、C 喝血（三種都每回合歸零）的次數與效果（伺服器與前端共用）（純函式） |
+| `src/game/ally.js` | 友方 NPC（純函式，伺服器與前端共用）：檢查輸入、攻擊怪物、被怪物打（生命倒扣）、改生命、移除、插進先攻隨機位置（`insertRandom`，增援也用）；只有 GM 操作。伺服器在 `room-core.js` 的 `onAlly`，畫面在 `encounterCard.js` 的「友方」 |
 | `src/game/nudge.js` | 戰鬥提醒與隊友資源條的判斷（純函式）：資源動用比例、資源條、隊伍摘要、偵測隊友倒地／危急／全隊吃緊、防連發、手上能做的事 |
 | `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄、房間上方；GM 不顯示）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示） |
 | `src/ui/confirmPop.js` | 網頁自己的對話框（取代瀏覽器的 confirm／prompt）：`askConfirm`／`askText`，有給按鈕貼在旁邊、沒給就置中；**全站不要再用 `confirm()`／`prompt()`／`alert()`** |
@@ -52,7 +53,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/tuning.js` | 模擬戰的目標（4～8 回合、勝率至少 75%、每場約耗一半資源）、評價與策略建議、自動調整（保守版／激進版兩個方案 `PLANS`）：先找回合數的結構下限、必要時拿掉最弱的怪，再二分搜尋血量與攻擊強度（自訂強度 `scaleSpecs`／固定敵人 `scaleEncounter` 都能調）；新增輸出占比評分 `shareInfo`（純函式） |
 | `src/game/activity.js`、`src/state/activityLog.js`、`src/ui/logsView.js` | 玩家日誌：內容格式（修整／學習／物品）、回報點（房間伺服器，離線存本機）、「日誌」大分頁（`#logs`，所有玩家都看得到每位玩家的）；伺服器端在 `room-core.js` 的 `actPost`／`actList`，每人留 500 筆 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
-| `tests/*.test.js` | 規則測試（遭遇戰的房間邏輯在 `worker/test/encounter.test.js`，立繪與隊友狀態在 `worker/test/images.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
+| `tests/*.test.js` | 規則測試（2026-10-12 跑團後的修正在 `tests/playtest-fixes.test.js`；遭遇戰的房間邏輯在 `worker/test/encounter.test.js`，立繪與隊友狀態在 `worker/test/images.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
 | `worker/src/room-core.js` | 房間規則（純邏輯）：白名單、GM 權限、伺服器擲骰、紀錄 200 筆、限流、輸入驗證、遭遇戰（GM 建立怪物、玩家出招後自動同步傷害、先攻位置隨機＋交換＋鎖定）、信箱（送東西與餵藥，離線暫存、領取先刪先贏）、玩家交易（交易單也放在信箱表，`tradeRespond` 處理接受／拒絕／失敗／取消，先刪先贏）、GM 寫入玩家角色時記「異動」事件（`worker/src/audit.js` 比對前後差異；鑑定 identify、黑市 deal、異動 audit 不存進 200 筆的紀錄歷史，只即時廣播或寫進日誌頁）、GM 新增的特殊配方與材料（`specialSet`／`specialDel`）與專屬技能（`skillSet`／`skillDel`），存在 meta、全員同步、每次改動記異動；怪物立繪（`imgPut`／`imgDel`／`encImg`，GM 上傳、存 SQLite、`room.js` 的 GET `/img/:id` 讀，網址由 `index.js` 驗登入）；隊友狀態（`vitals`，每人回報生命與資源、全員廣播）；敵人預組（`presetList`／`presetSave`／`presetDel`／`presetLoad`，只有 GM，回覆只送 GM 自己） |
 | `worker/src/backup.js` | 每日自動備份：`wrangler.jsonc` 的 cron（台灣 04:07）觸發 `entry.js` 的 `scheduled` → `runBackup` 呼叫 Room 的 `dumpAll`（所有資料表）→ gzip JSON 存進 R2 bucket `huan-jing-backup`（`backup/main/日期.json.gz`，保留最近 30 份）。部署前 bucket 要先在後台建立 |

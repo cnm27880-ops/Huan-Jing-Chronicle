@@ -63,6 +63,22 @@ export function attackResponses(state, move) {
     .filter((r) => r.tracks.length);
 }
 
+/**
+ * 我的刀盾（獨特）：一次跑團有 2 次使用次數，3、6、9 級時改為 4、6、8 次（state.daoDunUsed 記用掉幾次，「結束本次跑團」歸零）。
+ * 攻擊時花 1 次：這次攻擊獲得身上「防具」防禦的五分之一（只取整數），轉成同屬性的傷害骰——
+ * 體魄強韌→物理（A）、抗性免疫→能量（B）、精神意志→靈魂（C）、絕對防禦→真實傷害（加在用到的每一軌）。
+ */
+export const DAODUN = '我的刀盾';
+export const daoDunUses = (state) => { const lv = skillLevel(state, DAODUN); return lv >= 9 ? 8 : lv >= 6 ? 6 : lv >= 3 ? 4 : lv >= 1 ? 2 : 0; };
+export const daoDunLeft = (state) => Math.max(0, daoDunUses(state) - (Number(state.daoDunUsed) || 0));
+
+/**
+ * 浮腫之軀（獨特、神秘）的主動：花 X 點生命，獲得 2X 治療點，必須立刻分配給自己以外的隊友。X 上限 3，3、6、9 級改為 6、9、12。
+ * （被動「每個 5 級以上神秘技能 +5 生命上限」在 skillTable.js）
+ */
+export const SWELL = '浮腫之軀';
+export const swellCap = (state) => { const lv = skillLevel(state, SWELL); return lv >= 9 ? 12 : lv >= 6 ? 9 : lv >= 3 ? 6 : lv >= 1 ? 3 : 0; };
+
 /** 龍（傳說）：造成能量傷害時，每 1 級讓自己的能量傷害 +3，直到戰鬥結束（每次造成都疊加，需驗證）。回傳每次增加的點數 */
 export const dragonGain = (state) => 3 * skillLevel(state, '龍');
 
@@ -101,6 +117,13 @@ export const SKILL_CATALOG = {
   // 暗影斗篷（個人專屬）的「現身」：造成能量傷害 1 個目標，爆發所有聚集的能量傷害（骰數見 shadowCloak.js，加在能量軌，明細寫「暗影斗篷」）。
   // 進入隱身與每回合聚集不是招式，在戰鬥頁的暗影斗篷區塊操作
   暗影斗篷: { school: '西幻', kind: 'attack', tracks: ['B'], targets: 1, cost: {}, extraAt: () => ({}) },
+  // 恐怖機甲（傳說）：消耗 20 算力，「以你的能量傷害骰，同時造成物理、能量與靈魂傷害」——三軌的攻擊骰數都用能量那一軌算
+  // （能量傷害＋真傷＋能量加成…），各自對敵人該軌的防禦（使用者 2026-10-12：用能量傷害抵掉三種傷害）。響應：每 1 級 +3 顆能量傷害骰（三軌都吃）。
+  // 技能表寫「消耗」不是「花費」，自動產生時讀不到花費，所以手寫在這裡
+  恐怖機甲: { school: '科技', kind: 'attack', tracks: ['A', 'B', 'C'], targets: 1, cost: { 算力: 20 }, poolFrom: 'B', extraAt: (lv) => ({ B: 3 * lv }) },
+  // 機甲駕駛員（大師）：「選擇造成物理或能量傷害」＝每次出招擇一軌，不是兩軌都打（使用者 2026-10-12）。
+  // 出招時選軌道（opts.track，沒選就挑攻擊骰多的那一軌）；響應每 2 級 +3 顆，加在選到的那一軌
+  機甲駕駛員: { school: '科技', kind: 'attack', tracks: ['A', 'B'], choose: true, targets: 1, cost: {}, extraAt: (lv) => ({ A: 3 * Math.floor(lv / 2), B: 3 * Math.floor(lv / 2) }) },
   萬物歸一: {
     school: '神秘', kind: 'attack', mode: 'all', tracks: ['A', 'B', 'C'], cost: {},
     extraAt: () => ({}),
@@ -192,6 +215,12 @@ export function moveFromCatalog(name) {
     cost: { ...(c.cost ?? {}) }, extra: { A: 0, B: 0, C: 0 },
   };
 }
+
+/** 擇一軌的招式（機甲駕駛員）：可以選的軌道；不是這種招式回傳 null */
+export const choosableTracks = (move) => (move?.skill && catalogOf(move.skill)?.choose ? [...(catalogOf(move.skill).tracks ?? [])] : null);
+
+/** 用別軌的傷害骰打每一軌的招式（恐怖機甲用能量傷害骰）：回傳 'B'，一般招式回傳 null */
+export const poolFromOf = (move) => (move?.skill ? catalogOf(move.skill)?.poolFrom ?? null : null);
 
 /** 招式實際的加成骰數：手動 extra + 目錄的每級加成 */
 export function moveExtra(state, move) {

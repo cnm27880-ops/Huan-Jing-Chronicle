@@ -52,7 +52,7 @@ function upgrade(state) {
   for (const r of Object.keys(state.resources)) {
     state.resources[r] = Math.max(0, Math.min(state.resources[r], stats[r]?.total ?? Infinity));
   }
-  state.hp = Math.max(0, Math.min(state.hp, maxHp(state)));
+  state.hp = Math.min(Number(state.hp) || 0, maxHp(state)); // 生命可以是負數（倒扣，見 combat.js）
   return state;
 }
 

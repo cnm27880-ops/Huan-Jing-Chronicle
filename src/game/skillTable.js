@@ -292,7 +292,8 @@ export const isInsight = (name) => Object.hasOwn(INSIGHT_TIERS, name);
 
 /**
  * 升級時可以當「肥料」的抽出書（物品名＝技能名），1 本抵 1 本「同階」通用技能書；抽出書不能變回通用書（會無限抽）。
- * 優先順序：0 同階技能感悟　1 已學會技能的多餘書　2 還沒學、已湊滿 3 本、且不在保留名單的書。其餘（沒湊滿、保留中）不動。
+ * 優先順序：0 同階技能感悟　1 已學會技能的多餘書　2 還沒學、已湊滿 3 本、且不在保留名單的書
+ *          3 還沒學、沒湊滿 3 本、不在保留名單的書（使用者 2026-10-12：這些也可以當肥料，排最後）。保留中的不動。
  * learning = 這次正要從 0 級學起的技能：它的 3 本同名書要留給學習，只有超出的才算多餘。
  * 回傳 [{ name, n, rank }]（依優先順序）
  */
@@ -305,7 +306,7 @@ export function fodderBooks(state, tier, learning = null) {
     const n = item === learning ? have - LEARN_BOOKS : have;
     if (n <= 0) continue;
     if (learned) out.push({ name: item, n, rank: 1 });
-    else if (have >= LEARN_BOOKS && !isKeptBook(state, item)) out.push({ name: item, n, rank: 2 });
+    else if (!isKeptBook(state, item)) out.push({ name: item, n, rank: have >= LEARN_BOOKS ? 2 : 3 });
   }
   return out.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name, 'zh-Hant'));
 }

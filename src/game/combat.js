@@ -8,7 +8,7 @@
 // 傳說技能（使用者口述，2026-10-07）：
 //   萬物歸一：A+B+C+真傷 一次對 A+B+C+絕防；大羅真仙：選定傷害+真傷 只打對方絕對防禦；
 //   終焉武裝（被動）：無視對方絕對防禦（對方絕防視為 0；和大羅真仙同用＝對方沒有防禦）。
-// 倒地：HP 歸零只是「倒地」，不會死亡（使用者口述）。
+// 倒地：HP 歸零只是「倒地」，不會死亡（使用者口述）。玩家生命會「倒扣」成負數，要補回正數（> 0）才站得起來（使用者 2026-10-12）。
 // ============================================================
 import {
   TRACKS, TRACK_ATK_STAT, TRACK_DEF_STAT, TRUE_ATK, TRUE_DEF, POTIONS, TOXICITY_MAX,
@@ -19,6 +19,7 @@ import { removeItem } from './engine.js';
 import { recordMoveUse } from './moveUse.js';
 import {
   passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS, douMult, attackResponses, dragonGain, hasCyberHacker, addCost, MAGE, mageApplies, titanCut,
+  choosableTracks, poolFromOf, DAODUN, daoDunLeft, SWELL, swellCap,
 } from './skills.js';
 import { actionCost, shortfall, pay, costText } from './resources.js';
 import { SHADOW_SKILL, isHidden, gatheredOf, clearShadow } from './shadowCloak.js';
@@ -48,18 +49,21 @@ export function attackDice(state, move, potionBonus = 0, douBonus = 0, respDice 
   const p = derivedStats(state);
   const brute = passivesOf(state).brute;
   const extra = moveExtra(state, move);
+  const from = poolFromOf(move); // 恐怖機甲：每一軌都用能量傷害骰（'B'）；一般招式是 null（各軌用自己的）
   const dice = { A: 0, B: 0, C: 0 };
   const parts = {};
   for (const t of move.tracks) {
     if (t === 'A' && brute) { parts[t] = [{ label: '暴徒：無法造成物理傷害', value: 0 }]; continue; }
+    const src = from ?? t; // 骰數取自哪一軌的傷害
     const list = [
-      { label: TRACK_ATK_STAT[t], value: p[TRACK_ATK_STAT[t]].total },
+      { label: src === t ? TRACK_ATK_STAT[t] : `${TRACK_ATK_STAT[src]}（代替${TRACK_ATK_STAT[t]}）`, value: p[TRACK_ATK_STAT[src]].total },
       { label: TRUE_ATK, value: p[TRUE_ATK].total },
-      { label: '招式加成', value: extra[t] ?? 0 },
+      { label: '招式加成', value: extra[src] ?? 0 },
       { label: '藥水', value: potionBonus },
       { label: '鬥氣', value: douBonus }, // 花鬥氣換來的真實傷害骰（每條用到的軌道都加）
-      { label: '響應', value: respDice[t] ?? 0 }, // 腦機協議、殘缺筆記…（見 skills.js 的 ATTACK_RESPONSES）
-      { label: '龍', value: t === 'B' ? state.buffs?.dragon ?? 0 : 0 }, // 龍：造成能量傷害後累積的能量傷害，直到戰鬥結束
+      // 腦機協議、殘缺筆記…（見 skills.js 的 ATTACK_RESPONSES）；恐怖機甲：能量軌的響應三軌都吃，其他軌自己的響應照加
+      { label: '響應', value: (respDice[src] ?? 0) + (src !== t ? respDice[t] ?? 0 : 0) },
+      { label: '龍', value: src === 'B' ? state.buffs?.dragon ?? 0 : 0 }, // 龍：造成能量傷害後累積的能量傷害，直到戰鬥結束
       { label: SHADOW_SKILL, value: t === 'B' && move.skill === SHADOW_SKILL ? gatheredOf(state) : 0 }, // 現身爆發：隱身期間聚集的能量傷害（shadowCloak.js）
     ];
     parts[t] = list.filter((x, i) => i < 2 || x.value !== 0);
@@ -136,7 +140,6 @@ export function clashPool(label, atkDice, defDice, rng = Math.random) {
 
 // ---------- HP 與倒地 ----------
 export const isDowned = (e) => e.hp <= 0;
-const clampHp = (e, max) => Math.max(0, Math.min(max, e.hp));
 
 /** 扣玩家生命；有護盾（生生造化印）時先扣護盾，護盾破了抗性加成就消失。回傳 { toShield, toHp } */
 export function damagePlayer(state, dmg) {
@@ -147,11 +150,12 @@ export function damagePlayer(state, dmg) {
     if (state.shield.hp <= 0) state.shield = { hp: 0, res: 0 };
   }
   const toHp = dmg - toShield;
-  state.hp = Math.max(0, state.hp - toHp);
+  state.hp -= toHp; // 倒扣：可以變成負數（使用者 2026-10-12），補回正數才站得起來
   return { toShield, toHp };
 }
+/** 回血：從目前（可能是負數）的生命往上加，不超過最大生命 */
 export function healPlayer(state, n) {
-  state.hp = clampHp({ hp: state.hp + n }, maxHp(state));
+  state.hp = Math.min(maxHp(state), state.hp + n);
 }
 
 // ---------- 怪物（照機器人 generate_abc_split）----------
@@ -308,10 +312,37 @@ export function planResponses(state, move, baseCost, off = []) {
  * opts.extraAbs：敵人 B 技能多出來的絕對防禦骰（怪物 id → 骰數）。
  * opts.mage：大魔導師加骰的顆數（每顆 5 魔力，上限 12；招式要有能量軌）。
  * opts.respOff：這次不要觸發的攻擊響應（技能名稱陣列）；沒給＝學過的、符合條件的、付得起的都自動觸發。
+ * opts.track：擇一軌的招式（機甲駕駛員）這次打哪一軌（'A'／'B'）。
+ * opts.daoDun：這次攻擊用「我的刀盾」（花 1 次使用次數，防具防禦的 1/5 轉成傷害骰；次數用完就略過）。
  * 回傳 { move, target, hits[], cost, heal, ... }；失敗回傳 { error }。第一個目標的欄位也放在最外層，方便畫面使用。
  */
+/** 我的刀盾：身上防具的防禦五分之一（取整數）→ 同屬性的傷害骰 { A, B, C, T（真實傷害） } */
+export function daoDunDice(state) {
+  const g = state.equipment?.armor;
+  const sum = {};
+  for (const e of g?.effects ?? []) sum[e.stat] = (sum[e.stat] ?? 0) + e.value;
+  if (g?.gem) sum[g.gem.stat] = (sum[g.gem.stat] ?? 0) + g.gem.value;
+  const fifth = (stat) => Math.floor((sum[stat] ?? 0) / 5);
+  return { A: fifth(TRACK_DEF_STAT.A), B: fifth(TRACK_DEF_STAT.B), C: fifth(TRACK_DEF_STAT.C), T: fifth(TRUE_DEF) };
+}
+
+/**
+ * 擇一軌的招式（機甲駕駛員）這次打哪一軌：玩家選的（opts.track）優先，沒選或選錯就挑攻擊骰多的那一軌（同數取前面的）。
+ * 回傳只剩一軌的招式複本；一般招式原樣回傳
+ */
+export function resolveChosenTrack(state, move, track) {
+  const choices = choosableTracks(move);
+  if (!choices?.length) return move;
+  const pick = choices.includes(track) ? track : choices.reduce((best, t) => {
+    const d = attackDice(state, { ...move, tracks: [t] }).dice[t];
+    return d > attackDice(state, { ...move, tracks: [best] }).dice[best] ? t : best;
+  });
+  return { ...move, tracks: [pick] };
+}
+
 export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math.random, opts = {}) {
-  const move = state.moves.find((m) => m.id === moveId);
+  const found = state.moves.find((m) => m.id === moveId);
+  const move = found ? resolveChosenTrack(state, found, opts.track) : found; // 機甲駕駛員：只打選的那一軌
   const picked = Array.isArray(opts.targetIds);
   const first = enc.monsters.find((m) => m.id === (picked ? opts.targetIds[0] : monsterId));
   if (!move) return { error: '找不到這個招式。' };
@@ -344,6 +375,19 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   cost = plan.cost;
   respDice.B += mage; // 大魔導師：能量傷害骰
   const notes = plan.skipped.map((r) => `響應「${r.name}」資源不足，略過`);
+  // 我的刀盾：防具防禦的 1/5 → 同屬性傷害骰（真實傷害加在用到的每一軌；萬物歸一／大羅真仙是單一骰池，真實傷害只加一次）
+  if (opts.daoDun && skillLevel(state, DAODUN) > 0) {
+    if (daoDunLeft(state) < 1) notes.push(`${DAODUN}：這次跑團的使用次數用完了，略過`);
+    else {
+      const dd = daoDunDice(state);
+      const usedTracks = move.mode === 'all' ? TRACKS : move.tracks;
+      const pooledMove = move.mode === 'all' || move.mode === 'abs';
+      for (const t of TRACKS) if (usedTracks.includes(t)) respDice[t] += dd[t];
+      if (pooledMove) respDice[usedTracks[0]] += dd.T; else for (const t of usedTracks) respDice[t] += dd.T;
+      state.daoDunUsed = (Number(state.daoDunUsed) || 0) + 1;
+      notes.push(`${DAODUN}：防具防禦的 1/5 轉成傷害骰（物理 +${dd.A}、能量 +${dd.B}、靈魂 +${dd.C}、真實 +${dd.T}，只加在用到的軌道），本次跑團還剩 ${daoDunLeft(state)} 次`);
+    }
+  }
   if (mage) notes.push(`響應「大魔導師」：花 ${mage * MAGE.cost} 魔力，能量傷害骰 +${mage}`);
   pay(state, cost);
   recordMoveUse(state, move.name); // 招式使用紀錄（GM 的模擬戰照實際常用的招式模擬）
@@ -475,6 +519,24 @@ export function useSupport(state, moveId, tier = 0, { self = true } = {}) {
   const res = cat.resAt(lv);
   if (self) state.shield = { hp: amount, res }; // 重新施放會直接取代舊護盾（不可疊加）
   return { move, cost, pct: t.pct, amount, res, kind: 'shield' };
+}
+
+/**
+ * 浮腫之軀的主動：花 x 點生命（不能付到倒地；魔女另加 30 魔力），得到 2x 治療點（由畫面分配給隊友、用信箱送出）。
+ * 回傳 { x, points, cost } 或 { error }
+ */
+export function useSwell(state, x) {
+  const cap = swellCap(state);
+  if (!cap) return { error: `你沒有學「${SWELL}」。` };
+  if (isDowned(state)) return { error: '你已經倒地，無法行動。' };
+  const n = Math.floor(Number(x));
+  if (!Number.isInteger(n) || n < 1 || n > cap) return { error: `X 要是 1～${cap}。` };
+  const cost = actionCost(state, { cost: { 生命: n } });
+  const lack = shortfall(state, cost);
+  if (lack) return { error: `資源不足：${lack}（需要 ${costText(cost)}）` };
+  pay(state, cost);
+  recordMoveUse(state, SWELL);
+  return { x: n, points: 2 * n, cost };
 }
 
 /** 怪物攻擊玩家：玩家用三軌防禦 + 絕對防禦；會消耗「下次防禦」藥水加成並扣玩家 HP */
