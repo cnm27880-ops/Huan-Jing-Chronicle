@@ -82,7 +82,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/importSheet.js` | 試算表角色卡（貼上的文字）→ 網站角色：用標題文字找位置，不看固定格子；算出「手動調整」（純函式） |
 | `src/ui/backupRestore.js` | GM 專用的「從備份還原角色」面板（跑團頁房間區塊）：選 R2 下載的每日備份 `.json.gz`（瀏覽器內解壓），挑玩家，用 `charImport` 寫回伺服器（會記異動）；備份檔含所有玩家資料，不能進 git |
 | `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |
-| `src/ui/rewardSheet.js` | GM 專用「🎁 發放獎勵」面板（跑團頁房間區塊）：勾選玩家（預設全員）＋物品（技能書快捷鈕）、金幣、經驗、時間、備註，一次發出；也拿來補償（例如玩家忘了喝惜未央，直接補時間）。伺服器 `room-core.js` 的 `onReward`（只有 GM，走信箱 `kind:'reward'`，不用扣任何人的背包，上限：經驗 100 萬、時間 1000、60 位玩家），玩家端 `mail.js` 的 `applyMail` 套用（時間沒有上限）並跳通知 |
+| `src/ui/rewardSheet.js` | GM 專用「發放獎勵」面板（跑團頁房間區塊）：勾選玩家（預設全員）＋物品（技能書快捷鈕）、金幣、經驗、時間、備註，一次發出；也拿來補償（例如玩家忘了喝惜未央，直接補時間）。伺服器 `room-core.js` 的 `onReward`（只有 GM，走信箱 `kind:'reward'`，不用扣任何人的背包，上限：經驗 100 萬、時間 1000、60 位玩家），玩家端 `mail.js` 的 `applyMail` 套用（時間沒有上限）並跳通知 |
 | `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：看並改玩家的手動調整、技能等級、啟動；「生活技能補算」（`skillTable.js` 的 `lifeBackfill`／`applyLifeBackfill`，升級時自動記 `lifeGainDone`，沒記錄的由 GM 逐一勾選補上；也能直接改生活技能與技藝數值） |
 | `public/manifest.webmanifest`、`public/sw.js`、`public/icons/` | PWA（可加到主畫面）：manifest、Service Worker（只快取 /assets、/icons、/img，網頁與 API 不碰，改版後要讓舊快取失效就把 `sw.js` 的 `CACHE` 版本號 +1）、圖示（暫用，`tools/make-icons.py` 產生；換正式圖示：`python3 tools/make-icons.py --source 圖片.png`） |
 | `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
@@ -100,7 +100,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/battleView.js` | 戰鬥的個人部分（跑團頁左欄常駐，原戰鬥面板拆開）：HUD（生命／資源／防禦三軌／狀態標籤）、手機膠囊 HUD、招式條（選中的有「出招」）、藥水、狀態與防禦骰 |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
 | `src/ui/sessionView.js` | 跑團頁的三欄工作台（版面規格見 `DESIGN.md`「跑團頁」）：左欄 HUD＋招式／藥水與狀態／技能檢定分頁、中欄遭遇戰舞台、右欄房間＋紀錄（全部／擲骰／戰鬥，新的在下）＋快速擲骰（擲完播 `diceFx.js` 特效）；平板與手機的底部抽屜與快捷列；離開頁面會停掉紀錄更新 |
-| `src/ui/encounterCard.js` | 遭遇戰舞台（跑團頁中欄）：先攻軸（隨機、玩家可交換、GM 開打後鎖定）、BOSS 大立繪與 3 段血條（只是視覺）、三種防禦（點選）與三種攻擊（點兩下＝承受，第一下只待命）同時列出、小怪矩陣、多選目標（上限＝招式目標數）、出招與承受攻擊（打擊特效依傷害軌道：物理劈砍／能量爆裂／靈魂漩渦，多段招式連播，CSS 在 `blackgold.css` 的 `fx-slash`／`fx-burst`／`fx-soul`）、GM 的新增敵人／敵人管理／立繪庫（上傳前在瀏覽器縮成 WebP）。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
+| `src/ui/encounterCard.js` | 遭遇戰舞台（跑團頁中欄）：先攻軸（隨機、玩家可交換、GM 開打後鎖定）、BOSS 大立繪與 3 段血條（只是視覺）、三種防禦（點選）與三種攻擊（點兩下＝承受，第一下只待命）同時列出、小怪矩陣、多選目標（上限＝招式目標數）、出招與承受攻擊（打擊特效依傷害軌道：物理劈砍／能量爆裂／靈魂漩渦，多段招式連播，CSS 在 `session.css` 檔尾的 `fx-slash`／`fx-burst`／`fx-soul`）、GM 的新增敵人／敵人管理／立繪庫（上傳前在瀏覽器縮成 WebP）。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |
 | `src/ui/diceFx.js` | 擲骰特效（只是畫面）：骰子翻滾→落定→總和放大，1D20 的 20／1 有大成功／大失敗效果 |
 | `src/ui/battleSelect.js` | 跑團頁共用的「目前選擇」（出招招式、選中的目標、顯示哪隻 BOSS、怪物攻防模式），不存檔 |
 | `src/ui/rollFeed.js` | 擲骰紀錄的畫面：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要；`oldestFirst` 時新的在下並自動捲到底 |
@@ -113,16 +113,15 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/dossier.js` | 地點情報面板（點地圖標記打開） |
 | `src/styles/theme.css` | **主題檔**：全站色碼、字體、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
 | `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線）與**全站圖層階層 `--z-*`**（其他 CSS 檔 25 以上的 z-index 一律用 `var(--z-…)`，不能寫死數字，測試會檢查） |
-| `src/styles/layout.css` | 頂部列、`#main` 外殼 |
-| `src/styles/map.css` | 地圖與熱點 |
-| `src/styles/dossier.css` | 情報面板與四大區域主題 |
-| `src/styles/pages.css` | 各分頁的版面：**修整日、背包已是新版（Step B1，去框）**；裝備、交易、日誌的舊樣式與彈出面板（sheet、item-sheet）、toast 還在這裡，Step B2／D 再處理 |
-| `src/styles/dice.css` | 跑團頁、紀錄、裝備頁、戰鬥頁 |
-| `src/styles/redesign.css` | 全站新版樣式（覆蓋前面幾個檔案） |
-| `src/styles/polish.css` | 質感層：按鈕、卡片、物品格的舊版效果 |
-| `src/styles/blackgold.css` | 黑金主題（最後載入）：星點背景、面板、標題、擲骰紀錄三軌摘要、稀有度、三欄／手機版面與底部導覽列 |
-| `src/styles/base.css` | **基礎元件（UI 整合重構的新核心，最後載入）**：按鈕三級（Primary `btn--primary`／`btn--go`、Secondary `btn`、Ghost `btn--ghost`、`btn--danger`、緊湊 `btn--small`）、輸入框 `field`、面板 `panel`／`card`／`results`、去框列表 `list`、底線分頁 `tabs-line`，以及共用元件：區塊標題 `section-title`、物品格 `tile`／`tile-grid`／`showcase`、稀有度 `rarity`／`rarity-tag`（左側 2px 色條＋文字，沒有光暈與菱形，神話是彩虹色條）、徽章 `badge`／`info-chip`、數量選擇器 `amount`、單選選項 `action-card`／`diff`、紀念品開關 `keepsake`。尺寸與圓角用 `tokens.css` 的 `--ctl-h` 等變數，顏色用 `theme.css` 的 `--ctl-*`／`--line-soft`。**新增或修改按鈕、輸入框的樣式只改這裡，不要再到其他 CSS 檔寫 `.btn`／`.field` 的外觀或高度**（其他檔案只能寫它在版面裡的位置，例如 `margin`、`flex`）。規格見 `DESIGN.md`「控制項」 |
-| `src/styles/index.js` | 全站樣式的載入順序（`main.js` 與 `styleguide.html` 共用）；新增 CSS 檔要加在這裡 |
+| `src/styles/layout.css` | 整頁外殼：背景星點、頂部列、分頁、手機底部導覽與「更多」選單、吐司、全站捲軸與焦點、`.view--page` |
+| `src/styles/map.css` | 世界地圖外框與熱點 |
+| `src/styles/dossier.css` | 地點情報面板與四大區域主題 |
+| `src/styles/pages.css` | 各分頁的版面：修整日、背包、裝備、交易、日誌、技能方格（Step B 去框重寫）＋少量殘餘（骰面、數值格） |
+| `src/styles/session.css` | **跑團頁（Step C 重寫）**：三欄工作台（欄與欄之間只有細線）、個人 HUD、招式列、藥水、技能檢定、中央 BOSS 舞台（大立繪＋防禦／攻擊模式＋小怪矩陣）、GM 工具折疊區、隊友資源條、擲骰紀錄、快速擲骰、手機頂部 HUD 與底部抽屜。檔尾含打擊特效（`fx-*`、`data-fx`）與 BOSS 多段血條（`lbar`） |
+| `src/styles/overlays.css` | 覆蓋層：封面、鑑定開獎（`rv-*`）、數值調整面板（`vsheet`）、確認框、戰鬥提醒（`nudge`）、「收到的東西」（`mailbox`）、擲骰特效（`dfx`） |
+| `src/styles/gm.css` | GM 工具面板：模擬戰圖表、匯入、專屬技能與特殊配方編輯、發放獎勵、等候通知 |
+| `src/styles/base.css` | **基礎元件（UI 整合重構的新核心，最後載入）**：按鈕三級（Primary `btn--primary`／`btn--go`、Secondary `btn`、Ghost `btn--ghost`、`btn--danger`、緊湊 `btn--small`）、輸入框 `field`、面板 `panel`／`card`／`results`、去框列表 `list`、底線分頁 `tabs-line`，以及共用元件：區塊標題 `section-title`、物品格 `tile`／`tile-grid`／`showcase`、稀有度 `rarity`／`rarity-tag`（左側 2px 色條＋文字，沒有光暈與菱形，神話是彩虹色條）、徽章 `badge`／`info-chip`、數量選擇器 `amount`、單選選項 `action-card`／`diff`、紀念品開關 `keepsake`、選項小按鈕 `chip`／`toggle`（選中＝金字＋暗金底）。尺寸與圓角用 `tokens.css` 的 `--ctl-h` 等變數，顏色用 `theme.css` 的 `--ctl-*`／`--line-soft`。彈出面板（`sheet`、物品面板、贈送／交易面板、賣出面板、技能自選屬性）的樣式也在這裡。**新增或修改按鈕、輸入框的樣式只改這裡，不要再到其他 CSS 檔寫 `.btn`／`.field` 的外觀或高度**（其他檔案只能寫它在版面裡的位置，例如 `margin`、`flex`）。規格見 `DESIGN.md`「控制項」 |
+| `src/styles/index.js` | 全站樣式的載入順序（`main.js` 與 `styleguide.html` 共用）：theme → tokens → layout → map → dossier → pages → session → overlays → gm → shadowfx → base（最後）；新增 CSS 檔要加在這裡。不要用 `#view-…` id 選擇器蓋樣式（測試會擋） |
 | `styleguide.html` | 樣式規格預覽（只在 `npm run dev` 時打開 `/styleguide.html`，不會打包進正式網站）：按鈕三級、輸入框、面板、去框列表、底線分頁 |
 | `public/lore-data/*.json` | 設定集文字（Discord 匯出），點「查看設定集」時由 `lore.js` 讀取 |
 

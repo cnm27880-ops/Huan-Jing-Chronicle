@@ -83,18 +83,18 @@ export function createOffersView({ getState, commit }) {
   function incoming(o) {
     const state = getState();
     const lacks = shortages(state, o.want, o.wantGold);
-    return h('li', { class: 'trade-offer' },
+    return h('li', { class: 'list__item trade-offer' },
       h('strong', { text: `${o.fromName} 向你提出交易` }),
       line('他給你', o.give, o.giveGold, o.giveGear),
       line('要你交出', o.want, o.wantGold),
-      h('p', { class: `trade-offer__have${lacks.length ? ' is-short' : ''}`, text: lacks.length ? `你的背包還不夠：${lacks.map((x) => `${x.name} ${fmt(x.have)}/${fmt(x.need)}`).join('、')}（接受會交易失敗）` : '你的背包夠付 ✓' }),
+      h('p', { class: `trade-offer__have${lacks.length ? ' is-short' : ''}`, text: lacks.length ? `你的背包還不夠：${lacks.map((x) => `${x.name} ${fmt(x.have)}/${fmt(x.need)}`).join('、')}（接受會交易失敗）` : '你的背包夠付' }),
       h('div', { class: 'trade-offer__act' },
         h('button', { type: 'button', class: 'btn btn--small', onclick: (e) => respond(o, 'accept', e.currentTarget) }, '接受'),
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: (e) => respond(o, 'reject', e.currentTarget) }, '拒絕')));
   }
 
   function outgoing(o) {
-    return h('li', { class: 'trade-offer' },
+    return h('li', { class: 'list__item trade-offer' },
       h('strong', { text: `你 → ${o.toName}（等對方回覆）` }),
       line('你給出（已先扣）', o.give, o.giveGold, o.giveGear),
       line('要對方交出', o.want, o.wantGold),
@@ -111,12 +111,12 @@ export function createOffersView({ getState, commit }) {
     const ins = cache.filter((o) => o.to === mine);
     const outs = cache.filter((o) => o.from === mine);
     list.replaceChildren(
-      h('section', { class: 'card' },
+      h('section', { class: 'trade-section' },
         h('h2', { class: 'section-title', text: `收到的交易（${ins.length}）` }),
-        ins.length ? h('ul', { class: 'trade-offers__list' }, ins.map(incoming)) : h('p', { class: 'empty', text: '目前沒有人向你提出交易。' })),
-      h('section', { class: 'card' },
+        ins.length ? h('ul', { class: 'list trade-offers__list' }, ins.map(incoming)) : h('p', { class: 'empty', text: '目前沒有人向你提出交易。' })),
+      h('section', { class: 'trade-section' },
         h('h2', { class: 'section-title', text: `我發出的交易（${outs.length}）` }),
-        outs.length ? h('ul', { class: 'trade-offers__list' }, outs.map(outgoing)) : h('p', { class: 'empty', text: '沒有等待回覆的交易。' })));
+        outs.length ? h('ul', { class: 'list trade-offers__list' }, outs.map(outgoing)) : h('p', { class: 'empty', text: '沒有等待回覆的交易。' })));
   }
 
   draw();

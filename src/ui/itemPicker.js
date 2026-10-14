@@ -26,13 +26,13 @@ export function createItemPicker({ state, picked, pickedGear = new Set(), onChan
   const owned = Object.keys(state.inventory).filter((n) => giftable(state, n));
   const hasGold = (state.gold ?? 0) > 0;
   const gears = giftableGear(state); // 已鑑定的裝備（一件一格，只能整件送；pickedGear 放選中的裝備 id）
-  const cats = [{ id: 'all', name: '全部' }, ...(hasGold ? [{ id: 'gold', name: '🪙 金幣' }] : []), ...(gears.length ? [{ id: 'identified', name: '已鑑定裝備' }] : []), ...CATEGORIES.filter((c) => owned.some((n) => categoryOf(n) === c.id))];
-  const chips = h('div', { class: 'gift-cats', role: 'tablist', 'aria-label': '物品分類' });
+  const cats = [{ id: 'all', name: '全部' }, ...(hasGold ? [{ id: 'gold', name: '金幣' }] : []), ...(gears.length ? [{ id: 'identified', name: '已鑑定裝備' }] : []), ...CATEGORIES.filter((c) => owned.some((n) => categoryOf(n) === c.id))];
+  const chips = h('div', { class: 'tabs-line gift-cats', role: 'tablist', 'aria-label': '物品分類' });
   const grid = h('div', { class: 'gift-grid' });
 
   function renderChips() {
     chips.replaceChildren(...cats.map((c) => h('button', {
-      type: 'button', role: 'tab', class: 'chip', 'aria-selected': String(ui.cat === c.id),
+      type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.cat === c.id),
       onclick: () => { ui.cat = c.id; renderChips(); renderGrid(); },
     }, c.name)));
   }
@@ -69,7 +69,7 @@ export function createItemPicker({ state, picked, pickedGear = new Set(), onChan
         type: 'button', class: 'gift-tile__main', 'aria-pressed': String(on),
         onclick: () => { if (picked.has(n)) picked.delete(n); else picked.set(n, 1); renderGrid(); },
       },
-      h('span', { class: 'gift-tile__name', text: isGold ? '🪙 金幣' : labelOf(n) }),
+      h('span', { class: 'gift-tile__name', text: isGold ? '金幣' : labelOf(n) }),
       h('small', { class: 'num', text: `有 ${fmt(have)}${isGold ? `（每次 ±${fmt(step)}）` : ''}` })),
       stepper);
   }

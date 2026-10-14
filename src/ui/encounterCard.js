@@ -468,16 +468,16 @@ export function createEncounterCard({ getState, commit, rerender }) {
       return enc.monsters.length
         ? h('div', { class: 'row stage__gm' },
             h('span', { class: 'hint', text: `第 ${enc.round ?? 0} 回合` }),
-            h('button', { type: 'button', class: 'btn btn--small', onclick: () => { nextRound(getState().encounter); rerender(); commit(); } }, '▶ 新回合（敵人技能次數恢復）'))
+            h('button', { type: 'button', class: 'btn btn--small', onclick: () => { nextRound(getState().encounter); rerender(); commit(); } }, '新回合（敵人技能次數恢復）'))
         : null;
     }
     if (!isGm()) return null;
     return h('div', { class: 'row stage__gm' },
       h('span', { class: 'hint', text: `第 ${enc.round ?? 0} 回合` }),
-      h('button', { type: 'button', class: 'btn btn--small', title: '回合數 +1，敵人的技能次數與蓄力恢復（有先攻順序時，繞完一圈會自動進下一回合）', onclick: () => act({ t: 'encRound' }) }, '▶ 新回合'),
-      h('button', { type: 'button', class: 'btn btn--small', onclick: () => { ui.swapFrom = null; act({ t: 'encInit' }); } }, '🎲 抽先攻'),
-      h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.order?.length || enc.locked, onclick: () => act({ t: 'encStart' }) }, '⚔️ 開打（鎖定）'),
-      h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, onclick: () => act({ t: 'encNext' }) }, '下一位 ▶'));
+      h('button', { type: 'button', class: 'btn btn--small', title: '回合數 +1，敵人的技能次數與蓄力恢復（有先攻順序時，繞完一圈會自動進下一回合）', onclick: () => act({ t: 'encRound' }) }, '新回合'),
+      h('button', { type: 'button', class: 'btn btn--small', onclick: () => { ui.swapFrom = null; act({ t: 'encInit' }); } }, '抽先攻'),
+      h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.order?.length || enc.locked, onclick: () => act({ t: 'encStart' }) }, '開打（鎖定）'),
+      h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, onclick: () => act({ t: 'encNext' }) }, '下一位'));
   }
 
   // ---------- 敵人技能列與回合（2026/10 平衡更新，規則見 game/enemy.js） ----------
@@ -513,7 +513,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
         type: 'button', class: 'eskill num', title: SKILL_TIPS[k], dataset: { skill: k, ready: charged[k] ? '1' : '0' },
         disabled: !canUse || left[k] < 1, 'aria-label': `${m.id} 使用 ${k} 技能：${SKILL_NAMES[k]}，剩 ${left[k]} 次`,
         onclick: () => useSkill(state, m, k),
-      }, `${k}${k === 'C' ? '🩸' : k === 'A' ? '⚔' : '🛡'} ${left[k]}/${info[k].uses}${k === 'C' ? '・每場' : ''}${charged[k] ? ' ✓' : ''}`)));
+      }, `${{ A: '攻強', B: '防強', C: '喝血' }[k]} ${left[k]}/${info[k].uses}${k === 'C' ? '・每場' : ''}${charged[k] ? '・蓄力' : ''}`)));
   }
 
   /** 戰鬥結果（GM；本機是自己）：只記錄到紀錄裡，獎勵由 GM 另外發 */
@@ -565,7 +565,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('div', { class: 'boss__stats' },
         h('div', { class: 'boss__group' },
           h('p', { class: 'boss__k' },
-            h('span', { text: '🛡️ 防禦' }),
+            h('span', { text: '防禦' }),
             h('small', { text: '點一種＝選它當目標，打它時用這一組' }),
             monsterAbs(m) ? h('span', { class: 'boss__abs num', text: `絕防 ${fmt(monsterAbs(m))}` }) : null),
           h('div', { class: 'boss__modes', role: 'radiogroup', 'aria-label': `${m.id} 的防禦模式` }, BOSS_DEF_MODES.map((name, i) => h('button', {
@@ -574,7 +574,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
           }, h('span', { class: 'boss-mode__name', text: name }), abcCells(monsterDef(m, i)))))),
         h('div', { class: 'boss__group' },
           h('p', { class: 'boss__k' },
-            h('span', { text: '⚔️ 攻擊' }),
+            h('span', { text: '攻擊' }),
             h('small', { text: '點兩下＝你承受這一招' })),
           h('div', { class: 'boss__modes', 'aria-label': `${m.id} 的攻擊` }, BOSS_ATK_MODES.map((name, i) => {
             const armed = ui.armed === `${m.id}:${i}`;
@@ -610,7 +610,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
         title: ui.armed === m.id ? '再點一次確認' : `承受 ${m.id} 的攻擊（${formatAbc(m.atk)}），要點兩下`,
         'aria-label': ui.armed === m.id ? `再點一次確認承受 ${m.id} 的攻擊` : `承受 ${m.id} 的攻擊（要點兩下）`,
         onclick: () => confirmHit(m.id, () => doDefend(state, m)),
-      }, ui.armed === m.id ? '✔' : '🛡️')),
+      }, ui.armed === m.id ? '確認' : '承受')),
       skillBar(state, currentEnc(state), m));
   }
 
@@ -734,7 +734,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
               type: 'button', class: 'btn btn--small', disabled: !target,
               title: target ? `攻擊中間選中的第一個目標（${target}）` : '先在上面點選一個敵人當目標',
               onclick: () => act({ t: 'encAllyAtk', id: a.id, target, mode: defModeOf(target) }),
-            }, target ? `⚔️ 攻擊 ${target}` : '⚔️ 攻擊（先選目標）'),
+            }, target ? `攻擊 ${target}` : '攻擊（先選目標）'),
             foes.length
               ? h('select', { class: 'field', 'aria-label': `哪隻怪物攻擊 ${a.name}`, onchange: (e) => { ui.allyFoe[a.id] = e.target.value; } },
                   foes.map((m) => h('option', { value: m.id, selected: m.id === foe ? true : null, text: m.id })))
@@ -743,7 +743,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
               ? h('button', {
                   type: 'button', class: 'btn btn--ghost btn--small', dataset: { armed: ui.armed === `ally:${a.id}` ? '1' : '0' },
                   onclick: () => confirmHit(`ally:${a.id}`, () => act({ t: 'encAllyTake', id: a.id, monster: foe, mode: sel.modes[foe]?.atk ?? 0 })),
-                }, ui.armed === `ally:${a.id}` ? '再點一次：承受' : `🛡️ 承受 ${foe} 的攻擊`)
+                }, ui.armed === `ally:${a.id}` ? '再點一次：承受' : `承受 ${foe} 的攻擊`)
               : null)
         : null,
       gm && a.support && !down && mates.length
@@ -753,7 +753,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
             h('button', {
               type: 'button', class: 'btn btn--small',
               onclick: async () => { try { await encounterAction({ t: 'encAllySup', id: a.id, to }); toast(`${a.name} 對 ${mates.find((m) => m.uid === to)?.name ?? '隊友'} 施放了${SUPPORT_KINDS[a.support.kind]}。`); } catch (e) { toast(e.message || '操作失敗。'); } },
-            }, `✚ ${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%`))
+            }, `輔助：${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%`))
         : null,
       gm
         ? h('div', { class: 'row' },
@@ -866,7 +866,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     return h('section', { class: 'gm-tools__sec' },
       h('h3', { class: 'tray__title', text: `立繪庫（${images.length}）` }),
       h('p', { class: 'hint', text: '上傳後會自動縮小。指定給怪物後，所有玩家會即時看到。刪除立繪時，用到它的怪物會改回圖示。' }),
-      h('button', { type: 'button', class: 'btn btn--small', disabled: ui.uploading, onclick: () => pickAndUpload(null) }, ui.uploading ? '上傳中…' : '＋ 上傳新立繪'),
+      h('button', { type: 'button', class: 'btn btn--small', disabled: ui.uploading, onclick: () => pickAndUpload(null) }, ui.uploading ? '上傳中…' : '上傳新立繪'),
       images.length
         ? h('ul', { class: 'library' }, images.map((im) => h('li', { class: 'library__item' },
             h('img', { class: 'library__img', src: imageUrl(im.id), alt: '', loading: 'lazy' }),
@@ -902,7 +902,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
                 sel.modes = {}; sel.targets = [];
                 if (online()) act({ t: 'encClear' }); else { state.encounter = newEncounter(); commit(); }
               },
-            }, '清空')
+            }, '清空敵人')
           : null),
       initiativeBar(enc),
       gmBar(enc),
@@ -920,7 +920,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
             h('span', { text: '域外魔祖：這次攻擊花 30 靈氣，追加扣目標現有生命 10%' }))
         : null,
       canEdit
-        ? addBox('gm', online() ? '⚙️ 敵人、友方 NPC 與立繪（GM）' : '⚙️ 新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), allyForm(), manageBox(state, enc), presetBox(enc), libraryBox()))
+        ? addBox('gm', online() ? '敵人、友方 NPC 與立繪（GM）' : '新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), allyForm(), manageBox(state, enc), presetBox(enc), libraryBox()))
         : null);
   }
 

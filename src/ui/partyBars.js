@@ -34,11 +34,11 @@ export function mateCard(v, { online = true, inBattle = false } = {}) {
       h('div', { class: 'mate__top' },
         h('span', { class: 'mate__name', text: v.name }),
         v.downed ? h('span', { class: 'mate__tag', dataset: { tone: 'down' }, text: '倒地' }) : null,
-        idle ? h('span', { class: 'mate__tag', dataset: { tone: 'idle' }, title: '戰鬥中，資源幾乎沒動用', text: '🔔 資源很滿' }) : null,
+        idle ? h('span', { class: 'mate__tag', dataset: { tone: 'idle' }, title: '戰鬥中，資源幾乎沒動用', text: '資源很滿' }) : null,
         h('span', { class: 'mate__use', title: '各項資源與毒性平均用掉的比例', text: `動用 ${pct(use)}` })),
       h('div', { class: 'mate__hpline' },
         h('span', { class: 'mate__bar' }, h('span', { class: 'mate__fill', style: `width:${hpPct(v) * 100}%` })),
-        h('span', { class: 'mate__hp num', text: `${fmt(v.hp)}/${fmt(v.maxHp)}${v.shield ? ` 🛡${fmt(v.shield)}` : ''}` }))),
+        h('span', { class: 'mate__hp num', text: `${fmt(v.hp)}/${fmt(v.maxHp)}${v.shield ? ` 盾${fmt(v.shield)}` : ''}` }))),
     h('div', { class: 'mate__bars' }, barsOf(v).map(resPill)));
 }
 
@@ -49,9 +49,9 @@ const saveOpen = (v) => { try { localStorage.setItem(OPEN_KEY, v ? '1' : '0'); }
 /** 精簡列上的小頭像：環＝生命，收起來也看得到每位隊友的狀況；有 🔔 表示戰鬥中資源還很滿 */
 function partyDot(v, { idle = false } = {}) {
   return h('span', { class: 'pdot', dataset: { state: hpState(v) }, style: `--hp:${Math.round(hpPct(v) * 100)}`, role: 'img',
-    title: `${v.name}　生命 ${v.hp}/${v.maxHp}　動用 ${pct(usageOf(v))}${idle ? '　🔔 資源還很滿' : ''}`, 'aria-label': `${v.name} 生命 ${v.hp} / ${v.maxHp}` },
+    title: `${v.name}　生命 ${v.hp}/${v.maxHp}　動用 ${pct(usageOf(v))}${idle ? '　資源還很滿' : ''}`, 'aria-label': `${v.name} 生命 ${v.hp} / ${v.maxHp}` },
   h('span', { class: 'pdot__initial', text: [...(v.name || '?')][0] }),
-  idle ? h('span', { class: 'pdot__bell', 'aria-hidden': 'true', text: '🔔' }) : null);
+  idle ? h('span', { class: 'pdot__bell', 'aria-hidden': 'true', text: '!' }) : null);
 }
 
 /**

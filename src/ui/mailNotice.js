@@ -13,7 +13,7 @@ function draw() {
     list = h('ul', { class: 'mailbox__list' });
     box = h('aside', { class: 'mailbox', role: 'status', 'aria-live': 'polite', 'aria-label': '收到的東西' },
       h('header', { class: 'mailbox__head' },
-        h('strong', { text: '📬 收到的東西' }),
+        h('strong', { text: '收到的東西' }),
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { entries.length = 0; draw(); } }, '知道了')),
       list);
     document.body.append(box);

@@ -4,7 +4,7 @@
 //   中欄：遭遇戰舞台：先攻軸、BOSS、小怪矩陣、選目標、隊友血量、GM 工具（encounterCard.js）
 //   右欄：房間、擲骰紀錄（新的在下、自動捲到底）、快速擲骰
 // 電腦（≥1100px）三欄各自捲動；901–1099px 左欄改成底部抽屜；≤900px 紀錄當主畫面，
-// 左欄與中欄都變成底部抽屜（⚔️ 招式／🌿 技能／🎯 目標），頂部是膠囊 HUD 與目標血量。
+// 左欄與中欄都變成底部抽屜（招式／藥水／檢定／目標），頂部是膠囊 HUD 與目標血量。
 // 紀錄是「房間內所有玩家」共用（見 src/state/rollLog.js）。
 // ============================================================
 import { createPartyPanel } from './partyBars.js';
@@ -26,7 +26,7 @@ import { createBattleView, isBattleEvent } from './battleView.js';
 import { battleSel as sel } from './battleSelect.js';
 
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
-const LEFT_TABS = [['moves', '⚔️ 招式'], ['items', '🧪 藥水與狀態'], ['skills', '🎲 技能檢定']];
+const LEFT_TABS = [['moves', '招式'], ['items', '藥水與狀態'], ['skills', '技能檢定']];
 // 跑團紀錄只放「檢定、自訂骰、戰鬥」；鑑定、黑市、鑲嵌、GM 異動等都在「日誌」頁
 const sessionEvent = (e) => e.kind === 'check' || e.kind === 'dice' || isBattleEvent(e);
 const LOG_EMPTY = '按下任何一顆骰子，或出招、承受攻擊，結果會出現在這裡。';
@@ -61,7 +61,7 @@ export function createSessionView({ root, getState, commit }) {
     onclick: () => openSheet(id),
   }, label);
   const bar = h('nav', { class: 'sx-bar', 'aria-label': '跑團快捷' },
-    barBtn('moves', '⚔️ 招式', 'sx-left'), barBtn('items', '🧪 藥水', 'sx-left'), barBtn('skills', '🎲 檢定', 'sx-left'), barBtn('targets', '🎯 目標', 'sx-center'));
+    barBtn('moves', '招式', 'sx-left'), barBtn('items', '藥水', 'sx-left'), barBtn('skills', '檢定', 'sx-left'), barBtn('targets', '目標', 'sx-center'));
   const scrim = h('div', { class: 'sx-scrim', 'aria-hidden': 'true', onclick: () => setSheet('') });
   const wrap = h('div', { class: 'sx', dataset: { sheet: '' } }, left, center, right, scrim, bar);
 
@@ -127,7 +127,7 @@ export function createSessionView({ root, getState, commit }) {
     const stomach = state.sessionStomach;
     const bagSlots = foodBagSlots(state);
     const bagged = foodBags(state);
-    return h('section', { class: 'card skillpanel' },
+    return h('section', { class: 'sx-sec skillpanel' },
       h('h2', { class: 'section-title', text: '技能檢定' }),
       h('p', { class: 'hint', text: '點一下直接擲 1D20 ＋ 加值，結果在右邊紀錄。' }),
       advantageItem(state)
@@ -147,8 +147,8 @@ export function createSessionView({ root, getState, commit }) {
                 ? h('button', { // 有保溫針織袋：點一下吐進袋子
                     type: 'button', class: 'mini-slot', title: `${stomach[i].food}（點一下吐進${FOOD_BAG}）`, 'aria-label': `${stomach[i].food}，點一下吐進${FOOD_BAG}`,
                     onclick: () => { const food = stomach[i].food; const e = spitToBag(state, i); if (e) return toast(e); toast(`${food}吐進${FOOD_BAG}了。`); commit(); },
-                  }, h('span', { 'aria-hidden': 'true', text: iconOf(stomach[i].food) || '🍽️' }))
-                : h('span', { class: 'mini-slot', title: stomach[i].food }, h('span', { 'aria-hidden': 'true', text: iconOf(stomach[i].food) || '🍽️' })))
+                  }, h('span', { 'aria-hidden': 'true', text: iconOf(stomach[i].food) || '食' }))
+                : h('span', { class: 'mini-slot', title: stomach[i].food }, h('span', { 'aria-hidden': 'true', text: iconOf(stomach[i].food) || '食' })))
             : h('button', {
                 type: 'button', class: 'mini-slot mini-slot--empty', 'aria-label': '空胃袋，點一下吃東西',
                 onclick: () => openFoodSheet(state, 'session', commit),
@@ -180,7 +180,7 @@ export function createSessionView({ root, getState, commit }) {
     if (!slots && !bagged.length) return null;
     const n = Math.max(slots, bagged.length);
     return h('div', { class: 'tray__stomach' },
-      h('span', { class: 'field-label', title: '點胃袋的料理吐進袋子；點袋子的料理放回胃袋', text: `🧶 保溫袋 ${bagged.length}/${slots}` }),
+      h('span', { class: 'field-label', title: '點胃袋的料理吐進袋子；點袋子的料理放回胃袋', text: `保溫袋 ${bagged.length}/${slots}` }),
       h('span', { class: 'mini-slots' }, Array.from({ length: n }, (_, i) => {
         const s = bagged[i];
         if (!s) return h('span', { class: 'mini-slot mini-slot--empty', title: `空的${FOOD_BAG}（點上面胃袋的料理吐進來）`, 'aria-label': `空的${FOOD_BAG}` }, '·');
@@ -188,15 +188,15 @@ export function createSessionView({ root, getState, commit }) {
           type: 'button', class: 'mini-slot', title: `${s.food}（點一下放回胃袋；結束本次跑團時清空）`,
           'aria-label': `${s.food}，點一下放回跑團胃袋`, disabled: state.sessionStomach.length >= STOMACH_SLOTS ? true : null,
           onclick: () => { const e = takeFromBag(state, i); if (e) return toast(e); commit(); },
-        }, h('span', { 'aria-hidden': 'true', text: iconOf(s.food) || '🍽️' }));
+        }, h('span', { 'aria-hidden': 'true', text: iconOf(s.food) || '食' }));
       })));
   }
 
   function renderLeft() {
     const state = getState();
     const y = left.scrollTop;
-    const tabs = h('div', { class: 'sx-tabs', role: 'tablist', 'aria-label': '左欄分頁' }, LEFT_TABS.map(([id, label]) => h('button', {
-      type: 'button', role: 'tab', class: 'sx-tab', 'aria-selected': String(ui.leftTab === id),
+    const tabs = h('div', { class: 'sx-tabs tabs-line', role: 'tablist', 'aria-label': '左欄分頁' }, LEFT_TABS.map(([id, label]) => h('button', {
+      type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.leftTab === id),
       onclick: () => { ui.leftTab = id; renderLeft(); setSheet(ui.sheet); },
     }, label)));
     const panel = ui.leftTab === 'skills'
@@ -224,7 +224,7 @@ export function createSessionView({ root, getState, commit }) {
       battle.fireBar(getState())].filter(Boolean)); // 手機：目標抽屜底部的「選招式＋出招」列
     center.scrollTop = y;
     const n = sel.targets.length;
-    bar.querySelector('[data-id="targets"]').textContent = n ? `🎯 目標（${n}）` : '🎯 目標';
+    bar.querySelector('[data-id="targets"]').textContent = n ? `目標（${n}）` : '目標';
   }
 
   function renderTop() {
@@ -246,7 +246,7 @@ export function createSessionView({ root, getState, commit }) {
     const local = getRoomStatus().phase !== 'online';
     feedHead.hidden = !local;
     feedHead.replaceChildren(...(local
-      ? [h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: '清空這台裝置上的擲骰紀錄？', okText: '清空', danger: true })) clearLog(); } }, '清空')]
+      ? [h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: '清空這台裝置上的擲骰紀錄？', okText: '清空', danger: true })) clearLog(); } }, '清空紀錄')]
       : []));
   }
 
@@ -269,10 +269,10 @@ export function createSessionView({ root, getState, commit }) {
   /** 快速擲骰：骰子面數、顆數、加減值，或直接輸入骰式 */
   function renderDice() {
     const expr = expression();
-    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), title: expr.error ? '骰式格式不對' : `擲 ${expr.text}`, onclick: rollCustom }, '🎲 投骰');
+    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), title: expr.error ? '骰式格式不對' : `擲 ${expr.text}`, onclick: rollCustom }, '投骰');
     diceBox.replaceChildren(
       h('div', { class: 'sx-dice__sides', role: 'radiogroup', 'aria-label': '骰子面數' }, SIDES.map((n) => h('button', {
-        type: 'button', class: 'chip', role: 'radio', 'aria-checked': String(!ui.text.trim() && ui.sides === n),
+        type: 'button', class: 'sx-side', role: 'radio', 'aria-checked': String(!ui.text.trim() && ui.sides === n),
         onclick: () => { ui.sides = n; ui.text = ''; renderDice(); },
       }, `D${n}`))),
       h('div', { class: 'sx-dice__row' },
@@ -293,7 +293,7 @@ export function createSessionView({ root, getState, commit }) {
             const ex = expression();
             rollBtn.disabled = Boolean(ex.error);
             rollBtn.title = ex.error ? '骰式格式不對' : `擲 ${ex.text}`;
-            diceBox.querySelectorAll('.sx-dice__sides .chip').forEach((c) => c.setAttribute('aria-checked', String(!ui.text.trim() && c.textContent === `D${ui.sides}`)));
+            diceBox.querySelectorAll('.sx-dice__sides .sx-side').forEach((c) => c.setAttribute('aria-checked', String(!ui.text.trim() && c.textContent === `D${ui.sides}`)));
           },
           onkeydown: (e) => { if (e.key === 'Enter') rollCustom(); },
         }),

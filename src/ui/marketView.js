@@ -112,7 +112,7 @@ export function createMarketView({ root, getState, commit }) {
     const tier = rarityOf(item);
     const subEl = sub ? h('small', { class: 'trade-row__sub', text: sub(q) }) : null;
     const btn = h('button', {
-      type: 'button', class: 'btn btn--small', disabled: disabled || (max != null && max < 1),
+      type: 'button', class: 'btn', disabled: disabled || (max != null && max < 1),
       onclick: () => onGo(clamp(qtyOf(key))),
     }, button(q));
     return h('li', { class: `trade-row${tier !== null ? ' rarity' : ''}`, dataset: { tier: tier ?? 'none', rarity: tier ?? 'none' } },

@@ -26,7 +26,7 @@ export function checkAdjustCard({ getState, commit }) {
         commit();
       },
     });
-    return h('li', { class: 'adj-cell' }, h('strong', { text: skill }), h('small', { text: `技能 ${base}` }), input);
+    return h('li', { class: 'adj-cell' }, h('span', { class: 'adj-cell__name' }, h('strong', { text: skill }), h('small', { class: 'num', text: `技能 ${base}` })), input);
   };
   return h('section', { class: 'card' },
     h('h2', { class: 'section-title', text: '檢定數值修正（備用）' }),

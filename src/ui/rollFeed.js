@@ -6,10 +6,6 @@ import { parseTrackLine, parseTargetLine } from '../game/events.js';
 import { TRACKS, TRACK_ATK_STAT } from '../game/rules.js';
 import { getLog, subscribe } from '../state/rollLog.js';
 
-const ICON = {
-  check: '🎲', dice: '🎲', identify: '🔍', deal: '💰', attack: '⚔️', defend: '🛡️', potion: '🧪', skill: '✨', note: '📝', audit: '📋', divider: '⚔️',
-};
-
 const clock = (t) => new Date(t).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
 const MAX_FACES = 30; // 一般檢定最多畫幾顆骰面，其餘只寫「另 N 顆」
 
@@ -133,7 +129,6 @@ export function renderRoll(ev, { fresh = false } = {}) {
   const rest = battle ? battle.rest : faces ? faces.rest : ev.lines ?? [];
   return h('li', { class: `roll roll--${ev.kind}`, dataset: { tone: ev.tone ?? '', fresh: fresh ? '1' : '0' } },
     h('div', { class: 'roll__head' },
-      h('span', { class: 'roll__icon', 'aria-hidden': 'true', text: ICON[ev.kind] ?? '🎲' }),
       h('span', { class: 'roll__who', text: ev.who }),
       h('span', { class: 'roll__label', text: ev.label }),
       h('time', { class: 'roll__time', text: clock(ev.t) }),

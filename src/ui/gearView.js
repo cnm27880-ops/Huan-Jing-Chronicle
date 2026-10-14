@@ -5,7 +5,6 @@
 import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { toast, rollFailed, rarityTag } from './controls.js';
-import { iconOf } from './items.js';
 import { openFoodSheet } from './statusBar.js';
 import {
   ATK_STATS, DEF_STATS, RESOURCE_STATS, EQUIP_SLOTS, EQUIP_SLOT_LABEL, GEAR_TIERS,
@@ -26,7 +25,7 @@ import { checkAdjustCard } from './checkAdjustPanel.js';
 
 const tierIndex = (g) => GEAR_TIERS.indexOf(g.tier);
 const SLOT_ICON = { weapon: '⚔️', armor: '🛡️', accessory: '💍' };
-const gearIcon = (g) => SLOT_ICON[g.slot] ?? '';  // 取了自訂名字後不能再靠名稱判斷圖示，改看欄位
+const gearIcon = (g) => SLOT_ICON[g.slot] ?? '';  // 取了自訂名字後不能再靠名稱判斷圖示，改看欄位（只給開獎動畫用，頁面上不放）
 const NAME_MAX = 20;
 const SLOT_ORDER = { weapon: 0, armor: 1, accessory: 2 };
 const BADGE = {
@@ -47,23 +46,23 @@ export function createGearView({ root, getState, commit }) {
   // ---------- 數值面板 ----------
   function statCell(p, stat, extra) {
     const x = p[stat];
-    return h('div', { class: 'stat' },
-      h('span', { class: 'stat__name', text: stat }),
-      h('strong', { class: 'stat__value', text: fmt(x.total) }),
+    return h('div', { class: 'gear-stat' },
+      h('span', { class: 'gear-stat__name', text: stat }),
+      h('strong', { class: 'gear-stat__value num', text: fmt(x.total) }),
       extra ?? null);
   }
 
   function panelCard(state) {
     const p = derivedStats(state);
-    const group = (title, list) => h('div', { class: 'stat-group' },
+    const group = (title, list) => h('div', { class: 'gear-stat-group' },
       h('p', { class: 'field-label', text: title }),
-      h('div', { class: 'stat-grid' }, list.map((s) => statCell(p, s, s === '生命' ? h('small', { class: 'stat__detail', text: `目前 ${fmt(state.hp)}` }) : null))));
+      h('div', { class: 'gear-stat-grid' }, list.map((s) => statCell(p, s, s === '生命' ? h('small', { class: 'gear-stat__sub num', text: `目前 ${fmt(state.hp)}` }) : null))));
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '數值面板' }),
       group('攻擊', ATK_STATS),
       group('防禦', DEF_STATS),
       group('資源', RESOURCE_STATS),
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small stat-food', onclick: () => openFoodSheet(state, 'session', commit) }, '🍽️ 跑團胃袋吃東西'));
+      h('button', { type: 'button', class: 'btn btn--small gear-food', onclick: () => openFoodSheet(state, 'session', commit) }, '跑團胃袋吃東西'));
   }
 
   // ---------- 啟動型技能（武裝這類要花算力啟動才會算進面板；其他已學技能在修整日「學習」看） ----------
@@ -74,9 +73,9 @@ export function createGearView({ root, getState, commit }) {
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '啟動型技能' }),
       h('p', { class: 'hint', text: '勾選才會把效果算進數值面板，並扣除算力。其他技能到「修整日 → 學習」查看。' }),
-      h('ul', { class: 'activate-grid' }, list.map(([name, lv]) => h('li', { class: 'activate-cell' },
-        h('strong', { text: `${name}　${lv} 級` }),
-        h('label', { class: 'check' },
+      h('ul', { class: 'list' }, list.map(([name, lv]) => h('li', { class: 'list__item' },
+        h('div', { class: 'list__main' }, h('strong', { class: 'list__title', text: name }), h('p', { class: 'list__sub num', text: `${lv} 級` })),
+        h('label', { class: 'check list__end' },
           h('input', { type: 'checkbox', checked: state.skillOn?.[name] ? true : null, onchange: (e) => { state.skillOn = { ...state.skillOn, [name]: e.target.checked }; commit(); } }),
           h('span', { text: `啟動 −${SKILL_TABLE[name].activate.算力} 算力` }))))));
   }
@@ -87,18 +86,18 @@ export function createGearView({ root, getState, commit }) {
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '技能等級（會影響戰鬥規則的）' }),
       entries.length
-        ? h('ul', { class: 'skill-list' }, entries.map(([name, lv]) => h('li', { class: 'skill-row' },
-            h('strong', { text: name }),
-            h('label', { class: 'extra' }, h('span', { text: '等級' }),
-              h('input', { class: 'field', type: 'number', min: 1, max: 10, value: lv, onchange: (e) => { state.skills[name] = Math.max(1, Math.min(10, num(e.target.value, 1))); commit(); } })),
-            h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { delete state.skills[name]; commit(); } }, '移除'))))
+        ? h('ul', { class: 'list' }, entries.map(([name, lv]) => h('li', { class: 'list__item' },
+            h('strong', { class: 'list__main list__title', text: name }),
+            h('div', { class: 'list__end' },
+              h('input', { class: 'field gear-lv', type: 'number', min: 1, max: 10, value: lv, 'aria-label': `${name} 等級`, onchange: (e) => { state.skills[name] = Math.max(1, Math.min(10, num(e.target.value, 1))); commit(); } }),
+              h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { delete state.skills[name]; commit(); } }, '移除')))))
         : h('p', { class: 'notice', text: '還沒有登錄技能。' }),
       h('details', {
-        class: 'add-box', open: ui.skillBoxOpen,
+        class: 'gear-more', open: ui.skillBoxOpen,
         ontoggle: (e) => { ui.skillBoxOpen = e.target.open; },
       },
-      h('summary', { text: '＋ 登錄技能 / 從技能庫加入招式' }),
-      h('div', { class: 'row' },
+      h('summary', { text: '登錄技能／從技能庫加入招式' }),
+      h('div', { class: 'gear-add' },
         h('select', { class: 'field', 'aria-label': '技能', onchange: (e) => { ui.newSkill = e.target.value; } },
           h('option', { value: '', text: '選擇技能…' }),
           RULE_SKILLS.filter((n) => !(n in (state.skills ?? {}))).map((n) => h('option', { value: n, selected: ui.newSkill === n ? true : null, text: n }))),
@@ -137,20 +136,19 @@ export function createGearView({ root, getState, commit }) {
       : h('span', { class: 'fx-chip fx-chip--special', text: effectText(g) }),
     g.gem ? gemChip(g.gem) : null);
 
-  /** 鑲在裝備上的寶石（神話色、菱形） */
+  /** 鑲在裝備上的寶石 */
   const gemChip = (gem) => h('span', { class: 'fx-chip fx-chip--gem', title: '鑲嵌的寶石（目前無法取出）' },
-    h('span', { class: 'rarity-tag__gem', 'aria-hidden': 'true' }),
+    h('span', { class: 'fx-chip__tag', text: '寶石' }),
     h('span', { text: gem.stat }), h('strong', { class: 'num', text: `+${fmt(gem.value)}` }));
 
   function slotCard(state, key) {
     const g = state.equipment[key];
     return h('div', { class: `gear-slot${g ? ' rarity' : ' is-empty'}`, dataset: { tier: g ? tierIndex(g) : 'none', rarity: g ? tierIndex(g) : 'none' } },
-      h('span', { class: 'gear-slot__icon', 'aria-hidden': 'true', text: g ? gearIcon(g) : '＋' }),
       h('div', { class: 'gear-slot__head' },
         h('span', { class: 'gear-slot__label', text: EQUIP_SLOT_LABEL[key] }),
         g ? h('strong', { class: 'gear-slot__name rarity__name', text: gearName(g) }) : h('span', { class: 'gear-slot__name', text: '空著' }),
-        g ? rarityTag(tierIndex(g)) : null),
-      g ? h('button', { type: 'button', class: 'btn btn--ghost btn--small gear-slot__off', onclick: () => { unequip(state, key); commit(); } }, '卸下') : null,
+        g ? rarityTag(tierIndex(g)) : null,
+        g ? h('button', { type: 'button', class: 'btn btn--ghost btn--small gear-slot__off', onclick: () => { unequip(state, key); commit(); } }, '卸下') : null),
       g ? nameField(g) : null,
       g ? effectChips(g) : h('p', { class: 'gear-slot__empty', text: '從下方「背包裝備」選一件裝上' }));
   }
@@ -207,14 +205,14 @@ export function createGearView({ root, getState, commit }) {
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: '鑑定' }),
       list.length
-        ? h('div', { class: 'identify-list' }, list.map((x) =>
-            h('div', { class: 'identify rarity', dataset: { tier: GEAR_TIERS.indexOf(x.tier), rarity: GEAR_TIERS.indexOf(x.tier) } },
-              h('div', { class: 'identify__info' },
-                h('strong', { class: 'rarity__name', text: `${iconOf(x.name)} ${x.name}` }),
+        ? h('ul', { class: 'list gear-list' }, list.map((x) =>
+            h('li', { class: 'list__item gear-row rarity', dataset: { tier: GEAR_TIERS.indexOf(x.tier), rarity: GEAR_TIERS.indexOf(x.tier) } },
+              h('div', { class: 'gear-row__info' },
+                h('strong', { class: 'rarity__name', text: x.name }),
                 rarityTag(GEAR_TIERS.indexOf(x.tier)),
-                h('span', { class: 'identify__qty', text: `×${fmt(x.qty)}` }),
-                h('small', { text: gearDiceText(x.tier, x.slot) })),
-              h('div', { class: 'identify__btns' },
+                h('span', { class: 'gear-row__qty num', text: `×${fmt(x.qty)}` }),
+                h('small', { class: 'gear-row__dice', text: gearDiceText(x.tier, x.slot) })),
+              h('div', { class: 'list__end' },
                 [1, 10, 50].filter((n) => n < x.qty).map((n) =>
                   h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentify(state, x.name, n) }, `鑑定 ${n}`)),
                 h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentify(state, x.name, x.qty) }, `全部 ${fmt(x.qty)}`)))))
@@ -227,19 +225,19 @@ export function createGearView({ root, getState, commit }) {
   function gemIdentifyList(state) {
     const list = identifiableGems(state);
     if (!list.length) return null;
-    return h('div', { class: 'identify-list identify-list--gems' },
+    return h('div', { class: 'gear-subgroup' },
       h('p', { class: 'field-label', text: '寶石（神級鍛造，鑑定時擲出數值）' }),
-      list.map((x) =>
-        h('div', { class: 'identify rarity', dataset: { tier: 4, rarity: 4 } },
-          h('div', { class: 'identify__info' },
-            h('strong', { class: 'rarity__name', text: `💎 ${x.name}` }),
+      h('ul', { class: 'list gear-list' }, list.map((x) =>
+        h('li', { class: 'list__item gear-row rarity', dataset: { tier: 4, rarity: 4 } },
+          h('div', { class: 'gear-row__info' },
+            h('strong', { class: 'rarity__name', text: x.name }),
             rarityTag(4),
-            h('span', { class: 'identify__qty', text: `×${fmt(x.qty)}` }),
-            h('small', { text: gemDiceText(x.stat) })),
-          h('div', { class: 'identify__btns' },
+            h('span', { class: 'gear-row__qty num', text: `×${fmt(x.qty)}` }),
+            h('small', { class: 'gear-row__dice', text: gemDiceText(x.stat) })),
+          h('div', { class: 'list__end' },
             [1, 10].filter((n) => n < x.qty).map((n) =>
               h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentifyGems(state, x.name, n) }, `鑑定 ${n}`)),
-            h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentifyGems(state, x.name, x.qty) }, `全部 ${fmt(x.qty)}`)))));
+            h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentifyGems(state, x.name, x.qty) }, `全部 ${fmt(x.qty)}`))))));
   }
 
   async function runIdentifyGems(state, name, times) {
@@ -266,7 +264,7 @@ export function createGearView({ root, getState, commit }) {
     openReveal({
       title: `${name} ×${fmt(made.length)}`,
       cards: picked.map((g) => ({
-        tier: 4, icon: '💎', name: gemName(g),
+        tier: 4, icon: '', name: gemName(g),
         body: h('div', { class: 'fx-chips' }, h('span', { class: 'fx-chip' }, h('span', { text: g.stat }), h('strong', { class: 'num', dataset: { final: g.value }, text: `+${fmt(g.value)}` }))),
         note: gemDiceText(g.stat),
       })),
@@ -284,11 +282,11 @@ export function createGearView({ root, getState, commit }) {
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: `寶石（${fmt(gems.length)} 顆未鑲嵌）` }),
       targets.length ? null : h('p', { class: 'notice', text: '沒有可以鑲的傳說裝備（全部都已經鑲了，或還沒有傳說裝備）。' }),
-      h('ul', { class: 'gem-list' }, gems.map((gem) => {
+      h('ul', { class: 'list gear-list' }, gems.map((gem) => {
         const sel = targets.some((g) => g.id === ui.gemTarget[gem.id]) ? ui.gemTarget[gem.id] : targets[0]?.id;
-        return h('li', { class: 'gem-row rarity', dataset: { tier: 4, rarity: 4 } },
-          h('div', { class: 'gem-row__main' },
-            h('strong', { class: 'rarity__name', text: `💎 ${gemName(gem)}` }),
+        return h('li', { class: 'list__item gear-row gem-row rarity', dataset: { tier: 4, rarity: 4 } },
+          h('div', { class: 'gear-row__info' },
+            h('strong', { class: 'rarity__name', text: gemName(gem) }),
             rarityTag(4),
             h('span', { class: 'fx-chip' }, h('span', { text: gem.stat }), h('strong', { class: 'num', text: `+${fmt(gem.value)}` }))),
           targets.length
@@ -321,9 +319,9 @@ export function createGearView({ root, getState, commit }) {
     if (!made.length) return h('p', { class: 'hint', text: `上一批 ${ui.batch.ids.length} 件已經裝上或丟棄。` });
     const rows = made.map((g) => ({ g, cmp: compareGear(state, g) })).sort((a, b) => gearValue(b.g) - gearValue(a.g));
     const shown = rows.slice(0, 12);
-    return h('div', { class: 'batch' },
+    return h('div', { class: 'gear-subgroup' },
       h('p', { class: 'field-label', text: `上一批 ${made.length} 件（${ui.batch.name}）${worn ? `，另有 ${worn} 件已處理` : ''}` }),
-      h('ul', { class: 'batch__list' }, shown.map(({ g, cmp }) => h('li', { class: 'batch__row' },
+      h('ul', { class: 'list' }, shown.map(({ g, cmp }) => h('li', { class: 'list__item gear-batch' },
         h('span', { text: effectText(g) }),
         h('span', { class: 'badge', dataset: { tone: BADGE[cmp][1] }, text: BADGE[cmp][0] })))),
       rows.length > shown.length ? h('p', { class: 'hint', text: `只列出最高的 ${shown.length} 件，其餘在下方「背包裝備」。` }) : null);
@@ -334,9 +332,9 @@ export function createGearView({ root, getState, commit }) {
     const cmp = compareGear(state, g);
     const accFull = g.slot === 'accessory' && state.equipment.acc1 && state.equipment.acc2;
     const putOn = (key) => { const err = equip(state, g.id, key); if (err) return toast(err); commit(); };
-    return h('li', { class: 'owned rarity', dataset: { tier: tierIndex(g), rarity: tierIndex(g) } },
+    return h('li', { class: 'list__item owned rarity', dataset: { tier: tierIndex(g), rarity: tierIndex(g) } },
       h('div', { class: 'owned__main' },
-        h('strong', { class: 'owned__name rarity__name', text: `${gearIcon(g)} ${gearName(g)}` }),
+        h('strong', { class: 'owned__name rarity__name', text: gearName(g) }),
         rarityTag(tierIndex(g)),
         h('span', { class: 'owned__effect', text: effectText(g) }),
         g.gem ? gemChip(g.gem) : null,
@@ -372,18 +370,17 @@ export function createGearView({ root, getState, commit }) {
     const vals = items.map((g) => g.effects[0].value);
     const range = Math.max(...vals) === Math.min(...vals) ? `+${vals[0]}` : `+${Math.min(...vals)}～${Math.max(...vals)}`;
     const spare = items.filter((g) => junk.has(g.id)).length;
-    return h('li', { class: 'owned owned-group rarity', dataset: { tier: tierIndex(top), rarity: tierIndex(top) } },
+    return h('li', { class: 'list__item owned owned-group rarity', dataset: { tier: tierIndex(top), rarity: tierIndex(top) } },
       h('button', {
         type: 'button', class: 'owned-group__head', 'aria-expanded': String(open),
         onclick: () => { if (open) ui.openGroups.delete(key); else ui.openGroups.add(key); render(); },
       },
-        h('span', { class: 'owned-group__caret', 'aria-hidden': 'true', text: open ? '▾' : '▸' }),
-        h('strong', { class: 'owned__name rarity__name', text: `${gearIcon(top)} ${gearName(top)}` }),
+        h('strong', { class: 'owned__name rarity__name', text: gearName(top) }),
         rarityTag(tierIndex(top)),
         h('span', { class: 'owned__effect', text: single ? `${top.special ? '特殊：' : ''}${top.effects[0].stat} ${range}` : `最高 ${effectText(top)}` }),
         h('span', { class: 'badge', dataset: { tone: 'neutral' }, text: `×${items.length}` }),
         spare ? h('span', { class: 'badge', title: '同欄位同屬性已經有更高的，可以賣掉', text: `${spare} 件用不到` }) : null),
-      open ? h('ul', { class: 'owned-group__list' }, items.map((g) => ownedRow(state, g, junk))) : null);
+      open ? h('ul', { class: 'list owned-group__list' }, items.map((g) => ownedRow(state, g, junk))) : null);
   }
 
   function ownedCard(state) {
@@ -396,25 +393,25 @@ export function createGearView({ root, getState, commit }) {
       : list.map((g) => ownedRow(state, g, junk));
     return h('section', { class: 'card' },
       h('h2', { class: 'section-title', text: `背包裝備（${fmt(state.gear.length)} 件已鑑定）` }),
-      h('div', { class: 'row owned-bar' },
-        h('div', { class: 'tabs-seg', role: 'tablist' },
+      h('div', { class: 'owned-bar' },
+        h('div', { class: 'tabs-line', role: 'tablist', 'aria-label': '裝備分類' },
           FILTERS.map(([id, label]) => h('button', {
-            type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(ui.filter === id),
+            type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.filter === id),
             onclick: () => { ui.filter = id; render(); },
           }, label))),
         h('button', {
           type: 'button', class: 'btn btn--ghost btn--small', title: '同部位、階級、屬性的裝備疊成一列，點開看每一件',
           onclick: () => { ui.folded = !ui.folded; render(); },
         }, ui.folded ? '全部展開' : '折疊同款')),
-      rows.length ? h('ul', { class: 'owned-list' }, rows) : h('p', { class: 'empty', text: '這個分類沒有裝備。' }));
+      rows.length ? h('ul', { class: 'list owned-list' }, rows) : h('p', { class: 'empty', text: '這個分類沒有裝備。' }));
   }
 
   function render() {
     const state = getState();
     const scrollY = root.scrollTop;
     root.replaceChildren(
-      h('div', { class: 'page-wrap gear-layout' },
-        h('div', { class: 'gear-col' }, slotsCard(state), identifyCard(state), gemCard(state), ownedCard(state)), // 背包裝備放寶石下面，右欄技能表才不會太長
+      h('div', { class: 'gear-root' },
+        h('div', { class: 'gear-col gear-col--main' }, slotsCard(state), identifyCard(state), gemCard(state), ownedCard(state)), // 背包裝備放寶石下面，右欄技能表才不會太長
         h('div', { class: 'gear-col' }, panelCard(state), skillCard(state), badgeCard({ getState, commit }), checkAdjustCard({ getState, commit }))));
     root.scrollTop = scrollY;
   }

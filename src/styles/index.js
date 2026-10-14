@@ -5,9 +5,8 @@ import './layout.css';
 import './map.css';
 import './dossier.css';
 import './pages.css';
-import './redesign.css';
-import './dice.css';
-import './polish.css';
-import './blackgold.css';
+import './session.css'; // 跑團頁
+import './overlays.css'; // 封面、開獎、彈出調整面板、確認框、戰鬥提醒、擲骰特效
+import './gm.css'; // GM 工具面板
 import './shadowfx.css';
-import './base.css'; // 按鈕、輸入框、面板、列表、底線分頁的最終樣式：最後載入
+import './base.css'; // 按鈕、輸入框、面板、列表、底線分頁、彈出面板的最終樣式：最後載入
