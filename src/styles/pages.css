@@ -406,23 +406,27 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 /* ============================================================
    技能方格（skillTile.js；修整日「學習」用）：一格一行、左側色條表位階，沒有框
    ============================================================ */
-.skill-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0 var(--space-5); }
+.skill-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); align-items: start; gap: 6px; margin: 6px 0 10px; }
+/* 整格鋪一層淡淡的位階色（初階綠、進階藍、大師紫、傳說金），1px 細邊線；選取時邊線換成位階色 */
 .skill-tile {
-  --t: var(--faint);
-  box-sizing: border-box; display: flex; align-items: baseline; gap: var(--space-2); min-height: var(--ctl-h);
-  padding: var(--space-2) 0 var(--space-2) var(--space-3); border-bottom: 1px solid var(--line-soft); border-left: 2px solid var(--t); cursor: pointer;
+  --t: var(--faint); --t-rgb: var(--faint-rgb, 128, 128, 128);
+  box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; padding: 7px 10px; color: var(--ink); text-align: left; cursor: pointer;
+  background: linear-gradient(100deg, rgba(var(--t-rgb), 0.14), transparent 80%), var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px rgba(var(--t-rgb), 0.22); transition: box-shadow 0.15s ease;
 }
-.skill-tile[data-tier='初階'] { --t: var(--rarity-0); }
-.skill-tile[data-tier='進階'] { --t: var(--rarity-1); }
-.skill-tile[data-tier='大師'] { --t: var(--rarity-2); }
-.skill-tile[data-tier='傳說'] { --t: var(--rarity-3); }
-.skill-tile[data-learned='0'] { opacity: 0.7; }
-.skill-tile:hover .skill-tile__name, .skill-tile:focus-visible .skill-tile__name { color: var(--gold); }
-.skill-tile:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.skill-tile[data-tier='初階'] { --t: var(--rarity-0); --t-rgb: var(--rarity-0-rgb); }
+.skill-tile[data-tier='進階'] { --t: var(--rarity-1); --t-rgb: var(--rarity-1-rgb); }
+.skill-tile[data-tier='大師'] { --t: var(--rarity-2); --t-rgb: var(--rarity-2-rgb); }
+.skill-tile[data-tier='傳說'] { --t: var(--rarity-3); --t-rgb: var(--rarity-3-rgb); }
+.skill-tile[data-learned='0'] { opacity: 0.75; }
+.skill-tile:hover, .skill-tile:focus-visible { box-shadow: 0 0 0 1px var(--t); outline: 0; }
 .skill-tile__name { flex: none; font-size: 0.9rem; white-space: nowrap; }
-.skill-tile__tag { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--faint); font-size: 0.72rem; text-overflow: ellipsis; white-space: nowrap; }
-.skill-tile__note { order: 2; flex: none; color: var(--soft); font-size: 0.72rem; }
+.skill-tile__tag { flex: 1 1 0; min-width: 0; overflow: hidden; color: var(--t); font-size: 0.68rem; opacity: 0.85; text-overflow: ellipsis; white-space: nowrap; }
+.skill-tile__note { order: 2; flex: none; color: var(--soft); font-size: 0.7rem; }
 .skill-tile__lv { order: 3; flex: none; color: var(--gold); font-size: 0.85rem; }
+.skill-tile__on { display: inline-flex; align-items: center; gap: 4px; order: 4; padding: 1px 8px 1px 4px; color: var(--soft); font-size: 0.72rem; background: var(--paper); border-radius: var(--r-pill); white-space: nowrap; }
+.skill-tile__on:has(input:checked) { color: var(--res-calc); }
+.skill-tile__on input { width: 14px; height: 14px; margin: 0; }
+@media (max-width: 420px) { .skill-tile { padding: 6px 8px; } .skill-tile__name { font-size: 0.82rem; } }
 .skill-tip { position: fixed; z-index: var(--z-tip); max-width: 320px; padding: var(--space-3); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-box); box-shadow: 0 8px 24px rgba(var(--shadow-rgb), 0.5); font-size: 0.82rem; line-height: 1.6; pointer-events: none; opacity: 0; transition: opacity 0.12s ease; }
 .skill-tip[data-show='1'] { opacity: 1; }
 .skill-tip p { margin: 4px 0 0; color: var(--ink2); white-space: pre-line; }

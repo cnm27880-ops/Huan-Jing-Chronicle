@@ -117,7 +117,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/styles/map.css` | 世界地圖外框與熱點 |
 | `src/styles/dossier.css` | 地點情報面板與四大區域主題 |
 | `src/styles/pages.css` | 各分頁的版面：修整日、背包、裝備、交易、日誌、技能方格（Step B 去框重寫）＋少量殘餘（骰面、數值格） |
-| `src/styles/session.css` | **跑團頁（Step C 重寫）**：三欄工作台（欄與欄之間只有細線）、個人 HUD、招式列、藥水、技能檢定、中央 BOSS 舞台（大立繪＋防禦／攻擊模式＋小怪矩陣）、GM 工具折疊區、隊友資源條、擲骰紀錄、快速擲骰、手機頂部 HUD 與底部抽屜。檔尾含打擊特效（`fx-*`、`data-fx`）與 BOSS 多段血條（`lbar`） |
+| `src/styles/session.css` | **跑團頁（Step C 重寫）**：三欄卡片工作台（淡色底圓角卡片＋1px 淡金細邊線 `--sx-ring`）、個人 HUD、招式列、藥水、技能檢定、中央 BOSS 舞台（大立繪＋防禦／攻擊模式＋小怪矩陣）、GM 工具折疊區、隊友資源條、擲骰紀錄、快速擲骰、手機頂部 HUD 與底部抽屜。檔尾含打擊特效（`fx-*`、`data-fx`）與 BOSS 多段血條（`lbar`） |
 | `src/styles/overlays.css` | 覆蓋層：封面、鑑定開獎（`rv-*`）、數值調整面板（`vsheet`）、確認框、戰鬥提醒（`nudge`）、「收到的東西」（`mailbox`）、擲骰特效（`dfx`） |
 | `src/styles/gm.css` | GM 工具面板：模擬戰圖表、匯入、專屬技能與特殊配方編輯、發放獎勵、等候通知 |
 | `src/styles/base.css` | **基礎元件（UI 整合重構的新核心，最後載入）**：按鈕三級（Primary `btn--primary`／`btn--go`、Secondary `btn`、Ghost `btn--ghost`、`btn--danger`、緊湊 `btn--small`）、輸入框 `field`、面板 `panel`／`card`／`results`、去框列表 `list`、底線分頁 `tabs-line`，以及共用元件：區塊標題 `section-title`、物品格 `tile`／`tile-grid`／`showcase`、稀有度 `rarity`／`rarity-tag`（左側 2px 色條＋文字，沒有光暈與菱形，神話是彩虹色條）、徽章 `badge`／`info-chip`、數量選擇器 `amount`、單選選項 `action-card`／`diff`、紀念品開關 `keepsake`、選項小按鈕 `chip`／`toggle`（選中＝金字＋暗金底）。尺寸與圓角用 `tokens.css` 的 `--ctl-h` 等變數，顏色用 `theme.css` 的 `--ctl-*`／`--line-soft`。彈出面板（`sheet`、物品面板、贈送／交易面板、賣出面板、技能自選屬性）的樣式也在這裡。**新增或修改按鈕、輸入框的樣式只改這裡，不要再到其他 CSS 檔寫 `.btn`／`.field` 的外觀或高度**（其他檔案只能寫它在版面裡的位置，例如 `margin`、`flex`）。規格見 `DESIGN.md`「控制項」 |
