@@ -20,7 +20,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | 檔案 | 用途 |
 |---|---|
 | `index.html` | 頁面骨架（頂部列＋唯一的 `<main id="main">`，裡面是各分頁 `<section data-view="…">`；樣式在 `layout.css` 的 `#main`） |
-| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #session / #market（舊的 #battle 導到 #session，網址列的 hash 也會被修正成實際顯示的頁面））、角色存檔串接、GM 示範角色換成空白角色（`gmBlankCheck`，要先確認）與還原備份（`offerRestore`） |
+| `src/main.js` | 進入點、**各分頁 view 第一次進入才動態載入**（`VIEW_MODULES`／`ensureView`，沒載入前 `views[名稱]` 是 undefined，所以用到都要寫 `views[名稱]?.`；進首頁不下載任何分頁；瀏覽器閒置時背景預載修整日／背包／跑團／裝備，省流量或 2G 不預載）、分頁切換（#map / #rest / #bag / #gear / #session / #market（舊的 #battle 導到 #session，網址列的 hash 也會被修正成實際顯示的頁面））、角色存檔串接、GM 示範角色換成空白角色（`gmBlankCheck`，要先確認）與還原備份（`offerRestore`） |
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
 | `DESIGN.md` | 視覺設計規格（黑金主題） |
 | `RULES_OVERVIEW.md` | 規則原文整理（創角、每日養成、技能學習升級、資源、寶石、配方、特殊材料）；階段 2 的依據，含待確認清單 |
@@ -61,7 +61,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |
-| `src/ui/roomPanel.js` | 跑團頁裡的房間區塊：狀態、GM、成員、新戰鬥、暫代 GM |
+| `src/ui/roomPanel.js` | 跑團頁裡的房間區塊：狀態、GM、成員、新戰鬥、暫代 GM；8 個 GM 工具面板用 `lazyTool` 點了才動態載入（新增 GM 工具面板要照同樣寫法，不要靜態 import） |
+| `src/ui/lazyLoad.js` | 動態載入的共用工具：`loadModule`、載入失敗說明（離線／一般）、新版部署後舊檔案載不到時自動重新整理一次（`vite:preloadError`，30 秒內不重複、離線不重新整理）（判斷是純函式） |
 | `src/api/auth.js` | 前端登入 API：查詢登入者、登出；任何失敗都當未登入（維持單機試玩） |
 | `src/ui/userChip.js` | 頂部列的登入者頭像與登出 |
 | `src/state/rollLog.js` | 擲骰紀錄，**畫面與房間之間唯一的接線點**：房間模式走 WebSocket、伺服器擲骰；本機模式（沒登入／連不上）照舊存 localStorage |

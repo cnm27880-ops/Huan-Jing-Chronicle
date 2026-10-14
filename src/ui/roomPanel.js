@@ -2,15 +2,19 @@
 // 本機模式（沒登入）時整塊不顯示。文字一律走 textContent。
 import { askConfirm } from './confirmPop.js';
 import { h } from './dom.js';
-import { openBotImportSheet } from './botImport.js';
-import { openBackupRestoreSheet } from './backupRestore.js';
-import { openSheetImportSheet } from './sheetImport.js';
-import { openGmCharEditor } from './gmCharEdit.js';
-import { openRewardSheet } from './rewardSheet.js';
-import { openSimPanel } from './simPanel.js';
-import { openSpecialEditor } from './specialEdit.js';
-import { openSkillEditor } from './skillEdit.js';
+import { toast } from './controls.js';
+import { loadModule, chunkErrorText } from './lazyLoad.js';
 import { getRoomStatus, subscribeRoom, startNewBattle, setGmOverride } from '../state/rollLog.js';
+
+/**
+ * GM 工具面板：點了才下載（一般玩家永遠用不到，不放進首屏）。
+ * importer 要寫成 () => import('./x.js')（路徑寫死，Vite 才會把它分成獨立的檔案）；openName 是那個檔案匯出的開啟函式。
+ */
+const lazyTool = (importer, openName, label) => async () => {
+  let mod;
+  try { mod = await loadModule(importer); } catch { toast(`${label}：${chunkErrorText(navigator.onLine !== false)}`); return; }
+  mod[openName]();
+};
 
 export function mountRoomPanel(container) {
   const draw = () => {
@@ -42,14 +46,14 @@ export function mountRoomPanel(container) {
       if (r.me?.isGm) {
         parts.push(h('div', { class: 'room__tools' },
           gmBtn('🆕 新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, true),
-          gmBtn('🎁 發放獎勵', openRewardSheet, true),
-          gmBtn('模擬戰', openSimPanel),
-          gmBtn('玩家角色', openGmCharEditor),
-          gmBtn('匯入機器人存檔', openBotImportSheet),
-          gmBtn('匯入角色卡', openSheetImportSheet),
-          gmBtn('從備份還原角色', openBackupRestoreSheet),
-          gmBtn('特殊配方與材料', openSpecialEditor),
-          gmBtn('專屬技能', openSkillEditor)));
+          gmBtn('🎁 發放獎勵', lazyTool(() => import('./rewardSheet.js'), 'openRewardSheet', '發放獎勵'), true),
+          gmBtn('模擬戰', lazyTool(() => import('./simPanel.js'), 'openSimPanel', '模擬戰')),
+          gmBtn('玩家角色', lazyTool(() => import('./gmCharEdit.js'), 'openGmCharEditor', '玩家角色')),
+          gmBtn('匯入機器人存檔', lazyTool(() => import('./botImport.js'), 'openBotImportSheet', '匯入機器人存檔')),
+          gmBtn('匯入角色卡', lazyTool(() => import('./sheetImport.js'), 'openSheetImportSheet', '匯入角色卡')),
+          gmBtn('從備份還原角色', lazyTool(() => import('./backupRestore.js'), 'openBackupRestoreSheet', '從備份還原角色')),
+          gmBtn('特殊配方與材料', lazyTool(() => import('./specialEdit.js'), 'openSpecialEditor', '特殊配方與材料')),
+          gmBtn('專屬技能', lazyTool(() => import('./skillEdit.js'), 'openSkillEditor', '專屬技能'))));
       }
       const btns = [];
       if (r.me?.isAdmin) {

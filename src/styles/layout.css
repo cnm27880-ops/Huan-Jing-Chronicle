@@ -140,3 +140,15 @@ body {
     animation: none !important;
   }
 }
+
+/* 分頁第一次進入時的「載入中」與載入失敗說明（src/main.js 的 showView） */
+.view-loading {
+  display: grid;
+  gap: 0.8rem;
+  justify-items: center;
+  max-width: 28rem;
+  margin: 3rem auto;
+  padding: 0 1rem;
+  text-align: center;
+  color: var(--soft);
+}
