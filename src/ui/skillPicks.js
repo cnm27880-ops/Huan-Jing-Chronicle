@@ -55,7 +55,7 @@ export function skillPicksBlock(state, name, { commit, refresh }) {
       }
     }
     parts.push(h('button', {
-      type: 'button', class: 'btn btn--primary btn--small',
+      type: 'button', class: 'btn btn--small',
       onclick: async (e) => {
         const choice = d.skip ? { skip: true } : { gain: d.gain, lose: d.lose };
         const preview = setPickPreview(state, name, m, choice);

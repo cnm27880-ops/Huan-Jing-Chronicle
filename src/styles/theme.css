@@ -73,6 +73,15 @@
   --hover-ring: 0 0 0 1.5px var(--gold);
   --touch: 44px;
 
+  /* ---------- 控制項（按鈕、輸入框）與分隔線：規格見 DESIGN.md「控制項」，元件寫在 base.css ---------- */
+  --line-soft: rgba(var(--ink-rgb), 0.08);        /* 去框列表的底部分隔線 */
+  --ctl-bg: rgba(var(--ink-rgb), 0.04);           /* Secondary 按鈕、輸入框的底色 */
+  --ctl-line: rgba(var(--gold-rgb), 0.18);        /* Secondary 按鈕、輸入框的邊線（古銅金 18%） */
+  --ctl-line-hi: rgba(var(--gold-rgb), 0.5);      /* hover、focus 時的邊線 */
+  --ctl-primary-bg: rgba(var(--gold-rgb), 0.14);  /* Primary 按鈕：微暖暗金底 */
+  --ctl-primary-bg-hi: rgba(var(--gold-rgb), 0.24);
+  --ctl-primary-line: var(--gold2);               /* Primary 按鈕：1px 古銅金框 */
+
   /* ---------- 舊變數名稱 → 新主題（舊 CSS 檔還在用，之後可逐步改名） ---------- */
   --ink-raised: var(--raise);
   --ink-line: var(--line);

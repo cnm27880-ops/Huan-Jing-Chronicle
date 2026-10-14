@@ -89,7 +89,7 @@ export function createOffersView({ getState, commit }) {
       line('要你交出', o.want, o.wantGold),
       h('p', { class: `trade-offer__have${lacks.length ? ' is-short' : ''}`, text: lacks.length ? `你的背包還不夠：${lacks.map((x) => `${x.name} ${fmt(x.have)}/${fmt(x.need)}`).join('、')}（接受會交易失敗）` : '你的背包夠付 ✓' }),
       h('div', { class: 'trade-offer__act' },
-        h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: (e) => respond(o, 'accept', e.currentTarget) }, '接受'),
+        h('button', { type: 'button', class: 'btn btn--small', onclick: (e) => respond(o, 'accept', e.currentTarget) }, '接受'),
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: (e) => respond(o, 'reject', e.currentTarget) }, '拒絕')));
   }
 

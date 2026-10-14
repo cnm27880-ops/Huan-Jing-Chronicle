@@ -87,7 +87,7 @@ export function openGearSellSheet(state, g, commit) {
     const open = marketToday(state).session.open;
     const opt = (title, desc, enabled, onclick, note) => h('div', { class: 'sell-opt', 'aria-disabled': String(!enabled) },
       h('div', { class: 'sell-opt__text' }, h('strong', { text: title }), h('small', { text: desc }), note ? h('small', { class: 'sell-opt__note', text: note }) : null),
-      h('button', { type: 'button', class: 'btn btn--primary btn--small', disabled: !enabled, onclick: () => { onclick(); done(); } }, '賣出'));
+      h('button', { type: 'button', class: 'btn btn--small', disabled: !enabled, onclick: () => { onclick(); done(); } }, '賣出'));
     return h('div', { class: 'sell-sheet' },
       h('p', { class: 'hint', text: `${effectText(g)}　價目表以「${name}」計價。賣出後就沒了。` }),
       g.gem ? h('p', { class: 'notice notice--bad', text: '鑲了寶石的裝備不能賣。' }) : null,
@@ -112,7 +112,7 @@ export function createMarketView({ root, getState, commit }) {
     const tier = rarityOf(item);
     const subEl = sub ? h('small', { class: 'trade-row__sub', text: sub(q) }) : null;
     const btn = h('button', {
-      type: 'button', class: 'btn btn--primary btn--small', disabled: disabled || (max != null && max < 1),
+      type: 'button', class: 'btn btn--small', disabled: disabled || (max != null && max < 1),
       onclick: () => onGo(clamp(qtyOf(key))),
     }, button(q));
     return h('li', { class: `trade-row${tier !== null ? ' rarity' : ''}`, dataset: { tier: tier ?? 'none', rarity: tier ?? 'none' } },

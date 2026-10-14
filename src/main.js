@@ -2,17 +2,7 @@
 // 進入點：把資料層和各個 UI 模組接起來
 // ============================================================
 import { askConfirm } from './ui/confirmPop.js';
-import './styles/theme.css';
-import './styles/tokens.css';
-import './styles/layout.css';
-import './styles/map.css';
-import './styles/dossier.css';
-import './styles/pages.css';
-import './styles/redesign.css';
-import './styles/dice.css';
-import './styles/polish.css';
-import './styles/blackgold.css';
-import './styles/shadowfx.css';
+import './styles/index.js'; // 全站樣式（載入順序在那個檔案裡）
 
 import { getRegions, getMapLocations, getLocationDetail } from './api/lore.js';
 import { createMapView } from './ui/mapView.js';

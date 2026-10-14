@@ -51,7 +51,7 @@ export function badgeCard({ getState, commit }) {
         }, '我已經做過了');
         const craftBtn = b.reached
           ? h('button', {
-              type: 'button', class: 'btn btn--primary btn--small',
+              type: 'button', class: 'btn btn--small',
               onclick: async (e) => {
                 const name = await askText(e.currentTarget, { title: `製作徽章：${skill}技能等級 +1`, lines: ['每種只能做一次。', '如果你的等級已經含這個徽章的 +1，請取消，改按「我已經做過了」。', `名稱可以自己取（最多 ${BADGE_NAME_MAX} 字，之後也能改）：`], value: b.item, maxLength: BADGE_NAME_MAX, okText: '製作' });
                 if (name === null) return;

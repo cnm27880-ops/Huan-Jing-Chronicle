@@ -6,6 +6,22 @@
   --radius-sm: 4px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
+  /* ---------- 控制項尺寸與間距（按鈕、輸入框共用，並排時高度一致） ----------
+     桌機：一般 36px、緊湊 28px；手機（窄螢幕或觸控）全部 44px 以上，維持好按 */
+  --ctl-h: 36px;
+  --ctl-h-sm: 28px;
+  --ctl-h-go: 44px;          /* 整列的主要大按鈕（採集、製作…），全站只有少數幾處 */
+  --ctl-px: 14px;
+  --ctl-px-sm: 10px;
+  --radius-ctl: 4px;         /* 按鈕、輸入框 */
+  --radius-box: 6px;         /* 面板（最外層的區塊） */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
   /* ---------- 圖層（z-index）階層：全站只有這裡寫數字，其他檔案一律用 var(--z-…) ----------
      頁面內的小層級（sticky 列、地圖熱點，數字 ≤ 20）留在原處，不算在這裡。
      下面標「堆疊」的六個（drawer → confirm）要和 src/ui/modalStack.js 的 TIERS 順序一致，
@@ -27,4 +43,13 @@
   --z-fx: 105;        /* 擲骰／暗影特效：pointer-events: none，任何時候觸發都要看得到 */
   --z-toast: 110;     /* 吐司：操作回饋，在所有彈窗之上 */
   --z-cover: 200;     /* 封面 */
+}
+
+/* 手機（窄螢幕）或觸控裝置：控制項至少 44px */
+@media (max-width: 759px), (pointer: coarse) {
+  :root {
+    --ctl-h: 44px;
+    --ctl-h-sm: 44px;
+    --ctl-h-go: 48px;
+  }
 }

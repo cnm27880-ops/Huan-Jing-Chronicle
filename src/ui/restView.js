@@ -316,7 +316,7 @@ export function createRestView({ root, getState, commit }) {
               h('small', { class: 'draw-option__progress', dataset: { status: p.status }, text: PROGRESS_TEXT[p.status](p) }),
               h('p', { class: 'skill-info__text', text: SKILL_TABLE[n].text }),
               h('button', {
-                type: 'button', class: 'btn btn--primary btn--small',
+                type: 'button', class: 'btn btn--small',
                 onclick: (e) => {
                   const scroller = scrollerOf(e.currentTarget);
                   const top = scroller?.scrollTop ?? 0;
@@ -355,7 +355,7 @@ export function createRestView({ root, getState, commit }) {
               h('span', { class: 'num', text: `有 ${fmt(n)}` }),
               n ? h('div', { class: 'row' },
                 h('button', { type: 'button', class: 'btn btn--small', onclick: () => doDraw(tier, 1) }, '抽 1 本'),
-                n > 1 ? h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => doDraw(tier, Math.min(n, MAX_DRAW_AT_ONCE)) }, `抽 ${Math.min(n, MAX_DRAW_AT_ONCE)} 本`) : null) : null);
+                n > 1 ? h('button', { type: 'button', class: 'btn btn--small', onclick: () => doDraw(tier, Math.min(n, MAX_DRAW_AT_ONCE)) }, `抽 ${Math.min(n, MAX_DRAW_AT_ONCE)} 本`) : null) : null);
           })));
   }
 
@@ -417,7 +417,7 @@ export function createRestView({ root, getState, commit }) {
                 h('select', { class: 'field', 'aria-label': `${name}用的技能`, onchange: (e) => { ui.matSkill[name] = e.target.value; render(); } },
                   m.skills.map((s) => h('option', { value: s, selected: s === skill ? true : null, text: `${s}（+${modifier(state, s, 'rest').total}）` }))),
                 h('button', {
-                  type: 'button', class: 'btn btn--primary btn--small',
+                  type: 'button', class: 'btn btn--small',
                   onclick: () => {
                     if (blockedByDraw()) return;
                     const r = gatherDaily(state, name, skill);

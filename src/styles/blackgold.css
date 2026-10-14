@@ -127,38 +127,6 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .battle-head .section-title { flex: 1; margin-bottom: 0; }
 .battle-head { margin-bottom: 12px; }
 
-/* ---------- 按鈕：hover 金色 1.5px 外框 ---------- */
-.btn, .btn--ghost, .sheet__close, .dossier__close {
-  color: var(--ink);
-  background: var(--raise);
-  border: 1px solid var(--line3);
-  border-radius: 10px;
-  box-shadow: none;
-  text-shadow: none;
-}
-.btn:hover:not(:disabled), .btn--ghost:hover, .sheet__close:hover, .dossier__close:hover,
-.btn--ghost[aria-expanded='true'] {
-  color: var(--gold);
-  background: var(--raise);
-  border-color: var(--line3);
-  box-shadow: var(--hover-ring);
-}
-.btn--primary, .btn--go {
-  color: var(--on-gold);
-  background: var(--gold);
-  border: 1px solid var(--gold);
-  box-shadow: none;
-  text-shadow: none;
-}
-.btn--primary:hover:not(:disabled), .btn--go:hover:not(:disabled) {
-  color: var(--on-gold);
-  background: var(--gold);
-  border-color: var(--gold);
-  box-shadow: 0 0 0 1.5px var(--paper), 0 0 0 3px var(--gold);
-  transform: none;
-}
-.btn--primary::after, .btn--go::after { display: none; }
-
 /* 可點的卡片（物品格、選項、招式…）hover 同樣是金色 1.5px 外框 */
 .action-card, .diff, .skill-btn, .toggle, .potion, .move__pick, .chip, .amount__chip, .amount__step, .slot-add {
   background: var(--raise);
@@ -181,8 +149,6 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .tabs-seg { background: var(--paper); border: 1px solid var(--line); box-shadow: none; border-radius: var(--r-pill); }
 .seg { border-radius: var(--r-pill); }
 .seg[aria-selected='true'] { color: var(--on-gold); background: var(--gold); box-shadow: none; }
-.field, .amount__input { background: var(--paper); border: 1px solid var(--line3); box-shadow: none; color: var(--ink); }
-.field:focus, .amount__input:focus { border-color: var(--gold); box-shadow: 0 0 0 1.5px var(--gold); }
 
 /* ---------- 標籤與徽章：膠囊形 ---------- */
 .badge, .info-chip, .roll__badge, .track__tag, .status__day { border-radius: var(--r-pill); }
@@ -469,7 +435,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 
 /* 觸控目標至少 44px */
 @media (max-width: 759px), (pointer: coarse) {
-  .btn, .seg, .toggle, .chip, .field, .amount__chip, .amount__input, .move__pick, .sheet__close, .dossier__close,
+  .seg, .toggle, .chip, .amount__chip, .move__pick,
   .status__day, .potion, .diff, .skill-btn, .bag-group__head { min-height: 44px; }
   .amount__step, .info-chip__btn { min-width: 44px; min-height: 44px; }
 }
@@ -560,10 +526,9 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .vsheet__input { width: 7rem; min-height: var(--touch); font-size: 1.2rem; text-align: center; }
 .vsheet__was { margin: 0; color: var(--soft); font-size: 0.82rem; }
 .vsheet__steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
-.vsheet__step, .vsheet__full, .vsheet__actions .btn { min-height: var(--touch); }
+.vsheet__step, .vsheet__full { min-height: var(--touch); }
 .vsheet__step { padding-inline: 0; }
 .vsheet__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.vsheet__actions .btn { min-height: 48px; }
 @media (min-width: 760px) {
   .vsheet__backdrop { background: transparent; }
   .vsheet__panel { right: auto; bottom: auto; width: min(320px, calc(100vw - 16px)); border: 1px solid var(--line3); border-radius: var(--r-panel); box-shadow: 0 12px 32px var(--shadow); transform: translateY(-6px); opacity: 0; transition: transform 0.15s ease, opacity 0.15s ease; }
@@ -685,7 +650,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .reveal__title::after { content: ''; display: block; width: min(16rem, 60%); height: 1px; margin: 10px auto 0; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
 .reveal__summary { margin: 0; min-height: 1.6em; color: var(--ink2); }
 .reveal__actions { display: flex; justify-content: center; gap: 8px; }
-.reveal__actions .btn { min-width: 8rem; min-height: 44px; }
+.reveal__actions .btn { min-width: 8rem; }
 
 .rv-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 .rv-grid[data-count='1'] { grid-template-columns: minmax(0, 300px); justify-content: center; }
@@ -917,7 +882,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 
 /* 大按鈕：固定在設定下方，跟著頁面捲動（不浮動） */
 #view-rest .rest-go { position: static; }
-#view-rest .rest-go .btn--go { width: 100%; min-height: 52px; margin: 0; font-size: 1.05rem; letter-spacing: 0.08em; box-shadow: 0 6px 18px var(--shadow); }
+#view-rest .rest-go .btn--go { width: 100%; margin: 0; }
 
 /* 跑團檢定 */
 #view-rest .session-stomach__slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
@@ -1192,7 +1157,7 @@ input[type='number'], .amount__input { text-align: center; }
 .special-card { display: grid; gap: 6px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .special-card__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
 .special-card .row { display: flex; flex-wrap: wrap; gap: 6px; }
-.special-card .field { flex: 1; min-width: 0; padding: 6px 8px; font-size: 14px; }
+.special-card .field { flex: 1; min-width: 0; }
 .special-card .row .btn { margin: 0; }
 /* 餵肉球：材料排成小卡片網格（名稱＋持有／倍率、輸入數量、餵），不再拉滿整行 */
 .feed-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin-top: 6px; }
@@ -1536,7 +1501,7 @@ input[type='number'], .amount__input { text-align: center; }
 .manage { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .manage__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .manage__row .btn { margin-top: 0; }
-.manage__row .field { width: auto; min-width: 8rem; padding: 0.3rem 0.4rem; font-size: 14px; }
+.manage__row .field { width: auto; min-width: 8rem; }
 .manage__name { flex: 1; min-width: 6rem; font-weight: 700; }
 .library { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
 .library__item { display: grid; gap: 4px; justify-items: center; padding: 6px; background: var(--paper); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
@@ -1560,7 +1525,7 @@ input[type='number'], .amount__input { text-align: center; }
 .sx-dice__sides .chip { flex-shrink: 0; padding: 0.25rem 0.6rem; min-height: 32px; }
 .sx-dice__row { display: flex; align-items: center; gap: 6px; }
 .sx-dice__f { display: flex; align-items: center; gap: 3px; font-size: 0.72rem; color: var(--soft); }
-.sx-dice__f .field { width: 3.6rem; padding: 0.3rem 0.4rem; font-size: 14px; }
+.sx-dice__f .field { width: 3.6rem; }
 .sx-dice__expr { flex: 1; min-width: 0; padding: 0.3rem 0.5rem; font-size: 14px; }
 .sx-dice__roll { flex-shrink: 0; padding: 0 12px; min-height: 36px; white-space: nowrap; }
 
@@ -1845,7 +1810,7 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 
 /* GM 工具（房間區塊）：三組，每組小標題＋按鈕自動換行 */
 .room__tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
-.room__tools .btn { margin: 0; min-height: 34px; padding: 0.3rem 0.4rem; font-size: 0.78rem; line-height: 1.25; justify-content: center; text-align: center; }
+.room__tools .btn { margin: 0; padding-inline: 4px; justify-content: center; text-align: center; }
 
 /* 面板右上的「收起／關閉」：大小、高度、圓角統一 */
 .sheet__close, .dossier__close { min-width: 64px; min-height: 36px; padding: 0 14px; font: inherit; font-size: 0.85rem; line-height: 1; white-space: nowrap; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
@@ -1886,7 +1851,6 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
   .special-list { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 5px; margin-top: 4px; }
   .special-card { gap: 4px; padding: 6px 8px; }
   .special-card__head { line-height: 1.25; }
-  .special-card .field { padding: 4px 6px; }
 
   /* 裝備欄：四件一排 */
   .gear-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1930,7 +1894,7 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
   #view-market .trade-row__sub { grid-area: sub; font-size: 0.7rem; }
   #view-market .trade-row__act { grid-area: act; justify-content: stretch; gap: 4px; margin-top: 2px; }
   #view-market .trade-row__qty { flex: 0 0 3.2rem; width: 3.2rem; min-height: 44px; padding: 0 4px; }
-  #view-market .trade-row__act .btn { flex: 1; min-width: 0; min-height: 44px; padding: 0 6px; font-size: 0.8rem; white-space: nowrap; }
+  #view-market .trade-row__act .btn { flex: 1; min-width: 0; padding: 0 6px; white-space: nowrap; }
 }
 /* 修整日：行動卡與難度卡矮一點、特殊材料卡留白縮小 */
 @media (max-width: 900px) {
@@ -1957,7 +1921,7 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .confirm-pop__title { margin: 0 0 4px; font-weight: 700; color: var(--gold); overflow-wrap: anywhere; }
 .confirm-pop__line { margin: 2px 0; font-size: 0.9rem; color: var(--ink2); overflow-wrap: anywhere; }
 .confirm-pop__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
-.confirm-pop__actions .btn { min-height: 44px; min-width: 76px; }
+.confirm-pop__actions .btn { min-width: 76px; }
 .confirm-pop::after { /* 小箭頭：指向按鈕 */
   content: ''; position: absolute; left: var(--arrow-x, 50%); width: 10px; height: 10px; margin-left: -5px;
   background: var(--card); border: 1px solid var(--gold2); transform: rotate(45deg);
@@ -1965,7 +1929,6 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .confirm-pop[data-side='above']::after { bottom: -6px; border-top: 0; border-left: 0; }
 .confirm-pop[data-side='below']::after { top: -6px; border-bottom: 0; border-right: 0; }
 .confirm-pop[data-side='center']::after { display: none; }
-.btn--danger { background: var(--rosebg); border-color: var(--rose2); color: var(--rose); }
 @media (prefers-reduced-motion: reduce) { .confirm-pop { transition: none; } }
 .confirm-backdrop { position: fixed; inset: 0; z-index: var(--z-confirm); background: rgba(var(--paper-rgb), 0.6); opacity: 0; transition: opacity 0.15s ease; }
 .confirm-backdrop[data-open='true'] { opacity: 1; }
@@ -2006,7 +1969,7 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .nudge__tips { margin: 8px 0 0; padding-left: 1.2em; font-size: 0.82rem; color: var(--soft); }
 .nudge__tips li { margin: 2px 0; overflow-wrap: anywhere; }
 .nudge__foot { position: sticky; bottom: -16px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 14px -16px -16px; padding: 10px 16px 16px; background: linear-gradient(180deg, transparent, var(--card) 28%); }
-.nudge__foot .btn { min-height: 44px; min-width: 110px; }
+.nudge__foot .btn { min-width: 110px; }
 @media (prefers-reduced-motion: reduce) { .nudge, .nudge__icon { animation: none; } }
 
 /* 攻擊響應列（選中的招式裡）：點一下開／關 */
@@ -2036,4 +1999,4 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .adj-cell { display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-sm, 6px); background: rgba(var(--card-rgb), 0.5); min-width: 0; }
 .adj-cell strong { font-size: 0.85rem; white-space: nowrap; }
 .adj-cell small { font-size: 0.7rem; color: var(--faint); }
-.adj-cell .field { width: 100%; min-height: 0; padding: 3px 4px; font-size: 0.85rem; text-align: center; }
+.adj-cell .field { width: 100%; min-height: var(--ctl-h-sm); padding-inline: 4px; text-align: center; }

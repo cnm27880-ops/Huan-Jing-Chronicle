@@ -81,25 +81,7 @@ body {
   cursor: not-allowed;
 }
 
-.btn {
-  font: inherit;
-  font-size: 0.95rem;
-  padding: 0.45rem 0.9rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.btn--ghost {
-  color: var(--mist);
-  background: transparent;
-  border: 1px solid var(--ink-line);
-}
-
-.btn--ghost:hover,
-.btn--ghost[aria-expanded='true'] {
-  border-color: var(--bronze-dim);
-  color: var(--bronze);
-}
+/* 按鈕與輸入框的基礎樣式已搬到 base.css */
 
 /* ---------- 主區域 ---------- */
 /* 唯一的 <main>：撐滿頂部列以外的高度，裡面的分頁（section）照舊用 flex: 1 撐滿它 */

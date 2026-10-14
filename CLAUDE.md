@@ -113,7 +113,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/dossier.js` | 地點情報面板（點地圖標記打開） |
 | `src/styles/theme.css` | **主題檔**：全站色碼、字體、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
 | `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線）與**全站圖層階層 `--z-*`**（其他 CSS 檔 25 以上的 z-index 一律用 `var(--z-…)`，不能寫死數字，測試會檢查） |
-| `src/styles/layout.css` | 頂部列、按鈕 |
+| `src/styles/layout.css` | 頂部列、`#main` 外殼 |
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |
 | `src/styles/pages.css` | 修整日、背包頁面 |
@@ -121,6 +121,9 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/styles/redesign.css` | 全站新版樣式（覆蓋前面幾個檔案） |
 | `src/styles/polish.css` | 質感層：按鈕、卡片、物品格的舊版效果 |
 | `src/styles/blackgold.css` | 黑金主題（最後載入）：星點背景、面板、標題、擲骰紀錄三軌摘要、稀有度、三欄／手機版面與底部導覽列 |
+| `src/styles/base.css` | **基礎元件（UI 整合重構的新核心，最後載入）**：按鈕三級（Primary `btn--primary`／`btn--go`、Secondary `btn`、Ghost `btn--ghost`、`btn--danger`、緊湊 `btn--small`）、輸入框 `field`、面板 `panel`、去框列表 `list`、底線分頁 `tabs-line`。尺寸與圓角用 `tokens.css` 的 `--ctl-h` 等變數，顏色用 `theme.css` 的 `--ctl-*`／`--line-soft`。**新增或修改按鈕、輸入框的樣式只改這裡，不要再到其他 CSS 檔寫 `.btn`／`.field` 的外觀或高度**（其他檔案只能寫它在版面裡的位置，例如 `margin`、`flex`）。規格見 `DESIGN.md`「控制項」 |
+| `src/styles/index.js` | 全站樣式的載入順序（`main.js` 與 `styleguide.html` 共用）；新增 CSS 檔要加在這裡 |
+| `styleguide.html` | 樣式規格預覽（只在 `npm run dev` 時打開 `/styleguide.html`，不會打包進正式網站）：按鈕三級、輸入框、面板、去框列表、底線分頁 |
 | `public/lore-data/*.json` | 設定集文字（Discord 匯出），點「查看設定集」時由 `lore.js` 讀取 |
 
 ## 不可違反的規則

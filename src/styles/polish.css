@@ -65,53 +65,6 @@ body::before {
 }
 @media (max-width: 700px) { .tab { padding: 6px 9px; } }
 
-/* ---------- 按鈕：立體、內光、hover 發光，主要按鈕有掃光 ---------- */
-.btn, .btn--ghost, .sheet__close, .dossier__close {
-  border-radius: var(--r-ctl);
-  background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.08), rgba(var(--ink-rgb), 0.02));
-  border: 1px solid var(--glass-line-hi);
-  color: var(--text);
-  box-shadow: var(--glass-hi), 0 2px 6px rgba(var(--shadow-rgb), 0.3);
-  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
-}
-.btn:hover:not(:disabled), .btn--ghost:hover, .sheet__close:hover, .dossier__close:hover,
-.btn--ghost[aria-expanded='true'] {
-  color: var(--gold);
-  border-color: rgba(var(--gold-rgb), 0.5);
-  background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.16), rgba(var(--gold-rgb), 0.04));
-  box-shadow: var(--glass-hi), var(--glow-gold);
-}
-.btn:disabled, button:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
-
-.btn--primary, .btn--go {
-  position: relative;
-  overflow: hidden;
-  color: var(--on-gold);
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold) 55%, var(--gold) 100%);
-  border: 1px solid rgba(var(--gold-rgb), 0.9);
-  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.6), inset 0 -2px 0 rgba(var(--gold-rgb), 0.35), 0 6px 18px rgba(var(--gold-rgb), 0.22);
-  text-shadow: 0 1px 0 rgba(var(--ink-rgb), 0.35);
-  font-weight: 700;
-}
-.btn--primary::after, .btn--go::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(110deg, transparent 30%, rgba(var(--ink-rgb), 0.55) 50%, transparent 70%);
-  transform: translateX(-120%);
-  transition: transform 0.55s ease;
-  pointer-events: none;
-}
-.btn--primary:hover:not(:disabled), .btn--go:hover:not(:disabled) {
-  color: var(--on-gold);
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold) 55%, var(--gold) 100%);
-  border-color: var(--gold);
-  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.7), inset 0 -2px 0 rgba(var(--gold-rgb), 0.3), 0 8px 24px rgba(var(--gold-rgb), 0.4);
-  transform: translateY(-1px);
-}
-.btn--primary:hover::after, .btn--go:hover::after { transform: translateX(120%); }
-.btn:active:not(:disabled) { transform: translateY(1px) scale(0.98); }
-
 /* ---------- 卡片：玻璃面板 ---------- */
 .card, .results, .showcase, .sheet__panel, .dossier, .map-hint {
   background: var(--glass);
@@ -203,14 +156,6 @@ body::before {
   box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.6), 0 4px 12px rgba(var(--gold-rgb), 0.25);
 }
 
-.field, .amount__input {
-  background: rgba(var(--shadow-rgb), 0.35);
-  border: 1px solid var(--glass-line-hi);
-  border-radius: var(--r-ctl);
-  box-shadow: inset 0 2px 5px rgba(var(--shadow-rgb), 0.35);
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
-}
-.field:focus, .amount__input:focus { outline: none; border-color: rgba(var(--gold-rgb), 0.6); box-shadow: inset 0 2px 5px rgba(var(--shadow-rgb), 0.35), 0 0 0 3px rgba(var(--gold-rgb), 0.15); }
 .mod { background: linear-gradient(90deg, rgba(var(--gold-rgb), 0.1), rgba(var(--ink-rgb), 0.02)); border: 1px solid rgba(var(--gold-rgb), 0.2); border-radius: 10px; }
 
 /* ---------- 物品格：像角色卡一樣，hover 浮起、依稀有度發光 ---------- */
@@ -301,6 +246,5 @@ button.tile:hover::before { opacity: 1; }
 .cover__btn { padding: 0.7rem 1.2rem; font-size: 1rem; }
 
 @media (prefers-reduced-motion: reduce) {
-  .btn--primary::after, .btn--go::after { display: none; }
-  button.tile:hover, .btn--primary:hover, .btn--go:hover { transform: none; }
+  button.tile:hover { transform: none; }
 }

@@ -57,34 +57,9 @@
 
 .row { display: flex; gap: 0.5rem; align-items: center; }
 
-.field {
-  font: inherit;
-  font-size: 16px; /* 避免 iPhone 輸入時自動放大 */
-  color: var(--mist);
-  background: var(--paper);
-  border: 1px solid var(--ink-line);
-  border-radius: 8px;
-  padding: 0.6rem 0.75rem;
-  min-width: 0;
-  flex: 1;
-  width: 100%;
-}
-
-.field:focus { border-color: var(--bronze); outline: none; }
-
-.btn { border-radius: 8px; }
-.btn--primary { background: var(--bronze); color: var(--on-gold); border: 0; font-weight: 700; }
-.btn--primary:hover { filter: brightness(1.08); }
-.btn--small { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.btn--go {
-  width: 100%;
-  margin-top: 1rem;
-  padding: 0.95rem;
-  font-size: 1.1rem;
-  letter-spacing: 0.05em;
-}
+/* 按鈕與輸入框的基礎樣式已搬到 base.css */
+.field { min-width: 0; flex: 1; width: 100%; } /* 外觀在 base.css，這裡只管在版面裡的伸縮 */
+.btn--go { width: 100%; margin-top: 1rem; }
 
 /* ---------- 常駐狀態列 ---------- */
 .status {
@@ -598,7 +573,6 @@ button.tile:hover { border-color: var(--bronze); border-left-color: var(--t); }
 .item-sheet__desc { margin: 0; line-height: 1.7; font-size: 0.9rem; }
 .item-sheet__eat, .item-sheet__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 .item-sheet__actions { margin-top: 0.25rem; }
-.item-sheet__actions .btn, .item-sheet__eat .btn { padding: 0.8rem; }
 
 /* 提示訊息 */
 .toast {

@@ -104,7 +104,7 @@ export function createGearView({ root, getState, commit }) {
           RULE_SKILLS.filter((n) => !(n in (state.skills ?? {}))).map((n) => h('option', { value: n, selected: ui.newSkill === n ? true : null, text: n }))),
         h('input', { class: 'field', type: 'number', min: 1, max: 10, value: ui.newSkillLv, 'aria-label': '等級', onchange: (e) => { ui.newSkillLv = Math.max(1, Math.min(10, num(e.target.value, 1))); } }),
         h('button', {
-          type: 'button', class: 'btn btn--primary btn--small',
+          type: 'button', class: 'btn btn--small',
           onclick: () => {
             const n = ui.newSkill;
             if (!n) return toast('先選一個技能。');
@@ -217,7 +217,7 @@ export function createGearView({ root, getState, commit }) {
               h('div', { class: 'identify__btns' },
                 [1, 10, 50].filter((n) => n < x.qty).map((n) =>
                   h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentify(state, x.name, n) }, `鑑定 ${n}`)),
-                h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => runIdentify(state, x.name, x.qty) }, `全部 ${fmt(x.qty)}`)))))
+                h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentify(state, x.name, x.qty) }, `全部 ${fmt(x.qty)}`)))))
         : h('p', { class: 'notice', text: '背包裡沒有通用裝備。到修整日鍛造（鑄造）就會得到。' }),
       gemIdentifyList(state),
       batchCard(state));
@@ -239,7 +239,7 @@ export function createGearView({ root, getState, commit }) {
           h('div', { class: 'identify__btns' },
             [1, 10].filter((n) => n < x.qty).map((n) =>
               h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentifyGems(state, x.name, n) }, `鑑定 ${n}`)),
-            h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => runIdentifyGems(state, x.name, x.qty) }, `全部 ${fmt(x.qty)}`)))));
+            h('button', { type: 'button', class: 'btn btn--small', onclick: () => runIdentifyGems(state, x.name, x.qty) }, `全部 ${fmt(x.qty)}`)))));
   }
 
   async function runIdentifyGems(state, name, times) {
@@ -298,7 +298,7 @@ export function createGearView({ root, getState, commit }) {
                   onchange: (e) => { ui.gemTarget[gem.id] = Number(e.target.value); },
                 }, targets.map((g) => h('option', { value: String(g.id), selected: g.id === sel ? true : null, text: label(g) }))),
                 h('button', {
-                  type: 'button', class: 'btn btn--primary btn--small',
+                  type: 'button', class: 'btn btn--small',
                   onclick: async (e) => {
                     const target = targets.find((g) => g.id === (ui.gemTarget[gem.id] ?? sel));
                     if (!target || !(await askConfirm(e.currentTarget, { title: `把${gemName(gem)}（${gem.stat} +${gem.value}）鑲進「${label(target)}」？`, lines: ['鑲上後目前無法取出。'], okText: '鑲嵌' }))) return;
@@ -354,8 +354,8 @@ export function createGearView({ root, getState, commit }) {
           ? (accFull
               ? [h('button', { type: 'button', class: 'btn btn--small', onclick: () => putOn('acc1') }, '換飾品 1'),
                  h('button', { type: 'button', class: 'btn btn--small', onclick: () => putOn('acc2') }, '換飾品 2')]
-              : h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => putOn(state.equipment.acc1 ? 'acc2' : 'acc1') }, '裝備'))
-          : h('button', { type: 'button', class: 'btn btn--primary btn--small', onclick: () => putOn(g.slot) }, '裝備'),
+              : h('button', { type: 'button', class: 'btn btn--small', onclick: () => putOn(state.equipment.acc1 ? 'acc2' : 'acc1') }, '裝備'))
+          : h('button', { type: 'button', class: 'btn btn--small', onclick: () => putOn(g.slot) }, '裝備'),
         // 裝備不能丟棄，只能到交易大廳／黑市賣掉（使用者 2026-10-07）；鑲了寶石的不能賣
         h('button', {
           type: 'button', class: 'btn btn--ghost btn--small', disabled: Boolean(g.gem), title: g.gem ? '鑲了寶石的裝備不能賣' : '',

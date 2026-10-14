@@ -89,7 +89,6 @@
 .identify__qty { font-family: var(--font-mono); color: var(--gold); }
 .identify__info small { color: var(--dim); }
 .identify__btns { display: flex; gap: .3rem; flex-wrap: wrap; }
-.identify .btn { padding: .35rem .7rem; }
 .batch { margin-top: .8rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
 .batch__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .2rem; }
 .batch__row { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: .25rem .5rem; background: var(--input); border-radius: 5px; font-size: .8rem; }
@@ -113,7 +112,7 @@
 .bar__text { position: relative; display: block; text-align: center; font-family: var(--font-mono); font-size: .74rem; line-height: 20px; text-shadow: 0 1px 2px rgba(var(--shadow-rgb), .8); }
 .hp-adjust { flex-wrap: wrap; margin-top: .6rem; }
 .hp-adjust .field-label { margin: 0; flex: none; }
-.hp-adjust .field { width: 84px; flex: none; padding: .3rem .5rem; font-size: 14px; }
+.hp-adjust .field { width: 84px; flex: none; }
 .chip-row--info { align-items: center; }
 .info-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .6rem; font-size: .78rem; color: var(--muted); background: var(--input); border: 1px solid var(--line); border-radius: 999px; }
 .info-chip.is-bad { color: var(--rose); border-color: rgba(var(--rose-rgb), .55); }
@@ -144,11 +143,11 @@
 .add-box .btn { margin-top: .5rem; }
 .extra-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .4rem; margin-top: .4rem; }
 .extra { display: flex; flex-direction: column; gap: .15rem; font-size: .72rem; color: var(--muted); }
-.extra .field { padding: .35rem .5rem; font-size: 14px; }
+
 
 .modes { gap: .5rem; }
 .mode { display: flex; flex-direction: column; gap: .15rem; flex: 1; font-size: .7rem; color: var(--muted); }
-.mode .field { padding: .3rem .4rem; font-size: 14px; }
+
 
 @media (prefers-reduced-motion: reduce) {
   .roll[data-fresh='1'], .bar__fill { transition: none; animation: none; }
