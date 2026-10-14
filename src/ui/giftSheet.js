@@ -126,7 +126,7 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
       wantBox.replaceChildren(...ui.wants.map((w, i) => h('div', { class: 'trade-want' },
         h('input', { class: 'field', type: 'text', list: 'trade-known-items', placeholder: '物品名稱，例如 豪華蓋飯、金幣', value: w.name, 'aria-label': '對方要拿出的物品', oninput: (e) => { w.name = e.target.value; } }),
         h('input', { class: 'field gift-qty', type: 'number', min: 1, inputmode: 'numeric', value: w.qty, 'aria-label': '數量', onchange: (e) => { w.qty = Math.floor(Number(e.target.value)) || 0; } }),
-        ui.wants.length > 1 ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', 'aria-label': '移除這一項', onclick: () => { ui.wants.splice(i, 1); renderWants(); } }, '✕') : null)));
+        ui.wants.length > 1 ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', 'aria-label': '移除這一項', onclick: () => { ui.wants.splice(i, 1); renderWants(); } }, '移除') : null)));
     }
     renderWants();
 
@@ -145,7 +145,7 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
           h('p', { class: 'field-label', text: '② 我要對方拿出來換（物品名稱；要金幣就填「金幣」）' }),
           wantBox,
           h('datalist', { id: 'trade-known-items' }, [GOLD_NAME, ...KNOWN_ITEMS].map((n) => h('option', { value: n }))),
-          h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { ui.wants.push({ name: '', qty: 1 }); renderWants(); } }, '＋ 再加一項物品'),
+          h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { ui.wants.push({ name: '', qty: 1 }); renderWants(); } }, '再加一項物品'),
           h('p', { class: 'hint', text: '你要給出的東西與金幣，送出時就先扣掉、押在交易單上。對方接受但東西或金幣不夠＝交易失敗，全部退回給你；對方拒絕或你取消也會退回。對方在「待回覆」回覆。物品名稱要和背包裡的一模一樣。' }))
         : null,
       h('div', { class: 'gift-foot' }, total, clear, sendBtn));

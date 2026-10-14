@@ -84,9 +84,9 @@ export function createLogsView({ root }) {
             h('option', { value: '', text: '全部玩家' }),
             players.map((p) => h('option', { value: p.uid, selected: ui.uid === p.uid ? true : null, text: p.name })))
         : null,
-      h('div', { class: 'toggle-row', role: 'group', 'aria-label': '日誌類別' },
+      h('div', { class: 'tabs-line', role: 'tablist', 'aria-label': '日誌類別' },
         [['', '全部'], ...Object.entries(ACTIVITY_CATS)].map(([id, label]) => h('button', {
-          type: 'button', class: 'toggle', 'aria-pressed': String(ui.cat === id), onclick: () => { ui.cat = id; load(true); },
+          type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.cat === id), onclick: () => { ui.cat = id; load(true); },
         }, label))),
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.loading ? true : null, onclick: () => load(true) }, '重新整理'));
   }

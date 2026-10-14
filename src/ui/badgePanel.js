@@ -10,20 +10,18 @@ import { LIFE_SKILLS } from '../game/rules.js';
 import { usesSkillTable } from '../game/skillTable.js';
 import { badgeStatus, craftBadge, renameBadge, markBadgeOwned, BADGE_COUNT, BADGE_NAME_MAX } from '../game/badges.js';
 
-const LIFE_ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
-
 /** 舊式存檔（沒用技能目錄）不能做徽章，回傳 null */
 export function badgeCard({ getState, commit }) {
   const state = getState();
   if (!usesSkillTable(state)) return null;
   return h('section', { class: 'card' }, h('h2', { class: 'section-title', text: '生活徽章' }),
-    h('ul', { class: 'badge-list' }, LIFE_SKILLS.map((skill) => h('li', { class: 'badge-row' },
-      h('strong', { text: `${LIFE_ICONS[skill]} ${skill}　技能 ${state.lifeSkills[skill] ?? 0}` }),
+    h('ul', { class: 'list badge-list' }, LIFE_SKILLS.map((skill) => h('li', { class: 'list__item badge-row' },
+      h('strong', { class: 'badge-row__name', text: `${skill}　技能 ${state.lifeSkills[skill] ?? 0}` }),
       h('div', { class: 'badge-row__btns' }, badgeStatus(state, skill).map((b) => {
         const label = b.kind === '神級' ? '神級徽章' : `${BADGE_COUNT}次徽章（${fmt(Math.min(b.progress.have, BADGE_COUNT))}/${BADGE_COUNT}）`;
         if (b.made) {
           return h('div', { class: 'badge-made' },
-            h('span', { class: 'badge-made__name', title: b.item, text: `✓ ${b.item}` }),
+            h('span', { class: 'badge-made__name', title: b.item, text: `已製作　${b.item}` }),
             h('button', {
               type: 'button', class: 'btn btn--ghost btn--small',
               onclick: async (e) => {

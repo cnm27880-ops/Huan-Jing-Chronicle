@@ -15,10 +15,7 @@
 }
 
 /* ---------- 頁面共用 ---------- */
-.page-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem; max-width: 1480px; margin: 0 auto; padding: .7rem 1.1rem; align-items: start; }
-.gear-col, .battle-col { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
-@media (max-width: 900px) { .page-wrap { grid-template-columns: 1fr; padding: .6rem .75rem; } }
-
+.battle-col { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
 .chip-row { display: flex; flex-wrap: wrap; gap: .3rem; margin: .4rem 0 .6rem; }
 .chip { padding: .38rem .7rem; color: var(--muted); background: var(--input); border: 1px solid var(--line); border-radius: 999px; font-size: .82rem; cursor: pointer; }
 .chip:hover { border-color: var(--line-focus); color: var(--text); }
@@ -65,7 +62,6 @@
 @keyframes roll-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
 
 /* ---------- 數值面板 ---------- */
-.stat-group + .stat-group { margin-top: .6rem; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: .3rem; }
 .stat { display: flex; flex-direction: column; gap: .05rem; padding: .4rem .55rem; background: var(--input); border: 1px solid var(--line); border-radius: 7px; min-width: 0; }
 .stat__name { font-size: .7rem; color: var(--muted); }
@@ -73,34 +69,6 @@
 .stat__detail { font-size: .62rem; color: var(--dim); line-height: 1.4; }
 
 /* ---------- 裝備欄與裝備清單 ---------- */
-.gear-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
-.gear-slot { --t: var(--line-focus); display: flex; flex-direction: column; gap: .2rem; padding: .55rem .65rem; min-height: 96px; background: var(--input); border: 1px solid var(--line); border-left: 3px solid var(--t); border-radius: 7px; }
-.gear-slot.is-empty { border-style: dashed; color: var(--dim); }
-.gear-slot__label { font-size: .68rem; color: var(--dim); }
-.gear-slot__name { font-size: .88rem; }
-.gear-slot__effect { color: var(--gold); font-size: .82rem; line-height: 1.4; }
-.gear-slot .btn { align-self: flex-start; margin-top: auto; }
-.identify-list { display: flex; flex-direction: column; gap: .35rem; }
-.identify { --t: var(--line-focus); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; padding: .5rem .65rem; background: var(--input); border: 1px solid var(--line); border-left: 3px solid var(--t); border-radius: 7px; }
-.identify__info { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
-.identify__qty { font-family: var(--font-mono); color: var(--gold); }
-.identify__info small { color: var(--dim); }
-.identify__btns { display: flex; gap: .3rem; flex-wrap: wrap; }
-.batch { margin-top: .8rem; padding-top: .6rem; border-top: 1px dashed var(--line); }
-.batch__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .2rem; }
-.batch__row { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: .25rem .5rem; background: var(--input); border-radius: 5px; font-size: .8rem; }
-.owned-bar { justify-content: space-between; flex-wrap: wrap; margin-bottom: .6rem; }
-.owned-bar .tabs-seg { display: inline-grid; grid-template-columns: repeat(4, auto); margin: 0; }
-.owned-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; max-height: 560px; overflow-y: auto; }
-.owned { --t: var(--line-focus); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .35rem .6rem; padding: .45rem .6rem; background: var(--input); border: 1px solid var(--line); border-left: 3px solid var(--t); border-radius: 7px; }
-.owned__main { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .55rem; min-width: 0; }
-.owned__name { font-size: .84rem; }
-.owned__effect { color: var(--gold); font-size: .82rem; }
-.owned__btns { display: flex; gap: .3rem; }
-.owned-group__head { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .55rem; padding: 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.owned-group__caret { color: var(--gold); width: 1em; }
-.owned-group__list { flex: 1 1 100%; list-style: none; margin: .2rem 0 0; padding: 0 0 0 .7rem; display: flex; flex-direction: column; gap: .3rem; }
-.owned__note { flex: 1 1 100%; padding: .3rem .5rem; font-size: 14px; }
 
 /* ---------- 戰鬥頁 ---------- */
 .bar { position: relative; height: 22px; background: var(--input); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -245,40 +213,9 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 .mailbox__item { display: grid; gap: 2px; padding-top: .4rem; border-top: 1px solid var(--line); }
 .mailbox__item strong { color: var(--gold); font-size: .9rem; }
 .mailbox__line { color: var(--ink2); font-size: .84rem; }
-.giftsheet { display: flex; flex-direction: column; gap: .6rem; min-height: 100%; }
-.gift-head { display: grid; gap: .5rem; } /* 不固定在上面：整個面板一起捲，滑動空間最大 */
-.gift-cats { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-.gift-cats .chip { flex: none; white-space: nowrap; }
-.gift-cats .chip[aria-selected='true'] { color: var(--on-gold); background: var(--gold); border-color: var(--gold); }
-.gift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 8px; align-content: start; flex: 1; }
-.gift-grid .notice { grid-column: 1 / -1; }
-.gift-tile { display: grid; align-content: start; gap: 6px; padding: 8px; background: var(--card); border: 1.5px solid var(--line); border-radius: 10px; }
-.gift-tile[data-on='1'] { background: var(--goldbg); border-color: var(--gold); }
-.gift-tile__main { display: grid; gap: 2px; min-height: 44px; padding: 0; font: inherit; text-align: left; color: var(--ink); background: transparent; border: 0; cursor: pointer; }
-.gift-tile__name { overflow: hidden; font-size: .88rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.gift-tile__main small { color: var(--soft); }
-.gift-tile__qty { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.gift-step { min-width: 40px; min-height: 40px; padding: 0; font-size: 1.1rem; }
-.gift-foot { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; padding: .6rem 0 .2rem; border-top: 1px solid var(--line); } /* 不固定在下面 */
-.gift-foot__n { flex: 1; min-width: 8rem; color: var(--ink2); font-size: .86rem; }
-.gift-qty--gold { width: 5.5rem; }
-.gift-qty { width: 3.6rem; flex: none; padding-inline: 4px; text-align: center; }
+/* 不固定在上面：整個面板一起捲，滑動空間最大 */
+/* 不固定在下面 */
 .feedbox { margin-top: .8rem; display: grid; gap: .4rem; }
 .feedbox .row { flex-wrap: wrap; }
 
 /* 玩家交易（playerTrade.js）：發起交易面板與收到／發出的交易單 */
-.gift-picker-head { display: grid; gap: .5rem; }
-.trade-want-box { display: grid; gap: .5rem; padding: .6rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
-.trade-want-box .field-label, .trade-want-box .hint, .gift-head .field-label { margin: 0; }
-.trade-wants { display: grid; gap: .4rem; }
-.trade-want { display: flex; align-items: center; gap: .4rem; }
-.trade-want .field:first-child { flex: 1; min-width: 0; }
-.trade-offers { display: grid; gap: .8rem; }
-.trade-offers__list { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
-.trade-offer { display: grid; gap: .3rem; padding: .7rem .8rem; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
-.trade-offer strong { color: var(--gold); }
-.trade-offer__line { display: grid; gap: 2px; margin: 0; }
-.trade-offer__line small { color: var(--soft); }
-.trade-offer__have { margin: 0; font-size: .84rem; color: var(--ink2); }
-.trade-offer__have.is-short { color: var(--rose); }
-.trade-offer__act { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .2rem; }

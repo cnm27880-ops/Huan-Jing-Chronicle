@@ -425,3 +425,106 @@ button.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px
 .keepsake__text small { font-size: 0.72rem; color: var(--soft); }
 .keepsake__check { min-width: 1em; font-size: 0.8rem; text-align: center; color: var(--gold); }
 .keepsake[aria-pressed='true'] { color: var(--gold); background: var(--ctl-primary-bg); border-color: var(--ctl-primary-line); }
+
+/* ============================================================
+   彈出面板（sheet.js）：手機從底部滑出、桌機置中；裡面只有最外層有框，其餘用留白與細線
+   ============================================================ */
+.sheet { position: fixed; inset: 0; z-index: var(--z-sheet); display: grid; grid-template-rows: minmax(0, 1fr); align-items: center; justify-items: center; } /* 列高固定成畫面高，面板的 max-height 百分比才有依據 */
+.sheet__backdrop { position: absolute; inset: 0; background: rgba(var(--shadow-rgb), 0.6); opacity: 0; transition: opacity 0.2s ease; }
+.sheet__panel {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100% - 2rem));
+  max-height: min(86vh, 760px);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-box);
+  box-shadow: 0 16px 40px rgba(var(--shadow-rgb), 0.5);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.2s ease, transform 0.2s var(--ease);
+}
+.sheet__panel[data-size='tall'] { height: min(88dvh, 900px); max-height: none; }
+.sheet__panel[data-size='tall'] .sheet__body { flex: 1; min-height: 0; }
+.sheet[data-open='true'] .sheet__backdrop { opacity: 1; }
+.sheet[data-open='true'] .sheet__panel { opacity: 1; transform: none; }
+.sheet__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); }
+.sheet__title { margin: 0; color: var(--gold); font-family: var(--font-body); font-size: 1rem; font-weight: 600; letter-spacing: 0.08em; }
+.sheet__body { overflow-y: auto; padding: var(--space-4); overscroll-behavior: contain; }
+.sheet__body section + section { margin-top: var(--space-5); }
+.sheet__body .tile-grid { margin-top: var(--space-3); }
+@media (max-width: 640px) {
+  .sheet { align-items: end; }
+  .sheet__panel { width: 100%; max-height: 88%; border-radius: var(--radius-box) var(--radius-box) 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom, 0px); transform: translateY(100%); }
+  .sheet__panel[data-size='tall'] { height: 88dvh; max-height: 88dvh; }
+}
+@media (prefers-reduced-motion: reduce) { .sheet__backdrop, .sheet__panel { transition: none; } }
+
+/* 物品面板（點背包物品）：圖示＋稀有度＋持有量；沒有框，只有左側色條 */
+.item-sheet { display: grid; gap: var(--space-4); }
+.item-sheet__hero { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-2) 0 var(--space-2) var(--space-3); }
+.item-sheet__icon { font-size: 2.2rem; line-height: 1; }
+.item-sheet__icon:empty { display: none; }
+.item-sheet__have { margin: 4px 0 0; color: var(--soft); }
+.item-sheet__have strong { color: var(--ink); font-size: 1.5rem; font-variant-numeric: lining-nums tabular-nums; }
+.item-sheet__desc { margin: 0; color: var(--ink2); font-size: 0.9rem; line-height: 1.7; }
+.item-sheet__eat, .item-sheet__actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.item-sheet__eat .item-sheet__desc { grid-column: 1 / -1; }
+.item-sheet__eat > .btn:only-of-type { grid-column: 1 / -1; }
+.item-sheet__actions { padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
+
+/* 放進背包面板、賣出面板 */
+.add-sheet { display: grid; gap: var(--space-5); }
+.add-sheet .row { display: flex; gap: var(--space-2); }
+.add-sheet .row .field { flex: 1; min-width: 0; }
+.sell-sheet { display: grid; }
+.sell-opt { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); }
+.sell-opt:last-child { border-bottom: 0; }
+.sell-opt[aria-disabled='true'] { opacity: 0.5; }
+.sell-opt__text { display: grid; gap: 2px; min-width: 0; }
+.sell-opt__text small { color: var(--soft); font-size: 0.8rem; line-height: 1.5; }
+.sell-opt__note { color: var(--faint); }
+
+/* 贈送／交易面板（giftSheet.js、itemPicker.js、playerTrade.js） */
+.giftsheet { display: flex; flex-direction: column; gap: var(--space-3); min-height: 100%; }
+.gift-head { display: grid; gap: var(--space-3); }
+.gift-head .extra { display: grid; gap: 4px; font-size: 0.8rem; color: var(--soft); }
+.gift-cats { gap: var(--space-4); }
+.gift-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0 var(--space-4); flex: 1; align-content: start; }
+.gift-tile { display: grid; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 1px solid var(--line-soft); }
+.gift-tile__main { display: grid; gap: 2px; width: 100%; padding: 4px 0 4px var(--space-2); font: inherit; color: var(--ink); text-align: left; background: none; border: 0; border-left: 2px solid transparent; cursor: pointer; }
+.gift-tile__main small { color: var(--soft); font-size: 0.78rem; }
+.gift-tile__main:hover .gift-tile__name { color: var(--gold); }
+.gift-tile[data-on='1'] .gift-tile__main { border-left-color: var(--gold); }
+.gift-tile[data-on='1'] .gift-tile__name { color: var(--gold); }
+.gift-tile__qty { display: flex; align-items: center; gap: 4px; }
+.gift-step { min-width: var(--ctl-h-sm); padding-inline: 0; }
+.gift-qty { width: 3.6rem; flex: none; padding-inline: 4px; text-align: center; }
+.gift-qty--gold { width: 5.5rem; }
+.gift-foot { position: sticky; bottom: calc(-1 * var(--space-4)); display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4); background: var(--card); border-top: 1px solid var(--line-soft); }
+.gift-foot__n { flex: 1 1 10rem; min-width: 0; color: var(--soft); font-size: 0.85rem; }
+.trade-want-box { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
+.trade-wants { display: grid; gap: var(--space-2); }
+.trade-want { display: flex; align-items: center; gap: var(--space-2); }
+.trade-want .field:first-child { flex: 1; min-width: 0; }
+.trade-panel { display: grid; gap: var(--space-4); }
+.trade-offers { display: grid; gap: var(--space-5); }
+.trade-section .section-title { margin-top: 0; }
+.trade-offer { display: grid; gap: 6px; align-items: start; }
+.trade-offer__line { display: flex; gap: var(--space-3); margin: 0; font-size: 0.88rem; }
+.trade-offer__line small { flex: none; width: 5.5rem; color: var(--soft); }
+.trade-offer__have { margin: 0; color: var(--sky); font-size: 0.82rem; }
+.trade-offer__have.is-short { color: var(--rose); }
+.trade-offer__act { display: flex; gap: var(--space-2); padding-top: 4px; }
+
+/* 技能自選屬性（升級畫面下方） */
+.pick-block { margin-top: var(--space-4); }
+.pick-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.pick-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 1px solid var(--line-soft); }
+.pick-row--open { align-items: flex-start; }
+.pick-body { display: grid; flex: 1 1 12rem; gap: 6px; min-width: 0; }
+.pick-points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px var(--space-3); }
+.pick-line { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 0.82rem; }
+.pick-select { min-width: 0; }

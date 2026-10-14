@@ -21,7 +21,7 @@ export function skillPicksBlock(state, name, { commit, refresh }) {
     const saved = state.skillPicks?.[name]?.[m];
     if (saved) {
       return h('li', { class: 'pick-row' },
-        h('strong', { text: `${m} 級` }), h('span', { text: pickText(name, saved) }), h('small', { class: 'hint', text: '🔒 已選定' }));
+        h('strong', { text: `${m} 級` }), h('span', { text: pickText(name, saved) }), h('small', { class: 'hint', text: '已選定' }));
     }
     const key = `${name}:${m}`;
     const d = drafts.get(key) ?? { skip: false, lose: spec.lose?.from.length === 1 ? spec.lose.from[0] : '', gain: Array(spec.gain.fixed ? 0 : spec.gain.n).fill('') };
