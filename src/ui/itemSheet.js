@@ -145,7 +145,7 @@ export function openAddSheet(state, commit) {
             h('h3', { class: 'section-title', text: '有名字的技能書' }),
             h('p', { class: 'hint', text: '物品名稱就是技能名，例如機器人存檔裡的「大成真仙」。點一下選數量放進背包。' }),
             h('div', { class: 'menu-chips' }, books.map((n) =>
-              h('button', { type: 'button', class: 'chip', onclick: () => pickItem(n) }, `📜 ${n}${countOf(state, n) ? `（有 ${fmt(countOf(state, n))}）` : ''}`))))
+              h('button', { type: 'button', class: 'chip', onclick: () => pickItem(n) }, `${n}${countOf(state, n) ? `（有 ${fmt(countOf(state, n))}）` : ''}`))))
         : null
     );
   });

@@ -10,7 +10,7 @@
      桌機：一般 36px、緊湊 28px；手機（窄螢幕或觸控）全部 44px 以上，維持好按 */
   --ctl-h: 36px;
   --ctl-h-sm: 28px;
-  --ctl-h-go: 44px;          /* 整列的主要大按鈕（採集、製作…），全站只有少數幾處 */
+  --ctl-h-go: 36px;          /* 整列的主要大按鈕（採集、製作…）：和一般按鈕同高，靠寬度與 Primary 底色突顯 */
   --ctl-px: 14px;
   --ctl-px-sm: 10px;
   --radius-ctl: 4px;         /* 按鈕、輸入框 */
@@ -50,6 +50,6 @@
   :root {
     --ctl-h: 44px;
     --ctl-h-sm: 44px;
-    --ctl-h-go: 48px;
+    --ctl-h-go: 44px;
   }
 }

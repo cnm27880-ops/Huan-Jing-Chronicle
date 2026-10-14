@@ -34,8 +34,11 @@ test('按鈕與輸入框的外觀、高度只能寫在 base.css；其他檔案�
 });
 
 test('base.css 的按鈕高度只用 tokens.css 的變數（不寫死 px），手機放大也由 tokens.css 的媒體查詢處理', () => {
-  const base = read('base.css');
-  const bad = [...base.matchAll(/(min-height|height)\s*:\s*(\d+px)/g)].map((m) => m[0]);
+  const bad = [];
+  for (const m of read('base.css').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!/\.(btn|field|sheet__close|dossier__close|amount__(step|chip|input))/.test(m[1])) continue; // 只管按鈕與輸入框
+    for (const d of m[2].matchAll(/(min-height|height)\s*:\s*(\d+px)/g)) bad.push(`${m[1].trim()}: ${d[0]}`);
+  }
   assert.deepEqual(bad, []);
   const tokens = read('tokens.css');
   assert.match(tokens, /--ctl-h:\s*36px/);

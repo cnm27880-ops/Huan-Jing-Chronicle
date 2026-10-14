@@ -263,11 +263,11 @@ export function createMarketView({ root, getState, commit }) {
     root.replaceChildren(
       h('div', { class: 'mk-root' },
         hud(state),
-        h('div', { class: 'rest-tabs mk-tabs', role: 'tablist', 'aria-label': '交易' },
+        h('div', { class: 'tabs-line', role: 'tablist', 'aria-label': '交易' },
           tabs.map(([id, label]) => h('button', {
-            type: 'button', role: 'tab', class: 'rest-tab', 'aria-selected': String(ui.tab === id),
+            type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.tab === id),
             onclick: () => { ui.tab = id; render(); },
-          }, h('span', { class: 'rest-tab__name', text: label })))),
+          }, h('span', { text: label })))),
         h('div', { class: 'mk-grid' }, pane)));
     root.scrollTop = scrollY;
   }

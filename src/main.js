@@ -215,7 +215,10 @@ async function init() {
       }
       if (token !== showToken) return; // 載入的時候玩家已經切到別頁
     }
-    view.render();
+    try { view.render(); } catch (e) { // 畫面程式出錯：顯示說明，不要永遠停在「載入中…」
+      console.error(e);
+      root.replaceChildren(h('div', { class: 'view-loading', role: 'alert' }, h('p', { text: '這一頁顯示時發生錯誤，請重新整理頁面；如果一直出現，請回報給 GM。' })));
+    }
     applyWait();
   }
   // 登入後伺服器沒有角色、這台裝置也只有示範角色：非地圖頁改顯示「等 GM 匯入」（GM 自己不擋，要用 GM 工具）

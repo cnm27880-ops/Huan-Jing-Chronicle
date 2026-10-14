@@ -27,9 +27,9 @@ export const teammates = () => {
 
 /**
  * 贈送／交易：背包頁的唯一入口，上方三個分頁——
- *   🎁 贈送：對方不用同意
- *   🤝 交易：對方拿指定的東西（物品與／或金幣）來換，可接受或拒絕
- *   📥 待回覆：別人向我提出的交易單（接受／拒絕）與我發出的（取消），清單在 src/ui/playerTrade.js
+ *   贈送：對方不用同意
+ *   交易：對方拿指定的東西（物品與／或金幣）來換，可接受或拒絕
+ *   待回覆：別人向我提出的交易單（接受／拒絕）與我發出的（取消），清單在 src/ui/playerTrade.js
  * mode 決定一開始停在哪個。東西（與金幣）先從自己的背包扣，寄失敗會還回來。
  */
 export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
@@ -66,7 +66,7 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
     if (ui.mode === 'gift') {
       const gold = giveGold;
       if (!Object.keys(give).length && gold < 1 && !ui.pickedGear.size) return toast('先點選要送的東西（金幣、已鑑定裝備也在物品格裡）。');
-      return dispatch(sendBtn, '🎁 送出', give, gold, { kind: 'gift', items: give, ...(gold > 0 ? { gold } : {}) }, (state, who, gears) => {
+      return dispatch(sendBtn, '送出', give, gold, { kind: 'gift', items: give, ...(gold > 0 ? { gold } : {}) }, (state, who, gears) => {
         toast(`已送給 ${who}（對方不在線也會在上線時收到）。`);
         logActivity(state, { cat: 'item', text: `送給 ${who}：${itemsText(give, gold, gears)}`, lines: [] });
       });
@@ -83,17 +83,17 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
     if (!Object.keys(want).length && wantGold < 1) return toast('請填你要對方拿什麼來換（物品或金幣）。');
     const odd = Object.keys(want).filter((n) => !KNOWN.has(n));
     if (odd.length && !(await askConfirm(sendBtn, { title: `「${odd.join('、')}」不是已知的物品名稱`, lines: ['對方可能永遠湊不出來。仍要送出？'], okText: '仍要送出' }))) return undefined;
-    return dispatch(sendBtn, '🤝 送出交易單', give, giveGold, { kind: 'trade', give, giveGold, want, wantGold }, (state, who, gears) => {
-      toast(`交易單已送給 ${who}，等對方回覆（你押的東西隨時可以到「📥 待回覆」取消）。`);
+    return dispatch(sendBtn, '送出交易單', give, giveGold, { kind: 'trade', give, giveGold, want, wantGold }, (state, who, gears) => {
+      toast(`交易單已送給 ${who}，等對方回覆（你押的東西隨時可以到「待回覆」取消）。`);
       logActivity(state, { cat: 'item', text: `發起交易給 ${who}`, lines: [`給出：${itemsText(give, giveGold, gears)}`, `要換：${itemsText(want, wantGold)}`] });
       notifyTradeChange();
     });
   }
 
   function modeToggle(pending) {
-    const tabs = [['gift', '🎁 贈送'], ['trade', '🤝 交易'], ['inbox', `📥 待回覆${pending ? `（${pending}）` : ''}`]];
-    return h('div', { class: 'toggle-row', role: 'group', 'aria-label': '贈送或交易' }, tabs.map(([id, label]) => h('button', {
-      type: 'button', class: 'toggle', 'aria-pressed': String(ui.mode === id), disabled: ui.busy ? true : null,
+    const tabs = [['gift', '贈送'], ['trade', '交易'], ['inbox', `待回覆${pending ? `（${pending}）` : ''}`]];
+    return h('div', { class: 'tabs-line', role: 'tablist', 'aria-label': '贈送或交易' }, tabs.map(([id, label]) => h('button', {
+      type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.mode === id), disabled: ui.busy ? true : null,
       onclick: () => { ui.mode = id; sheet.refresh(); },
     }, label)));
   }
@@ -106,7 +106,7 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
       return h('div', { class: 'giftsheet' }, h('div', { class: 'gift-head' }, modeToggle(incomingCount())), createOffersView({ getState, commit }));
     }
     const trade = ui.mode === 'trade';
-    const idle = trade ? '🤝 送出交易單' : '🎁 送出';
+    const idle = trade ? '送出交易單' : '送出';
     const total = h('span', { class: 'gift-foot__n' });
     const clear = h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { ui.picked.clear(); ui.pickedGear.clear(); picker.refresh(); } }, '清除已選');
     const sendBtn = h('button', { type: 'button', class: 'btn btn--primary btn--go', onclick: () => send(sendBtn) }, idle);
@@ -146,7 +146,7 @@ export function openGiftSheet(getState, commit, { mode = 'gift' } = {}) {
           wantBox,
           h('datalist', { id: 'trade-known-items' }, [GOLD_NAME, ...KNOWN_ITEMS].map((n) => h('option', { value: n }))),
           h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { ui.wants.push({ name: '', qty: 1 }); renderWants(); } }, '＋ 再加一項物品'),
-          h('p', { class: 'hint', text: '你要給出的東西與金幣，送出時就先扣掉、押在交易單上。對方接受但東西或金幣不夠＝交易失敗，全部退回給你；對方拒絕或你取消也會退回。對方在「📥 待回覆」回覆。物品名稱要和背包裡的一模一樣。' }))
+          h('p', { class: 'hint', text: '你要給出的東西與金幣，送出時就先扣掉、押在交易單上。對方接受但東西或金幣不夠＝交易失敗，全部退回給你；對方拒絕或你取消也會退回。對方在「待回覆」回覆。物品名稱要和背包裡的一模一樣。' }))
         : null,
       h('div', { class: 'gift-foot' }, total, clear, sendBtn));
   }

@@ -66,86 +66,55 @@ body::before {
 @media (max-width: 700px) { .tab { padding: 6px 9px; } }
 
 /* ---------- 卡片：玻璃面板 ---------- */
-.card, .results, .showcase, .sheet__panel, .dossier, .map-hint {
+.sheet__panel,
+.dossier,
+.map-hint {
   background: var(--glass);
   border: 1px solid var(--glass-line);
   backdrop-filter: blur(14px) saturate(1.2);
   -webkit-backdrop-filter: blur(14px) saturate(1.2);
 }
-.card, .results {
-  border-radius: var(--r-card);
-  box-shadow: var(--glass-hi), 0 10px 30px rgba(var(--shadow-rgb), 0.35);
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
-}
-.card:hover, .results:hover { border-color: var(--glass-line-hi); box-shadow: var(--glass-hi), 0 14px 36px rgba(var(--shadow-rgb), 0.45); }
 .sheet__panel, .dossier { background: var(--glass-strong); }
 .sheet__panel { border-radius: 16px; box-shadow: var(--glass-hi), 0 24px 60px rgba(var(--shadow-rgb), 0.65); }
 .dossier { border-left-color: rgba(var(--gold-rgb), 0.22); box-shadow: -18px 0 48px rgba(var(--shadow-rgb), 0.6); }
 
-.section-title { position: relative; padding-bottom: 0.4rem; text-shadow: 0 0 14px rgba(var(--gold-rgb), 0.12); }
-.section-title::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(var(--gold-rgb), 0.5), rgba(var(--ink-rgb), 0.06) 45%, transparent);
-}
-.results .section-title { border-bottom: 0; }
 
 /* ---------- 狀態列／背包列：半透明玻璃 ---------- */
-.status, .bag-bar {
-  background: linear-gradient(180deg, rgba(var(--card-rgb), 0.85), rgba(var(--paper-rgb), 0.8));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--glass-line);
-}
-.status__who, .status__time, .status__prof, .status__num {
-  background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.06), rgba(var(--ink-rgb), 0.015));
-  border: 1px solid var(--glass-line);
-  border-radius: 10px;
-  box-shadow: var(--glass-hi);
-}
-.status__who:hover, .status__time:hover, .status__prof:hover, .status__num:hover {
-  background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.09), rgba(var(--ink-rgb), 0.03));
-  border-color: var(--glass-line-hi);
-}
-.status__time { flex-wrap: wrap; }
-.status__name, .status__prof > strong, .status__num strong { text-shadow: 0 0 12px rgba(var(--gold-rgb), 0.3); }
 .pip.is-on { background: linear-gradient(180deg, var(--gold), var(--gold)); box-shadow: 0 0 6px rgba(var(--gold-rgb), 0.55); }
 
 /* 「新的一天」二次確認：在同一格裡展開 */
 .day-confirm { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
 .day-confirm__ask { color: var(--rose); font-size: 0.74rem; font-weight: 700; }
-.status__day { border-radius: 999px; transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease; }
-.status__day:hover { box-shadow: var(--glow-gold); }
-.status__day--yes { color: var(--on-gold); background: linear-gradient(180deg, var(--gold), var(--gold)); border-color: var(--gold); font-weight: 700; }
-.status__day--no { color: var(--muted); border-color: var(--glass-line-hi); }
-.status__day--no:hover { color: var(--text); background: rgba(var(--ink-rgb), 0.08); }
 
 /* ---------- 可選卡片（行動、難度、技能、切換鈕） ---------- */
-.action-card, .diff, .skill-btn, .toggle, .potion, .move__pick, .chip, .amount__chip, .amount__step, .slot-add {
+.skill-btn,
+.toggle,
+.potion,
+.move__pick,
+.chip {
   background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.055), rgba(var(--ink-rgb), 0.015));
   border: 1px solid var(--glass-line);
   box-shadow: var(--glass-hi);
 }
-.action-card, .diff, .skill-btn, .toggle, .potion, .move__pick { border-radius: 10px; }
-.action-card:hover, .diff:hover, .skill-btn:hover, .toggle:hover, .potion:hover:not(:disabled), .move__pick:hover:not(:disabled),
-.chip:hover, .amount__chip:hover, .amount__step:hover, .slot-add:hover {
+.skill-btn,
+.toggle,
+.potion,
+.move__pick { border-radius: 10px; }
+.skill-btn:hover,
+.toggle:hover,
+.potion:hover:not(:disabled),
+.move__pick:hover:not(:disabled),
+.chip:hover {
   background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.09), rgba(var(--ink-rgb), 0.025));
   border-color: rgba(var(--gold-rgb), 0.35);
   box-shadow: var(--glass-hi), 0 8px 18px rgba(var(--shadow-rgb), 0.35), 0 0 12px rgba(var(--gold-rgb), 0.1);
 }
-.action-card[aria-checked='true'], .diff[aria-checked='true'], .toggle[aria-pressed='true'], .amount__chip[aria-pressed='true'],
+.toggle[aria-pressed='true'],
 .move[aria-current='true'] .move__pick {
   background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.16), rgba(var(--gold-rgb), 0.04));
   border-color: rgba(var(--gold-rgb), 0.6);
   box-shadow: var(--glass-hi), var(--glow-gold);
 }
-.action-card[aria-checked='true'] .action-card__icon { filter: drop-shadow(0 0 8px rgba(var(--gold-rgb), 0.6)); }
-.action-card__icon { transition: transform 0.2s ease; }
-.action-card:hover .action-card__icon { transform: scale(1.12) rotate(-4deg); }
 
 .tabs-seg { background: rgba(var(--shadow-rgb), 0.3); border: 1px solid var(--glass-line); border-radius: 11px; box-shadow: inset 0 2px 6px rgba(var(--shadow-rgb), 0.35); }
 .seg { border-radius: 8px; transition: color 0.18s ease, background 0.18s ease; }
@@ -156,51 +125,9 @@ body::before {
   box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.6), 0 4px 12px rgba(var(--gold-rgb), 0.25);
 }
 
-.mod { background: linear-gradient(90deg, rgba(var(--gold-rgb), 0.1), rgba(var(--ink-rgb), 0.02)); border: 1px solid rgba(var(--gold-rgb), 0.2); border-radius: 10px; }
 
 /* ---------- 物品格：像角色卡一樣，hover 浮起、依稀有度發光 ---------- */
-.tile, .showcase .tile {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(160deg, rgba(var(--ink-rgb), 0.07), rgba(var(--ink-rgb), 0.015) 60%), rgba(var(--card-rgb), 0.9);
-  border: 1px solid var(--glass-line);
-  border-left: 3px solid var(--t, var(--glass-line-hi));
-  border-radius: 10px;
-  box-shadow: var(--glass-hi), 0 3px 10px rgba(var(--shadow-rgb), 0.3);
-  transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-.tile::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse 60% 90% at 0% 50%, color-mix(in srgb, var(--t, transparent) 22%, transparent), transparent 70%);
-  opacity: 0.55;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-.tile > * { position: relative; }
-button.tile:hover {
-  transform: translateY(-3px);
-  border-color: color-mix(in srgb, var(--t, var(--gold)) 55%, transparent);
-  border-left-color: var(--t, var(--gold));
-  box-shadow: var(--glass-hi), var(--lift), 0 0 16px color-mix(in srgb, var(--t, var(--gold)) 30%, transparent);
-}
-button.tile:hover::before { opacity: 1; }
-.tile__icon { filter: drop-shadow(0 2px 4px rgba(var(--shadow-rgb), 0.5)); }
-.showcase { border-radius: var(--r-card); border-color: rgba(var(--gold-rgb), 0.3); box-shadow: var(--glass-hi), 0 0 24px rgba(var(--gold-rgb), 0.06); }
 
-.bag-group__head { border-bottom: 0; position: relative; padding-bottom: 0.35rem; }
-.bag-group__head::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(var(--gold-rgb), 0.45), rgba(var(--ink-rgb), 0.06) 40%, transparent);
-}
-.bag-group__head::after { transition: transform 0.2s ease; }
-.bag-group__head:hover { color: var(--gold); }
 
 /* ---------- 結果、紀錄、數值 ---------- */
 .result, .roll, .stat, .gear-slot, .identify, .owned, .monster {
@@ -213,7 +140,6 @@ button.tile:hover::before { opacity: 1; }
 .result__big, .roll__big { text-shadow: 0 0 16px rgba(var(--gold-rgb), 0.35); }
 .bar { border-radius: 999px; background: rgba(var(--shadow-rgb), 0.45); box-shadow: inset 0 2px 4px rgba(var(--shadow-rgb), 0.5); }
 .bar__fill { box-shadow: 0 0 10px rgba(var(--sky-rgb), 0.45), inset 0 1px 0 rgba(var(--ink-rgb), 0.25); }
-.badge, .info-chip { box-shadow: var(--glass-hi); }
 
 /* ---------- 地圖 ---------- */
 .map-viewport { border: 1px solid var(--glass-line-hi); border-radius: 12px; box-shadow: 0 16px 40px rgba(var(--shadow-rgb), 0.55); }
@@ -245,6 +171,3 @@ button.tile:hover::before { opacity: 1; }
 .cover__title { text-shadow: 0 0 30px rgba(var(--gold-rgb), 0.35), 0 4px 12px rgba(var(--shadow-rgb), 0.7); }
 .cover__btn { padding: 0.7rem 1.2rem; font-size: 1rem; }
 
-@media (prefers-reduced-motion: reduce) {
-  button.tile:hover { transform: none; }
-}

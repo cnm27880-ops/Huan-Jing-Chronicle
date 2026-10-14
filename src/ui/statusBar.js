@@ -186,7 +186,7 @@ export function statusBar(state, commit, ctx = 'rest') {
           h('span', { class: 'hud-box__label', text: ctx === 'rest' ? '修整熟練' : '跑團熟練' }),
           h('strong', { class: 'hud-box__value num', text: `+${prof.total}` })),
         h('span', { class: 'mini-slots' },
-          h('button', { type: 'button', class: 'mini-slot mini-slot--menu', title: '編輯菜單', 'aria-label': '編輯菜單', onclick: () => openMenuSheet(state, commit) }, '📋'),
+          h('button', { type: 'button', class: 'mini-slot mini-slot--menu', title: '編輯菜單', 'aria-label': '編輯菜單', onclick: () => openMenuSheet(state, commit) }, '菜單'),
           slots,
           ctx === 'rest' && restQueue(state).length
             ? h('button', { type: 'button', class: 'mini-slot mini-slot--queue', title: '等候中的料理，點一下管理', onclick: () => openFoodSheet(state, ctx, commit) },

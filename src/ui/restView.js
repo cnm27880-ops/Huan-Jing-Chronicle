@@ -29,7 +29,6 @@ import { askConfirm } from './confirmPop.js';
 import { skillTile, skillInfoBlock, skillTag } from './skillTile.js';
 import { skillPicksBlock } from './skillPicks.js';
 
-const ICONS = { 採藥: '🌿', 狩獵: '🏹', 挖礦: '⛏️', 釣魚: '🎣', 調劑: '⚗️', 烹飪: '🍳', 鑄造: '🔨', 書寫: '✍️' };
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function createRestView({ root, getState, commit }) {
@@ -86,14 +85,13 @@ export function createRestView({ root, getState, commit }) {
           h('span', { class: 'keepsake__check', 'aria-hidden': 'true', text: ui.keepsakes.has(n) ? '✓' : '' })))));
   }
 
-  /** 行動卡：圖示、名稱、技能等級、目前加值 */
+  /** 行動選項：名稱、技能等級、目前加值 */
   function actionCards(state, list, current, onPick) {
     return h('div', { class: 'action-cards', role: 'radiogroup' },
       list.map((a) => h('button', {
         type: 'button', class: 'action-card', role: 'radio', 'aria-checked': String(a === current),
         onclick: () => onPick(a),
       },
-      h('span', { class: 'action-card__icon', 'aria-hidden': 'true', text: ICONS[a] }),
       h('span', { class: 'action-card__name', text: a }),
       h('span', { class: 'action-card__sub', text: `技能 ${state.lifeSkills[a] ?? 0}` }),
       h('span', { class: 'action-card__mod num', text: `+${modifier(state, a, 'rest').total}` }))));
@@ -124,7 +122,7 @@ export function createRestView({ root, getState, commit }) {
       ...(max <= 0
         ? [h('p', { class: 'notice notice--bad', text: '今天的時間用完了。點上方的「新的一天」恢復 10 點。' })]
         : runBlock(state, a, {
-            kctx: { kind: 'gather' }, label: `${ICONS[a]} ${a} ${ui.times} 次`, hint: `每次 1 點時間，今天還剩 ${max} 點`, max, quick: [1, 3, 5],
+            kctx: { kind: 'gather' }, label: `${a} ${ui.times} 次`, hint: `每次 1 點時間，今天還剩 ${max} 點`, max, quick: [1, 3, 5],
             onRun: () => blockedByDraw() || pushResult({ kind: 'gather', action: a, ...gather(state, a, ui.times, [...ui.keepsakes]) }),
           })),
     ];
@@ -158,7 +156,7 @@ export function createRestView({ root, getState, commit }) {
       ...(max <= 0
         ? [h('p', { class: 'notice notice--bad', text: `${recipe.cost}不足 ${CRAFT_COST_AMOUNT} 個，先去採集吧。` })]
         : runBlock(state, a, {
-            kctx: { kind: 'craft', diff: d }, label: `${ICONS[a]} ${a}（${d}）${ui.times} 次`, hint: '製作不消耗時間', max, quick: [1, 5, 10],
+            kctx: { kind: 'craft', diff: d }, label: `${a}（${d}）${ui.times} 次`, hint: '製作不消耗時間', max, quick: [1, 5, 10],
             onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: a, diff: d, ...craft(state, a, d, ui.times, [...ui.keepsakes]) }),
           })),
     ];
@@ -179,7 +177,7 @@ export function createRestView({ root, getState, commit }) {
     const tone = gatherKind ? 'tier' : ok > 0 ? 'ok' : 'fail';
     return h('li', { class: 'rres', dataset: { tone, tier: gatherKind ? best : 'none' } },
       h('div', { class: 'rres__head' },
-        h('strong', { class: 'rres__title', text: gatherKind ? `${ICONS[r.action]} ${r.action} ×${r.rolls.length}` : `${ICONS[r.action]} ${r.action}（${r.diff}）×${r.rolls.length}` }),
+        h('strong', { class: 'rres__title', text: gatherKind ? `${r.action} ×${r.rolls.length}` : `${r.action}（${r.diff}）×${r.rolls.length}` }),
         h('span', { class: 'rres__badge', dataset: { tone } , text: gatherKind ? `經驗 +${fmt(r.exp)}` : `成功 ${ok} / ${r.rolls.length}` })),
       gatherKind && best >= 3 ? h('p', { class: 'rres__flash', text: `擲出${TIERS[best]}！` }) : null,
       h('div', { class: 'dice-faces' },
@@ -264,7 +262,7 @@ export function createRestView({ root, getState, commit }) {
           plan.gate && plan.gate.need > 0 ? costRow('累計花費經驗（門檻）', plan.gate.need, plan.gate.have) : null,
           costRow('經驗', plan.exp, plan.haveExp),
           Object.entries(plan.books).map(([n, q]) => costRow(`${iconOf(n)} ${n}`, q, getState().inventory[n] ?? 0)),
-          Object.entries(plan.fodder).map(([n, q]) => costRow(`♻️ ${n}（肥料，抵 ${INSIGHT_TIERS[n] ?? SKILL_TABLE[n].tier}技能書）`, q, getState().inventory[n] ?? 0))),
+          Object.entries(plan.fodder).map(([n, q]) => costRow(`${n}（肥料，抵 ${INSIGHT_TIERS[n] ?? SKILL_TABLE[n].tier}技能書）`, q, getState().inventory[n] ?? 0))),
         swapAt.length ? h('p', { class: 'hint', text: `會在 ${swapAt.join('、')} 級自動對調「${FOOL_SWAPS[name][0]}」與「${FOOL_SWAPS[name][1]}」。` }) : null,
         h('button', {
           type: 'button', class: 'btn btn--primary btn--go', disabled: plan.ok ? null : true, onclick: (e) => doUpgrade(plan, e.currentTarget),
@@ -364,7 +362,7 @@ export function createRestView({ root, getState, commit }) {
     const list = bookProgressList(state).filter((p) => p.status !== 'learned');
     if (!list.length) return null;
     return h('details', { class: 'add-box', open: ui.keepOpen, ontoggle: (e) => { ui.keepOpen = e.target.open; } },
-      h('summary', { text: `📌 技能書保留名單（${fmt(list.length)}）` }),
+      h('summary', { text: `技能書保留名單（${fmt(list.length)}）` }),
       h('p', { class: 'hint', text: '升級時，通用技能書不夠的話，會先用肥料書抵（1 比 1、同階）：先用已學會技能的多餘書，再用「湊滿 3 本、沒保留」的書，最後才用「沒湊滿 3 本、沒保留」的書。打算學的技能請按成保留。' }),
       h('div', { class: 'draw-progress__list' }, list.map((p) => {
         const kept = isKeptBook(state, p.name);
@@ -374,7 +372,7 @@ export function createRestView({ root, getState, commit }) {
           type: 'button', class: 'chip', 'aria-pressed': String(kept),
           title: kept ? '保留中：不會被當肥料' : late ? '還沒湊滿 3 本：最後才會被當肥料（點一下改成保留）' : '會被當肥料（點一下改成保留）',
           onclick: () => { toggleKeepBook(getState(), p.name); commit(); },
-        }, `${kept ? '📌 ' : fodder ? '♻️ ' : ''}${p.name} ${p.have}/${p.need}`);
+        }, `${kept ? '保留・' : fodder ? '肥料・' : ''}${p.name} ${p.have}/${p.need}`);
       })));
   }
 
@@ -493,7 +491,7 @@ export function createRestView({ root, getState, commit }) {
       ...(max <= 0
         ? [h('p', { class: 'notice notice--bad', text: `${name}的材料不足，先去取材料或採集。` })]
         : runBlock(state, r.skill, {
-            kctx: { kind: 'special' }, label: `${ICONS[r.skill]} ${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 5, 10],
+            kctx: { kind: 'special' }, label: `${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 5, 10],
             onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSpecial(state, name, ui.times, [...ui.keepsakes]) }),
           })),
     ];
@@ -503,10 +501,10 @@ export function createRestView({ root, getState, commit }) {
 
   // ---------- 組合 ----------
   const TABS = [
-    ['gather', '採集', '🌿', '花時間'],
-    ['craft', '製作', '🔨', '不花時間'],
-    ['learn', '學習', '📖', '花經驗'],
-    ['special', '特殊', '🧪', '配方與材料'],
+    ['gather', '採集', '花時間'],
+    ['craft', '製作', '不花時間'],
+    ['learn', '學習', '花經驗'],
+    ['special', '特殊', '配方與材料'],
   ];
 
   function render() {
@@ -518,14 +516,13 @@ export function createRestView({ root, getState, commit }) {
     root.replaceChildren(
       h('div', { class: 'rest-root' },
         statusBar(state, commit, 'rest'),
-        h('div', { class: 'rest-tabs', role: 'tablist', 'aria-label': '修整日行動' },
-          TABS.map(([id, label, icon, sub]) => h('button', {
-            type: 'button', role: 'tab', class: 'rest-tab', 'aria-selected': String(ui.tab === id),
+        h('div', { class: 'tabs-line', role: 'tablist', 'aria-label': '修整日行動' },
+          TABS.map(([id, label, sub]) => h('button', {
+            type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.tab === id),
             onclick: () => { ui.tab = id; ui.times = 1; render(); },
           },
-          h('span', { class: 'rest-tab__icon', 'aria-hidden': 'true', text: icon }),
-          h('span', { class: 'rest-tab__name', text: label }),
-          h('small', { class: 'rest-tab__sub', text: sub })))),
+          h('span', { text: label }),
+          h('small', { class: 'tabs-line__sub', text: sub })))),
         h('div', { class: 'rest-grid' },
           h('div', { class: 'rest-main' }, panel),
           h('section', { class: 'card rest-results', 'aria-live': 'polite' },

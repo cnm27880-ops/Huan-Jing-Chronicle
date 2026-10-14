@@ -24,9 +24,6 @@
 .chip:hover { border-color: var(--line-focus); color: var(--text); }
 .chip[aria-checked='true'] { color: var(--on-gold); background: var(--gold); border-color: var(--gold); font-weight: 700; }
 
-.badge { display: inline-block; padding: .08rem .5rem; border-radius: 999px; font-size: .68rem; white-space: nowrap; color: var(--muted); background: var(--input); border: 1px solid var(--line); }
-.badge[data-tone='good'] { color: var(--green); border-color: rgba(var(--sky-rgb), .5); }
-.badge[data-tone='bad'] { color: var(--rose); border-color: rgba(var(--rose-rgb), .55); }
 
 .notice--bad { color: var(--rose); border-color: rgba(var(--rose-rgb), .5); background: rgba(var(--rose-rgb), .07); margin-top: .5rem; }
 .battle-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
@@ -114,7 +111,6 @@
 .hp-adjust .field-label { margin: 0; flex: none; }
 .hp-adjust .field { width: 84px; flex: none; }
 .chip-row--info { align-items: center; }
-.info-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .6rem; font-size: .78rem; color: var(--muted); background: var(--input); border: 1px solid var(--line); border-radius: 999px; }
 .info-chip.is-bad { color: var(--rose); border-color: rgba(var(--rose-rgb), .55); }
 .info-chip.is-good { color: var(--green); border-color: rgba(var(--sky-rgb), .5); }
 .info-chip__btn { width: 22px; height: 22px; padding: 0; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: 50%; cursor: pointer; }
