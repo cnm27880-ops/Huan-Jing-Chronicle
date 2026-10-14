@@ -48,8 +48,21 @@ export function createCharSync({
   const online = () => getRoomStatus().phase === 'online';
   let wasOnline = online();
   const myUid = () => getRoomStatus().me?.uid ?? null;
-  // 一次只做一件事；失敗只提示，不讓後面的同步卡死
-  const run = (fn) => { chain = chain.then(fn).catch(() => notify('角色存檔同步失敗，會在下次連線時再試。')); return chain; };
+
+  // 失敗後自動重試：5 秒、15 秒、之後每 60 秒一次，直到成功（或斷線，改由重連時的比對處理）。同一次中斷只提示一次。
+  const RETRY_MS = [5000, 15_000, 60_000];
+  let retryTimer = null;
+  let retryCount = 0;
+  let failNotified = false;
+  const resetRetry = () => { clearTimeout(retryTimer); retryTimer = null; retryCount = 0; failNotified = false; };
+  function failed() {
+    if (!failNotified) { failNotified = true; notify('角色存檔同步失敗，修改已先存在這台裝置，會自動重試。'); }
+    if (!online()) return; // 已經斷線：重連時會重新比對，不用另外排重試
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => { retryTimer = null; run(syncAfterConnect); }, RETRY_MS[Math.min(retryCount++, RETRY_MS.length - 1)]);
+  }
+  // 一次只做一件事；失敗只提示並排重試，不讓後面的同步卡死
+  const run = (fn) => { chain = chain.then(async () => { await fn(); if (online()) resetRetry(); }).catch(failed); return chain; };
 
   async function push(base) {
     const sent = gen;
@@ -66,6 +79,11 @@ export function createCharSync({
   async function resolveConflict() {
     const res = await request({ t: 'charGet' });
     if (res.data === null) return push(0);
+    // 內容其實一樣（例如上一次上傳成功、只是回應遺失，這次重試才發現版本對不上）：不用問，直接對齊版本
+    if (JSON.stringify(res.data) === JSON.stringify(getState())) {
+      writeMeta({ uid: myUid(), version: res.version, dirty: false });
+      return undefined;
+    }
     const useServer = await confirmFn(
       `伺服器上已有你的角色存檔（第 ${res.version} 版，${when(res.updatedAt)} 更新）。\n\n`
       + '選「使用伺服器的存檔」：這台裝置目前的存檔會被取代。\n'
@@ -111,6 +129,9 @@ export function createCharSync({
     let meta = readMeta();
     if (meta.uid !== null && meta.uid !== myUid()) meta = switchAccount(meta, myUid()); // 這台裝置換了帳號：舊存檔收起來，不能傳給新帳號
     const res = await request({ t: 'charGet' });
+    // 等回應的這段時間（最多 6 秒）玩家可能又改了、或剛領到信並套用到角色（都會經過 markDirty 寫下 dirty）：
+    // 要用「現在」的存檔狀態判斷，不能用請求前讀到的舊值，否則會把這些新修改當成不存在而被伺服器版蓋掉。
+    meta = readMeta();
     if (res.data === null) {
       if (meta.waiting || !hasLocalSave()) { // 本機只有示範角色：不上傳，等 GM 匯入
         if (!meta.waiting) notify('伺服器還沒有你的角色，請 GM 匯入；匯入後會自動套用。這台裝置的示範角色不會上傳。');
@@ -149,14 +170,29 @@ export function createCharSync({
     }), DEBOUNCE_MS);
   }
 
+  // 斷線／重連的提示：只在「已加入房間後又斷線」（phase 變成 reconnecting）提示一次；登出或本來就沒連上不提示。
+  // 重連後比對完成才說「已同步」，比對失敗就等重試成功再說。
+  let outage = false;
+  async function syncAfterConnect() {
+    const editedOffline = readMeta().dirty;
+    await reconcile();
+    if (outage && online()) {
+      outage = false;
+      notify(editedOffline && !readMeta().dirty ? '已重新連線，離線期間的修改已同步到伺服器。' : '已重新連線。');
+    }
+  }
   subscribeRoom(() => {
     const now = online();
-    if (now && !wasOnline) run(reconcile);
+    if (now && !wasOnline) run(syncAfterConnect);
+    if (!now && wasOnline) {
+      resetRetry(); // 斷線：之前排的重試作廢，重連時會重新比對
+      if (getRoomStatus().phase === 'reconnecting') { outage = true; notify('連線中斷，已切換成離線模式：修改會先存在這台裝置，連上後自動同步。'); }
+    }
     wasOnline = now;
   });
   // 等 GM 匯入的玩家：GM 一匯入，紀錄裡會出現指向自己的異動事件 → 立刻重新比對並採用，不用重新整理
   room.subscribe?.((ev) => { if (ev?.kind === 'audit' && ev.target && ev.target === myUid() && readMeta().waiting && online()) run(reconcile); });
-  if (wasOnline) run(reconcile); // 建立時已經在房間裡（通常是測試或重新建立）
+  if (wasOnline) run(syncAfterConnect); // 建立時已經在房間裡（通常是測試或重新建立）
   document.addEventListener('visibilitychange', () => { // 切到背景前盡快上傳，避免關掉分頁漏存
     if (document.visibilityState === 'hidden' && online() && readMeta().dirty && !readMeta().waiting) { clearTimeout(timer); run(() => push(readMeta().version)); }
   });
@@ -164,6 +200,20 @@ export function createCharSync({
   return {
     /** 這台裝置正在等 GM 匯入角色（伺服器沒有存檔、本機只有示範角色） */
     isWaiting: () => readMeta().waiting,
+    /**
+     * 目前的同步狀態（給畫面顯示用，之後 UI 改版可以直接用）：
+     * 'local' 沒登入／沒進房間（只存本機）｜'connecting' 連線中｜'offline' 斷線中（修改先存本機）｜
+     * 'waiting' 等 GM 匯入｜'pending' 在線但有修改還沒上傳｜'synced' 已同步
+     */
+    getSyncStatus() {
+      const phase = getRoomStatus().phase;
+      if (phase === 'reconnecting') return 'offline';
+      if (phase === 'connecting') return 'connecting';
+      if (phase !== 'online') return 'local';
+      const meta = readMeta();
+      if (meta.waiting) return 'waiting';
+      return meta.dirty ? 'pending' : 'synced';
+    },
     /** 等目前排隊中的同步工作（連線後比對、上傳）都做完 */
     idle: () => chain,
     /**

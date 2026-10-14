@@ -32,7 +32,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/market.js` | 交易：交易大廳（每日原價 5 個）、黑市（擲骰溢價／壓價、勞動抵債、代金券換金幣）、特殊黑市（黑市團只有 GM 能開，房間同步：`syncBlackSession`；伺服器 `room-core.js` 的 `onBlackMarket`；50 個）（純函式） |
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
 | `src/game/mail.js` | 送東西與餵藥（純函式）：打包扣背包（已鑑定裝備整件送：`takeGear`／`refundGear`／`receiveGear`，收到換新編號，鑲的寶石跟著走；交易單的裝備只放「我給出」這邊，欄位 `giveGear`；伺服器 `parseGear` 只留已知欄位、一次最多 10 件）、收到時套用（禮物進背包、藥水回復＋毒性算收件人、毒性滿了退回） |
-| `src/state/mailbox.js` | 信箱：收到伺服器的信 → 領取（只有第一個分頁拿得到）→ 套用到自己的角色 → 存檔 → 跳通知；不在線寄來的上線才收到 |
+| `src/state/mailbox.js` | 信箱：收到伺服器的信 → **等角色存檔比對完成（`ready`＝`sync.idle`）** → 領取（只有第一個分頁拿得到）→ 套用到自己的角色 → 存檔 → 跳通知；不在線寄來的上線才收到。不能在比對前領信：領了就刪，之後比對採用伺服器版會把東西蓋掉 |
 | `src/ui/mailNotice.js` | 「收到的東西」通知面板（右下角浮動，不需同意） |
 | `src/ui/holdRepeat.js` | 長按連加／連減（按住＋／－會越按越快；`onEnd` 放開才重畫）：送東西數量用（鬥氣加骰已改成直接輸入數字） |
 | `src/ui/itemPicker.js` | 背包物品挑選器（分類鈕＋格狀物品，沒有搜尋欄；金幣是其中一格；點一下選取、長按調數量）：贈送與交易共用 |
@@ -65,8 +65,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/api/auth.js` | 前端登入 API：查詢登入者、登出；任何失敗都當未登入（維持單機試玩） |
 | `src/ui/userChip.js` | 頂部列的登入者頭像與登出 |
 | `src/state/rollLog.js` | 擲骰紀錄，**畫面與房間之間唯一的接線點**：房間模式走 WebSocket、伺服器擲骰；本機模式（沒登入／連不上）照舊存 localStorage |
-| `src/state/vitals.js` | 隊友狀態回報：存檔後 0.6 秒比對，生命／資源／毒性／護盾有變才送給房間；等 GM 匯入期間不送 |
-| `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；全新裝置且伺服器沒有存檔時不上傳示範角色（標記等待，GM 匯入後自動採用，畫面在 `src/ui/waitNotice.js`，新玩家也可以在那裡自己建立空白角色）；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔 |
+| `src/state/vitals.js` | 隊友狀態回報：存檔後 0.6 秒比對，生命／資源／毒性／護盾有變才送給房間；等 GM 匯入期間不送；連上房間後等角色比對完（`ready`＝`sync.idle`）才送；每則帶遞增的 `seq`，伺服器（`room-core.js` 的 `onVitals`）遇到比已存的舊就忽略，兩台裝置不會互蓋 |
+| `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；全新裝置且伺服器沒有存檔時不上傳示範角色（標記等待，GM 匯入後自動採用，畫面在 `src/ui/waitNotice.js`，新玩家也可以在那裡自己建立空白角色）；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔。**比對（`reconcile`）等回應的期間玩家可能又改了，回應回來要重讀存檔標記，不能用請求前的舊值**；內容相同的「兩份存檔」靜默對齊；上傳失敗 5／15／60 秒自動重試；斷線／重連各提示一次；`getSyncStatus()` 給畫面用（local／connecting／offline／waiting／pending／synced） |
 | `src/game/importBot.js` | 機器人存檔（players_data.json 的一位玩家）→ 網站角色（純函式）：只填機器人有的欄位，技能與基礎數值空白；可合併進既有角色 |
 | `src/ui/botImport.js` | GM 專用的「匯入機器人存檔」面板（在跑團頁的房間區塊）：檔案只在瀏覽器讀取轉換，轉好才送伺服器（`charImport`）；`players_data.json` 永遠不能進 git |
 | `src/data/skills.js` | 技能目錄（**自動產生，不要手改**；試算表沒有的個人專屬技能放 `tools/extra-skills.json`）：119 個技能、每級累積數值、位階／類型／系別／效果文字、升級經驗表。由 `tools/extract-skills.py` 從 GM 的自動角色卡產生 |

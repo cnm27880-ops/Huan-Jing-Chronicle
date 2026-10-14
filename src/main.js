@@ -125,11 +125,11 @@ async function init() {
       vitals?.changed();
     },
   });
-  vitals = createVitalsReporter({ getState, skip: () => sync.isWaiting() }); // 等 GM 匯入期間不回報示範角色
+  vitals = createVitalsReporter({ getState, skip: () => sync.isWaiting(), ready: () => sync.idle() }); // 等 GM 匯入期間不回報示範角色；連上房間後等角色比對完才回報（免得送出放了很久的舊血量）
 
   mountNudges({ getState, commit }); // 戰鬥提醒：隊友倒地、危急、全隊吃緊時跳出（GM 不顯示）
   createShadowWatcher({ getState, commit }); // 暗影斗篷：遭遇戰換回合時，隱身中自動聚集
-  createMailbox({ getState, commit }); // 別人送的東西、餵的藥：領取後直接放進自己的角色
+  createMailbox({ getState, commit, ready: () => sync.idle() }); // 別人送的東西、餵的藥：等角色比對完才領取，再直接放進自己的角色
 
   // GM 不用示範角色：連上房間後，如果 GM 的角色看起來還是示範角色（名字相同、或還在等匯入），**先問**要不要換成空白角色（名字用 Discord 名稱）。
   // 注意：示範角色就是照某位玩家的角色做的，名字會一樣——所以只用名字判斷不夠準，一定要讓人確認（2026/10/10 出過事：玩家自己的角色被誤換掉）。

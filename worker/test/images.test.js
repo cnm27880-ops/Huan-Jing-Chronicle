@@ -93,6 +93,38 @@ test('隊友狀態：回報後廣播給所有人、hello 也有；不合法的�
   assert.equal(core.vitalsView()['300'].downed, true);
 });
 
+test('隊友狀態 seq：比已存的舊就忽略（兩台裝置不會互蓋）；相同或更新就收；沒帶 seq 的舊前端照常；超前太多會被壓回', () => {
+  const core = room();
+  const vit = (hp, seq) => ({ t: 'vitals', v: { name: '福德', hp, maxHp: 300, downed: false, ...(seq === undefined ? {} : { seq }) } });
+  const hpOf = () => core.vitalsView()['300'].hp;
+
+  const first = find(send(core, P1, vit(100, 5000)), 'vitals');
+  assert.equal(first.msg.v.seq, 5000); // seq 跟著廣播
+  assert.equal(hpOf(), 100);
+
+  const stale = send(core, P1, vit(999, 4000)); // 另一台放了很久的裝置，回報舊狀態
+  assert.deepEqual(stale.out, []); // 靜默忽略：不廣播、不報錯（對方不需要知道）
+  assert.equal(hpOf(), 100);
+
+  send(core, P1, vit(80, 5000)); // 相同 seq：收（重送不能被擋）
+  assert.equal(hpOf(), 80);
+  send(core, P1, vit(60, 6000));
+  assert.equal(hpOf(), 60);
+
+  send(core, P1, vit(40)); // 沒帶 seq（還沒更新的前端）：照舊直接收
+  assert.equal(hpOf(), 40);
+  assert.equal(core.vitalsView()['300'].seq, undefined);
+
+  const far = find(send(core, P1, vit(30, 9_000_000_000_000)), 'vitals'); // 時鐘錯亂的裝置不能把後面全部擋掉
+  assert.ok(far.msg.v.seq < 2_000_000, `seq 要被壓回「現在 + 60 秒」以內，實際 ${far.msg.v.seq}`);
+  const real = send(core, P1, vit(20, far.msg.v.seq + 1));
+  assert.equal(hpOf(), 20);
+  assert.ok(find(real, 'vitals'));
+
+  assert.equal(errorOf(send(core, P1, vit(10, 1.5)))?.code, undefined); // seq 格式錯誤＝當作沒帶
+  assert.equal(hpOf(), 10);
+});
+
 // ---------- 對外網址 /rooms/main/img/:id ----------
 const SITE = 'https://huan-jing.yuci8660.uk';
 const API = 'https://huan-jing-api.yuci8660.uk';

@@ -527,3 +527,153 @@ test('角色同步：等待中的新玩家自己建立空白角色 → 解除等
   assert.equal(hub.core.charRow('300').version, 2);
   stopAll(m);
 });
+
+// ---------- 階段 4：同步競態與離線降級 ----------
+const SYNC_KEY = 'huanjing:character:sync:v1';
+/** 包一層房間介面：before(msg) 可以在請求送出時做事（例如模擬「等待回應的期間玩家又改了」），override(msg) 可以讓請求失敗 */
+const wrapRoom = (m, { before, override } = {}) => ({ ...m, roomRequest: (msg) => { before?.(msg); return override?.(msg) ?? m.roomRequest(msg); } });
+
+test('角色同步：重連比對的等待期間本機又改了（或剛領到信）→ 不會被伺服器版悄悄蓋掉，改問玩家', async () => {
+  resetHub(); store.clear();
+  hub.core.onCharPut(P1, { base: 0, data: { name: '角色', hp: 1 } });
+  hub.core.onCharPut(P1, { base: 1, data: { name: '角色', hp: 2 } }); // 伺服器第 2 版
+  store.set(SYNC_KEY, JSON.stringify({ uid: '300', version: 1, dirty: false })); // 本機停在第 1 版、請求送出時沒有未上傳的修改 → 以前會直接採用伺服器版
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t5a');
+  const state = { name: '角色', hp: 1 };
+  let sync = null; let hooked = false; let adopted = null; let asked = 0;
+  const room = wrapRoom(m, { before: (msg) => { if (msg.t === 'charGet' && !hooked) { hooked = true; state.hp = 50; sync.markDirty(); } } }); // 等回應的期間：玩家改了、或信件套用了
+  sync = createCharSync({ getState: () => state, adopt: (d) => { adopted = d; }, hasLocalSave: () => true, confirmFn: () => { asked++; return false; }, room });
+  await flush();
+  assert.equal(adopted, null, '不能直接採用伺服器版，本機剛做的修改會消失');
+  assert.equal(asked, 1);
+  assert.equal(JSON.parse(hub.core.charRow('300').json).hp, 50); // 玩家選「用這台裝置」→ 修改保住
+  stopAll(m);
+});
+
+test('角色同步：版本相同、等待回應的期間本機又改了 → 「待上傳」標記不會被洗掉，之後照常上傳', async () => {
+  resetHub(); store.clear();
+  hub.core.onCharPut(P1, { base: 0, data: { name: '角色', hp: 1 } });
+  store.set(SYNC_KEY, JSON.stringify({ uid: '300', version: 1, dirty: false }));
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t5b');
+  const state = { name: '角色', hp: 1 };
+  let sync = null; let hooked = false;
+  const room = wrapRoom(m, { before: (msg) => { if (msg.t === 'charGet' && !hooked) { hooked = true; state.hp = 9; sync.markDirty(); } } });
+  sync = createCharSync({ getState: () => state, adopt: () => assert.fail('不該採用伺服器'), hasLocalSave: () => true, confirmFn: () => assert.fail('不該問'), room });
+  await flush();
+  mock.timers.tick(2000); await flush();
+  assert.equal(JSON.parse(hub.core.charRow('300').json).hp, 9, '修改要上傳到伺服器（以前標記被洗成 false，永遠不上傳）');
+  stopAll(m);
+});
+
+test('角色同步：兩邊內容其實一樣（上傳成功但回應遺失、重試時版本對不上）→ 靜默對齊版本，不跳「兩份存檔」詢問框', async () => {
+  resetHub(); store.clear();
+  hub.core.onCharPut(P1, { base: 0, data: { name: '角色', hp: 5 } }); // 伺服器已經收到了
+  store.set(SYNC_KEY, JSON.stringify({ uid: '300', version: 0, dirty: true })); // 本機以為還沒上傳成功
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t5c');
+  createCharSync({ getState: () => ({ name: '角色', hp: 5 }), adopt: () => assert.fail('內容相同，不用採用'), hasLocalSave: () => true, confirmFn: () => assert.fail('內容相同，不該問'), room: m });
+  await flush();
+  const meta = JSON.parse(store.get(SYNC_KEY));
+  assert.deepEqual([meta.uid, meta.version, meta.dirty, Boolean(meta.waiting)], ['300', 1, false, false]);
+  assert.equal(hub.core.charRow('300').version, 1); // 沒有多上傳一版
+  stopAll(m);
+});
+
+test('角色同步：上傳失敗（逾時）→ 5、15 秒後自動重試直到成功；同一次中斷只提示一次', async () => {
+  resetHub(); store.clear();
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t5d');
+  const state = { name: '角色', hp: 3 };
+  let fail = 0; const notes = [];
+  const room = wrapRoom(m, { override: (msg) => (msg.t === 'charPut' && fail > 0 ? (fail--, Promise.reject(new m.RollError('伺服器沒有回應，請再試一次。'))) : undefined) });
+  const sync = createCharSync({ getState: () => state, adopt: () => assert.fail('不該採用'), hasLocalSave: () => true, notify: (t) => notes.push(t), room });
+  await flush();
+  assert.equal(hub.core.charRow('300').version, 1);
+  fail = 2; state.hp = 2; sync.markDirty();
+  mock.timers.tick(1600); await flush(); // 第一次上傳失敗
+  assert.equal(notes.length, 1);
+  mock.timers.tick(4900); await flush();
+  assert.equal(hub.core.charRow('300').version, 1); // 還沒到 5 秒
+  mock.timers.tick(200); await flush(); // 5 秒：重試，又失敗
+  assert.equal(hub.core.charRow('300').version, 1);
+  mock.timers.tick(14_800); await flush();
+  assert.equal(hub.core.charRow('300').version, 1); // 還沒到 15 秒
+  mock.timers.tick(400); await flush(); // 15 秒：成功
+  assert.equal(hub.core.charRow('300').version, 2);
+  assert.equal(JSON.parse(hub.core.charRow('300').json).hp, 2);
+  assert.equal(JSON.parse(store.get(SYNC_KEY)).dirty, false);
+  assert.equal(notes.length, 1, '兩次失敗只該提示一次，不要連續跳');
+  stopAll(m);
+});
+
+test('角色同步：斷線提示一次、離線時的修改存本機，重連後自動同步並提示；getSyncStatus 反映目前狀態', async () => {
+  resetHub(); store.clear();
+  const m = await browser(P1);
+  const { createCharSync } = await import('../src/state/charSync.js?t5e');
+  const state = { name: '角色', hp: 3 };
+  const notes = [];
+  const sync = createCharSync({ getState: () => state, adopt: () => assert.fail('不該採用'), hasLocalSave: () => true, notify: (t) => notes.push(t), room: m });
+  await flush();
+  assert.equal(sync.getSyncStatus(), 'synced');
+  [...hub.sockets][0].kick(1006); await flush();
+  assert.equal(sync.getSyncStatus(), 'offline');
+  assert.equal(notes.length, 1);
+  assert.match(notes[0], /離線/);
+  state.hp = 2; sync.markDirty(); // 離線時照常操作，只存本機
+  assert.equal(sync.getSyncStatus(), 'offline');
+  mock.timers.tick(31_000); await flush(); // 重連
+  assert.equal(m.getRoomStatus().phase, 'online');
+  assert.equal(hub.core.charRow('300').version, 2);
+  assert.equal(sync.getSyncStatus(), 'synced');
+  assert.equal(notes.length, 2);
+  assert.match(notes[1], /已重新連線.*同步/);
+  state.hp = 1; sync.markDirty();
+  assert.equal(sync.getSyncStatus(), 'pending'); // 在線、有修改還沒上傳
+  stopAll(m);
+});
+
+test('隊友狀態：連上房間後要等角色比對完成才回報（不把放了很久的舊血量當成最新的）；每則帶遞增的 seq', async () => {
+  resetHub(); store.clear();
+  const m = await browser(P1);
+  const { createVitalsReporter } = await import('../src/state/vitals.js?v5');
+  const state = character(); state.hp = 40;
+  let release; const gate = new Promise((r) => { release = r; });
+  const reporter = createVitalsReporter({ getState: () => state, ready: () => gate, room: m });
+  await flush();
+  mock.timers.tick(700); await flush();
+  assert.equal(hub.core.vitalsView()['300'], undefined, '比對還沒完成，不該回報');
+  release(); await flush();
+  const first = hub.core.vitalsView()['300'];
+  assert.equal(first.hp, 40);
+  assert.ok(Number.isInteger(first.seq) && first.seq > 0);
+  state.hp = 30; reporter.changed(); mock.timers.tick(700); await flush();
+  state.hp = 20; reporter.changed(); mock.timers.tick(700); await flush();
+  const last = hub.core.vitalsView()['300'];
+  assert.equal(last.hp, 20);
+  assert.ok(last.seq > first.seq, 'seq 要遞增（同一毫秒內也一樣）');
+  stopAll(m);
+});
+
+test('信箱：角色比對（sync.idle）還沒完成時先不領信；完成後才領，套用到比對後的角色並存檔（領信與採用伺服器版不再互蓋）', async () => {
+  const { createMailbox } = await import('../src/state/mailbox.js?mb1');
+  const { countOf } = await import('../src/game/engine.js');
+  let listener = null; const claimed = [];
+  const room = {
+    setMailListener: (fn) => { listener = fn; },
+    claimMail: async (id) => { claimed.push(id); return { mail: { id, kind: 'gift', fromName: '小明', items: { 測試禮物: 2 } } }; },
+    sendMail: async () => ({}), notifyTradeChange() {},
+  };
+  let release; const gate = new Promise((r) => { release = r; });
+  let state = character(); let commits = 0;
+  createMailbox({ getState: () => state, commit: () => { commits++; }, ready: () => gate, room });
+  listener([{ id: 'm1', kind: 'gift' }]);
+  await flush();
+  assert.deepEqual(claimed, [], '比對還沒完成，不能領（領了就刪，之後被蓋掉就永遠消失）');
+  state = character(); state.name = '比對後的角色'; // 比對期間 adopt 換成伺服器版
+  release(); await flush();
+  assert.deepEqual(claimed, ['m1']);
+  assert.equal(commits, 1);
+  assert.equal(countOf(state, '測試禮物'), 2, '東西要放進比對後的角色');
+});
