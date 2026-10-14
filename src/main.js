@@ -2,17 +2,7 @@
 // 進入點：把資料層和各個 UI 模組接起來
 // ============================================================
 import { askConfirm } from './ui/confirmPop.js';
-import './styles/theme.css';
-import './styles/tokens.css';
-import './styles/layout.css';
-import './styles/map.css';
-import './styles/dossier.css';
-import './styles/pages.css';
-import './styles/redesign.css';
-import './styles/dice.css';
-import './styles/polish.css';
-import './styles/blackgold.css';
-import './styles/shadowfx.css';
+import './styles/index.js'; // 全站樣式（載入順序在那個檔案裡）
 
 import { getRegions, getMapLocations, getLocationDetail } from './api/lore.js';
 import { createMapView } from './ui/mapView.js';
@@ -225,7 +215,10 @@ async function init() {
       }
       if (token !== showToken) return; // 載入的時候玩家已經切到別頁
     }
-    view.render();
+    try { view.render(); } catch (e) { // 畫面程式出錯：顯示說明，不要永遠停在「載入中…」
+      console.error(e);
+      root.replaceChildren(h('div', { class: 'view-loading', role: 'alert' }, h('p', { text: '這一頁顯示時發生錯誤，請重新整理頁面；如果一直出現，請回報給 GM。' })));
+    }
     applyWait();
   }
   // 登入後伺服器沒有角色、這台裝置也只有示範角色：非地圖頁改顯示「等 GM 匯入」（GM 自己不擋，要用 GM 工具）

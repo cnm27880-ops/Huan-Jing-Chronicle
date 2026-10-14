@@ -1,0 +1,427 @@
+/* ============================================================
+   基礎元件（最後載入）：按鈕三級、輸入框、面板、去框列表、底線分頁。
+   尺寸、圓角、間距用 tokens.css 的變數；顏色用 theme.css 的變數；這裡不寫死任何數字色碼。
+   規格見 DESIGN.md「控制項」。
+
+   原則：
+   - 只有最外層的 .panel 有邊框；裡面的列表項目不要再加框，用留白與底部細線分隔（.list）。
+   - 按鈕只有三級（高度一致，並排時對齊）：
+       Primary   .btn--primary（整列大按鈕 .btn--go）：每個畫面 1～2 顆，列表每一列都有的動作不要用 Primary
+       Secondary .btn（預設）：一般操作
+       Ghost     .btn--ghost：取消、返回、切換、GM 輔助等低頻工具，沒有框也沒有底色，只有文字
+   - 手機（窄螢幕或觸控）所有控制項 44px 以上（--ctl-h 在 tokens.css 的媒體查詢裡變大）。
+   ============================================================ */
+
+/* ---------- 按鈕 ---------- */
+.btn,
+.sheet__close,
+.dossier__close,
+.amount__step,
+.amount__chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl-h);
+  padding: 0 var(--ctl-px);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  color: var(--ink2);
+  background: var(--ctl-bg);
+  border: 1px solid var(--ctl-line);
+  border-radius: var(--radius-ctl);
+  box-shadow: none;
+  text-shadow: none;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.btn:hover:not(:disabled),
+.sheet__close:hover,
+.dossier__close:hover,
+.amount__step:hover,
+.amount__chip:hover {
+  color: var(--gold);
+  border-color: var(--ctl-line-hi);
+}
+.btn:active:not(:disabled) { background: var(--ctl-primary-bg); }
+.btn:focus-visible,
+.sheet__close:focus-visible,
+.dossier__close:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+/* 緊湊 */
+.btn--small {
+  min-height: var(--ctl-h-sm);
+  padding: 0 var(--ctl-px-sm);
+  font-size: 0.85rem;
+}
+
+/* Primary：微暖暗金底＋古銅金框，是畫面上最明確的一顆 */
+.btn--primary,
+.btn--go {
+  color: var(--gold);
+  background: var(--ctl-primary-bg);
+  border-color: var(--ctl-primary-line);
+  font-weight: 700;
+}
+.btn--primary:hover:not(:disabled),
+.btn--go:hover:not(:disabled) {
+  color: var(--gold);
+  background: var(--ctl-primary-bg-hi);
+  border-color: var(--gold);
+}
+.btn--primary:active:not(:disabled),
+.btn--go:active:not(:disabled) { background: var(--ctl-primary-bg-hi); }
+
+/* 整列的主要大按鈕（採集、製作、送出…）：寬度由所在的版面決定 */
+.btn--go {
+  min-height: var(--ctl-h-go);
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+}
+
+/* Ghost：徹底沒有框和底色，只有文字；hover 時文字變亮。鍵盤聚焦的外框要保留（無障礙） */
+.btn--ghost,
+.sheet__close,
+.dossier__close {
+  color: var(--soft);
+  background: none;
+  border-color: transparent;
+  padding-inline: var(--ctl-px-sm);
+}
+.btn--ghost:hover:not(:disabled),
+.sheet__close:hover,
+.dossier__close:hover {
+  color: var(--gold);
+  border-color: transparent;
+}
+.btn--ghost:active:not(:disabled) { background: none; color: var(--gold); }
+.btn--ghost[aria-expanded='true'] { color: var(--gold); }
+
+/* 危險操作：Secondary 的紅色版，只有字與邊線變色，不加底色 */
+.btn--danger {
+  color: var(--rose);
+  border-color: rgba(var(--rose-rgb), 0.35);
+}
+.btn--danger:hover:not(:disabled) { color: var(--rose); border-color: var(--rose); }
+
+/* ---------- 輸入框（文字、數字、下拉）：和按鈕同高，並排時垂直對齊 ---------- */
+.field,
+.amount__input {
+  box-sizing: border-box;
+  min-height: var(--ctl-h);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  color: var(--ink);
+  background: var(--ctl-bg);
+  border: 1px solid var(--ctl-line);
+  border-radius: var(--radius-ctl);
+  box-shadow: none;
+  transition: border-color 0.15s ease;
+}
+textarea.field { padding: 8px 10px; }
+.field::placeholder { color: var(--faint); }
+.field:hover:not(:disabled),
+.amount__input:hover:not(:disabled) { border-color: rgba(var(--gold-rgb), 0.32); }
+.field:focus,
+.amount__input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: none;
+}
+.field:focus-visible,
+.amount__input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.field:disabled { opacity: 0.5; cursor: not-allowed; }
+/* iPhone 輸入框字小於 16px 會在聚焦時自動放大畫面 */
+@media (max-width: 759px), (pointer: coarse) {
+  .field, .amount__input { font-size: 16px; }
+}
+
+/* ---------- 面板：只有最外層的區塊有邊框，裡面用留白與細線分隔 ---------- */
+.panel {
+  box-sizing: border-box;
+  padding: var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-box);
+}
+.panel > .section-title:first-child { margin-top: 0; }
+
+/* ---------- 去框列表：項目之間只有底部一條淡線；.list__item--accent 左側 2px 指示線（稀有度色條也用這個） ---------- */
+.list { display: grid; margin: 0; padding: 0; list-style: none; }
+.list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.list__item:last-child { border-bottom: 0; }
+.list__item--accent {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--accent, var(--gold2));
+}
+.list__main { flex: 1; min-width: 0; }
+.list__title { margin: 0; color: var(--ink); }
+.list__sub { margin: 2px 0 0; color: var(--soft); font-size: 0.85rem; }
+.list__end { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+
+/* ---------- 底線分頁：文字＋底部 2px 線，沒有框、沒有實心底色 ---------- */
+.tabs-line {
+  display: flex;
+  gap: var(--space-5);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--line-soft);
+}
+.tabs-line::-webkit-scrollbar { display: none; }
+.tabs-line__tab {
+  flex: none;
+  min-height: var(--ctl-h);
+  margin-bottom: -1px;
+  padding: 0 2px;
+  font: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  color: var(--soft);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.tabs-line__tab:hover { color: var(--gold); }
+.tabs-line__tab[aria-selected='true'] { color: var(--gold); border-bottom-color: var(--gold); }
+.tabs-line__tab:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.tabs-line__sub { margin-left: 6px; font-size: 0.72rem; letter-spacing: 0.04em; color: var(--faint); }
+@media (max-width: 520px) { .tabs-line { gap: var(--space-4); } .tabs-line__sub { display: none; } }
+
+/* ---------- 數字對齊：所有數字用等寬數字，表格式排列時才會對齊 ---------- */
+.num, .tnum { font-variant-numeric: lining-nums tabular-nums; }
+
+/* ============================================================
+   共用元件：區塊標題、說明文字、面板、物品格、稀有度、徽章、數量選擇器、選項
+   ============================================================ */
+
+/* ---------- 區塊標題（12px、金色，後面接一條漸淡細線）與說明文字 ---------- */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  border: 0;
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  text-shadow: none;
+}
+.section-title::before { content: none; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line3), transparent); }
+.field-label { margin: 0 0 6px; font-size: 0.8rem; color: var(--soft); }
+.hint { margin: 0.4rem 0; font-size: 0.82rem; line-height: 1.7; color: var(--soft); }
+.empty { padding: var(--space-5) 0; font-size: 0.9rem; color: var(--soft); text-align: center; }
+.notice { margin: 0; padding: var(--space-3) var(--space-4); color: var(--soft); border: 0; border-left: 2px solid var(--line3); border-radius: 0; }
+
+/* ---------- 面板（最外層的區塊）：1px 細框、6px 圓角、沒有陰影與毛玻璃 ---------- */
+.card,
+.results {
+  box-sizing: border-box;
+  padding: var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-box);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ---------- 稀有度：左側 2px 色條＋文字等級（不只靠顏色），沒有光暈、菱形、外框 ---------- */
+.rarity[data-rarity='0'] { --t: var(--rarity-0); }
+.rarity[data-rarity='1'] { --t: var(--rarity-1); }
+.rarity[data-rarity='2'] { --t: var(--rarity-2); }
+.rarity[data-rarity='3'] { --t: var(--rarity-3); }
+.rarity[data-rarity='4'] { --t: var(--rarity-4); }
+.rarity { border-left: 2px solid var(--t); }
+.rarity .rarity__name { color: var(--t); }
+/* 神話：色條用彩虹漸層 */
+.rarity[data-rarity='4'] {
+  border-left-color: transparent;
+  background: var(--rainbow-v) left top / 2px 100% no-repeat;
+}
+.rarity-tag {
+  display: inline-flex;
+  align-items: center;
+  color: var(--t);
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.rarity-tag__name { padding: 0; border: 0; }
+
+/* ---------- 物品格：去框，只有左側色條與底部細線；格子之間靠留白分開 ---------- */
+.tile-grid,
+.showcase {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  column-gap: var(--space-5);
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.showcase { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.tile {
+  box-sizing: border-box;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  min-height: 44px;
+  padding: 8px 4px 8px var(--space-3);
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-left: 2px solid var(--t, transparent);
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  box-shadow: none;
+  transition: background-color 0.15s ease;
+}
+.tile[data-rarity='4'] { border-left-color: transparent; }
+button.tile { cursor: pointer; }
+button.tile:hover { background-color: rgba(var(--ink-rgb), 0.04); }
+button.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.tile__icon { font-size: 1.25rem; line-height: 1; }
+.tile__icon:empty { display: none; }
+.tile__name { min-width: 0; overflow-wrap: anywhere; font-size: 0.9rem; line-height: 1.35; }
+.tile__qty { font-family: var(--font-num); font-variant-numeric: lining-nums tabular-nums; font-size: 0.85rem; color: var(--ink2); }
+.tile__note { grid-column: 1 / -1; font-size: 0.78rem; line-height: 1.5; color: var(--soft); }
+.tile .rarity-tag { grid-column: 2 / -1; justify-self: start; }
+.tile--sm { min-height: 36px; padding-block: 4px; }
+.tile--sm .tile__icon { font-size: 1.05rem; }
+.tile--sm .tile__name { font-size: 0.82rem; }
+.tile--lg { padding-block: var(--space-3); }
+.tile--lg .tile__icon { font-size: 1.6rem; }
+
+/* ---------- 徽章與資訊標籤：維持膠囊形（狀態用；稀有度不用膠囊） ---------- */
+.badge,
+.info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1px 10px;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--ink2);
+  background: none;
+  border: 1px solid var(--line3);
+  border-radius: var(--r-pill);
+  box-shadow: none;
+  white-space: nowrap;
+}
+.badge[data-tone='good'], .info-chip.is-good { color: var(--sky); background: none; border-color: var(--sky2); }
+.badge[data-tone='bad'], .info-chip.is-bad { color: var(--rose); background: none; border-color: var(--rose2); }
+.info-chip.is-warn { color: var(--gold); background: none; border-color: var(--gold2); }
+
+/* ---------- 數量選擇器：－ 輸入框 ＋ 與快速選項，都是一般控制項的高度 ---------- */
+.amount { display: grid; gap: var(--space-2); }
+.amount__row { display: grid; grid-template-columns: var(--ctl-h) minmax(0, 1fr) var(--ctl-h); gap: var(--space-2); }
+.amount__step { padding: 0; font-size: 1.1rem; }
+.amount__input { min-width: 0; text-align: center; -moz-appearance: textfield; }
+.amount__input::-webkit-outer-spin-button,
+.amount__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.amount__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.amount__chip { min-height: var(--ctl-h-sm); padding: 0 var(--ctl-px-sm); font-size: 0.85rem; }
+.amount__chip[aria-pressed='true'] { color: var(--gold); background: var(--ctl-primary-bg); border-color: var(--ctl-primary-line); }
+
+/* ---------- 選項（單選）：沒有框，底部 2px 線；選中時文字與線變金色 ---------- */
+.action-cards,
+.diff-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 var(--space-4);
+}
+.diff-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; }
+.action-card,
+.diff {
+  box-sizing: border-box;
+  display: grid;
+  align-content: start;
+  min-height: var(--ctl-h);
+  padding: var(--space-2) 2px;
+  font: inherit;
+  color: var(--ink2);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid var(--line-soft);
+  border-radius: 0;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.action-card:hover,
+.diff:hover { color: var(--ink); border-bottom-color: var(--line3); }
+.action-card:focus-visible,
+.diff:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.action-card { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 8px; }
+.action-card__name { font-weight: 600; color: inherit; }
+.action-card__sub { grid-column: 1; font-size: 0.75rem; color: var(--soft); }
+.action-card__mod { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 0.9rem; color: var(--gold); }
+.action-card[aria-checked='true'] { color: var(--gold); border-bottom-color: var(--gold); }
+.diff { gap: 2px; }
+.diff__head { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.diff__head strong { color: var(--t); font-size: 0.95rem; }
+.diff__dc { font-size: 0.72rem; color: var(--soft); }
+.diff__cost { font-size: 0.78rem; color: var(--ink2); }
+.diff__can { font-size: 0.78rem; font-weight: 700; color: var(--gold); }
+.diff[aria-checked='true'] { border-bottom-color: var(--t); }
+@media (max-width: 759px) {
+  .action-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .diff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- 紀念品開關（修整日、跑團共用）：一般控制項的外觀，按下去變金色 ---------- */
+.keepsake-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.keepsake {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--ctl-h);
+  padding: 4px var(--space-3);
+  font: inherit;
+  color: var(--ink2);
+  text-align: left;
+  background: var(--ctl-bg);
+  border: 1px solid var(--ctl-line);
+  border-radius: var(--radius-ctl);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.keepsake:hover { border-color: var(--ctl-line-hi); }
+.keepsake__icon:empty { display: none; }
+.keepsake__text { display: grid; line-height: 1.3; }
+.keepsake__text small { font-size: 0.72rem; color: var(--soft); }
+.keepsake__check { min-width: 1em; font-size: 0.8rem; text-align: center; color: var(--gold); }
+.keepsake[aria-pressed='true'] { color: var(--gold); background: var(--ctl-primary-bg); border-color: var(--ctl-primary-line); }

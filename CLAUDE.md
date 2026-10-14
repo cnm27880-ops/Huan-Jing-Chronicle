@@ -90,7 +90,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/skillTile.js` | 技能方格（一格一行：名稱、位階類型、等級；電腦滑過浮動顯示效果、手機點開面板）：修整日學習與裝備頁技能共用 |
 | `src/ui/restView.js` | 修整日頁面：上方 HUD、採集／製作／跑團檢定分頁、設定步驟＋大按鈕、結果卡 |
 | `src/ui/statusBar.js` | 修整日的 HUD（時間、熟練、胃袋）與「吃東西」面板 |
-| `src/ui/bagView.js` | 背包頁面 |
+| `src/ui/bagView.js` | 背包頁面（物品格去框：只有左側色條與底部細線；沒有表情符號按鈕） |
 | `src/ui/gearView.js` | 裝備頁：面板、裝備欄（電腦版四件一排）、鑑定、寶石、背包裝備（不能丟棄，只能賣出）；右欄是「啟動型技能」勾選（其他已學技能到修整日學習看）與生活徽章 |
 | `src/game/shadowCloak.js`、`src/state/shadowRound.js`、`src/ui/cloakCard.js`、`src/ui/shadowFx.js` | 暗影斗篷（個人專屬）：規則（進入隱身、跟遭遇戰回合自動聚集、現身爆發，純函式）、監聽房間回合、戰鬥頁招式分頁的操作區塊、特效（樣式 `src/styles/shadowfx.css`） |
 | `src/ui/checkAdjustPanel.js` | 檢定數值修正（備用保險，裝備頁右欄，小格子一排 3～4 個）：玩家自己填每個生活技能／技藝的差額（±99），加進檢定明細的「手動修正」；規則在 `engine.js` 的 `setCheckAdjust`／`modifier` |
@@ -113,14 +113,17 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/dossier.js` | 地點情報面板（點地圖標記打開） |
 | `src/styles/theme.css` | **主題檔**：全站色碼、字體、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
 | `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線）與**全站圖層階層 `--z-*`**（其他 CSS 檔 25 以上的 z-index 一律用 `var(--z-…)`，不能寫死數字，測試會檢查） |
-| `src/styles/layout.css` | 頂部列、按鈕 |
+| `src/styles/layout.css` | 頂部列、`#main` 外殼 |
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |
-| `src/styles/pages.css` | 修整日、背包頁面 |
+| `src/styles/pages.css` | 各分頁的版面：**修整日、背包已是新版（Step B1，去框）**；裝備、交易、日誌的舊樣式與彈出面板（sheet、item-sheet）、toast 還在這裡，Step B2／D 再處理 |
 | `src/styles/dice.css` | 跑團頁、紀錄、裝備頁、戰鬥頁 |
 | `src/styles/redesign.css` | 全站新版樣式（覆蓋前面幾個檔案） |
 | `src/styles/polish.css` | 質感層：按鈕、卡片、物品格的舊版效果 |
 | `src/styles/blackgold.css` | 黑金主題（最後載入）：星點背景、面板、標題、擲骰紀錄三軌摘要、稀有度、三欄／手機版面與底部導覽列 |
+| `src/styles/base.css` | **基礎元件（UI 整合重構的新核心，最後載入）**：按鈕三級（Primary `btn--primary`／`btn--go`、Secondary `btn`、Ghost `btn--ghost`、`btn--danger`、緊湊 `btn--small`）、輸入框 `field`、面板 `panel`／`card`／`results`、去框列表 `list`、底線分頁 `tabs-line`，以及共用元件：區塊標題 `section-title`、物品格 `tile`／`tile-grid`／`showcase`、稀有度 `rarity`／`rarity-tag`（左側 2px 色條＋文字，沒有光暈與菱形，神話是彩虹色條）、徽章 `badge`／`info-chip`、數量選擇器 `amount`、單選選項 `action-card`／`diff`、紀念品開關 `keepsake`。尺寸與圓角用 `tokens.css` 的 `--ctl-h` 等變數，顏色用 `theme.css` 的 `--ctl-*`／`--line-soft`。**新增或修改按鈕、輸入框的樣式只改這裡，不要再到其他 CSS 檔寫 `.btn`／`.field` 的外觀或高度**（其他檔案只能寫它在版面裡的位置，例如 `margin`、`flex`）。規格見 `DESIGN.md`「控制項」 |
+| `src/styles/index.js` | 全站樣式的載入順序（`main.js` 與 `styleguide.html` 共用）；新增 CSS 檔要加在這裡 |
+| `styleguide.html` | 樣式規格預覽（只在 `npm run dev` 時打開 `/styleguide.html`，不會打包進正式網站）：按鈕三級、輸入框、面板、去框列表、底線分頁 |
 | `public/lore-data/*.json` | 設定集文字（Discord 匯出），點「查看設定集」時由 `lore.js` 讀取 |
 
 ## 不可違反的規則

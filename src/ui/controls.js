@@ -6,13 +6,12 @@ import { iconOf, rarityOf, plainName, TIERS, RARITY_NAMES } from './items.js';
 import { RollError } from '../state/rollLog.js';
 
 /**
- * 稀有度標籤：菱形圖示 + 方框寫出等級名稱（不能只靠顏色辨識，見 DESIGN.md）。
+ * 稀有度標籤：用文字寫出等級名稱（不能只靠顏色辨識；沒有框也沒有菱形，色條在物品的左側，見 DESIGN.md「控制項」）。
  * 外層元素要有 data-rarity（0~4）才會上色。tier 為 null 時不顯示。
  */
 export function rarityTag(tier) {
   if (tier == null || tier < 0) return null;
   return h('span', { class: 'rarity-tag', title: `${RARITY_NAMES[tier]}（製作難度 ${TIERS[tier]}）` },
-    h('span', { class: 'rarity-tag__gem', 'aria-hidden': 'true' }),
     h('span', { class: 'rarity-tag__name', text: RARITY_NAMES[tier] }));
 }
 

@@ -1,0 +1,121 @@
+<!doctype html>
+<!-- 樣式規格預覽：開發時打開 http://localhost:5173/styleguide.html 看。不會打包進正式網站（vite build 只打包 index.html）。
+     用的就是網站真正的樣式（src/styles/index.js），所以改了樣式這裡也會跟著變。 -->
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>樣式規格預覽</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Serif+TC:wght@400;600;900&display=swap" />
+    <style>
+      /* 只有這個預覽頁自己的排版；顏色與尺寸一律用全站的變數 */
+      .sg { max-width: 1100px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); display: grid; gap: var(--space-5); }
+      .sg h1 { margin: 0; color: var(--gold); font-size: 1.3rem; letter-spacing: 0.12em; }
+      .sg__lead { margin: 4px 0 0; color: var(--soft); }
+      .sg__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+      .sg__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
+      .sg__note { margin: var(--space-2) 0 0; color: var(--soft); font-size: 0.85rem; }
+      .sg__chip { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; background: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main id="main">
+      <section class="view view--page" data-view="styleguide">
+        <div class="sg">
+          <header>
+            <h1>樣式規格預覽</h1>
+            <p class="sg__lead">按鈕三級、輸入框、面板、去框列表、底線分頁。桌機控制項 36／28px，手機一律 44px 以上。</p>
+          </header>
+
+          <section class="panel">
+            <h2 class="section-title">按鈕三級</h2>
+            <div class="sg__row">
+              <button class="btn btn--primary" type="button">Primary 主行動</button>
+              <button class="btn" type="button">Secondary 一般操作</button>
+              <button class="btn btn--ghost" type="button">Ghost 次要工具</button>
+              <button class="btn btn--danger" type="button">Danger 刪除</button>
+              <button class="btn" type="button" disabled>停用</button>
+            </div>
+            <p class="sg__note">緊湊（28px）</p>
+            <div class="sg__row">
+              <button class="btn btn--primary btn--small" type="button">Primary</button>
+              <button class="btn btn--small" type="button">Secondary</button>
+              <button class="btn btn--ghost btn--small" type="button">Ghost</button>
+              <button class="btn btn--danger btn--small" type="button">Danger</button>
+              <button class="btn btn--small" type="button" disabled>停用</button>
+            </div>
+            <p class="sg__note">整列大按鈕（--go）：全站只有採集、製作、送出這幾種</p>
+            <button class="btn btn--primary btn--go" type="button" style="width: 100%">採藥 1 次</button>
+          </section>
+
+          <section class="panel">
+            <h2 class="section-title">輸入框與按鈕並排（高度與垂直對齊要一致）</h2>
+            <div class="sg__row">
+              <input class="field" type="text" placeholder="文字輸入框" style="flex: 1 1 150px; width: auto" />
+              <input class="field" type="number" value="1" style="flex: 0 0 72px; width: 72px; text-align: center" />
+              <select class="field" style="flex: 1 1 120px; width: auto"><option>下拉選單</option><option>第二項</option></select>
+              <button class="btn" type="button">按鈕</button>
+              <button class="btn btn--primary" type="button">確認</button>
+              <button class="btn btn--ghost" type="button">取消</button>
+            </div>
+            <p class="sg__note">輸入框和按鈕同高、同圓角，並排時垂直置中對齊。</p>
+          </section>
+
+          <div class="sg__grid">
+            <section class="panel">
+              <h2 class="section-title">去框列表</h2>
+              <ul class="list">
+                <li class="list__item">
+                  <div class="list__main"><p class="list__title">滿漢全席</p><p class="list__sub">料理・可食用</p></div>
+                  <div class="list__end"><span class="num">×118</span><button class="btn btn--small" type="button">使用</button></div>
+                </li>
+                <li class="list__item">
+                  <div class="list__main"><p class="list__title">傳說盛宴</p><p class="list__sub">料理・可食用</p></div>
+                  <div class="list__end"><span class="num">×25</span><button class="btn btn--small" type="button">使用</button></div>
+                </li>
+                <li class="list__item">
+                  <div class="list__main"><p class="list__title">拉麵</p><p class="list__sub">料理・可食用</p></div>
+                  <div class="list__end"><span class="num">×9</span><button class="btn btn--small" type="button">使用</button></div>
+                </li>
+              </ul>
+              <p class="sg__note">項目之間只有一條淡線，沒有方框。</p>
+            </section>
+
+            <section class="panel">
+              <h2 class="section-title">左側 2px 色條（稀有度）</h2>
+              <ul class="list">
+                <li class="list__item list__item--accent" style="--accent: var(--rarity-0)">
+                  <div class="list__main"><p class="list__title">綠草藥</p></div><span class="list__sub">初階</span>
+                </li>
+                <li class="list__item list__item--accent" style="--accent: var(--rarity-1)">
+                  <div class="list__main"><p class="list__title">寧神花</p></div><span class="list__sub">進階</span>
+                </li>
+                <li class="list__item list__item--accent" style="--accent: var(--rarity-2)">
+                  <div class="list__main"><p class="list__title">大師武器</p></div><span class="list__sub">大師</span>
+                </li>
+                <li class="list__item list__item--accent" style="--accent: var(--rarity-3)">
+                  <div class="list__main"><p class="list__title">傳說盛宴</p></div><span class="list__sub">傳說</span>
+                </li>
+              </ul>
+              <p class="sg__note">稀有度＝左側 2px 色條＋文字等級（不只靠顏色）。神話的色條用彩虹漸層（B 步驟套用）。</p>
+            </section>
+          </div>
+
+          <section class="panel">
+            <h2 class="section-title">底線分頁</h2>
+            <div class="tabs-line" role="tablist">
+              <button class="tabs-line__tab" role="tab" aria-selected="true" type="button">採集</button>
+              <button class="tabs-line__tab" role="tab" aria-selected="false" type="button">製作</button>
+              <button class="tabs-line__tab" role="tab" aria-selected="false" type="button">學習</button>
+              <button class="tabs-line__tab" role="tab" aria-selected="false" type="button">特殊</button>
+            </div>
+            <p class="sg__note">取代原本 1400px 寬的金色實心膠囊分頁（B 步驟套用到修整日與交易）。</p>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script type="module">
+      import './src/styles/index.js';
+    </script>
+  </body>
+</html>

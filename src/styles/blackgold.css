@@ -15,8 +15,20 @@ body {
     radial-gradient(ellipse 70% 55% at 100% 100%, rgba(var(--sky-rgb), 0.07), transparent 65%),
     var(--paper);
 }
-.num, .roll__big, .roll__time, .roll__badge, .roll__formula, .die, .stat__value, .tile__qty, .bar__text,
-.identify__qty, .move__dice, .result__big, .status__num strong, .track__name b, .abc__cell, .brand::after {
+.num,
+.roll__big,
+.roll__time,
+.roll__badge,
+.roll__formula,
+.die,
+.stat__value,
+.bar__text,
+.identify__qty,
+.move__dice,
+.result__big,
+.track__name b,
+.abc__cell,
+.brand::after {
   font-family: var(--font-num);
   font-variant-numeric: lining-nums tabular-nums;
 }
@@ -86,22 +98,23 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .tab--more, .more-menu { display: none; }
 
 /* ---------- 面板（不透明） ---------- */
-.card, .results, .showcase, .sheet__panel, .dossier, .map-hint, .status, .bag-bar {
+.sheet__panel,
+.dossier,
+.map-hint {
   background: var(--card);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border: 0;
   box-shadow: var(--panel-shadow);
 }
-.card, .results, .showcase, .sheet__panel { border-radius: var(--r-panel); }
-.card { padding: 16px 18px; }
-.card:hover, .results:hover { box-shadow: var(--panel-shadow); }
+.sheet__panel { border-radius: var(--r-panel); }
 .dossier { background: var(--paper2); }
-.status, .bag-bar { border-radius: 0; box-shadow: 0 1px 0 var(--line), 0 4px 12px var(--shadow); }
-.result, .stat, .monster, .mod { background: var(--raise); border: 0; box-shadow: 0 0 0 1px var(--line); border-radius: 10px; }
+.result,
+.stat,
+.monster { background: var(--raise); border: 0; box-shadow: 0 0 0 1px var(--line); border-radius: 10px; }
 
 /* ---------- 區塊標題：12px、金色、後接漸淡細線，前面不加符號 ---------- */
-.section-title, .tray__title, .results .section-title {
+.tray__title {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -116,8 +129,8 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
   line-height: 1.4;
   text-shadow: none;
 }
-.section-title::before, .tray__title::before, .results .section-title::before { content: none; display: none; }
-.section-title::after, .tray__title::after, .results .section-title::after {
+.tray__title::before { content: none; display: none; }
+.tray__title::after {
   content: '';
   position: static;
   flex: 1;
@@ -127,52 +140,27 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .battle-head .section-title { flex: 1; margin-bottom: 0; }
 .battle-head { margin-bottom: 12px; }
 
-/* ---------- 按鈕：hover 金色 1.5px 外框 ---------- */
-.btn, .btn--ghost, .sheet__close, .dossier__close {
-  color: var(--ink);
-  background: var(--raise);
-  border: 1px solid var(--line3);
-  border-radius: 10px;
-  box-shadow: none;
-  text-shadow: none;
-}
-.btn:hover:not(:disabled), .btn--ghost:hover, .sheet__close:hover, .dossier__close:hover,
-.btn--ghost[aria-expanded='true'] {
-  color: var(--gold);
-  background: var(--raise);
-  border-color: var(--line3);
-  box-shadow: var(--hover-ring);
-}
-.btn--primary, .btn--go {
-  color: var(--on-gold);
-  background: var(--gold);
-  border: 1px solid var(--gold);
-  box-shadow: none;
-  text-shadow: none;
-}
-.btn--primary:hover:not(:disabled), .btn--go:hover:not(:disabled) {
-  color: var(--on-gold);
-  background: var(--gold);
-  border-color: var(--gold);
-  box-shadow: 0 0 0 1.5px var(--paper), 0 0 0 3px var(--gold);
-  transform: none;
-}
-.btn--primary::after, .btn--go::after { display: none; }
-
 /* 可點的卡片（物品格、選項、招式…）hover 同樣是金色 1.5px 外框 */
-.action-card, .diff, .skill-btn, .toggle, .potion, .move__pick, .chip, .amount__chip, .amount__step, .slot-add {
+.skill-btn,
+.toggle,
+.potion,
+.move__pick,
+.chip {
   background: var(--raise);
   border: 1px solid var(--line);
   box-shadow: none;
 }
-.action-card:hover, .diff:hover, .skill-btn:hover, .toggle:hover, .potion:hover:not(:disabled), .move__pick:hover:not(:disabled),
-.chip:hover, .amount__chip:hover, .amount__step:hover, .slot-add:hover, button.tile:hover {
+.skill-btn:hover,
+.toggle:hover,
+.potion:hover:not(:disabled),
+.move__pick:hover:not(:disabled),
+.chip:hover {
   background: var(--raise);
   border-color: var(--line);
   box-shadow: var(--hover-ring);
   transform: none;
 }
-.action-card[aria-checked='true'], .diff[aria-checked='true'], .toggle[aria-pressed='true'], .amount__chip[aria-pressed='true'],
+.toggle[aria-pressed='true'],
 .move[aria-current='true'] .move__pick {
   background: var(--goldbg);
   border-color: var(--gold2);
@@ -181,14 +169,12 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .tabs-seg { background: var(--paper); border: 1px solid var(--line); box-shadow: none; border-radius: var(--r-pill); }
 .seg { border-radius: var(--r-pill); }
 .seg[aria-selected='true'] { color: var(--on-gold); background: var(--gold); box-shadow: none; }
-.field, .amount__input { background: var(--paper); border: 1px solid var(--line3); box-shadow: none; color: var(--ink); }
-.field:focus, .amount__input:focus { border-color: var(--gold); box-shadow: 0 0 0 1.5px var(--gold); }
 
 /* ---------- 標籤與徽章：膠囊形 ---------- */
-.badge, .info-chip, .roll__badge, .track__tag, .status__day { border-radius: var(--r-pill); }
-.badge, .info-chip { background: var(--paper); border: 1px solid var(--line3); color: var(--ink2); box-shadow: none; }
-.badge[data-tone='good'], .info-chip.is-good { color: var(--sky); background: var(--skybg); border-color: var(--sky2); }
-.badge[data-tone='bad'], .info-chip.is-bad { color: var(--rose); background: var(--rosebg); border-color: var(--rose2); }
+.roll__badge,
+.track__tag { border-radius: var(--r-pill); }
+.info-chip.is-good { color: var(--sky); background: var(--skybg); border-color: var(--sky2); }
+.info-chip.is-bad { color: var(--rose); background: var(--rosebg); border-color: var(--rose2); }
 
 /* ---------- 血條、資源條 ---------- */
 .bar { background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); }
@@ -312,67 +298,10 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
    物品稀有度：左側色條＋菱形＋方框標籤（形狀和擲骰的膠囊不同，不可混用）
    色由 data-tier／data-rarity 決定（--t），0~4 = 初階／進階／大師／傳說／神話
    ============================================================ */
-.rarity[data-rarity='0'] { --t: var(--rarity-0); } /* 比 .gear-slot 等元件自己的 --t 優先 */
-.rarity[data-rarity='1'] { --t: var(--rarity-1); }
-.rarity[data-rarity='2'] { --t: var(--rarity-2); }
-.rarity[data-rarity='3'] { --t: var(--rarity-3); }
-.rarity[data-rarity='4'] { --t: var(--rarity-4); }
-.rarity { border-left: 4px solid var(--t); }
-.rarity .rarity__name { color: var(--t); }
+/* 比 .gear-slot 等元件自己的 --t 優先 */
 /* 平常和其他稀有度一樣只有左側色條；滑過、聚焦或選取時才出現外框與光暈（使用者 2026-10-07） */
-.rarity[data-rarity='0']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
-  box-shadow: 0 0 0 1.5px var(--rarity-0), 0 0 14px rgba(var(--rarity-0-rgb), 0.28);
-}
-.rarity[data-rarity='1']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
-  box-shadow: 0 0 0 1.5px var(--rarity-1), 0 0 14px rgba(var(--rarity-1-rgb), 0.28);
-}
-.rarity[data-rarity='2']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
-  box-shadow: 0 0 0 1.5px var(--rarity-2), 0 0 14px rgba(var(--rarity-2-rgb), 0.28);
-}
-.rarity[data-rarity='3']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
-  box-shadow: 0 0 0 1.5px var(--rarity-3), 0 0 22px rgba(var(--rarity-3-rgb), 0.35);
-}
-.rarity[data-rarity='4']:is(:hover, :focus-visible, [aria-current='true'], [aria-pressed='true'], .is-selected) {
-  box-shadow: 0 0 0 1.5px var(--rarity-4), 0 0 16px rgba(var(--rarity-4-rgb), 0.3);
-}
-.rarity[data-rarity='3'] .rarity__name {
-  color: var(--rarity-3);
-  background: linear-gradient(180deg, var(--ink), var(--rarity-3) 55%, var(--gold2));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.rarity[data-rarity='4'] { /* 神話：2px 虹彩外框＋左側 5px 虹彩小條，無動態 */
-  border: 2px solid transparent;
-  background:
-    var(--rainbow-v) left top / 5px 100% no-repeat padding-box,
-    linear-gradient(var(--card), var(--card)) padding-box,
-    var(--rainbow) border-box;
-  padding-left: calc(0.6rem + 5px);
-}
-.rarity[data-rarity='4'] .rarity__name { color: var(--rarity-4); }
-.rarity[data-rarity='4']::before { content: none; display: none; }
 
-.rarity-tag { display: inline-flex; align-items: center; gap: 5px; color: var(--t); font-size: 11px; line-height: 1; white-space: nowrap; }
-.rarity-tag__gem { /* 12px 菱形：8.5px 方塊轉 45 度 */
-  flex: none;
-  width: 8.5px;
-  height: 8.5px;
-  margin: 1.75px;
-  background: var(--t);
-  transform: rotate(45deg);
-}
-.rarity-tag__name { padding: 2px 6px; border: 1.5px solid var(--t); border-radius: 2px; letter-spacing: 0.08em; }
-[data-rarity='4'] .rarity-tag { color: var(--rarity-4); }
-[data-rarity='4'] .rarity-tag__gem { background: var(--rainbow); }
-[data-rarity='4'] .rarity-tag__name { border-image: var(--rainbow) 1; }
 /* 基礎字級改成 14px 後，物品格的字要放大一點才看得清楚 */
-.tile__name { font-size: 0.86rem; }
-.tile__qty { font-size: 0.8rem; }
-.tile__note { font-size: 0.78rem; }
-.tile .rarity-tag { grid-column: 2 / -1; justify-self: start; }
-.tile.rarity { border-left-width: 4px; }
-.tile[data-rarity='4'] { border-left-width: 2px; }
 
 /* ============================================================
    戰鬥頁：電腦三欄、平板兩欄、手機單欄
@@ -393,8 +322,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
   :root { --nav-h: 58px; }
   .topbar { z-index: auto; } /* 頁首自己是一層 z-index 30，裡面的「更多」選單會被跑團頁的抽屜（45）蓋住；讓選單直接跟抽屜比高低 */
   .page-wrap { grid-template-columns: minmax(0, 1fr); padding: 10px 12px; }
-  .card { padding: 14px 16px; }
-
+  
   /* 頁首：分頁移到底部後，品牌字放左邊、骰盤靠右 */
   .brand { display: block; margin-right: auto; padding: 0; font-size: 1.15rem; letter-spacing: 0.2em; }
   .brand::after { display: none; }
@@ -469,9 +397,13 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 
 /* 觸控目標至少 44px */
 @media (max-width: 759px), (pointer: coarse) {
-  .btn, .seg, .toggle, .chip, .field, .amount__chip, .amount__input, .move__pick, .sheet__close, .dossier__close,
-  .status__day, .potion, .diff, .skill-btn, .bag-group__head { min-height: 44px; }
-  .amount__step, .info-chip__btn { min-width: 44px; min-height: 44px; }
+  .seg,
+.toggle,
+.chip,
+.move__pick,
+.potion,
+.skill-btn { min-height: 44px; }
+  .info-chip__btn { min-width: 44px; min-height: 44px; }
 }
 
 /* ============================================================
@@ -560,10 +492,9 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .vsheet__input { width: 7rem; min-height: var(--touch); font-size: 1.2rem; text-align: center; }
 .vsheet__was { margin: 0; color: var(--soft); font-size: 0.82rem; }
 .vsheet__steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
-.vsheet__step, .vsheet__full, .vsheet__actions .btn { min-height: var(--touch); }
+.vsheet__step, .vsheet__full { min-height: var(--touch); }
 .vsheet__step { padding-inline: 0; }
 .vsheet__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.vsheet__actions .btn { min-height: 48px; }
 @media (min-width: 760px) {
   .vsheet__backdrop { background: transparent; }
   .vsheet__panel { right: auto; bottom: auto; width: min(320px, calc(100vw - 16px)); border: 1px solid var(--line3); border-radius: var(--r-panel); box-shadow: 0 12px 32px var(--shadow); transform: translateY(-6px); opacity: 0; transition: transform 0.15s ease, opacity 0.15s ease; }
@@ -685,7 +616,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .reveal__title::after { content: ''; display: block; width: min(16rem, 60%); height: 1px; margin: 10px auto 0; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
 .reveal__summary { margin: 0; min-height: 1.6em; color: var(--ink2); }
 .reveal__actions { display: flex; justify-content: center; gap: 8px; }
-.reveal__actions .btn { min-width: 8rem; min-height: 44px; }
+.reveal__actions .btn { min-width: 8rem; }
 
 .rv-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 .rv-grid[data-count='1'] { grid-template-columns: minmax(0, 300px); justify-content: center; }
@@ -796,191 +727,44 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
    修整日（restView.js）：HUD → 行動分頁 → 左邊一步步設定＋大按鈕，右邊結果
    全部加 #view-rest 前綴，蓋過 pages.css／redesign.css／polish.css 的舊樣式
    ============================================================ */
-#view-rest .rest-root { max-width: 1480px; margin: 0 auto; padding: 0 12px 12px; }
 
 /* HUD：固定在上方 */
-#view-rest .rest-hud {
-  position: sticky; top: 0; z-index: 5;
-  display: grid; gap: 8px;
-  margin: 0 -12px 12px; padding: 10px 12px;
-  background: var(--paper2); border-bottom: 1px solid var(--line3); box-shadow: 0 6px 14px var(--shadow);
-}
-#view-rest .rest-hud__top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-#view-rest .rest-hud__name { margin: 0; color: var(--gold); font-size: 1.05rem; letter-spacing: 0.08em; }
-#view-rest .rest-hud__day { padding: 0 10px; color: var(--ink2); font-size: 0.78rem; background: var(--paper); border: 1px solid var(--line3); border-radius: var(--r-pill); }
-#view-rest .rest-hud__num { display: inline-flex; align-items: baseline; gap: 6px; }
-#view-rest .rest-hud__day + .rest-hud__num { margin-left: auto; }
-#view-rest .rest-hud__num small { color: var(--soft); font-size: 0.75rem; }
-#view-rest .rest-hud__num strong { color: var(--gold); font-size: 1.05rem; }
-#view-rest .rest-hud__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
-#view-rest .hud-box { display: grid; gap: 6px; padding: 8px 10px; background: var(--card); border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line3); }
-#view-rest .hud-box__head { display: flex; align-items: center; gap: 8px; }
-#view-rest .hud-box__label { color: var(--soft); font-size: 0.8rem; }
-#view-rest .hud-box__value { color: var(--ink); font-size: 1.05rem; }
 #view-rest .hud-box__head .day-confirm { margin-left: auto; }
-#view-rest .hud-box--prof { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-#view-rest .pips { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; width: 100%; }
-#view-rest .pip { height: 8px; background: var(--paper); border: 0; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--line); }
 #view-rest .pip.is-on { background: linear-gradient(90deg, var(--gold2), var(--gold)); box-shadow: none; }
-#view-rest .mini-slots { display: flex; gap: 6px; margin: 0; }
-#view-rest .mini-slot { width: 36px; height: 36px; font-size: 1rem; background: var(--paper); border: 1px solid var(--line3); border-radius: 8px; }
-#view-rest .mini-slot--empty { color: var(--faint); border-style: dashed; }
-#view-rest .mini-slot--empty:hover { color: var(--gold); border-color: var(--gold); }
-#view-rest .status__day { min-height: 32px; padding: 0 12px; color: var(--gold); background: var(--goldbg); border: 1px solid var(--gold2); }
-#view-rest .status__day--yes { color: var(--on-gold); background: var(--gold); }
 
 /* 四個行動分頁 */
-#view-rest .rest-tabs {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
-  margin-bottom: 12px; padding: 4px;
-  background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-pill);
-}
-#view-rest .rest-tab {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  min-height: var(--touch); padding: 0 8px; font: inherit; color: var(--soft);
-  background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer;
-}
-#view-rest .rest-tab:hover { color: var(--gold); }
-#view-rest .rest-tab__name { font-weight: 700; }
-#view-rest .rest-tab__sub { color: var(--faint); font-size: 0.72rem; }
-#view-rest .rest-tab[aria-selected='true'] { color: var(--on-gold); background: var(--gold); }
-#view-rest .rest-tab[aria-selected='true'] .rest-tab__sub { color: var(--on-gold); opacity: 0.7; }
-#view-rest .rest-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* 主體：左設定、右結果 */
-#view-rest .rest-grid { display: grid; gap: 12px; align-items: start; }
-#view-rest .rest-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-#view-rest .rest-step .hint { margin: 10px 0 0; }
-#view-rest .rest-field + .rest-field, #view-rest .rest-field + .mod-line { margin-top: 12px; }
-#view-rest .field-label { margin: 0 0 6px; color: var(--soft); font-size: 0.8rem; }
 
 /* 行動卡 */
-#view-rest .action-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-#view-rest .action-card {
-  position: relative;
-  display: grid; justify-items: center; gap: 2px;
-  min-height: 96px; padding: 12px 6px 10px; font-size: 0.9rem;
-  background: var(--raise); border: 1px solid var(--line); border-radius: 12px; transform: none;
-}
-#view-rest .action-card__icon {
-  display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 4px;
-  font-size: 1.5rem; background: var(--paper); border-radius: 50%; box-shadow: inset 0 0 0 1px var(--line3);
-  filter: none; transform: none;
-}
-#view-rest .action-card__name { font-weight: 700; color: var(--ink); }
-#view-rest .action-card__sub { color: var(--soft); font-size: 0.75rem; }
-#view-rest .action-card__mod { position: absolute; top: 6px; right: 8px; color: var(--gold); font-size: 0.8rem; }
-#view-rest .action-card[aria-checked='true'] { background: var(--goldbg); border-color: var(--gold2); box-shadow: var(--hover-ring); }
-#view-rest .action-card[aria-checked='true'] .action-card__icon { box-shadow: inset 0 0 0 1.5px var(--gold); }
 
 /* 難度卡：左側色條＝製作難度（同稀有度色） */
-#view-rest .diff-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; }
-#view-rest .diff {
-  display: grid; gap: 4px; align-content: start;
-  padding: 10px; font-size: 0.82rem; text-align: left;
-  background: var(--raise); border: 1px solid var(--line); border-left: 4px solid var(--t); border-top-width: 1px; border-radius: 10px;
-}
-#view-rest .diff__head { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
-#view-rest .diff__head strong { color: var(--t); font-size: 0.95rem; }
-#view-rest .diff__dc { padding: 0 6px; color: var(--ink2); font-size: 0.7rem; background: var(--paper); border-radius: var(--r-pill); }
-#view-rest .diff__cost { color: var(--ink2); }
-#view-rest .diff__can { color: var(--gold); font-weight: 700; }
 #view-rest .diff.is-none .diff__can { color: var(--faint); font-weight: 400; }
 #view-rest .diff.is-none:not([aria-checked='true']) { opacity: 0.6; }
-#view-rest .diff[aria-checked='true'] { background: var(--goldbg); border-color: var(--t); box-shadow: 0 0 0 1.5px var(--t); } /* 選取框跟著難度的稀有度色 */
-#view-rest .diff[data-tier='4'][aria-checked='true'] { box-shadow: 0 0 0 1.5px var(--rarity-4), 0 0 14px rgba(var(--rarity-4-rgb), 0.3); }
-#view-rest .reward-line { display: block; margin-top: 12px; }
-#view-rest .reward-line__tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+/* 選取框跟著難度的稀有度色 */
 
 /* 次數、紀念品、加值 */
-#view-rest .keepsake-row { display: flex; flex-wrap: wrap; gap: 6px; }
-#view-rest .keepsake, #view-session .keepsake {
-  display: flex; align-items: center; gap: 8px; min-height: var(--touch); padding: 4px 10px;
-  font: inherit; color: var(--ink); text-align: left; cursor: pointer;
-  background: var(--raise); border: 1px solid var(--line); border-radius: 10px;
-}
-#view-rest .keepsake:hover, #view-session .keepsake:hover { box-shadow: var(--hover-ring); }
-#view-rest .keepsake__text, #view-session .keepsake__text { display: grid; line-height: 1.3; }
-#view-rest .keepsake__text small, #view-session .keepsake__text small { color: var(--soft); font-size: 0.72rem; }
-#view-rest .keepsake__check, #view-session .keepsake__check { display: grid; place-items: center; width: 20px; height: 20px; color: var(--on-gold); font-size: 0.75rem; border: 1.5px solid var(--line3); border-radius: 50%; }
-#view-rest .keepsake[aria-pressed='true'], #view-session .keepsake[aria-pressed='true'] { background: var(--goldbg); border-color: var(--gold2); }
-#view-rest .keepsake[aria-pressed='true'] .keepsake__check, #view-session .keepsake[aria-pressed='true'] .keepsake__check { background: var(--gold); border-color: var(--gold); }
-#view-rest .mod-line {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
-  padding: 10px 12px; background: var(--paper); border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line);
-}
-#view-rest .mod-line__label { color: var(--soft); font-size: 0.8rem; }
-#view-rest .mod-line__value { color: var(--gold); font-size: 1.6rem; line-height: 1; }
-#view-rest .mod-line__parts { display: flex; flex-wrap: wrap; gap: 4px; }
-#view-rest .mod-chip { padding: 1px 8px; color: var(--ink2); font-size: 0.78rem; background: var(--raise); border-radius: var(--r-pill); }
-#view-rest .mod-chip b { color: var(--gold); }
 
 /* 大按鈕：固定在設定下方，跟著頁面捲動（不浮動） */
-#view-rest .rest-go { position: static; }
-#view-rest .rest-go .btn--go { width: 100%; min-height: 52px; margin: 0; font-size: 1.05rem; letter-spacing: 0.08em; box-shadow: 0 6px 18px var(--shadow); }
+#view-rest .rest-go .btn--go { width: 100%; margin: 0; }
 
 /* 跑團檢定 */
 #view-rest .session-stomach__slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 10px; }
-#view-rest .slot-add { min-height: 48px; color: var(--soft); border: 1px dashed var(--line3); border-radius: 10px; }
 #view-rest .skill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 6px; }
 #view-rest .skill-btn { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 6px; min-height: 52px; padding: 8px 10px; text-align: left; border-radius: 10px; }
 #view-rest .skill-btn__name { font-weight: 700; color: var(--ink); }
 #view-rest .skill-btn__mod { color: var(--gold); font-size: 1rem; }
 
 /* 結果卡：和擲骰紀錄同一種樣式 */
-#view-rest .rest-results { min-width: 0; }
-#view-rest .rres-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-#view-rest .rres {
-  position: relative; overflow: hidden;
-  display: grid; gap: 8px;
-  padding: 12px 14px 12px 18px;
-  background: var(--raise); border-radius: 12px; box-shadow: 0 0 0 1px var(--line);
-}
-#view-rest .rres::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: linear-gradient(180deg, var(--line3), var(--line)); }
-#view-rest .rres[data-tone='ok']::before { background: linear-gradient(180deg, var(--sky), var(--sky2)); }
-#view-rest .rres[data-tone='fail']::before { background: linear-gradient(180deg, var(--rose), var(--rose2)); }
-#view-rest .rres[data-tone='gold']::before { background: linear-gradient(180deg, var(--gold), var(--gold2)); }
-#view-rest .rres[data-tone='tier']::before { background: var(--t); }
-#view-rest .rres[data-tier='4']::before { background: var(--rainbow-v); }
-#view-rest .rres[data-fresh='1'] { animation: rres-in 0.35s ease both; }
-#view-rest .rres--note { color: var(--soft); font-size: 0.85rem; }
-#view-rest .rres__head { display: flex; align-items: center; gap: 8px; }
-#view-rest .rres__title { color: var(--ink); font-size: 0.95rem; }
-#view-rest .rres__badge {
-  margin-left: auto; padding: 1px 10px; white-space: nowrap; font-size: 0.82rem; font-weight: 700;
-  color: var(--gold); background: var(--goldbg); border: 1px solid var(--gold2); border-radius: var(--r-pill);
-}
-#view-rest .rres__badge[data-tone='ok'] { color: var(--sky); background: var(--skybg); border-color: var(--sky2); }
-#view-rest .rres__badge[data-tone='fail'] { color: var(--rose); background: var(--rosebg); border-color: var(--rose2); }
-#view-rest .rres__flash { margin: 0; color: var(--t); font-weight: 900; letter-spacing: 0.1em; }
 #view-rest .rres .dice-faces { gap: 4px; }
 #view-rest .rres .die[data-tier] { color: var(--t); background: var(--t); }
 #view-rest .rres .die[data-tier='ok'] { --t: var(--sky); }
 #view-rest .rres .die[data-tier='fail'] { --t: var(--rose); }
 #view-rest .rres .die[data-tier='4'] { color: var(--ink); background: var(--rainbow); }
 #view-rest .dice-legend { margin: 0; color: var(--faint); font-size: 0.72rem; }
-#view-rest .loot { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin: 0; }
 @keyframes rres-in { from { opacity: 0; transform: translateY(-6px); } }
 
 /* 版面：平板兩欄、電腦結果在右側固定 */
-@media (min-width: 760px) {
-  #view-rest .rest-grid { grid-template-columns: minmax(0, 1fr) 340px; }
-}
-@media (min-width: 1100px) {
-  #view-rest .rest-grid { grid-template-columns: minmax(0, 1fr) 420px; }
-  #view-rest .rest-results { position: sticky; top: calc(var(--rest-hud-h, 120px) + 12px); max-height: calc(100vh - var(--topbar-h) - var(--rest-hud-h, 120px) - 24px); overflow-y: auto; }
-}
-@media (max-width: 759px) {
-  #view-rest .rest-hud { position: static; }
-  #view-rest .rest-hud__grid { grid-template-columns: minmax(0, 1fr); }
-  #view-rest .action-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-  #view-rest .action-card { min-height: 88px; padding: 10px 2px 8px; }
-  #view-rest .action-card__mod { position: static; }
-  #view-rest .diff-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #view-rest .rest-tab__sub { display: none; }
-}
-@media (prefers-reduced-motion: reduce) { #view-rest .rres[data-fresh='1'] { animation: none; } }
-
 /* ============================================================
    寶石：鑑定清單、未鑲嵌清單、裝備上的寶石小格（神話色＝虹彩菱形）
    ============================================================ */
@@ -1066,8 +850,10 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 /* ============================================================
    手機測試後調整：數字框置中、沒有圖示的物品不留空格
    ============================================================ */
-input[type='number'], .amount__input { text-align: center; }
-.tile__icon:empty, .keepsake__icon:empty, .item-sheet__icon:empty, .trade-row__icon:empty, .potion__icon:empty { display: none; }
+input[type='number'] { text-align: center; }
+.item-sheet__icon:empty,
+.trade-row__icon:empty,
+.potion__icon:empty { display: none; }
 
 /* 裝備取名欄：身上（整列）與背包（整列） */
 .gear-slot .gear-name { grid-area: name; }
@@ -1148,32 +934,14 @@ input[type='number'], .amount__input { text-align: center; }
 /* 技能面板（點方格） */
 .skill-info__tag { margin: 0 0 4px; color: var(--soft); font-size: 0.8rem; }
 .skill-info__text { margin: 0 0 10px; color: var(--ink2); font-size: 0.9rem; white-space: pre-line; }
-.learn { display: grid; gap: 0.6rem; }
-.learn__levels { flex-wrap: wrap; }
-.learn-cost { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.learn-cost__row {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto 3.2rem; gap: 8px; align-items: center;
-  padding: 6px 10px; background: var(--raise); border-radius: 8px; font-size: 0.88rem;
-}
-.learn-cost__row b { text-align: right; color: var(--sky); }
-.learn-cost__row[data-ok='0'] { color: var(--rose); box-shadow: inset 0 0 0 1px var(--rose2); }
-.learn-cost__row[data-ok='0'] b { color: var(--rose); }
 
 
 /* 抽取技能書、生活徽章 */
-.draw-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-@media (max-width: 759px) { .draw-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* 一張：第一行「書名　有 N」，第二行兩顆按鈕 */
-.draw-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px 8px; padding: 8px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
-.draw-card > strong { overflow: hidden; font-size: 0.9rem; text-overflow: ellipsis; white-space: nowrap; }
 .draw-card > .num { color: var(--soft); font-size: 0.82rem; }
 .draw-card .row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
 .draw-card .row .btn { flex: 1; margin: 0; padding-inline: 6px; }
-.draw-set { display: grid; gap: 6px; }
-.draw-options { display: grid; gap: 6px; }
-.draw-option { display: grid; gap: 4px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .draw-option .skill-info__text { margin: 0; font-size: 0.82rem; }
-@media (min-width: 640px) { .draw-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .badge-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 6px; }
 .badge-row { display: grid; gap: 4px; padding: 8px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
 .badge-row__btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
@@ -1188,30 +956,11 @@ input[type='number'], .amount__input { text-align: center; }
 .badge-made .btn { flex: none; white-space: nowrap; }
 
 /* 修整日「特殊」分頁 */
-.special-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; margin-top: 6px; }
-.special-card { display: grid; gap: 6px; padding: 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
-.special-card__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
 .special-card .row { display: flex; flex-wrap: wrap; gap: 6px; }
-.special-card .field { flex: 1; min-width: 0; padding: 6px 8px; font-size: 14px; }
+.special-card .field { flex: 1; min-width: 0; }
 .special-card .row .btn { margin: 0; }
 /* 餵肉球：材料排成小卡片網格（名稱＋持有／倍率、輸入數量、餵），不再拉滿整行 */
-.feed-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin-top: 6px; }
-.feed-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px auto;
-  align-items: center;
-  gap: 0 8px;
-  padding: 6px 10px;
-  background: var(--raise);
-  border-radius: 10px;
-  box-shadow: 0 0 0 1px var(--line);
-}
-.feed-row__name { grid-column: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.feed-row__have { grid-column: 1; grid-row: 2; color: var(--soft); font-size: 0.78rem; }
-.feed-row__qty { grid-column: 2; grid-row: 1 / 3; min-width: 0; padding: 4px 6px; font-size: 14px; text-align: center; }
 .feed-row .btn { grid-column: 3; grid-row: 1 / 3; margin: 0; }
-@media (max-width: 420px) { #view-rest .rest-tab { gap: 3px; padding: 0 4px; font-size: 0.9rem; } #view-rest .rest-tab__icon { display: none; } }
-
 /* 「等 GM 匯入角色」畫面（waitNotice.js） */
 .wait-notice { margin: 16px; text-align: center; padding-block: 28px; }
 .wait-notice__text { margin: 10px auto 0; max-width: 28em; line-height: 1.7; }
@@ -1536,7 +1285,7 @@ input[type='number'], .amount__input { text-align: center; }
 .manage { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .manage__row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .manage__row .btn { margin-top: 0; }
-.manage__row .field { width: auto; min-width: 8rem; padding: 0.3rem 0.4rem; font-size: 14px; }
+.manage__row .field { width: auto; min-width: 8rem; }
 .manage__name { flex: 1; min-width: 6rem; font-weight: 700; }
 .library { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
 .library__item { display: grid; gap: 4px; justify-items: center; padding: 6px; background: var(--paper); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
@@ -1560,7 +1309,7 @@ input[type='number'], .amount__input { text-align: center; }
 .sx-dice__sides .chip { flex-shrink: 0; padding: 0.25rem 0.6rem; min-height: 32px; }
 .sx-dice__row { display: flex; align-items: center; gap: 6px; }
 .sx-dice__f { display: flex; align-items: center; gap: 3px; font-size: 0.72rem; color: var(--soft); }
-.sx-dice__f .field { width: 3.6rem; padding: 0.3rem 0.4rem; font-size: 14px; }
+.sx-dice__f .field { width: 3.6rem; }
 .sx-dice__expr { flex: 1; min-width: 0; padding: 0.3rem 0.5rem; font-size: 14px; }
 .sx-dice__roll { flex-shrink: 0; padding: 0 12px; min-height: 36px; white-space: nowrap; }
 
@@ -1845,7 +1594,7 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 
 /* GM 工具（房間區塊）：三組，每組小標題＋按鈕自動換行 */
 .room__tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
-.room__tools .btn { margin: 0; min-height: 34px; padding: 0.3rem 0.4rem; font-size: 0.78rem; line-height: 1.25; justify-content: center; text-align: center; }
+.room__tools .btn { margin: 0; padding-inline: 4px; justify-content: center; text-align: center; }
 
 /* 面板右上的「收起／關閉」：大小、高度、圓角統一 */
 .sheet__close, .dossier__close { min-width: 64px; min-height: 36px; padding: 0 14px; font: inherit; font-size: 0.85rem; line-height: 1; white-space: nowrap; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
@@ -1866,28 +1615,13 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
    電腦版緊湊排版（修整日、裝備、交易）：內容區加寬、格子變小，少往下滑。手機版面不動。
    ============================================================ */
 @media (min-width: 901px) {
-  #view-rest .rest-root, #view-market .mk-root { max-width: 1800px; }
+  #view-market .mk-root { max-width: 1800px; }
   .page-wrap.gear-layout { max-width: 1800px; }
 
   /* 修整日：採集／製作的選擇格縮小（圖示放左邊、文字放右邊），讓下方真正擲骰的區域早點出現 */
-  #view-rest .action-cards { gap: 6px; }
-  #view-rest .action-card {
-    grid-template-columns: auto minmax(0, 1fr); justify-items: start; align-items: center; column-gap: 8px;
-    min-height: 0; padding: 6px 28px 6px 8px; text-align: left;
-  }
-  #view-rest .action-card__icon { grid-row: 1 / span 2; width: 34px; height: 34px; margin: 0; font-size: 1.15rem; }
-  #view-rest .action-card__name { font-size: 0.88rem; }
-  #view-rest .action-card__sub { font-size: 0.7rem; }
-  #view-rest .action-card__mod { top: 4px; right: 6px; font-size: 0.74rem; }
-  #view-rest .diff-grid { gap: 6px; }
-  #view-rest .diff { gap: 2px; padding: 6px 8px; font-size: 0.78rem; }
-
+                
   /* 修整日「特殊」：材料格子上下縮窄、一排放更多張 */
-  .special-list { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 5px; margin-top: 4px; }
-  .special-card { gap: 4px; padding: 6px 8px; }
-  .special-card__head { line-height: 1.25; }
-  .special-card .field { padding: 4px 6px; }
-
+      
   /* 裝備欄：四件一排 */
   .gear-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
@@ -1911,7 +1645,6 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .activate-cell .check { font-size: 0.76rem; color: var(--soft); }
 
 /* 特殊材料卡：名稱與說明之間不留空（#view-rest .rest-step .hint 的上邊距會蓋掉一般規則，所以要寫得一樣具體） */
-#view-rest .special-card .hint { margin: 0; font-size: 0.74rem; line-height: 1.35; }
 
 /* ============================================================
    手機緊湊排版（交易、修整日）：觸控目標維持 44px 以上，只縮卡片的留白與圖示
@@ -1930,22 +1663,9 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
   #view-market .trade-row__sub { grid-area: sub; font-size: 0.7rem; }
   #view-market .trade-row__act { grid-area: act; justify-content: stretch; gap: 4px; margin-top: 2px; }
   #view-market .trade-row__qty { flex: 0 0 3.2rem; width: 3.2rem; min-height: 44px; padding: 0 4px; }
-  #view-market .trade-row__act .btn { flex: 1; min-width: 0; min-height: 44px; padding: 0 6px; font-size: 0.8rem; white-space: nowrap; }
+  #view-market .trade-row__act .btn { flex: 1; min-width: 0; padding: 0 6px; white-space: nowrap; }
 }
 /* 修整日：行動卡與難度卡矮一點、特殊材料卡留白縮小 */
-@media (max-width: 900px) {
-  #view-rest .action-cards { gap: 5px; }
-  #view-rest .action-card { min-height: 0; padding: 7px 2px 6px; gap: 0; }
-  #view-rest .action-card__icon { width: 34px; height: 34px; margin-bottom: 2px; font-size: 1.1rem; }
-  #view-rest .action-card__name { font-size: 0.82rem; }
-  #view-rest .action-card__sub { font-size: 0.68rem; }
-  #view-rest .diff-grid { gap: 5px; }
-  #view-rest .diff { gap: 2px; padding: 6px 7px; }
-  .special-list { gap: 5px; margin-top: 4px; }
-  .special-card { gap: 4px; padding: 7px 9px; }
-  .special-card__head { line-height: 1.25; }
-}
-
 /* 網頁自己的確認框（src/ui/confirmPop.js）：貼在按鈕旁邊，蓋在彈出面板（z-index 60）之上 */
 .confirm-pop {
   position: fixed; z-index: calc(var(--z-confirm) + 1); box-sizing: border-box; padding: 12px 14px;
@@ -1957,7 +1677,7 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .confirm-pop__title { margin: 0 0 4px; font-weight: 700; color: var(--gold); overflow-wrap: anywhere; }
 .confirm-pop__line { margin: 2px 0; font-size: 0.9rem; color: var(--ink2); overflow-wrap: anywhere; }
 .confirm-pop__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
-.confirm-pop__actions .btn { min-height: 44px; min-width: 76px; }
+.confirm-pop__actions .btn { min-width: 76px; }
 .confirm-pop::after { /* 小箭頭：指向按鈕 */
   content: ''; position: absolute; left: var(--arrow-x, 50%); width: 10px; height: 10px; margin-left: -5px;
   background: var(--card); border: 1px solid var(--gold2); transform: rotate(45deg);
@@ -1965,7 +1685,6 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .confirm-pop[data-side='above']::after { bottom: -6px; border-top: 0; border-left: 0; }
 .confirm-pop[data-side='below']::after { top: -6px; border-bottom: 0; border-right: 0; }
 .confirm-pop[data-side='center']::after { display: none; }
-.btn--danger { background: var(--rosebg); border-color: var(--rose2); color: var(--rose); }
 @media (prefers-reduced-motion: reduce) { .confirm-pop { transition: none; } }
 .confirm-backdrop { position: fixed; inset: 0; z-index: var(--z-confirm); background: rgba(var(--paper-rgb), 0.6); opacity: 0; transition: opacity 0.15s ease; }
 .confirm-backdrop[data-open='true'] { opacity: 1; }
@@ -2006,7 +1725,7 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .nudge__tips { margin: 8px 0 0; padding-left: 1.2em; font-size: 0.82rem; color: var(--soft); }
 .nudge__tips li { margin: 2px 0; overflow-wrap: anywhere; }
 .nudge__foot { position: sticky; bottom: -16px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 14px -16px -16px; padding: 10px 16px 16px; background: linear-gradient(180deg, transparent, var(--card) 28%); }
-.nudge__foot .btn { min-height: 44px; min-width: 110px; }
+.nudge__foot .btn { min-width: 110px; }
 @media (prefers-reduced-motion: reduce) { .nudge, .nudge__icon { animation: none; } }
 
 /* 攻擊響應列（選中的招式裡）：點一下開／關 */
@@ -2022,13 +1741,6 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .reward-targets { display: grid; gap: 4px; max-height: 200px; overflow-y: auto; padding: 4px 2px; }
 .reward-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 /* 抽技能書：選項上的同名書進度、頂端的進度列 */
-.draw-progress { display: grid; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.draw-progress__list { display: flex; flex-wrap: wrap; gap: 4px; }
-.draw-chip { padding: 0 8px; font-size: 0.72rem; line-height: 1.6; color: var(--gold); background: var(--goldbg); border: 1px solid var(--gold2); border-radius: var(--r-pill); }
-.draw-chip[data-status='complete'], .draw-chip[data-status='learned'] { color: var(--faint); background: transparent; border-color: var(--line3); }
-.draw-option__progress { color: var(--gold); }
-.draw-option__progress[data-status='complete'], .draw-option__progress[data-status='learned'] { color: var(--faint); }
-.draw-option[data-status='complete'], .draw-option[data-status='learned'] { opacity: 0.7; }
 
 /* 檢定數值修正（裝備頁右欄）：一排 3～4 個技能，小小的好滑 */
 .adj-grid { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 6rem)); justify-content: start; gap: 6px; }
@@ -2036,4 +1748,4 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .adj-cell { display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-sm, 6px); background: rgba(var(--card-rgb), 0.5); min-width: 0; }
 .adj-cell strong { font-size: 0.85rem; white-space: nowrap; }
 .adj-cell small { font-size: 0.7rem; color: var(--faint); }
-.adj-cell .field { width: 100%; min-height: 0; padding: 3px 4px; font-size: 0.85rem; text-align: center; }
+.adj-cell .field { width: 100%; min-height: var(--ctl-h-sm); padding-inline: 4px; text-align: center; }
