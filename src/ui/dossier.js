@@ -3,6 +3,7 @@
 // 一律用 textContent 放文字，不用 innerHTML：
 // 之後內容由 GM 在後台輸入，這樣可避免惡意程式碼被塞進網頁（XSS）。
 // ============================================================
+import { pushLayer } from './modalStack.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -26,10 +27,8 @@ export function createDossier({ panel, onClose }) {
   const closeBtn = panel.querySelector('[data-dossier-close]');
   let lastFocus = null;
 
+  let layer = null; // 開著的時候在 modalStack 佔一層（不鎖背景），這樣上面有別的視窗時，Esc 先關上面的
   closeBtn.addEventListener('click', () => close());
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && panel.dataset.open === 'true') close();
-  });
 
   function renderLocked(loc, region) {
     return [
@@ -85,6 +84,7 @@ export function createDossier({ panel, onClose }) {
   }
 
   function open(loc, region) {
+    if (panel.dataset.open !== 'true') layer = pushLayer({ tier: 'drawer', modal: false, close });
     lastFocus = document.activeElement;
     panel.dataset.theme = region.theme;
     body.replaceChildren(...(loc.locked ? renderLocked(loc, region) : renderRevealed(loc, region)));
@@ -95,6 +95,8 @@ export function createDossier({ panel, onClose }) {
   }
 
   function close() {
+    layer?.remove();
+    layer = null;
     panel.dataset.open = 'false';
     panel.setAttribute('aria-hidden', 'true');
     onClose?.();

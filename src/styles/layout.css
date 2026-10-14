@@ -44,7 +44,7 @@ body {
   border-bottom: 1px solid var(--ink-line);
   background: var(--paper);
   position: relative;
-  z-index: 30;
+  z-index: var(--z-topbar);
 }
 
 .brand {

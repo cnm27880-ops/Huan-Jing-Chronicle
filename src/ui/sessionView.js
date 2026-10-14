@@ -9,6 +9,7 @@
 // ============================================================
 import { createPartyPanel } from './partyBars.js';
 import { askConfirm } from './confirmPop.js';
+import { pushLayer } from './modalStack.js';
 import { h } from './dom.js';
 import { rollFailed, toast } from './controls.js';
 import { mountRoomPanel } from './roomPanel.js';
@@ -78,9 +79,12 @@ export function createSessionView({ root, getState, commit }) {
   }, 0));
 
   // ---------- 抽屜（手機、平板） ----------
+  let drawerLayer = null; // 抽屜開著時在 modalStack 佔一層（不鎖背景）：上面有別的視窗時，Esc 先關上面的
   function setSheet(sheet) {
     ui.sheet = sheet;
     wrap.dataset.sheet = sheet;
+    if (sheet && !drawerLayer) drawerLayer = pushLayer({ tier: 'drawer', modal: false, close: () => setSheet('') });
+    else if (!sheet && drawerLayer) { drawerLayer.remove(); drawerLayer = null; }
     bar.querySelectorAll('.sx-bar__btn').forEach((b) => {
       const on = (b.dataset.id === 'targets' && sheet === 'center') || (sheet === 'left' && b.dataset.id === ui.leftTab);
       b.setAttribute('aria-expanded', String(on));
@@ -94,7 +98,6 @@ export function createSessionView({ root, getState, commit }) {
     left.scrollTop = 0;
     return undefined;
   }
-  const onKey = (e) => { if (e.key === 'Escape' && ui.sheet) setSheet(''); };
 
   // ---------- 左欄：技能檢定 ----------
   /** 有「優勢骰」效果、背包還有的紀念品名稱（沒有就 null） */
@@ -318,7 +321,6 @@ export function createSessionView({ root, getState, commit }) {
       roomPanel = mountRoomPanel(roomBox);
       mountLog();
       renderDice();
-      document.addEventListener('keydown', onKey);
       roomSig = sigOf();
       unsubRoom = subscribeRoom(() => {
         renderRoomSummary();
@@ -347,7 +349,6 @@ export function createSessionView({ root, getState, commit }) {
     unsubRoom?.(); unsubRoom = null;
     feed?.destroy(); feed = null;
     roomPanel?.destroy(); roomPanel = null;
-    document.removeEventListener('keydown', onKey);
     setSheet('');
     mounted = false;
   }

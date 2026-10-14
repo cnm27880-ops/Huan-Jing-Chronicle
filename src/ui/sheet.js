@@ -2,13 +2,15 @@
 // 彈出面板：手機從底部滑出，桌機置中。點背景或按 Esc 關閉
 // ============================================================
 import { h } from './dom.js';
+import { pushLayer } from './modalStack.js';
 
 let current = null;
 
 export function closeSheet() {
   if (!current) return;
-  const { node, lastFocus } = current;
+  const { node, lastFocus, layer } = current;
   current = null;
+  layer.remove(); // 先解除背景鎖定，下面才能把焦點還給原本的元素
   node.dataset.open = 'false';
   setTimeout(() => node.remove(), 220);
   lastFocus?.focus?.({ preventScroll: true });
@@ -28,14 +30,10 @@ export function openSheet(title, build, { tall = false } = {}) {
   const refresh = () => body.replaceChildren(build(closeSheet));
   refresh();
   document.body.append(node);
-  current = { node, lastFocus: document.activeElement };
+  current = { node, lastFocus: document.activeElement, layer: pushLayer({ tier: 'sheet', close: closeSheet, node }) };
   requestAnimationFrame(() => {
     node.dataset.open = 'true';
     panel.querySelector('.sheet__close').focus({ preventScroll: true });
   });
   return { refresh };
 }
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && current) closeSheet();
-});

@@ -5,6 +5,7 @@
 // ============================================================
 import { h, fmt } from './dom.js';
 import { rarityTag } from './controls.js';
+import { pushLayer } from './modalStack.js';
 
 const MAX_CARDS = 12;
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -82,17 +83,16 @@ export function openReveal({ title, cards, best = -1, summary = '' }) {
   function openAll() { shown.forEach((_, i) => flip(i)); }
   function close() {
     timers.forEach(clearTimeout);
-    document.removeEventListener('keydown', onKey);
+    layer.remove();
     root.remove();
     if (closeCurrent === close) closeCurrent = null;
   }
   closeCurrent = close;
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const layer = pushLayer({ tier: 'reveal', close, node: root }); // Esc 由 modalStack 處理（只關最上層）
 
   // 開獎的數字先顯示 0，翻開時才跳到真正的數值
   root.querySelectorAll('[data-final]').forEach((n) => { n.textContent = '+0'; });
   document.body.append(root);
-  document.addEventListener('keydown', onKey);
   skip.focus();
   if (reduceMotion()) { openAll(); return; }
   const gap = Math.max(140, Math.min(320, 2600 / shown.length)); // 張數越多翻得越快，總長約 3 秒內

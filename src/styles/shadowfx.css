@@ -2,7 +2,7 @@
    暗影斗篷特效（src/ui/shadowFx.js）與隱身狀態的外觀。色碼只用 theme.css 的 --cloak 系列變數。
    四種：enter 帷幕合攏、gather 能量漣漪、fade 帷幕散開、reveal 閃光撕開斗篷。全部不擋操作，減少動態效果時只留文字。
    ============================================================ */
-.sfx { position: fixed; inset: 0; z-index: 97; pointer-events: none; overflow: hidden; animation: sfx-in 0.2s ease; }
+.sfx { position: fixed; inset: 0; z-index: var(--z-fx); pointer-events: none; overflow: hidden; animation: sfx-in 0.2s ease; }
 .sfx[data-phase='out'] { animation: sfx-out 0.45s ease forwards; }
 
 /* 四周暗角 */

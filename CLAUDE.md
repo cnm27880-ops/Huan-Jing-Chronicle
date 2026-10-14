@@ -46,6 +46,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/nudge.js` | 戰鬥提醒與隊友資源條的判斷（純函式）：資源動用比例、資源條、隊伍摘要、偵測隊友倒地／危急／全隊吃緊、防連發、手上能做的事 |
 | `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄、房間上方；GM 不顯示）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示） |
 | `src/ui/confirmPop.js` | 網頁自己的對話框（取代瀏覽器的 confirm／prompt）：`askConfirm`／`askText`，有給按鈕貼在旁邊、沒給就置中；**全站不要再用 `confirm()`／`prompt()`／`alert()`** |
+| `src/ui/modalStack.js` | 彈窗堆疊：全站唯一的 Esc 監聽器，Esc 一次只關畫面最上面那層（`sheet.js`、`confirmPop.js`、`valueSheet.js`、`reveal.js`、`nudgeModal.js`、`dossier.js`、`sessionView.js` 的抽屜都用 `pushLayer` 註冊，**這些檔案不要再自己監聽 Escape**）；modal 開著時背景（`#main`、頂部列、被蓋住的彈窗）設 `inert`、`<html data-modal="open">`（不鎖 body 捲動，body 本來就 `overflow: hidden`）；戰鬥提醒 `dismissible: false`；輸入法組字中、封面還在時不處理 Esc。層級順序 `TIERS` 要和 `tokens.css` 的 `--z-*` 一致（`tests/modal-stack.test.js` 檢查）（判斷邏輯是純函式） |
 | `src/game/fairness.js` | 模擬戰的公平性（純函式）：量每位玩家一次出手的傷害並排強弱、小怪血量依最弱玩家設、「第一名只出六成力」的情境（`FAIR` 常數可調） |
 | `src/game/sensitivity.js` | 模擬戰的「範本調整影響分析」（純函式，只用在自訂強度）：以 GM 的範本（9 小怪＋BOSS，`TEMPLATE`／`templateSpecs`）為基準，逐項微調（加減隻數、攻擊／防禦／血量 ±10%／±20%／±50%，`variations`），用同一批固定種子重跑（`makeEvaluator`），算出勝率、回合、資源消耗等的變化（`analyzeSensitivity`）與影響力排行（`topImpact`） |
 | `src/game/moveUse.js` | 招式使用紀錄（純函式）：`recordMoveUse`（玩家出招／用輔助成功後，在角色 `moveUse` 累計招式名稱次數，記在 `combat.js` 的 `playerAttack`／`useSupport`）、`usageList`、`usagePlan`（依紀錄排出模擬戰的出招優先順序）；GM 的模擬戰用 |
@@ -110,7 +111,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/mapView.js` | 地圖拖曳、縮放、熱點 |
 | `src/ui/dossier.js` | 地點情報面板（點地圖標記打開） |
 | `src/styles/theme.css` | **主題檔**：全站色碼、字體、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
-| `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線） |
+| `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線）與**全站圖層階層 `--z-*`**（其他 CSS 檔 25 以上的 z-index 一律用 `var(--z-…)`，不能寫死數字，測試會檢查） |
 | `src/styles/layout.css` | 頂部列、按鈕 |
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |

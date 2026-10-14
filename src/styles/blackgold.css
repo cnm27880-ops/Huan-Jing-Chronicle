@@ -405,7 +405,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 50;
+    z-index: var(--z-nav);
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0;
@@ -435,7 +435,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
     position: fixed;
     right: 8px;
     bottom: calc(var(--nav-h) + 8px + env(safe-area-inset-bottom, 0px));
-    z-index: 60;
+    z-index: var(--z-more-menu);
     display: grid;
     min-width: 10rem;
     padding: 6px;
@@ -545,7 +545,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 .witch-rest { width: 100%; min-height: 48px; margin-bottom: 10px; font-weight: 700; box-shadow: var(--hover-ring); }
 
 /* 數值調整面板：手機從底部彈出，電腦版是小彈出框 */
-.vsheet { position: fixed; inset: 0; z-index: 90; }
+.vsheet { position: fixed; inset: 0; z-index: var(--z-popover); }
 .vsheet__backdrop { position: absolute; inset: 0; background: rgba(var(--shadow-rgb), 0.55); opacity: 0; transition: opacity 0.2s ease; }
 .vsheet[data-open='true'] .vsheet__backdrop { opacity: 1; }
 .vsheet__panel {
@@ -663,7 +663,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
 /* ============================================================
    鑑定開獎動畫（reveal.js）：卡片背面 → 翻面 → 數值跳動 → 最佳一件發光
    ============================================================ */
-.reveal { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; padding: 16px; }
+.reveal { position: fixed; inset: 0; z-index: var(--z-reveal); display: grid; place-items: center; padding: 16px; }
 .reveal__backdrop { position: absolute; inset: 0; background: rgba(var(--paper-rgb), 0.86); animation: rv-fade 0.25s ease both; }
 .reveal__panel {
   position: relative;
@@ -672,6 +672,7 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
   width: min(880px, 100%);
   max-height: calc(100vh - 32px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px 18px 16px;
   text-align: center;
   background: var(--paper2);
@@ -1136,7 +1137,7 @@ input[type='number'], .amount__input { text-align: center; }
 
 /* 電腦滑鼠移上技能時浮動顯示效果 */
 .skill-tip {
-  position: fixed; z-index: 90; width: min(320px, calc(100vw - 16px)); padding: 10px 12px;
+  position: fixed; z-index: var(--z-tip); width: min(320px, calc(100vw - 16px)); padding: 10px 12px;
   background: var(--card); border-radius: 10px; box-shadow: 0 0 0 1px var(--gold2), 0 10px 30px var(--shadow);
   pointer-events: none; opacity: 0; transition: opacity 0.12s ease;
 }
@@ -1593,7 +1594,7 @@ input[type='number'], .amount__input { text-align: center; }
   .sx-top { display: block; flex-shrink: 0; }
   .sx-top .tstrip { display: none; }
   .sx-left {
-    position: fixed; left: 0; right: 0; z-index: 45; max-height: min(78vh, 760px); padding: 0 12px 14px;
+    position: fixed; left: 0; right: 0; z-index: var(--z-drawer); max-height: min(78vh, 760px); padding: 0 12px 14px;
     bottom: calc(var(--sx-bar-h) + var(--nav-h, 0px) + env(safe-area-inset-bottom, 0px));
     background: var(--paper2); border-top: 1px solid var(--line3); border-radius: var(--r-panel) var(--r-panel) 0 0;
     box-shadow: 0 -10px 30px var(--shadow); transform: translateY(110%); visibility: hidden;
@@ -1607,11 +1608,11 @@ input[type='number'], .amount__input { text-align: center; }
   }
   .sx-sheethead__grip { position: absolute; left: 50%; top: 8px; width: 40px; height: 4px; margin-left: -20px; background: var(--line3); border-radius: var(--r-pill); }
   .sx-center > .sx-sheethead { display: none; }
-  .sx-scrim { position: fixed; inset: 0; z-index: 44; background: rgba(var(--shadow-rgb), 0.5); }
+  .sx-scrim { position: fixed; inset: 0; z-index: var(--z-scrim); background: rgba(var(--shadow-rgb), 0.5); }
   .sx[data-sheet=''] .sx-scrim { display: none; }
   .sx[data-sheet='left'] .sx-scrim { display: block; }
   .sx-bar {
-    position: fixed; left: 0; right: 0; z-index: 46; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px;
+    position: fixed; left: 0; right: 0; z-index: var(--z-drawerbar); display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px;
     bottom: calc(var(--nav-h, 0px) + env(safe-area-inset-bottom, 0px)); height: var(--sx-bar-h); padding: 6px 10px;
     background: var(--paper2); border-top: 1px solid var(--line); box-shadow: 0 -4px 12px var(--shadow);
   }
@@ -1625,7 +1626,7 @@ input[type='number'], .amount__input { text-align: center; }
   .sx { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 8px 8px calc(var(--sx-bar-h) + var(--nav-h, 0px) + 8px + env(safe-area-inset-bottom, 0px)); }
   .sx-top .tstrip { display: grid; }
   .sx-center {
-    position: fixed; left: 0; right: 0; z-index: 45; max-height: min(82vh, 820px); padding: 0 12px 14px;
+    position: fixed; left: 0; right: 0; z-index: var(--z-drawer); max-height: min(82vh, 820px); padding: 0 12px 14px;
     bottom: calc(var(--sx-bar-h) + var(--nav-h, 0px) + env(safe-area-inset-bottom, 0px));
     background: var(--paper2); border-top: 1px solid var(--line3); border-radius: var(--r-panel) var(--r-panel) 0 0;
     box-shadow: 0 -10px 30px var(--shadow); transform: translateY(110%); visibility: hidden;
@@ -1665,7 +1666,7 @@ input[type='number'], .amount__input { text-align: center; }
    擲骰特效（diceFx.js）：翻滾 → 落定 → 總和放大；1D20 的 20／1 有大成功光芒／大失敗震動。不擋操作
    ============================================================ */
 .dfx {
-  position: fixed; left: 50%; top: 42%; z-index: 96; transform: translate(-50%, -50%);
+  position: fixed; left: 50%; top: 42%; z-index: var(--z-fx); transform: translate(-50%, -50%);
   display: grid; justify-items: center; gap: 10px; min-width: 220px; max-width: calc(100vw - 32px); padding: 22px 30px 20px;
   pointer-events: none; overflow: visible;
   background: radial-gradient(ellipse at 50% 40%, rgba(var(--card-rgb), 0.98), rgba(var(--paper-rgb), 0.96));
@@ -1947,7 +1948,7 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 
 /* 網頁自己的確認框（src/ui/confirmPop.js）：貼在按鈕旁邊，蓋在彈出面板（z-index 60）之上 */
 .confirm-pop {
-  position: fixed; z-index: 110; box-sizing: border-box; padding: 12px 14px;
+  position: fixed; z-index: calc(var(--z-confirm) + 1); box-sizing: border-box; padding: 12px 14px;
   background: var(--card); color: var(--ink); border: 1px solid var(--gold2); border-radius: 12px;
   box-shadow: 0 10px 30px rgba(var(--shadow-rgb), 0.55);
   opacity: 0; transform: translateY(4px); transition: opacity 0.15s ease, transform 0.15s ease;
@@ -1966,14 +1967,14 @@ button.eskill:disabled { cursor: default; opacity: 0.55; }
 .confirm-pop[data-side='center']::after { display: none; }
 .btn--danger { background: var(--rosebg); border-color: var(--rose2); color: var(--rose); }
 @media (prefers-reduced-motion: reduce) { .confirm-pop { transition: none; } }
-.confirm-backdrop { position: fixed; inset: 0; z-index: 109; background: rgba(var(--paper-rgb), 0.6); opacity: 0; transition: opacity 0.15s ease; }
+.confirm-backdrop { position: fixed; inset: 0; z-index: var(--z-confirm); background: rgba(var(--paper-rgb), 0.6); opacity: 0; transition: opacity 0.15s ease; }
 .confirm-backdrop[data-open='true'] { opacity: 1; }
 .confirm-pop__input { width: 100%; margin-top: 8px; box-sizing: border-box; min-height: 44px; }
 
 /* 戰鬥提醒（src/ui/nudgeModal.js）：擋住畫面、只能按「我知道了」關；蓋在彈出面板之上、確認框之下 */
-.nudge { position: fixed; inset: 0; z-index: 108; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at center, rgba(var(--rose-rgb), 0.12), transparent 60%), rgba(var(--paper-rgb), 0.82); animation: nudge-in 0.2s ease; }
+.nudge { position: fixed; inset: 0; z-index: var(--z-nudge); display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at center, rgba(var(--rose-rgb), 0.12), transparent 60%), rgba(var(--paper-rgb), 0.82); animation: nudge-in 0.2s ease; }
 @keyframes nudge-in { from { opacity: 0; } to { opacity: 1; } }
-.nudge__panel { position: relative; box-sizing: border-box; width: min(440px, 100%); max-height: min(88dvh, 680px); overflow-y: auto; padding: 18px 16px 16px; background: linear-gradient(180deg, rgba(var(--rose-rgb), 0.08), transparent 28%), var(--card); border-radius: var(--r-panel); box-shadow: 0 0 0 1px var(--rose2), 0 18px 48px rgba(var(--shadow-rgb), 0.65); scrollbar-width: thin; }
+.nudge__panel { position: relative; box-sizing: border-box; width: min(440px, 100%); max-height: min(88dvh, 680px); overflow-y: auto; overscroll-behavior: contain; padding: 18px 16px 16px; background: linear-gradient(180deg, rgba(var(--rose-rgb), 0.08), transparent 28%), var(--card); border-radius: var(--r-panel); box-shadow: 0 0 0 1px var(--rose2), 0 18px 48px rgba(var(--shadow-rgb), 0.65); scrollbar-width: thin; }
 .nudge__panel::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 3px; border-radius: var(--r-panel) var(--r-panel) 0 0; background: linear-gradient(90deg, var(--rose2), var(--gold), var(--rose2)); }
 .nudge__head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .nudge__icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; font-size: 1.3rem; font-weight: 900; color: var(--rose); background: var(--rosebg); border-radius: 50%; box-shadow: 0 0 0 1px var(--rose2), 0 0 0 5px rgba(var(--rose-rgb), 0.12); animation: nudge-pulse 1.8s ease-out infinite; }
