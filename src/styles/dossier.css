@@ -23,7 +23,7 @@
   box-shadow: -18px 0 40px rgba(var(--shadow-rgb), 0.35);
   transform: translateX(104%);
   transition: transform 0.32s var(--ease);
-  z-index: 25;
+  z-index: var(--z-dossier);
   display: flex;
   flex-direction: column;
 }

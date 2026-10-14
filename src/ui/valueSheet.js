@@ -3,6 +3,7 @@
 // 只管畫面與操作；寫入數值由呼叫端的 onConfirm 負責。樣式見 blackgold.css 的 .vsheet。
 // ============================================================
 import { h, fmt } from './dom.js';
+import { pushLayer } from './modalStack.js';
 
 const STEPS = [-10, -5, -1, 1, 5, 10];
 const isWide = () => window.matchMedia('(min-width: 760px)').matches;
@@ -53,8 +54,7 @@ export function openValueSheet({ title, now, max, min = 0, trigger, onConfirm, f
   }
 
   function onKey(e) {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false); return; }
-    if (e.key !== 'Tab') return;
+    if (e.key !== 'Tab') return; // Esc 由 modalStack 處理（只關最上層）
     const items = [...panel.querySelectorAll('button, input')];
     const first = items[0];
     const last = items[items.length - 1];
@@ -67,6 +67,7 @@ export function openValueSheet({ title, now, max, min = 0, trigger, onConfirm, f
   function close(ok) {
     if (closed) return;
     closed = true;
+    layer.remove(); // 先解除背景鎖定，下面才能把焦點還給原本的元素
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('hashchange', onHash);
     window.removeEventListener('resize', place);
@@ -77,6 +78,7 @@ export function openValueSheet({ title, now, max, min = 0, trigger, onConfirm, f
   }
 
   document.body.append(box);
+  const layer = pushLayer({ tier: 'popover', close: () => close(false), node: box });
   document.addEventListener('keydown', onKey, true);
   window.addEventListener('hashchange', onHash);
   window.addEventListener('resize', place);

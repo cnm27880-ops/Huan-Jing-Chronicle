@@ -10,6 +10,7 @@ import * as defaultRoom from '../state/rollLog.js';
 import { takeItems, refundItems } from '../game/mail.js';
 import { detectEvents, createNudgeGate, canFeed, myOptions } from '../game/nudge.js';
 import { resPill } from './partyBars.js';
+import { pushLayer } from './modalStack.js';
 
 const LOCK_MS = 1000; // 「我知道了」要等一下才能按（不是故意刁難：避免連點把提醒直接關掉）
 const pctOf = (v) => (v.maxHp > 0 ? Math.round((v.hp / v.maxHp) * 100) : 0);
@@ -125,15 +126,16 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
     const panel = h('div', { class: 'nudge__panel', role: 'alertdialog', 'aria-modal': 'true', 'aria-label': '隊友需要幫忙' });
     const backdrop = h('div', { class: 'nudge', 'aria-hidden': 'false' }, panel);
     const btn = h('button', { type: 'button', class: 'btn btn--primary', disabled: true }, '我知道了');
-    const dismiss = () => { backdrop.remove(); modal = null; };
+    let layer = null;
+    const dismiss = () => { layer?.remove(); backdrop.remove(); modal = null; };
     dismiss.btn = btn;
     btn.addEventListener('click', dismiss);
     modal = { events: [...events], panel, node: backdrop, fed: new Set(), dismiss };
     document.body.append(backdrop);
+    // 強制回應：Esc 由 modalStack 吞掉但不關閉（不管焦點在哪裡都擋得住，底下的面板也不會被關），只能按「我知道了」
+    layer = pushLayer({ tier: 'nudge', dismissible: false, node: backdrop });
     draw();
     setTimeout(() => { btn.disabled = false; }, LOCK_MS);
-    // 擋住 Esc 讓底下的面板也不會被關掉；提醒本身只能按「我知道了」
-    backdrop.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); } });
     (panel.querySelector('.nudge__potion:not(:disabled)') ?? btn).focus({ preventScroll: true });
   }
 

@@ -51,6 +51,7 @@ const B64 = /^[A-Za-z0-9+/]+={0,2}$/;
 const VITAL_KEY = /^[\u4e00-\u9fff]{1,4}$/; // 資源名稱（靈氣、魔力…）
 
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
+const VITALS_SEQ_AHEAD_MS = 60_000; // 隊友狀態的 seq 最多可以比伺服器時間超前這麼多（見 onVitals）
 const TRACKS_TEXT = (o) => ['A', 'B', 'C'].filter((t) => o?.[t] > 0).map((t) => `${o[t]}${t}`).join(' ') || '0';
 const cleanStr = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
 /** 物品清單（{ 名稱: 數量 }）驗證與整理：回傳 { items } 或 { error } */
@@ -1029,6 +1030,15 @@ export class RoomCore {
       for (const [k, pair] of Object.entries(v.res).slice(0, 8)) {
         if (VITAL_KEY.test(k) && Array.isArray(pair) && pair.length === 2 && isInt(pair[0], 0, BIG) && isInt(pair[1], 0, BIG)) clean.res[k] = pair;
       }
+    }
+    // seq（前端用 Date.now() 加單調遞增）：比已存的舊就靜默忽略，免得放了很久的另一台裝置把新狀態蓋回舊的。
+    // 沒帶 seq（還沒更新的前端）照舊直接收。超前太多（時鐘錯亂）壓回「現在 + 60 秒」，免得把這位玩家後面的回報全部擋掉。
+    if (isInt(v.seq, 0, Number.MAX_SAFE_INTEGER)) {
+      clean.seq = Math.min(v.seq, this.now() + VITALS_SEQ_AHEAD_MS);
+      const old = this.db.exec('SELECT json FROM vitals WHERE uid = ?', user.uid)[0];
+      let oldSeq;
+      try { oldSeq = old ? JSON.parse(old.json).seq : undefined; } catch { oldSeq = undefined; }
+      if (Number.isInteger(oldSeq) && clean.seq < oldSeq) return { out: [], close: null };
     }
     this.db.exec('INSERT INTO vitals(uid, json, t) VALUES (?, ?, ?) ON CONFLICT(uid) DO UPDATE SET json = excluded.json, t = excluded.t', user.uid, JSON.stringify(clean), this.now());
     return { out: [{ to: 'all', msg: { t: 'vitals', uid: user.uid, v: clean } }], close: null };

@@ -174,7 +174,7 @@
 
 /* ---------- 封面 ---------- */
 .cover {
-  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1.5rem;
+  position: fixed; inset: 0; z-index: var(--z-cover); display: grid; place-items: center; padding: 1.5rem;
   background:
     radial-gradient(ellipse at 50% 30%, rgba(var(--gold-rgb), 0.18), transparent 60%),
     radial-gradient(ellipse at 20% 90%, rgba(var(--sky-rgb), 0.12), transparent 55%),
@@ -240,7 +240,7 @@ a.cover__btn--discord { display: inline-flex; align-items: center; justify-conte
 
 /* 收到東西的通知面板、送禮與餵藥 */
 .mailbox {
-  position: fixed; right: 14px; bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: 80;
+  position: fixed; right: 14px; bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom, 0px)); z-index: var(--z-notice);
   width: min(340px, calc(100vw - 28px)); max-height: 60vh; overflow-y: auto; padding: .7rem .8rem;
   background: var(--paper2); border: 1px solid var(--gold); border-radius: var(--r-panel); box-shadow: 0 10px 30px rgba(var(--shadow-rgb), .55);
 }

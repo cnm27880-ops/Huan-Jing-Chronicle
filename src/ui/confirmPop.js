@@ -6,14 +6,16 @@
 // 點旁邊、按 Esc、按「取消」都算取消；一次只會有一個。
 // ============================================================
 import { h } from './dom.js';
+import { pushLayer } from './modalStack.js';
 
 let current = null;
 
 function close(result) {
   if (!current) return;
-  const { node, backdrop, resolve, anchor, off } = current;
+  const { node, backdrop, resolve, anchor, off, layer } = current;
   current = null;
   off();
+  layer.remove();
   node.remove();
   backdrop?.remove();
   resolve(result);
@@ -56,19 +58,14 @@ function openPop(anchor, title, build, cancelValue) {
     if (backdrop) document.body.append(backdrop);
     document.body.append(node);
     place(node, anchor);
-    const onKey = (e) => {
-      if (e.key !== 'Escape') return;
-      e.stopImmediatePropagation(); // 不要連底下的面板一起關掉
-      close(cancelValue);
-    };
     const onDown = (e) => { if (!node.contains(e.target) && e.target !== anchor && !anchor?.contains?.(e.target)) close(cancelValue); };
     const onMove = () => place(node, anchor);
-    document.addEventListener('keydown', onKey, true);
     document.addEventListener('pointerdown', onDown, true);
     window.addEventListener('resize', onMove);
     document.addEventListener('scroll', onMove, true); // 面板內捲動時跟著按鈕走
-    current = { node, backdrop, resolve, anchor, off: () => {
-      document.removeEventListener('keydown', onKey, true);
+    // Esc 由 modalStack 統一處理（只關最上層）；貼在按鈕旁的小浮窗不鎖背景，置中的才鎖
+    const layer = pushLayer({ tier: 'confirm', modal, close: () => close(cancelValue), node });
+    current = { node, backdrop, resolve, anchor, layer, off: () => {
       document.removeEventListener('pointerdown', onDown, true);
       window.removeEventListener('resize', onMove);
       document.removeEventListener('scroll', onMove, true);

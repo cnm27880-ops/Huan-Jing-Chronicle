@@ -19,8 +19,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 ## 檔案地圖
 | 檔案 | 用途 |
 |---|---|
-| `index.html` | 頁面骨架（頂部列、地圖、面板容器） |
-| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #session / #market（舊的 #battle 導到 #session））、角色存檔串接、GM 示範角色換成空白角色（`gmBlankCheck`，要先確認）與還原備份（`offerRestore`） |
+| `index.html` | 頁面骨架（頂部列＋唯一的 `<main id="main">`，裡面是各分頁 `<section data-view="…">`；樣式在 `layout.css` 的 `#main`） |
+| `src/main.js` | 進入點、**各分頁 view 第一次進入才動態載入**（`VIEW_MODULES`／`ensureView`，沒載入前 `views[名稱]` 是 undefined，所以用到都要寫 `views[名稱]?.`；進首頁不下載任何分頁；瀏覽器閒置時背景預載修整日／背包／跑團／裝備，省流量或 2G 不預載）、分頁切換（#map / #rest / #bag / #gear / #session / #market（舊的 #battle 導到 #session，網址列的 hash 也會被修正成實際顯示的頁面））、角色存檔串接、GM 示範角色換成空白角色（`gmBlankCheck`，要先確認）與還原備份（`offerRestore`） |
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
 | `DESIGN.md` | 視覺設計規格（黑金主題） |
 | `RULES_OVERVIEW.md` | 規則原文整理（創角、每日養成、技能學習升級、資源、寶石、配方、特殊材料）；階段 2 的依據，含待確認清單 |
@@ -32,7 +32,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/market.js` | 交易：交易大廳（每日原價 5 個）、黑市（擲骰溢價／壓價、勞動抵債、代金券換金幣）、特殊黑市（黑市團只有 GM 能開，房間同步：`syncBlackSession`；伺服器 `room-core.js` 的 `onBlackMarket`；50 個）（純函式） |
 | `src/game/combat.js` | 戰鬥：A/B/C 結算、遭遇戰、藥水、倒地（純函式） |
 | `src/game/mail.js` | 送東西與餵藥（純函式）：打包扣背包（已鑑定裝備整件送：`takeGear`／`refundGear`／`receiveGear`，收到換新編號，鑲的寶石跟著走；交易單的裝備只放「我給出」這邊，欄位 `giveGear`；伺服器 `parseGear` 只留已知欄位、一次最多 10 件）、收到時套用（禮物進背包、藥水回復＋毒性算收件人、毒性滿了退回） |
-| `src/state/mailbox.js` | 信箱：收到伺服器的信 → 領取（只有第一個分頁拿得到）→ 套用到自己的角色 → 存檔 → 跳通知；不在線寄來的上線才收到 |
+| `src/state/mailbox.js` | 信箱：收到伺服器的信 → **等角色存檔比對完成（`ready`＝`sync.idle`）** → 領取（只有第一個分頁拿得到）→ 套用到自己的角色 → 存檔 → 跳通知；不在線寄來的上線才收到。不能在比對前領信：領了就刪，之後比對採用伺服器版會把東西蓋掉 |
 | `src/ui/mailNotice.js` | 「收到的東西」通知面板（右下角浮動，不需同意） |
 | `src/ui/holdRepeat.js` | 長按連加／連減（按住＋／－會越按越快；`onEnd` 放開才重畫）：送東西數量用（鬥氣加骰已改成直接輸入數字） |
 | `src/ui/itemPicker.js` | 背包物品挑選器（分類鈕＋格狀物品，沒有搜尋欄；金幣是其中一格；點一下選取、長按調數量）：贈送與交易共用 |
@@ -46,6 +46,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/nudge.js` | 戰鬥提醒與隊友資源條的判斷（純函式）：資源動用比例、資源條、隊伍摘要、偵測隊友倒地／危急／全隊吃緊、防連發、手上能做的事 |
 | `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄、房間上方；GM 不顯示）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示） |
 | `src/ui/confirmPop.js` | 網頁自己的對話框（取代瀏覽器的 confirm／prompt）：`askConfirm`／`askText`，有給按鈕貼在旁邊、沒給就置中；**全站不要再用 `confirm()`／`prompt()`／`alert()`** |
+| `src/ui/modalStack.js` | 彈窗堆疊：全站唯一的 Esc 監聽器，Esc 一次只關畫面最上面那層（`sheet.js`、`confirmPop.js`、`valueSheet.js`、`reveal.js`、`nudgeModal.js`、`dossier.js`、`sessionView.js` 的抽屜都用 `pushLayer` 註冊，**這些檔案不要再自己監聽 Escape**）；modal 開著時背景（`#main`、頂部列、被蓋住的彈窗）設 `inert`、`<html data-modal="open">`（不鎖 body 捲動，body 本來就 `overflow: hidden`）；戰鬥提醒 `dismissible: false`；輸入法組字中、封面還在時不處理 Esc。層級順序 `TIERS` 要和 `tokens.css` 的 `--z-*` 一致（`tests/modal-stack.test.js` 檢查）（判斷邏輯是純函式） |
 | `src/game/fairness.js` | 模擬戰的公平性（純函式）：量每位玩家一次出手的傷害並排強弱、小怪血量依最弱玩家設、「第一名只出六成力」的情境（`FAIR` 常數可調） |
 | `src/game/sensitivity.js` | 模擬戰的「範本調整影響分析」（純函式，只用在自訂強度）：以 GM 的範本（9 小怪＋BOSS，`TEMPLATE`／`templateSpecs`）為基準，逐項微調（加減隻數、攻擊／防禦／血量 ±10%／±20%／±50%，`variations`），用同一批固定種子重跑（`makeEvaluator`），算出勝率、回合、資源消耗等的變化（`analyzeSensitivity`）與影響力排行（`topImpact`） |
 | `src/game/moveUse.js` | 招式使用紀錄（純函式）：`recordMoveUse`（玩家出招／用輔助成功後，在角色 `moveUse` 累計招式名稱次數，記在 `combat.js` 的 `playerAttack`／`useSupport`）、`usageList`、`usagePlan`（依紀錄排出模擬戰的出招優先順序）；GM 的模擬戰用 |
@@ -60,12 +61,13 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `worker/src/room.js` | Durable Object 外殼（Hibernation WebSocket + SQLite）；`entry.js` 是 wrangler 進入點 |
 | `src/state/roomClient.js` | 房間 WebSocket 連線：自動重連、心跳 |
 | `src/state/diceTape.js` | 讓規則函式直接吃伺服器擲出的骰點（不複製、不改規則） |
-| `src/ui/roomPanel.js` | 跑團頁裡的房間區塊：狀態、GM、成員、新戰鬥、暫代 GM |
+| `src/ui/roomPanel.js` | 跑團頁裡的房間區塊：狀態、GM、成員、新戰鬥、暫代 GM；8 個 GM 工具面板用 `lazyTool` 點了才動態載入（新增 GM 工具面板要照同樣寫法，不要靜態 import） |
+| `src/ui/lazyLoad.js` | 動態載入的共用工具：`loadModule`、載入失敗說明（離線／一般）、新版部署後舊檔案載不到時自動重新整理一次（`vite:preloadError`，30 秒內不重複、離線不重新整理）（判斷是純函式） |
 | `src/api/auth.js` | 前端登入 API：查詢登入者、登出；任何失敗都當未登入（維持單機試玩） |
 | `src/ui/userChip.js` | 頂部列的登入者頭像與登出 |
 | `src/state/rollLog.js` | 擲骰紀錄，**畫面與房間之間唯一的接線點**：房間模式走 WebSocket、伺服器擲骰；本機模式（沒登入／連不上）照舊存 localStorage |
-| `src/state/vitals.js` | 隊友狀態回報：存檔後 0.6 秒比對，生命／資源／毒性／護盾有變才送給房間；等 GM 匯入期間不送 |
-| `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；全新裝置且伺服器沒有存檔時不上傳示範角色（標記等待，GM 匯入後自動採用，畫面在 `src/ui/waitNotice.js`，新玩家也可以在那裡自己建立空白角色）；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔 |
+| `src/state/vitals.js` | 隊友狀態回報：存檔後 0.6 秒比對，生命／資源／毒性／護盾有變才送給房間；等 GM 匯入期間不送；連上房間後等角色比對完（`ready`＝`sync.idle`）才送；每則帶遞增的 `seq`，伺服器（`room-core.js` 的 `onVitals`）遇到比已存的舊就忽略，兩台裝置不會互蓋 |
+| `src/state/charSync.js` | 角色存檔同步（階段 2）：登入連上房間後把角色上傳伺服器，版本號樂觀鎖、防抖 1.5 秒、兩邊不同時問玩家；全新裝置且伺服器沒有存檔時不上傳示範角色（標記等待，GM 匯入後自動採用，畫面在 `src/ui/waitNotice.js`，新玩家也可以在那裡自己建立空白角色）；另有 GM 用的 `listCharacters`／`fetchCharacter`（模擬戰用）。本機 localStorage 仍是主要存檔。**比對（`reconcile`）等回應的期間玩家可能又改了，回應回來要重讀存檔標記，不能用請求前的舊值**；內容相同的「兩份存檔」靜默對齊；上傳失敗 5／15／60 秒自動重試；斷線／重連各提示一次；`getSyncStatus()` 給畫面用（local／connecting／offline／waiting／pending／synced） |
 | `src/game/importBot.js` | 機器人存檔（players_data.json 的一位玩家）→ 網站角色（純函式）：只填機器人有的欄位，技能與基礎數值空白；可合併進既有角色 |
 | `src/ui/botImport.js` | GM 專用的「匯入機器人存檔」面板（在跑團頁的房間區塊）：檔案只在瀏覽器讀取轉換，轉好才送伺服器（`charImport`）；`players_data.json` 永遠不能進 git |
 | `src/data/skills.js` | 技能目錄（**自動產生，不要手改**；試算表沒有的個人專屬技能放 `tools/extra-skills.json`）：119 個技能、每級累積數值、位階／類型／系別／效果文字、升級經驗表。由 `tools/extract-skills.py` 從 GM 的自動角色卡產生 |
@@ -110,7 +112,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/mapView.js` | 地圖拖曳、縮放、熱點 |
 | `src/ui/dossier.js` | 地點情報面板（點地圖標記打開） |
 | `src/styles/theme.css` | **主題檔**：全站色碼、字體、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
-| `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線） |
+| `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線）與**全站圖層階層 `--z-*`**（其他 CSS 檔 25 以上的 z-index 一律用 `var(--z-…)`，不能寫死數字，測試會檢查） |
 | `src/styles/layout.css` | 頂部列、按鈕 |
 | `src/styles/map.css` | 地圖與熱點 |
 | `src/styles/dossier.css` | 情報面板與四大區域主題 |
