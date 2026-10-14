@@ -41,12 +41,12 @@ export function mountRoomPanel(container) {
           r.members.length
             ? h('ul', { class: 'room__members' }, r.members.map((m) => h('li', { class: 'room__member', dataset: { online: m.online ? '1' : '0' }, text: m.name })))
             : null));
-      // GM 工具：不分類，三個一排（排版在 blackgold.css 的 .room__tools）
+      // GM 工具：不分類，三個一排（排版在 session.css 的 .room__tools）
       const gmBtn = (text, onclick, main) => h('button', { type: 'button', class: `btn btn--small${main ? '' : ' btn--ghost'}`, onclick }, text);
       if (r.me?.isGm) {
         parts.push(h('div', { class: 'room__tools' },
-          gmBtn('🆕 新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, true),
-          gmBtn('🎁 發放獎勵', lazyTool(() => import('./rewardSheet.js'), 'openRewardSheet', '發放獎勵'), true),
+          gmBtn('新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, true),
+          gmBtn('發放獎勵', lazyTool(() => import('./rewardSheet.js'), 'openRewardSheet', '發放獎勵'), true),
           gmBtn('模擬戰', lazyTool(() => import('./simPanel.js'), 'openSimPanel', '模擬戰')),
           gmBtn('玩家角色', lazyTool(() => import('./gmCharEdit.js'), 'openGmCharEditor', '玩家角色')),
           gmBtn('匯入機器人存檔', lazyTool(() => import('./botImport.js'), 'openBotImportSheet', '匯入機器人存檔')),

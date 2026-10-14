@@ -753,7 +753,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
             h('button', {
               type: 'button', class: 'btn btn--small',
               onclick: async () => { try { await encounterAction({ t: 'encAllySup', id: a.id, to }); toast(`${a.name} 對 ${mates.find((m) => m.uid === to)?.name ?? '隊友'} 施放了${SUPPORT_KINDS[a.support.kind]}。`); } catch (e) { toast(e.message || '操作失敗。'); } },
-            }, `✚ ${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%`))
+            }, `輔助：${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%`))
         : null,
       gm
         ? h('div', { class: 'row' },

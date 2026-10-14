@@ -46,7 +46,7 @@ export function cloakCard(state, { commit }) {
   };
 
   return h('section', { class: `card cloak${hidden ? ' is-hidden' : ''}` },
-    h('h2', { class: 'section-title', text: `🌑 暗影斗篷 Lv${skillLevel(state, SHADOW_SKILL)}` }),
+    h('h2', { class: 'section-title', text: `暗影斗篷 Lv${skillLevel(state, SHADOW_SKILL)}` }),
     h('p', { class: 'hint', text: `每次聚集 ${gainPerRound(state)} 點能量傷害（2 + 等級÷2）。進入隱身花 ${costText(STEALTH_COST)}，立刻聚集一次，之後遭遇戰每個新回合開始再聚集（最多 ${STEALTH_ROUNDS} 回合）；隱身中無法被優先指定、不能用其他攻擊。` }),
     sh
       ? h('p', { class: 'cloak__now', text: hidden ? `隱身中：第 ${sh.rounds}／${STEALTH_ROUNDS} 回合・已聚集 +${sh.gathered} 能量傷害` : `隱身結束：已聚集 +${sh.gathered} 能量傷害，還可以現身爆發` })

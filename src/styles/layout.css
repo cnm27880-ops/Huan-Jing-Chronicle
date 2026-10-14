@@ -19,61 +19,32 @@ body {
 }
 
 body {
-  background: var(--paper);
-  color: var(--mist);
-  font-family: var(--font-ui);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   padding-top: env(safe-area-inset-top, 0px);
 }
 
-:focus-visible {
-  outline: 2px solid var(--bronze);
-  outline-offset: 2px;
-}
-
 /* ---------- 頂部列 ---------- */
 .topbar {
-  height: var(--topbar-h);
   flex: none;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0 1rem;
-  border-bottom: 1px solid var(--ink-line);
-  background: var(--paper);
   position: relative;
   z-index: var(--z-topbar);
 }
 
 .brand {
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.5rem;
-  letter-spacing: 0.2em;
-  color: var(--bronze);
   white-space: nowrap;
 }
 
 .tabs {
   display: flex;
-  gap: 0.25rem;
-  margin-right: auto;
 }
 
 .tab {
-  font-size: 0.95rem;
-  padding: 0.4rem 0.75rem;
-  color: var(--mist-dim);
   text-decoration: none;
-  border-bottom: 2px solid transparent;
-}
-
-.tab[aria-current='page'] {
-  color: var(--mist);
-  border-bottom-color: var(--bronze);
 }
 
 .tab[aria-disabled='true'] {
@@ -81,9 +52,6 @@ body {
   cursor: not-allowed;
 }
 
-/* 按鈕與輸入框的基礎樣式已搬到 base.css */
-
-/* ---------- 主區域 ---------- */
 /* 唯一的 <main>：撐滿頂部列以外的高度，裡面的分頁（section）照舊用 flex: 1 撐滿它 */
 #main {
   flex: 1;
@@ -118,7 +86,6 @@ body {
   *,
   *::before,
   *::after {
-    transition-duration: 0.01ms !important;
     animation: none !important;
   }
 }
@@ -134,3 +101,328 @@ body {
   text-align: center;
   color: var(--soft);
 }
+
+/* 分頁外殼與手機頂部列縮小（原本在 pages.css，必須排在下面舊檔搬來的規則之前才會維持原本的層疊順序） */
+.view[hidden] { display: none !important; }
+.view--page {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
+  /* 背景淡淡透出世界地圖，讓每一頁都在同一個世界裡 */
+  background:
+    linear-gradient(180deg, rgba(var(--paper-rgb), 0.94) 0%, rgba(var(--paper-rgb), 0.985) 35%, var(--paper) 100%),
+    url('/img/maps/world.webp') center top / cover no-repeat;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 1rem);
+  padding: 0.6rem 1.1rem;
+  font-size: 0.9rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: var(--z-toast);
+}
+.toast[data-show='true'] { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 640px) {
+  .tabs { gap: 0; }
+  .tab { padding: 0.4rem 0.5rem; }
+}
+
+/* ============================================================
+   （舊檔搬來）整體外殼：背景、頂部列、分頁、手機底部導覽、吐司、全站捲軸與焦點
+   ============================================================ */
+/* 幻境編年史 v3：乾淨卡片式遊戲介面
+   視覺參考：深色戰術工作區、灰色外框、襯線標題、金色主操作色。
+   本檔只改呈現，不改動遊戲規則、資料或互動事件。 */
+html { scrollbar-color: var(--line) transparent; }
+button { font-family: inherit; transition: color .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .1s ease; }
+button:active { transform: scale(.97); }
+/* ---------- 導覽列：參考 Limbus 的簡單深色工作列 ---------- */
+.topbar { padding: 0 12px; gap: 16px; }
+.brand { flex: none; position: relative; padding: 0 14px 0 20px; font-size: 1.25rem; line-height: 1; }
+.brand::before { position: absolute; left: 0; top: 50%; transform: translateY(-50%) scale(.65); color: var(--gold); }
+.brand::after { content: 'WORLD CHRONICLE'; display: block; margin-top: 5px; font-family: var(--font-mono); }
+.tabs { margin-right: auto; }
+.tab { display: inline-flex; align-items: center; gap: 6px; font-size: .86rem; border-bottom: 2px solid transparent; }
+.tab::before { display: none; }
+.tab[aria-current='page'] { border-bottom-color: var(--gold); }
+/* ---------- 修整日／背包：卡片、按鈕、數值 ---------- */
+.view--page::before { display: none; }
+.toast { background: var(--gold); color: var(--on-gold); border-radius: 999px; box-shadow: 0 5px 18px rgba(var(--shadow-rgb), .3); }
+@media (max-width: 700px) {
+  .topbar { padding: 0 8px; gap: 8px; }
+  .brand { font-size: 1rem; letter-spacing: .08em; padding-left: 16px; }
+  .brand::after { font-size: .35rem; letter-spacing: .1em; }
+  .tab { font-size: .76rem; }
+  .atlas { padding: 5px; }
+}
+@media (max-width: 440px) {
+  .brand { display: none; }
+  .tabs { margin-left: 0; }
+  .tab { padding-inline: 7px; }
+}
+/* 顏色已移到 theme.css */
+.view--page { background: var(--paper); color: var(--ink); }
+/* 地圖兩側使用低對比背景，不干擾中央地圖 */
+.atlas { padding: 7px; background: var(--paper); }
+/* 背包全寬密集排列：消除右側空白，文字／圖示／上下間距一起縮小 */
+@media (max-width: 700px) {
+  .topbar { height: 50px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+/* ---------- v6：全頁響應式、角色狀態面板、戰鬥結算卡片 ---------- */
+.view--page {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* ============================================================
+   骰盤、擲骰紀錄、裝備頁、戰鬥頁
+   最後載入，深色卡片風格與變數
+   ============================================================ */
+/* ---------- 頂部列：新增分頁後在窄螢幕可左右滑 ---------- */
+.tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { white-space: nowrap; }
+@media (max-width: 900px) {
+  .topbar { gap: 8px; }
+  .brand { padding: 0 4px 0 16px; font-size: 1.05rem; letter-spacing: .08em; }
+  .brand::after { display: none; }
+  .tab { padding: 8px 9px; font-size: .8rem; }
+}
+.user-chip { display: flex; align-items: center; gap: 0.4rem; margin-left: auto; color: var(--mist); font-family: var(--font-ui); font-size: 0.85rem; min-width: 0; }
+.user-chip[hidden] { display: none; }
+.user-chip__avatar { width: 24px; height: 24px; border-radius: 50%; flex: none; }
+.user-chip__name { max-width: 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 700px) {
+  .user-chip__name { display: none; }
+}
+/* ---------- 房間（階段 1-B） ---------- */
+.user-chip__dot { width: .55rem; height: .55rem; border-radius: 50%; flex: none; background: var(--soft); }
+.user-chip__dot[data-phase='online'] { background: var(--sky); }
+.user-chip__dot[data-phase='connecting'],
+.user-chip__dot[data-phase='reconnecting'] { background: var(--gold); }
+.user-chip__dot[data-phase='denied'] { background: var(--rose); }
+/* ============================================================
+   質感層（最後載入）：玻璃擬態面板、立體按鈕、光暈與微動畫
+   參考 SillyTavern 角色卡：深色模糊背景、半透明圓角卡片、hover 浮起發光。
+   只改外觀，不改任何互動與資料。不要放「每次出現都重播」的進場動畫（會閃）。
+   ============================================================ */
+:root {
+  --topbar-h: 52px; /* 和實際頂部列高度一致，骰盤抽屜才不會露縫；顏色與質感變數在 theme.css */
+}
+@media (max-width: 700px) {
+  :root { --topbar-h: 50px; }
+}
+/* ---------- 全站背景：深色＋模糊的世界地圖，取代平平的灰底 ---------- */
+body::before {
+  display: block;
+  content: '';
+  position: fixed;
+  inset: -40px;
+  z-index: -1;
+  background: url('/img/maps/world.webp') center / cover no-repeat;
+  filter: blur(26px) saturate(0.6) brightness(0.32);
+  pointer-events: none;
+}
+::selection { background: rgba(var(--gold-rgb), 0.35); color: var(--ink); }
+* { scrollbar-width: thin; scrollbar-color: rgba(var(--ink-rgb), 0.18) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(var(--ink-rgb), 0.16); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(var(--gold-rgb), 0.45); }
+:focus-visible { outline: 2px solid rgba(var(--gold-rgb), 0.85); outline-offset: 2px; border-radius: 6px; }
+/* ---------- 頂部列：玻璃質感＋金色細線 ---------- */
+.topbar {
+  height: var(--topbar-h);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+}
+.tabs { align-self: center; gap: 4px; padding: 3px; }
+.tab {
+  position: relative;
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.tab:hover { border-color: var(--glass-line); }
+@media (max-width: 700px) {
+  .tab { padding: 6px 9px; }
+}
+/* ============================================================
+   黑金主題（最後載入）：依 DESIGN.md 覆蓋前面各檔的外觀。
+   只用 theme.css 的變數，不寫死色碼；只改外觀，不改互動與資料。
+   ============================================================ */
+/* ---------- 基礎：字體、字級、數字 ---------- */
+html { font-size: 14px; }
+body {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse 70% 55% at 0% 0%, rgba(var(--gold-rgb), 0.08), transparent 65%),
+    radial-gradient(ellipse 70% 55% at 100% 100%, rgba(var(--sky-rgb), 0.07), transparent 65%),
+    var(--paper);
+}
+.num,
+.die,
+.stat__value,
+.brand::after {
+  font-family: var(--font-num);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+/* ---------- 背景點綴：兩層細小星點（只在背景層，面板不透明） ---------- */
+body::before,
+body::after {
+  content: '';
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  filter: none;
+  opacity: 1;
+}
+body::before { /* 靜止的 1px 星點，尺寸用質數避免看出重複 */
+  background:
+    radial-gradient(circle at 17px 29px, var(--star) 0 0.5px, transparent 1px),
+    radial-gradient(circle at 131px 83px, var(--star) 0 0.5px, transparent 1px),
+    radial-gradient(circle at 67px 163px, var(--star) 0 0.5px, transparent 1px),
+    radial-gradient(circle at 181px 191px, var(--star) 0 0.5px, transparent 1px);
+  background-size: 197px 211px;
+  opacity: 0.55;
+}
+body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
+  background:
+    radial-gradient(circle at 41px 61px, var(--star) 0 0.75px, transparent 1.25px),
+    radial-gradient(circle at 229px 137px, var(--star) 0 0.75px, transparent 1.25px),
+    radial-gradient(circle at 113px 251px, var(--star) 0 0.75px, transparent 1.25px);
+  background-size: 307px 283px;
+  animation: bg-twinkle 7s ease-in-out infinite alternate;
+}
+@keyframes bg-twinkle { from { opacity: 0.2; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; opacity: 0.6; }
+}
+.atlas, .view--page { background: transparent; }
+/* ---------- 頁首 ---------- */
+.topbar {
+  background: var(--paper2);
+  backdrop-filter: none; /* 有 backdrop-filter 時，手機底部導覽列（position: fixed）會跟著頁首跑 */
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, var(--gold) 50%, transparent) 1;
+  box-shadow: 0 4px 12px var(--shadow);
+}
+.brand {
+  padding-left: 0;
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  text-shadow: none;
+}
+.brand::before { content: none; display: none; }
+.brand::after { color: var(--soft); font-size: 0.5rem; font-weight: 500; letter-spacing: 0.3em; }
+.tab { color: var(--soft); background: transparent; border-radius: 0; box-shadow: none; text-shadow: none; }
+.tab:hover { color: var(--ink); background: transparent; }
+.tab[aria-current='page'] {
+  color: var(--gold);
+  background: transparent;
+  border-color: transparent;
+  border-bottom: 2px solid var(--gold);
+  box-shadow: none;
+  text-shadow: none;
+}
+.tab--more, .more-menu { display: none; }
+/* ============================================================
+   物品稀有度：左側色條＋菱形＋方框標籤（形狀和擲骰的膠囊不同，不可混用）
+   色由 data-tier／data-rarity 決定（--t），0~4 = 初階／進階／大師／傳說／神話
+   ============================================================ */
+/* ============================================================
+   戰鬥頁：電腦三欄、平板兩欄、手機單欄
+   ============================================================ */
+/* ============================================================
+   手機（<760px）：單欄卡片堆疊、底部固定導覽列、觸控目標 44px
+   ============================================================ */
+@media (max-width: 759px) {
+  :root { --nav-h: 58px; }
+  .topbar { z-index: auto; }
+  .brand { display: block; margin-right: auto; padding: 0; font-size: 1.15rem; letter-spacing: 0.2em; }
+  .brand::after { display: none; }
+  .tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-nav);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+    padding: 0 0 env(safe-area-inset-bottom, 0px);
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+    overflow: visible;
+    background: var(--paper2);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -4px 12px var(--shadow);
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 4px;
+    font-size: 0.95rem;
+    border: 0;
+    border-top: 2px solid transparent;
+  }
+  .tab[data-view-link='gear'], .tab[data-view-link='market'], .tab[data-view-link='logs'] { display: none; }
+  .tab[aria-current='page'], .tab--more[data-active] { color: var(--gold); border-bottom: 0; border-top: 2px solid var(--gold); }
+  .tab--more { display: flex; font: inherit; background: transparent; cursor: pointer; }
+  .tab--more[aria-expanded='true'] { color: var(--gold); }
+  .more-menu {
+    position: fixed;
+    right: 8px;
+    bottom: calc(var(--nav-h) + 8px + env(safe-area-inset-bottom, 0px));
+    z-index: var(--z-more-menu);
+    display: grid;
+    min-width: 10rem;
+    padding: 6px;
+    background: var(--card);
+    border-radius: var(--r-panel);
+    box-shadow: var(--panel-shadow);
+  }
+  .more-menu[hidden] { display: none; }
+  .more-menu__item {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 14px;
+    color: var(--ink);
+    font: inherit;
+    text-decoration: none;
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .more-menu__item:hover, .more-menu__item[aria-current='page'] { color: var(--gold); background: var(--goldbg); }
+  .view--page { padding-bottom: calc(var(--nav-h) + 1.5rem + env(safe-area-inset-bottom, 0px)); }
+  .toast { bottom: calc(var(--nav-h) + 1rem + env(safe-area-inset-bottom, 0px)); }
+}
+/* ============================================================
+   寶石：鑑定清單、未鑲嵌清單、裝備上的寶石小格（神話色＝虹彩菱形）
+   ============================================================ */
+/* ============================================================
+   交易頁（marketView.js）：HUD、三個分頁、商品列；裝備頁的「賣出」面板
+   ============================================================ */
+/* ============================================================
+   手機測試後調整：數字框置中、沒有圖示的物品不留空格
+   ============================================================ */
+input[type='number'] { text-align: center; }

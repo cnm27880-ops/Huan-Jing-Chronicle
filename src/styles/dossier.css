@@ -3,11 +3,7 @@
    每個區域有自己的主題：只要改 [data-theme] 底下的變數即可
    ============================================================ */
 .dossier {
-  --d-bg: var(--card);
-  --d-text: var(--mist);
-  --d-muted: var(--mist-dim);
   --d-accent: var(--gold);
-  --d-rule: var(--ink-line);
   --d-head-font: var(--font-display);
   --d-seal-bg: var(--bronze);
   --d-seal-text: var(--on-gold);
@@ -16,11 +12,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(460px, 100%);
-  background: var(--d-bg);
   color: var(--d-text);
-  border-left: 1px solid var(--d-rule);
-  box-shadow: -18px 0 40px rgba(var(--shadow-rgb), 0.35);
   transform: translateX(104%);
   transition: transform 0.32s var(--ease);
   z-index: var(--z-dossier);
@@ -34,50 +26,30 @@
 
 .dossier__close {
   align-self: flex-end;
-  margin: 0.75rem 0.75rem 0;
-  font: inherit;
   font-family: var(--font-ui);
-  font-size: 0.85rem;
-  color: var(--d-muted);
-  background: transparent;
   border: 1px solid var(--d-rule);
-  border-radius: var(--radius-sm);
-  padding: 0.3rem 0.8rem;
   cursor: pointer;
-}
-
-.dossier__close:hover {
-  color: var(--d-text);
-  border-color: var(--d-accent);
 }
 
 .dossier__body {
   overflow-y: auto;
-  padding: 0.5rem 1.75rem 3rem;
   flex: 1;
   overscroll-behavior: contain;
 }
 
 .dossier__region {
   margin: 0;
-  font-size: 0.85rem;
-  color: var(--d-muted);
-  letter-spacing: 0.08em;
 }
 
 .dossier__title {
   margin: 0.2rem 0 1.1rem;
   font-family: var(--d-head-font);
-  font-size: 2.4rem;
   line-height: 1.15;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--d-text);
 }
 
 .dossier__cover {
   display: block;
-  width: calc(100% + 3.5rem);
   height: auto; /* GM 的圖片比例各不相同：照原比例完整顯示，不裁切頭腳 */
   margin: 0 -1.75rem 1.25rem;
 }
@@ -85,7 +57,6 @@
 .dossier__text {
   font-family: var(--font-body);
   font-size: 1rem;
-  line-height: 1.95;
   margin: 0 0 1em;
   text-align: justify;
 }
@@ -93,10 +64,8 @@
 .dossier__section {
   margin: 2rem 0 1rem;
   font-family: var(--d-head-font);
-  font-size: 1.15rem;
   font-weight: 700;
   padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--d-rule);
 }
 
 .dossier__locked {
@@ -131,7 +100,6 @@
   padding: 0.2rem 0.6rem;
   background: var(--d-seal-bg);
   color: var(--d-seal-text);
-  border-radius: 2px;
 }
 
 .faction__seat {
@@ -221,9 +189,7 @@
     padding: 0.25rem 1.25rem 2.5rem;
   }
   .dossier__cover {
-    width: calc(100% + 2.5rem);
     height: auto;
-    margin: 0 -1.25rem 1rem;
   }
   .dossier__title {
     font-size: 2rem;
@@ -232,3 +198,67 @@
     grid-template-columns: 40% 1fr;
   }
 }
+
+/* ============================================================
+   地點情報面板：標題、分段、封面圖
+   ============================================================ */
+/* ---------- 資訊卡 ---------- */
+.dossier { width: min(460px, 100%); border-left: 1px solid var(--line-focus); }
+.dossier__close { margin: 12px 12px 0; color: var(--muted); background: var(--card); border-color: var(--line); }
+.dossier__close:hover { color: var(--gold); border-color: var(--gold-deep); }
+.dossier__body { padding: 8px 22px 35px; }
+.dossier__region { font-size: .72rem; letter-spacing: .08em; }
+.dossier__title { font-size: 2.2rem; letter-spacing: .04em; }
+.dossier__text { color: var(--ink2); line-height: 1.9; }
+.dossier__section { border-bottom-color: var(--line); }
+.faction__name { border-radius: 6px; }
+@media (max-width: 700px) {
+  .dossier__body { padding-inline: 16px; }
+  .dossier__title { font-size: 1.9rem; }
+}
+.dossier[data-open='true'] .dossier__body > * { animation: dossier-item-in .3s ease both; }
+.dossier[data-open='true'] .dossier__body > *:nth-child(2) { animation-delay: .04s; }
+.dossier[data-open='true'] .dossier__body > *:nth-child(3) { animation-delay: .08s; }
+@keyframes dossier-item-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+/* ---------- 卡片：玻璃面板 ---------- */
+.dossier { border-left-color: rgba(var(--gold-rgb), 0.22); box-shadow: -18px 0 48px rgba(var(--shadow-rgb), 0.6); }
+/* ---------- 設定集面板 ---------- */
+.dossier__region { color: var(--d-accent); }
+.dossier__section { position: relative; border-bottom: 0; }
+.dossier__section::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+}
+.dossier__cover {
+  width: 100%;
+  margin: 0.4rem 0 1.25rem;
+  border-radius: 10px;
+  border: 1px solid var(--glass-line-hi);
+  box-shadow: 0 10px 28px rgba(var(--shadow-rgb), 0.55);
+}
+@media (max-width: 640px) {
+  .dossier__cover { width: 100%; margin: 0.4rem 0 1rem; }
+}
+/* ---------- 面板（不透明） ---------- */
+.dossier,
+.map-hint {
+  background: var(--card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 0;
+  box-shadow: var(--panel-shadow);
+}
+.dossier { background: var(--paper2); }
+@media (max-width: 759px) {
+  .dossier { bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px)); max-height: calc(100% - var(--nav-h) - 1rem); }
+}
+.dossier { --d-bg: var(--paper2); --d-text: var(--ink); --d-muted: var(--soft); --d-rule: var(--line); }
+.dossier__title { color: var(--ink); text-shadow: none; }
+.dossier__section { color: var(--gold); font-size: 12px; letter-spacing: 0.14em; }
+.dossier__section::after { background: linear-gradient(90deg, var(--line3), transparent); }
+/* 面板右上的「收起／關閉」：大小、高度、圓角統一 */
+.dossier__close { min-width: 64px; min-height: 36px; padding: 0 14px; font: inherit; font-size: 0.85rem; line-height: 1; white-space: nowrap; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }

@@ -64,7 +64,7 @@ export function openRewardSheet() {
       h('input', { class: 'field', type: 'text', list: 'reward-known-items', placeholder: '物品名稱，例如 大師技能書', value: it.name, 'aria-label': '獎勵物品', oninput: (e) => { it.name = e.target.value; } }),
       h('input', { class: 'field gift-qty', type: 'number', min: 1, inputmode: 'numeric', value: it.qty, 'aria-label': '數量', onchange: (e) => { it.qty = int(e.target.value); } }),
       ui.items.length > 1 ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', 'aria-label': '移除這一項', onclick: () => { ui.items.splice(i, 1); sheet.refresh(); } }, '✕') : null));
-    const sendBtn = h('button', { type: 'button', class: 'btn btn--primary', disabled: ui.busy ? true : null, onclick: (e) => send(e.currentTarget) }, ui.busy ? '發放中…' : '🎁 發放獎勵');
+    const sendBtn = h('button', { type: 'button', class: 'btn btn--primary', disabled: ui.busy ? true : null, onclick: (e) => send(e.currentTarget) }, ui.busy ? '發放中…' : '發放獎勵');
     return h('div', { class: 'giftsheet' },
       h('p', { class: 'field-label', text: '① 發給誰（預設全員）' }),
       h('label', { class: 'check' },

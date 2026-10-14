@@ -454,7 +454,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         h('span', { class: 'badge', dataset: { tone: i.status === 'ok' ? 'good' : 'bad' }, text: `${STATUS_LABEL[i.status]}・${i.text}` })))),
       h('h3', { class: 'section-title', text: '策略建議' }),
       h('ul', { class: 'simassess__advice' }, a.advice.map((t) => h('li', { text: t }))),
-      ui.source === 'custom' ? null : h('button', { type: 'button', class: 'btn btn--small', disabled: ui.running || ui.tuning ? true : null, onclick: tune }, ui.tuning ? `調整中… ${Math.round(ui.tuneProgress * 100)}%` : '🎯 自動調整數值（保守／激進兩個方案）'),
+      ui.source === 'custom' ? null : h('button', { type: 'button', class: 'btn btn--small', disabled: ui.running || ui.tuning ? true : null, onclick: tune }, ui.tuning ? `調整中… ${Math.round(ui.tuneProgress * 100)}%` : '自動調整數值（保守／激進兩個方案）'),
       ui.source === 'custom' ? null : tuneView());
   }
 
@@ -465,7 +465,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       h('h3', { class: 'section-title', text: '範本調整影響分析' }),
       h('p', { class: 'hint', text: `以上面的敵人清單（例如「載入範本」）為基準，一次只動一項：加減隻數、攻擊／防禦／血量 ±10%／±20%／±50%，各用同一批固定種子跑 ${SENS_RUNS} 場，告訴你每個調整會讓戰局變多少。玩家變強了，範本不動、重新分析一次就知道該往哪調。` }),
       h('button', { type: 'button', class: 'btn btn--primary btn--go', disabled: ui.running || ui.tuning || ui.analyzing ? true : null, onclick: analyze },
-        ui.analyzing ? `分析中… ${Math.round(ui.sensProgress * 100)}%` : '🔬 分析範本調整的影響'),
+        ui.analyzing ? `分析中… ${Math.round(ui.sensProgress * 100)}%` : '分析範本調整的影響'),
       ui.sens ? sensView() : null);
   }
 
@@ -478,7 +478,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
       h('h3', { class: 'section-title', text: '範本版本' }),
       h('p', { class: 'hint', text: '把調整好的敵人清單存成版本（範本 v1、v2…），之後可以載入繼續調整，或勾兩個版本比較。版本存在房間伺服器（只有 GM 看得到，每日備份）。' }),
       t.error ? h('p', { class: 'notice notice--bad', text: `${t.error}（沒連上房間時無法使用版本）` }) : null,
-      h('button', { type: 'button', class: 'btn btn--small', disabled: busy ? true : null, onclick: (e) => saveVersion(e.currentTarget) }, t.busy ? '儲存中…' : '💾 把目前的敵人清單存成新版本'),
+      h('button', { type: 'button', class: 'btn btn--small', disabled: busy ? true : null, onclick: (e) => saveVersion(e.currentTarget) }, t.busy ? '儲存中…' : '把目前的敵人清單存成新版本'),
       t.list === null ? h('p', { class: 'hint', text: '讀取中…' }) : !t.list.length ? h('p', { class: 'hint', text: '還沒有版本。先「載入範本」、調整，再存成 v1。' }) : h('ul', { class: 'import-list' }, t.list.map((v) => h('li', { class: 'import-row' },
         h('label', { class: 'check' },
           h('input', { type: 'checkbox', checked: t.selected.includes(v.id) ? true : null, disabled: busy ? true : null, onchange: () => toggleSelected(v.id) }),
@@ -492,7 +492,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: busy ? true : null, onclick: (e) => deleteVersion(e.currentTarget, v) }, '刪除')))),
       t.list?.length >= 2
         ? h('button', { type: 'button', class: 'btn btn--primary btn--small', disabled: busy || t.selected.length !== 2 ? true : null, onclick: compareSelected },
-            t.comparing ? '比較中…' : t.selected.length === 2 ? '⚖️ 比較勾選的兩個版本' : '勾選兩個版本才能比較')
+            t.comparing ? '比較中…' : t.selected.length === 2 ? '比較勾選的兩個版本' : '勾選兩個版本才能比較')
         : null,
       t.compare ? compareView() : null);
   }
@@ -566,7 +566,7 @@ export function openSimPanel({ list = listCharacters, fetch = fetchCharacter, pr
         const a = assess(t.summary);
         const exact = penalty(t.summary, t.plan) === 0;
         return h('section', { class: 'simtune__plan' },
-          h('h4', { class: 'field-label', text: `${t.plan.key === 'aggressive' ? '🔥' : '🛡️'} ${t.plan.label}：${t.plan.note}` }),
+          h('h4', { class: 'field-label', text: `${t.plan.label}：${t.plan.note}` }),
           ui.tuneFrom
             ? h('ul', { class: 'import-list' }, ui.tuneFrom.monsters.map((o) => {
                 const m = t.specs.monsters.find((x) => x.id === o.id);

@@ -56,7 +56,6 @@
 .hud-meter[data-hud='鬥氣'] { --m: var(--res-fight); }
 .hud-meter[data-hud='算力'] { --m: var(--res-calc); }
 .hud-meter.is-bad .hud-meter__val { color: var(--rose); }
-.bt-hud.is-cloaked .bt-hud__name { color: var(--cloak); }
 
 /* ---------- 左欄：分頁與內容 ---------- */
 .sx-tabs { flex: none; gap: var(--space-4); }
@@ -348,7 +347,6 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .sx-feed { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .roll-list { display: grid; margin: 0; padding: 0; list-style: none; }
 .roll { display: grid; gap: 6px; padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); }
-.roll[data-fresh='1'] { animation: roll-in 0.3s ease both; }
 .roll__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2); }
 .roll__who { color: var(--gold); font-weight: 600; }
 .roll__label { color: var(--ink2); font-size: 0.88rem; }
@@ -454,4 +452,74 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 }
 @media (prefers-reduced-motion: reduce) {
   .sx-left, .sx-center, .mob, .boss__art, .lbar__fill, .mob__fill, .hud-meter__fill { transition: none; }
+}
+
+/* ============================================================
+   跑團頁的動畫與特效：BOSS 多段血條、打擊特效
+   ============================================================ */
+/* ---------- 擲骰紀錄 ---------- */
+.roll[data-fresh='1'] { animation: roll-in .3s ease both; }
+/* 最新結果跟著內容捲動，不再釘在上方佔畫面 */
+@keyframes roll-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .roll[data-fresh='1'], .bar__fill { transition: none; animation: none; }
+}
+/* ============================================================
+   跑團頁：固定三欄工作台（規格見 DESIGN.md「跑團頁」）
+   ≥1100px 三欄各自捲動；901–1099px 中＋右兩欄、左欄變底部抽屜；≤900px 紀錄當主畫面，左欄與中欄都是底部抽屜
+   ============================================================ */
+/* 承受攻擊的二次確認：第一次點＝待命（玫瑰紅框閃動、字變「再點一次確認」），3 秒內再點才執行 */
+.lbar { position: relative; display: grid; gap: 4px; }
+.lbar__bars { display: grid; gap: 4px; }
+/* 三條各自獨立，沒有外框 */
+.lbar__track { position: relative; height: 14px; overflow: hidden; background: var(--paper); border-radius: 5px; box-shadow: inset 0 0 0 1px var(--line3), inset 0 2px 4px var(--shadow); }
+.lbar__fill, .lbar__ghost { position: absolute; inset: 0 auto 0 0; border-radius: 5px; }
+.lbar__fill { box-shadow: inset 0 1px 0 rgba(var(--gold-rgb), 0.35); }
+.lbar__ghost { background: rgba(var(--ink-rgb), 0.55); }
+/* 扣掉的那一段：淡色殘影，過一下才縮掉 */
+.lbar__track[data-layer='3'] .lbar__fill { background: linear-gradient(90deg, var(--rose2), var(--rose)); }
+.lbar__track[data-layer='2'] .lbar__fill { background: linear-gradient(90deg, var(--gold2), var(--gold)); }
+.lbar__track[data-layer='1'] .lbar__fill { background: linear-gradient(90deg, rgba(var(--lilac-rgb), 0.55), var(--lilac)); }
+.lbar__track[data-state='empty'] { opacity: 0.5; }
+.lbar__info { display: flex; align-items: baseline; gap: 8px; padding: 0 2px; }
+.lbar__text { margin-right: auto; font-size: 0.8rem; color: var(--ink2); }
+.lbar__count { font-size: 1.05rem; font-weight: 700; color: var(--rose); }
+.lbar[data-layer='2'] .lbar__count { color: var(--gold); }
+.lbar[data-layer='1'] .lbar__count { color: var(--lilac); }
+.lbar[data-layer='0'] .lbar__count { color: var(--faint); }
+.lbar__pop { position: absolute; right: 8px; top: -6px; font-size: 1.3rem; font-weight: 900; color: var(--rose); text-shadow: 0 2px 6px var(--shadow); pointer-events: none; animation: lbar-pop 1.1s ease-out both; }
+.lbar[data-broke='1'] .lbar__bars { animation: lbar-break 0.7s ease-out both; }
+/* 打掉一整條：整組閃一下、晃一下 */
+@keyframes lbar-pop { 0% { opacity: 0; transform: translateY(8px) scale(0.7); } 15% { opacity: 1; transform: translateY(-4px) scale(1.15); } 100% { opacity: 0; transform: translateY(-26px) scale(1); } }
+@keyframes lbar-break { 0% { filter: brightness(2.2); transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 100% { filter: none; transform: none; } }
+/* 出招／承受攻擊的動畫（data-fx 由 encounterCard.js 設定；--fx-delay 讓重畫後從中途接著播） */
+.boss__art[data-fx='hit'] { animation: fx-shake 0.5s ease-out var(--fx-delay) both; }
+.boss__art[data-fx='hit']::after { background: radial-gradient(circle at 50% 50%, rgba(var(--gold-rgb), 0.85), rgba(var(--rose-rgb), 0.35) 45%, transparent 70%); animation: fx-flash 0.5s ease-out var(--fx-delay) both; }
+.boss__art[data-fx='block'] { animation: fx-block 0.55s ease-out var(--fx-delay) both; }
+.boss__art[data-fx='block']::after { box-shadow: inset 0 0 0 3px var(--sky), inset 0 0 50px rgba(var(--sky-rgb), 0.7); animation: fx-flash 0.6s ease-out var(--fx-delay) both; }
+.boss__art[data-fx='strike'] { animation: fx-lunge 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) var(--fx-delay) both; }
+.boss__art[data-fx='strike']::after { background: radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(var(--rose-rgb), 0.75) 100%); animation: fx-flash 0.6s ease-out var(--fx-delay) both; }
+.mob[data-fx='hit'], .mob[data-fx='block'] { animation: fx-shake 0.45s ease-out var(--fx-delay) both; }
+.mob[data-fx='strike'] { animation: fx-lunge 0.5s ease-out var(--fx-delay) both; }
+/* 依傷害種類的打擊特效（護眼：顏色柔和、不用大面積強閃光、動得慢一點）：物理＝劈砍（一道斜光掃過）、能量＝爆裂（光圈柔和炸開）、靈魂＝漩渦（紫色旋轉光暈）。
+   --fx-n＝連打幾下（守密人 3 段）：只有輕微震動會重複 n 次，光效只播一次 */
+.boss__art[data-fx='slash'], .mob[data-fx='slash'], .boss__art[data-fx='burst'], .mob[data-fx='burst'], .boss__art[data-fx='soul'], .mob[data-fx='soul'] { animation: fx-nudge 0.35s ease-out var(--fx-delay) var(--fx-n, 1) both; }
+.boss__art[data-fx='slash']::after, .mob[data-fx='slash']::after { background: linear-gradient(115deg, transparent 42%, rgba(var(--gold-rgb), 0.55) 49%, rgba(var(--ink-rgb), 0.7) 50.5%, transparent 58%) 120% 0 / 260% 100% no-repeat; animation: fx-slash 0.6s ease-out var(--fx-delay) both; }
+.boss__art[data-fx='burst']::after, .mob[data-fx='burst']::after { background: radial-gradient(circle at 50% 50%, rgba(var(--res-energy-rgb), 0.5) 0, rgba(var(--res-fight-rgb), 0.28) 35%, transparent 65%); animation: fx-burst 0.7s ease-out var(--fx-delay) both; }
+.boss__art[data-fx='soul']::after, .mob[data-fx='soul']::after { background: conic-gradient(from 0deg, transparent, rgba(var(--lilac-rgb), 0.5), transparent 35%, rgba(var(--cloak-rgb), 0.45), transparent 70%, rgba(var(--lilac-rgb), 0.4), transparent); -webkit-mask-image: radial-gradient(circle, rgba(var(--shadow-rgb), 1) 30%, rgba(var(--shadow-rgb), 0) 70%); mask-image: radial-gradient(circle, rgba(var(--shadow-rgb), 1) 30%, rgba(var(--shadow-rgb), 0) 70%); animation: fx-soul 0.8s ease-out var(--fx-delay) both; }
+@keyframes fx-nudge { 0% { transform: translate(0); } 25% { transform: translate(-4px, 1px); } 60% { transform: translate(3px, -1px); } 100% { transform: none; } }
+@keyframes fx-slash { 0% { opacity: 0; background-position: 120% 0; } 25% { opacity: 0.9; } 75% { opacity: 0.9; } 100% { opacity: 0; background-position: -20% 0; } }
+@keyframes fx-burst { 0% { opacity: 0; transform: scale(0.4); } 30% { opacity: 0.9; } 100% { opacity: 0; transform: scale(1.4); } }
+@keyframes fx-soul { 0% { opacity: 0; transform: scale(0.6) rotate(0deg); } 35% { opacity: 0.9; } 100% { opacity: 0; transform: scale(1.15) rotate(120deg); } }
+@keyframes fx-shake { 0% { transform: translate(0); } 15% { transform: translate(-9px, 3px) rotate(-1deg); } 30% { transform: translate(8px, -3px) rotate(1deg); } 50% { transform: translate(-5px, 2px); } 70% { transform: translate(3px); } 100% { transform: none; } }
+@keyframes fx-block { 0% { transform: scale(1); } 20% { transform: scale(0.97); } 100% { transform: none; } }
+@keyframes fx-lunge { 0% { transform: scale(1); } 30% { transform: scale(1.07) translateY(6px); } 100% { transform: none; } }
+@keyframes fx-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .boss__art[data-fx], .mob[data-fx], .boss__art[data-fx]::after, .mob[data-fx]::after, .lbar__pop, .lbar[data-broke='1'] .lbar__bars { animation: none; }
+  .lbar__pop { opacity: 0; }
+}
+/* 手機「目標」抽屜底部固定的選招式＋出招列（電腦版左欄就有出招按鈕，所以隱藏） */
+@media (prefers-reduced-motion: reduce) {
+  .lbar__fill { transition: none; }
 }

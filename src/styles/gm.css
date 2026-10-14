@@ -1,0 +1,64 @@
+/* ============================================================
+   GM 工具面板：模擬戰、匯入、專屬技能與特殊配方編輯、發放獎勵、等候通知
+   ============================================================ */
+/* ---------- 數值面板 ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: .3rem; }
+.extra-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .4rem; margin-top: .4rem; }
+/* GM 玩家角色面板：技能三個一排，名稱在上、等級輸入在下 */
+.skill-list--grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.skill-list--grid .skill-row { flex-direction: column; align-items: stretch; gap: 0.2rem; padding: 0.35rem 0.4rem; border: 1px solid var(--line); border-radius: 8px; }
+.skill-list--grid .skill-row strong { font-size: 0.8rem; overflow-wrap: anywhere; }
+.skill-list--grid .extra { flex-direction: row; align-items: center; gap: 0.3rem; }
+.skill-list--grid .extra .field { width: 100%; min-width: 0; }
+/* 模擬戰（GM） */
+.simpanel { display: grid; gap: .6rem; }
+.simpanel .section-title { margin: .6rem 0 .2rem; }
+.simchart { display: flex; align-items: flex-end; gap: 3px; height: 130px; padding: 4px 0 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.simchart__col { flex: 1 0 14px; min-width: 14px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; }
+.simchart__stack { display: flex; flex-direction: column; width: 100%; min-height: 0; }
+.simchart__bar { display: block; width: 100%; background: var(--gold); border-radius: 2px 2px 0 0; min-height: 2px; }
+.simchart__bar[data-tone='win'] { background: var(--gold); }
+.simchart__bar[data-tone='lose'] { background: var(--rose); }
+.simchart__bar[data-tone='mute'] { background: var(--faint); }
+.simchart__label { text-align: center; color: var(--soft); font-size: .62rem; margin-top: 2px; }
+.simbar { flex: 1; height: 10px; margin: 0 .6rem; background: var(--paper); border-radius: var(--r-pill); overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
+.simbar__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--rose2), var(--rose)); }
+/* GM 匯入機器人存檔 */
+.import-list, .import-results { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+.import-row { padding: 10px; background: var(--raise); border: 1px solid var(--line); border-radius: 10px; display: grid; gap: 4px; }
+.import-results li { color: var(--ink2); font-size: 0.85rem; }
+/* 技能清單（有技能目錄的角色） */
+.skill-row__text p { margin: 4px 0 0; color: var(--ink2); font-size: 0.82rem; white-space: pre-line; }
+.skill-row__text summary { color: var(--soft); font-size: 0.78rem; cursor: pointer; }
+/* GM 匯入角色卡 */
+.import-text { width: 100%; font-family: inherit; resize: vertical; }
+.import-adjust { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.import-adjust li { padding: 2px 10px; background: var(--raise); border-radius: var(--r-pill); font-size: 0.82rem; color: var(--ink); }
+.import-adjust li[data-neg='1'] { color: var(--rose); box-shadow: inset 0 0 0 1px var(--rose2); }
+/* 技能面板（點方格） */
+.skill-info__text { margin: 0 0 10px; color: var(--ink2); font-size: 0.9rem; white-space: pre-line; }
+.draw-option .skill-info__text { margin: 0; font-size: 0.82rem; }
+/* 「等 GM 匯入角色」畫面（waitNotice.js） */
+.wait-notice { margin: 16px; text-align: center; padding-block: 28px; }
+.wait-notice__text { margin: 10px auto 0; max-width: 28em; line-height: 1.7; }
+.wait-notice__form { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+.wait-notice__form .field { flex: 1 1 12em; max-width: 16em; min-width: 0; }
+.wait-notice__msg { margin: 6px 0 0; min-height: 1.2em; color: var(--rose); font-size: 0.85rem; }
+.wait-notice__sub { margin: 8px 0 0; color: var(--soft); font-size: 0.9rem; }
+/* GM 編輯特殊配方與材料（specialEdit.js） */
+.special-edit { display: grid; gap: 8px; margin-bottom: 18px; }
+.special-edit__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.special-edit__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: var(--raise); border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.special-edit__name { min-width: 0; overflow-wrap: anywhere; font-size: 0.9rem; }
+.special-edit__btns { display: flex; gap: 6px; flex: none; }
+.special-edit__form { display: grid; gap: 6px; }
+.special-edit__pair { display: grid; grid-template-columns: minmax(0, 1fr) 6.5em; gap: 6px; }
+.special-edit__skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(6em, 1fr)); gap: 6px 10px; }
+.special-edit__trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.special-edit__level { display: grid; grid-template-columns: 3.2em minmax(0, 1fr); align-items: center; gap: 6px; }
+.special-edit__lv { color: var(--soft); font-size: 0.85rem; text-align: right; }
+/* 跑團頁「技能檢定」：各區塊之間留間距，優勢骰按鈕撐滿、胃袋格固定大小 */
+.simtune__plan { display: grid; gap: 6px; margin-top: 10px; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+/* GM 發放獎勵：對象清單（人多時可捲動）與常用技能書快捷鈕 */
+.reward-targets { display: grid; gap: 4px; max-height: 200px; overflow-y: auto; padding: 4px 2px; }
+.reward-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }

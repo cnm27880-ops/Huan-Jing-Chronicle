@@ -45,3 +45,31 @@ test('base.css 的按鈕高度只用 tokens.css 的變數（不寫死 px），�
   assert.match(tokens, /--ctl-h-sm:\s*28px/);
   assert.match(tokens, /@media \(max-width: 759px\), \(pointer: coarse\)\s*\{\s*:root\s*\{[^}]*--ctl-h:\s*44px/);
 });
+
+test('CSS 檔案結構：舊檔已刪除，每個 CSS 檔都在 src/styles/index.js 載入，且 base.css 最後載入', () => {
+  for (const gone of ['redesign.css', 'polish.css', 'dice.css', 'blackgold.css']) assert.ok(!files.includes(gone), `${gone} 應該已經刪除`);
+  const index = readFileSync(new URL('index.js', DIR), 'utf8');
+  const imported = [...index.matchAll(/import '\.\/([\w-]+\.css)'/g)].map((m) => m[1]);
+  assert.deepEqual([...imported].sort(), [...files].sort(), '每個 CSS 檔都要載入，也不能載入不存在的檔案');
+  assert.equal(imported.at(-1), 'base.css');
+});
+
+test('不用 #view-… id 選擇器蓋樣式（各頁的樣式用自己的 class）', () => {
+  const bad = [];
+  for (const f of files) for (const m of read(f).matchAll(/#view-[\w-]+/g)) bad.push(`${f}: ${m[0]}`);
+  assert.deepEqual(bad, []);
+});
+
+test('一般頁面不用外發光：layout／pages／session／gm／base 的 box-shadow、text-shadow 不能是「0 0 模糊」的光暈（動畫特效 animation 與覆蓋層 overlays、地圖、情報面板除外）', () => {
+  const bad = [];
+  for (const f of ['layout.css', 'pages.css', 'session.css', 'gm.css', 'base.css']) {
+    for (const m of read(f).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (/animation/.test(m[2])) continue; // 打擊特效（fx-*）是短暫的動畫，不算常駐的光暈
+      for (const d of m[2].matchAll(/(?:box|text)-shadow\s*:\s*([^;]+)/g)) {
+        const layers = d[1].split(/,(?![^(]*\))/).map((x) => x.trim().replace(/^inset\s+/, ''));
+        if (layers.some((x) => /^0(px)?\s+0(px)?\s+[1-9]\d*px/.test(x))) bad.push(`${f}: ${m[1].trim().slice(0, 50)} → ${d[1].trim().slice(0, 50)}`);
+      }
+    }
+  }
+  assert.deepEqual(bad, []);
+});

@@ -239,7 +239,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
                   r.restored ? `回復 ${Object.entries(r.restored).map(([k, v]) => `${k} +${v}`).join('、')}` : null,
                   r.atk ? '下次攻擊：真實傷害骰增加' : null,
                   r.def ? '下次防禦：絕對防禦骰增加（三軌都加）' : null,
-                  `毒性 ${r.toxicity} / ${TOXICITY_MAX}${r.atLimit ? '　⚠ 已達上限，不能再喝' : ''}`,
+                  `毒性 ${r.toxicity} / ${TOXICITY_MAX}${r.atLimit ? '　已達上限，不能再喝' : ''}`,
                 ].filter(Boolean),
               }, { draw });
               commit();

@@ -1,6 +1,6 @@
 // ============================================================
 // 數值調整面板：手機從底部彈出（bottom sheet），電腦版是貼在觸發元件旁的小彈出框（popover）。
-// 只管畫面與操作；寫入數值由呼叫端的 onConfirm 負責。樣式見 blackgold.css 的 .vsheet。
+// 只管畫面與操作；寫入數值由呼叫端的 onConfirm 負責。樣式見 overlays.css 的 .vsheet。
 // ============================================================
 import { h, fmt } from './dom.js';
 import { pushLayer } from './modalStack.js';
