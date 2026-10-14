@@ -85,42 +85,7 @@ body::before {
 .day-confirm__ask { color: var(--rose); font-size: 0.74rem; font-weight: 700; }
 
 /* ---------- 可選卡片（行動、難度、技能、切換鈕） ---------- */
-.skill-btn,
-.toggle,
-.potion,
-.move__pick,
-.chip {
-  background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.055), rgba(var(--ink-rgb), 0.015));
-  border: 1px solid var(--glass-line);
-  box-shadow: var(--glass-hi);
-}
-.skill-btn,
-.toggle,
-.potion,
-.move__pick { border-radius: 10px; }
-.skill-btn:hover,
-.toggle:hover,
-.potion:hover:not(:disabled),
-.move__pick:hover:not(:disabled),
-.chip:hover {
-  background: linear-gradient(180deg, rgba(var(--ink-rgb), 0.09), rgba(var(--ink-rgb), 0.025));
-  border-color: rgba(var(--gold-rgb), 0.35);
-  box-shadow: var(--glass-hi), 0 8px 18px rgba(var(--shadow-rgb), 0.35), 0 0 12px rgba(var(--gold-rgb), 0.1);
-}
-.toggle[aria-pressed='true'],
-.move[aria-current='true'] .move__pick {
-  background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.16), rgba(var(--gold-rgb), 0.04));
-  border-color: rgba(var(--gold-rgb), 0.6);
-  box-shadow: var(--glass-hi), var(--glow-gold);
-}
 
-.seg { border-radius: 8px; transition: color 0.18s ease, background 0.18s ease; }
-.seg:hover { color: var(--text); background: rgba(var(--ink-rgb), 0.05); }
-.seg[aria-selected='true'] {
-  color: var(--on-gold);
-  background: linear-gradient(180deg, var(--gold), var(--gold));
-  box-shadow: inset 0 1px 0 rgba(var(--ink-rgb), 0.6), 0 4px 12px rgba(var(--gold-rgb), 0.25);
-}
 
 
 /* ---------- 物品格：像角色卡一樣，hover 浮起、依稀有度發光 ---------- */
@@ -128,7 +93,6 @@ body::before {
 
 /* ---------- 結果、紀錄、數值 ---------- */
 .result,
-.roll,
 .stat,
 .monster {
   background: linear-gradient(160deg, rgba(var(--ink-rgb), 0.06), rgba(var(--ink-rgb), 0.012)), rgba(var(--card-rgb), 0.85);
@@ -137,9 +101,7 @@ body::before {
   box-shadow: var(--glass-hi);
 }
 .result:first-child { box-shadow: var(--glass-hi), 0 0 0 1px var(--t, rgba(var(--gold-rgb), 0.6)), 0 0 22px color-mix(in srgb, var(--t, var(--gold)) 22%, transparent); }
-.result__big, .roll__big { text-shadow: 0 0 16px rgba(var(--gold-rgb), 0.35); }
-.bar { border-radius: 999px; background: rgba(var(--shadow-rgb), 0.45); box-shadow: inset 0 2px 4px rgba(var(--shadow-rgb), 0.5); }
-.bar__fill { box-shadow: 0 0 10px rgba(var(--sky-rgb), 0.45), inset 0 1px 0 rgba(var(--ink-rgb), 0.25); }
+.result__big { text-shadow: 0 0 16px rgba(var(--gold-rgb), 0.35); }
 
 /* ---------- 地圖 ---------- */
 .map-viewport { border: 1px solid var(--glass-line-hi); border-radius: 12px; box-shadow: 0 16px 40px rgba(var(--shadow-rgb), 0.55); }

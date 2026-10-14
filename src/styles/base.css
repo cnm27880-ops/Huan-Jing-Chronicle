@@ -528,3 +528,17 @@ button.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px
 .pick-points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px var(--space-3); }
 .pick-line { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 0.82rem; }
 .pick-select { min-width: 0; }
+
+/* ============================================================
+   選項按鈕 chip／toggle（開關型：aria-pressed；單選：aria-checked）：28px 小按鈕，選中＝金字＋暗金底
+   ============================================================ */
+.chip-row, .toggle-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.chip, .toggle {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: var(--ctl-h-sm); padding: 0 var(--ctl-px-sm);
+  font: inherit; font-size: 0.85rem; color: var(--soft); background: none; border: 1px solid var(--line-soft); border-radius: var(--radius-ctl); cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.chip:hover, .toggle:hover { color: var(--gold); border-color: var(--ctl-line-hi); }
+.chip:focus-visible, .toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.chip:disabled, .toggle:disabled { opacity: 0.45; cursor: not-allowed; }
+.chip[aria-pressed='true'], .chip[aria-checked='true'], .toggle[aria-pressed='true'] { color: var(--gold); background: var(--ctl-primary-bg); border-color: var(--ctl-primary-line); }

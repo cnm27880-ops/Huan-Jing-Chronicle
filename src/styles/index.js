@@ -9,5 +9,6 @@ import './redesign.css';
 import './dice.css';
 import './polish.css';
 import './blackgold.css';
+import './session.css'; // 跑團頁（Step C 重寫）
 import './shadowfx.css';
 import './base.css'; // 按鈕、輸入框、面板、列表、底線分頁的最終樣式：最後載入
