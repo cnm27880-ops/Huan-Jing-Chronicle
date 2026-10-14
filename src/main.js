@@ -191,6 +191,7 @@ async function init() {
     const id = raw === 'battle' ? 'session' : raw; // 戰鬥頁已改成跑團頁裡的戰鬥面板（舊連結導到跑團頁）
     const previous = currentView;
     currentView = ['map', 'rest', 'bag', 'gear', 'session', 'market', 'logs'].includes(id) ? id : 'map';
+    if (location.hash && raw !== currentView) history.replaceState(null, '', `#${currentView}`); // 舊連結（#battle）或打錯的網址：把網址列修成實際顯示的頁面（replaceState 不會觸發 hashchange、也不多一筆歷史）
     if (previous !== currentView) views[previous]?.leave?.(); // 離開的頁面可以停掉背景更新（跑團頁的紀錄）
     document.querySelectorAll('[data-view]').forEach((el) => {
       el.hidden = el.dataset.view !== currentView;
@@ -253,11 +254,7 @@ async function init() {
   const moreMenu = $('#more-menu');
   const setMore = (open) => { moreMenu.hidden = !open; moreBtn.setAttribute('aria-expanded', String(open)); };
   moreBtn.addEventListener('click', (e) => { e.stopPropagation(); setMore(moreMenu.hidden); });
-  moreMenu.addEventListener('click', (e) => {
-    const target = e.target.closest('[data-more-click]');
-    setMore(false);
-    if (target) $(`#${target.dataset.moreClick}`).click();
-  });
+  moreMenu.addEventListener('click', () => setMore(false)); // 選單項目是一般的 #hash 連結，點了就收合
   document.addEventListener('click', (e) => { if (!moreMenu.hidden && !moreMenu.contains(e.target)) setMore(false); });
 
   window.addEventListener('hashchange', () => { setMore(false); showView(); });

@@ -19,8 +19,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 ## 檔案地圖
 | 檔案 | 用途 |
 |---|---|
-| `index.html` | 頁面骨架（頂部列、地圖、面板容器） |
-| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #session / #market（舊的 #battle 導到 #session））、角色存檔串接、GM 示範角色換成空白角色（`gmBlankCheck`，要先確認）與還原備份（`offerRestore`） |
+| `index.html` | 頁面骨架（頂部列＋唯一的 `<main id="main">`，裡面是各分頁 `<section data-view="…">`；樣式在 `layout.css` 的 `#main`） |
+| `src/main.js` | 進入點、分頁切換（#map / #rest / #bag / #gear / #session / #market（舊的 #battle 導到 #session，網址列的 hash 也會被修正成實際顯示的頁面））、角色存檔串接、GM 示範角色換成空白角色（`gmBlankCheck`，要先確認）與還原備份（`offerRestore`） |
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
 | `DESIGN.md` | 視覺設計規格（黑金主題） |
 | `RULES_OVERVIEW.md` | 規則原文整理（創角、每日養成、技能學習升級、資源、寶石、配方、特殊材料）；階段 2 的依據，含待確認清單 |
