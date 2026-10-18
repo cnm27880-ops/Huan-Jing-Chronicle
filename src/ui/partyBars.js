@@ -89,7 +89,8 @@ export function createPartyPanel({ room = defaultRoom } = {}) {
     if (r.phase !== 'online' || r.me?.isGm) { node.hidden = true; return; }
     node.hidden = false;
     const onlineIds = new Set(r.members.filter((m) => m.online).map((m) => m.uid));
-    const mates = Object.entries(r.vitals ?? {}).filter(([uid]) => uid !== r.me?.uid && !gm.has(uid));
+    const hidden = new Set(r.hiddenVitals ?? []); // GM 設定「不顯示於資源條」的玩家（只是畫面過濾）
+    const mates = Object.entries(r.vitals ?? {}).filter(([uid]) => uid !== r.me?.uid && !gm.has(uid) && !hidden.has(uid));
     const inBattle = Boolean(getEncounter()?.monsters?.some((m) => m.hp > 0));
     const d = partyDigest(mates.map(([, v]) => v), { inBattle });
     node.dataset.level = d.level;

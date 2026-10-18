@@ -122,6 +122,8 @@ export function createMarketView({ root, getState, commit }) {
           h('strong', { class: 'rarity__name', text: plainName(item) }),
           rarityTag(tier),
           have != null ? h('small', { class: 'trade-row__have', text: `持有 ${fmt(have)}` }) : null),
+        ),
+      h('div', { class: 'trade-row__money' }, // 價格（原價、黑心價）與「共多少」合成一行，放不下才換行
         h('span', { class: 'trade-row__price', text: price }),
         subEl),
       h('div', { class: 'trade-row__act' },
@@ -263,9 +265,9 @@ export function createMarketView({ root, getState, commit }) {
     root.replaceChildren(
       h('div', { class: 'mk-root' },
         hud(state),
-        h('div', { class: 'tabs-line', role: 'tablist', 'aria-label': '交易' },
+        h('div', { class: 'tabs-seg', role: 'tablist', 'aria-label': '交易' },
           tabs.map(([id, label]) => h('button', {
-            type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.tab === id),
+            type: 'button', role: 'tab', class: 'tabs-seg__tab', 'aria-selected': String(ui.tab === id),
             onclick: () => { ui.tab = id; render(); },
           }, h('span', { text: label })))),
         h('div', { class: 'mk-grid' }, pane)));

@@ -562,13 +562,13 @@ export function createRestView({ root, getState, commit }) {
     root.replaceChildren(
       h('div', { class: 'rest-root' },
         statusBar(state, commit, 'rest'),
-        h('div', { class: 'tabs-line', role: 'tablist', 'aria-label': '修整日行動' },
+        h('div', { class: 'tabs-seg', role: 'tablist', 'aria-label': '修整日行動' },
           TABS.map(([id, label, sub]) => h('button', {
-            type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.tab === id),
+            type: 'button', role: 'tab', class: 'tabs-seg__tab', 'aria-selected': String(ui.tab === id),
             onclick: () => { ui.tab = id; ui.times = 1; render(); },
           },
           h('span', { text: label }),
-          h('small', { class: 'tabs-line__sub', text: sub })))),
+          h('small', { class: 'tabs-seg__sub', text: sub })))),
         h('div', { class: 'rest-grid' },
           h('div', { class: 'rest-main' }, panel),
           h('section', { class: 'card rest-results', 'aria-live': 'polite' },

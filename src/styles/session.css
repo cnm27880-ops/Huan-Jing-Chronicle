@@ -19,6 +19,7 @@
 .sx-left, .sx-center { display: flex; flex-direction: column; gap: var(--space-3); }
 
 .sx-right { display: flex; flex-direction: column; gap: var(--space-2); overflow: hidden; }
+.sx-right > .sx-self { flex: none; }
 .sx-stack { display: grid; gap: var(--space-3); }
 .sx-scrim, .sx-bar, .sx-sheethead, .sx-top { display: none; }
 /* 面板：淡色底＋1px 細邊線＋圓角（跑團頁保留原本的面板感，只是線條變細） */
@@ -72,8 +73,7 @@
 .hud-meter.is-bad .hud-meter__val { color: var(--rose); }
 
 /* ---------- 左欄：分頁與內容 ---------- */
-.sx-tabs { flex: none; gap: var(--space-4); }
-.sx-tabs .tabs-line__tab { flex: 1; font-size: 0.9rem; letter-spacing: 0.04em; }
+.sx-tabs { flex: none; }
 
 /* 招式：每招一列，選中的只有左側金色細條；選中才展開內容與出招按鈕 */
 .move-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -367,7 +367,7 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .rpill[data-res='毒性'] { --rc: var(--res-tox); --rc-rgb: var(--res-tox-rgb); }
 
 .sx-room { flex: none; padding: 4px 12px; }
-.sx-room__sum { min-height: var(--ctl-h-sm); padding: 4px 0; color: var(--soft); font-size: 0.82rem; cursor: pointer; }
+.sx-room__sum { min-height: var(--ctl-h-sm); padding: 4px 0; color: var(--soft); font-size: 0.82rem; line-height: 1.4; overflow-wrap: anywhere; cursor: pointer; }
 .sx-room[open] .sx-room__sum { color: var(--gold); }
 .sx-room__body { display: grid; gap: var(--space-3); max-height: 40vh; overflow-y: auto; padding: var(--space-2) 0 var(--space-3); }
 .room { display: grid; gap: var(--space-3); }
@@ -376,19 +376,16 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .room[data-phase='online'] .room__dot { background: var(--res-tox); }
 .room[data-phase='connecting'] .room__dot, .room[data-phase='reconnecting'] .room__dot { background: var(--gold); }
 .room[data-phase='denied'] .room__dot { background: var(--rose); }
-.room__line { display: grid; gap: var(--space-2); }
-.room__gm { color: var(--ink2); font-size: 0.88rem; }
 .room__members { display: flex; flex-wrap: wrap; gap: 2px var(--space-3); margin: 0; padding: 0; list-style: none; color: var(--soft); font-size: 0.82rem; }
 .room__member[data-online='0'] { opacity: 0.45; }
 .room__member[data-online='1']::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; background: var(--res-tox); border-radius: 50%; }
 /* GM 工具：一張有外框的卡片，按鈕依用途分組（戰鬥／玩家資料／設定／交接），組有小標題，按鈕等寬排成格子 */
-.room__gm { display: grid; gap: var(--space-3); padding: var(--card-pad); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-box); }
-.room__gm > .section-title { margin: 0; }
-.room__group { display: grid; gap: var(--space-2); }
-.room__group > .section-title { margin: 0; }
-.room__tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr)); gap: var(--space-2); }
+.room__gm { display: grid; gap: var(--space-2); padding: var(--card-pad); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-box); }
+.room__group { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); align-items: center; gap: var(--space-2); } /* 組名在左、按鈕格在右：一組一到兩列，整張卡片矮很多 */
+.room__gtitle { margin: 0; color: var(--gold); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; }
+.room__tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 6.4rem), 1fr)); gap: 6px; }
 .room__tools .btn { min-width: 0; white-space: normal; text-align: center; }
-.room__group--handover { padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
+.room__group--handover { padding-top: var(--space-2); border-top: 1px solid var(--line-soft); }
 
 .sx-feedhead { display: flex; flex: none; justify-content: flex-end; }
 .sx-feed { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
@@ -424,16 +421,22 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .track__tag[data-broke='1'][data-good='0'] { color: var(--rose); }
 .track.is-unused { opacity: 0.45; }
 
-.sx-dice { display: grid; flex: none; gap: var(--space-2); padding: 8px 10px; }
-.sx-dice__sides { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-.sx-side { min-height: var(--ctl-h-sm); padding: 0 10px; font: inherit; font-size: 0.85rem; color: var(--soft); background: var(--paper); border: 0; border-radius: var(--radius-ctl); box-shadow: var(--sx-ring); cursor: pointer; }
+.sx-dice { display: grid; flex: none; gap: 6px; padding: 6px 10px; }
+.sx-dice__top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sx-dice__sides { display: flex; flex: 1; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.sx-dice__sides::-webkit-scrollbar { display: none; }
+.sx-side { flex: none; min-height: 24px; padding: 0 8px; font: inherit; font-size: 0.78rem; color: var(--soft); background: var(--paper); border: 0; border-radius: var(--radius-ctl); box-shadow: var(--sx-ring); cursor: pointer; }
 .sx-side:hover { color: var(--gold); }
 .sx-side[aria-checked='true'] { color: var(--gold); background: var(--ctl-primary-bg); box-shadow: var(--sx-ring-hi); }
-.sx-dice__row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); }
-.sx-dice__f { display: grid; gap: 2px; color: var(--soft); font-size: 0.72rem; }
-.sx-dice__f .field { width: 4rem; padding-inline: 6px; text-align: center; }
-.sx-dice__expr { flex: 1 1 7rem; width: auto; min-width: 0; }
-.sx-dice__roll { flex: none; }
+.sx-dice__row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sx-dice .sx-dice__n { flex: none; width: 3.6rem; min-height: var(--ctl-h-sm); padding-inline: 4px; text-align: center; }
+.sx-dice .sx-dice__expr { flex: 1 1 0; width: auto; min-width: 0; min-height: var(--ctl-h-sm); }
+.sx-dice .sx-dice__roll { flex: none; min-height: var(--ctl-h-sm); }
+@media (max-width: 759px), (pointer: coarse) { .sx-side { min-height: 36px; padding: 0 12px; } .sx-dice .sx-dice__fold { min-height: 36px; } } /* 觸控：骰型小鈕留 36px（單列可橫向捲動），輸入框與投骰鈕維持 44px，收合鈕 36px */
+.sx-dice .sx-dice__n { appearance: textfield; -moz-appearance: textfield; }
+.sx-dice .sx-dice__n::-webkit-inner-spin-button, .sx-dice .sx-dice__n::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+.sx-dice .sx-dice__fold { display: none; flex: none; } /* 收合只給手機 */
+.sx-dice .sx-dice__row--fold .sx-dice__roll { flex: 1; }
 
 /* ---------- 手機頂部：膠囊 HUD 與目標血量 ---------- */
 .mini-hud {
@@ -491,7 +494,8 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 }
 @media (max-width: 900px) {
   .sx-top { display: block; flex: none; }
-  .sx-left__hud { display: none; }
+  .sx-dice .sx-dice__fold { display: inline-flex; }
+  .sx-self { display: none; } /* 手機用頂部膠囊 HUD（點開就是完整資源卡） */
   .sx-right > .sx-room, .sx-right > .sx-party { flex: none; }
   .boss__art { height: clamp(200px, 40vh, 340px); }
   .boss__modes { grid-template-columns: repeat(3, minmax(0, 1fr)); }

@@ -29,23 +29,17 @@ export function mountRoomPanel(container) {
       reconnecting: '連線中斷，重新連線中…（暫時使用本機骰盤，結果不會同步給大家）',
       denied: r.message,
     }[r.phase];
-    // 連上之後標題列（「房間・N / M 人在線」）已經有狀態，內文只留 GM 與成員；其他狀態才顯示一行說明
+    // 連上之後標題列（「房間・N / M 人在線」）已經有狀態，內文只留在線名單與 GM 工具；其他狀態才顯示一行說明
     const parts = r.phase === 'online' ? [] : [h('div', { class: 'room__status' }, h('span', { class: 'room__dot', 'aria-hidden': 'true' }), h('span', { text }))];
 
     if (r.phase === 'online') {
-      const nameOf = (uid) => r.gm.names[uid] ?? r.members.find((m) => m.uid === uid)?.name ?? '（尚未加入）';
-      const gmText = r.gm.uids.length ? r.gm.uids.map(nameOf).join('、') : '未設定';
-      parts.push(
-        h('div', { class: 'room__line' },
-          h('span', { class: 'room__gm', title: r.battleNo ? `目前是第 ${r.battleNo} 場戰鬥` : '' }, `GM ${gmText}`, r.gm.override ? h('span', { class: 'badge', dataset: { tone: 'warn' }, text: '暫代' }) : null),
-          r.members.length
-            ? h('ul', { class: 'room__members' }, r.members.map((m) => h('li', { class: 'room__member', dataset: { online: m.online ? '1' : '0' }, text: m.name })))
-            : null));
+      // 「GM 某某〔暫代〕」已經放在標題列（sessionView.js 的 renderRoomSummary），這裡只留在線名單
+      if (r.members.length) parts.push(h('ul', { class: 'room__members' }, r.members.map((m) => h('li', { class: 'room__member', dataset: { online: m.online ? '1' : '0' }, text: m.name }))));
       // GM 工具：整個包成一張有外框的卡片，按鈕依用途分組、每組有小標題、等寬排成格子（排版在 session.css 的 .room__gm）
       // main＝主要操作（金色框）；quiet＝淡一點的框（容易誤按的操作）
       const gmBtn = (text, onclick, kind) => h('button', { type: 'button', class: `btn btn--small${kind === 'main' ? ' btn--primary' : kind === 'quiet' ? ' btn--quiet' : ''}`, onclick }, text);
       const group = (title, buttons, extra = '') => h('div', { class: `room__group${extra}` },
-        h('h3', { class: 'section-title', text: title }),
+        h('h3', { class: 'room__gtitle', text: title }),
         h('div', { class: 'room__tools' }, buttons));
       const groups = [];
       if (r.me?.isGm) {
@@ -70,7 +64,7 @@ export function mountRoomPanel(container) {
           : gmBtn('暫代 GM', async (e) => { if (await askConfirm(e.currentTarget, { title: '暫代 GM？', lines: ['原本的 GM 在你還回去之前沒有 GM 權限，所有人都會看到。'], okText: '暫代' })) setGmOverride('take'); }, 'quiet')],
         ' room__group--handover'));
       }
-      if (groups.length) parts.push(h('div', { class: 'room__gm' }, h('h2', { class: 'section-title', text: 'GM 工具' }), groups));
+      if (groups.length) parts.push(h('div', { class: 'room__gm', role: 'group', 'aria-label': 'GM 工具' }, groups));
     }
     if (r.notice) parts.push(h('p', { class: 'notice notice--bad', text: r.notice }));
     container.append(h('section', { class: 'room', dataset: { phase: r.phase } }, parts));
