@@ -116,6 +116,13 @@ export const REST_FOOD_CHECKS = 10;
 export const BASE_PROFICIENCY = 1;
 export const MAX_TIME = 10;
 
+// 「新的一天」的每週開放上限（使用者 2026-10-19；台灣時間 UTC+8，用瀏覽器時鐘、不做伺服器驗證）
+// 上限 = DAY_CAP_BASE + DAY_CAP_STEP × 已經過了幾個解鎖時間點；第一個解鎖點是 DAY_CAP_START，之後每 DAY_CAP_PERIOD_MS 一個
+export const DAY_CAP_BASE = 64;
+export const DAY_CAP_STEP = 7;
+export const DAY_CAP_START = Date.parse('2026-10-19T23:00:00+08:00');
+export const DAY_CAP_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+
 // ============================================================
 // 戰鬥與裝備規則（來源：GM 試算表「角色永久狀態」「生產表」）
 // 機器人沒有這些內容。標「待確認」者尚未經 GM 驗證，見 GAME_RULES.md

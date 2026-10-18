@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gatherTier } from '../src/game/rules.js';
-import { proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, overwriteLoss, fixItemAliases } from '../src/game/engine.js';
+import { proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, overwriteLoss, fixItemAliases, newDay, dayCap, nextUnlock } from '../src/game/engine.js';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 
 const fresh = () => JSON.parse(JSON.stringify(SAMPLE_CHARACTER));
@@ -140,4 +140,55 @@ test('背包裡打錯字的「代金卷」併進「代金券」', () => {
   assert.equal(s.inventory['代金卷'], undefined);
   assert.ok(!s.sortOrder.includes('代金卷'));
   assert.equal(fixItemAliases(s), false); // 再跑一次沒有變動
+});
+
+// ---------- 「新的一天」每週開放上限（台灣時間 UTC+8） ----------
+const tw = (t) => Date.parse(`${t}+08:00`);
+
+test('每週上限：10/19 22:59:59 還是 64，23:00:00 起 71', () => {
+  assert.equal(dayCap(tw('2026-10-18T12:00:00')), 64);
+  assert.equal(dayCap(tw('2026-10-19T22:59:59')), 64);
+  assert.equal(dayCap(tw('2026-10-19T23:00:00')), 71);
+});
+
+test('每週上限：每 7 天 +7（10/26 23:00 → 78，11/2 23:00 → 85）', () => {
+  assert.equal(dayCap(tw('2026-10-26T22:59:59')), 71);
+  assert.equal(dayCap(tw('2026-10-26T23:00:00')), 78);
+  assert.equal(dayCap(tw('2026-11-02T23:00:00')), 85);
+});
+
+test('下一個解鎖時間點與解鎖後的上限', () => {
+  const a = nextUnlock(tw('2026-10-18T12:00:00'));
+  assert.equal(a.at, tw('2026-10-19T23:00:00'));
+  assert.equal(a.cap, 71);
+  const b = nextUnlock(tw('2026-10-19T23:00:00'));
+  assert.equal(b.at, tw('2026-10-26T23:00:00'));
+  assert.equal(b.cap, 78);
+});
+
+test('新的一天：到上限就擋下（不動任何數值），邊界後才能換', () => {
+  const s = fresh();
+  s.loginDays = 64;
+  s.time = 3;
+  const r = newDay(s, tw('2026-10-19T22:59:59'));
+  assert.equal(r.ok, false);
+  assert.equal(r.cap, 64);
+  assert.equal(r.next.cap, 71);
+  assert.equal(s.loginDays, 64);
+  assert.equal(s.time, 3);
+  assert.equal(newDay(s, tw('2026-10-19T23:00:00')).ok, true);
+  assert.equal(s.loginDays, 65);
+  assert.equal(s.time, 10);
+});
+
+test('新的一天：已超過上限的玩家不扣回，只是不能再換日', () => {
+  const s = fresh();
+  s.loginDays = 70;
+  const r = newDay(s, tw('2026-10-18T12:00:00'));
+  assert.equal(r.ok, false);
+  assert.equal(s.loginDays, 70);
+  s.loginDays = 77;
+  assert.equal(newDay(s, tw('2026-10-26T22:59:59')).ok, false);
+  assert.equal(newDay(s, tw('2026-10-26T23:00:00')).ok, true);
+  assert.equal(s.loginDays, 78);
 });

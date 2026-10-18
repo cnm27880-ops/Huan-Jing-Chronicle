@@ -119,6 +119,12 @@ export function openFoodSheet(state, ctx, commit) {
  * 「新的一天」：第一下只會在同一格裡變成「確定換日？」，再按「確定」才真的換日（避免誤觸）。
  * 5 秒內沒確認就自動恢復原狀。
  */
+/** 每週上限的提示文字：台灣時間（UTC+8）的月／日，不受瀏覽器時區影響 */
+function dayCapText({ cap, next }) {
+  const t = new Date(next.at + 8 * 3600 * 1000);
+  return `目前開放到第 ${cap} 天，${t.getUTCMonth() + 1}/${t.getUTCDate()} 23:00 開放到第 ${next.cap} 天`;
+}
+
 function newDayButton(state, commit) {
   const box = h('span', { class: 'day-confirm' });
   let timer = null;
@@ -131,7 +137,8 @@ function newDayButton(state, commit) {
       type: 'button', class: 'status__day status__day--yes',
       onclick: () => {
         clearTimeout(timer);
-        newDay(state);
+        const r = newDay(state);
+        if (!r.ok) { showIdle(); return toast(dayCapText(r)); }
         toast(`第 ${state.loginDays} 天，時間恢復 10 點`);
         commit();
       },

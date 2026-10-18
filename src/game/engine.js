@@ -6,6 +6,7 @@
 import {
   LIFE_SKILLS, ART_SKILLS, GATHER_POOLS, gatherTier, RECIPES, CRAFT_COST_AMOUNT,
   FOODS, STOMACH_SLOTS, REST_FOOD_CHECKS, BASE_PROFICIENCY, MAX_TIME,
+  DAY_CAP_BASE, DAY_CAP_STEP, DAY_CAP_START, DAY_CAP_PERIOD_MS,
 } from './rules.js';
 import { rollDie } from './dice.js';
 import { skillParts } from './skillTable.js';
@@ -260,12 +261,35 @@ export function endSession(state) {
   return gone;
 }
 
-export function newDay(state) {
+/** 現在（毫秒時間戳，預設用瀏覽器時鐘）已經過了幾個每週解鎖時間點 */
+function unlocksPassed(now) {
+  return now < DAY_CAP_START ? 0 : Math.floor((now - DAY_CAP_START) / DAY_CAP_PERIOD_MS) + 1;
+}
+
+/** 「新的一天」目前開放到第幾天（loginDays 到這個數字就不能再換日） */
+export function dayCap(now = Date.now()) {
+  return DAY_CAP_BASE + DAY_CAP_STEP * unlocksPassed(now);
+}
+
+/** 下一個解鎖時間點（毫秒時間戳）與解鎖後的上限 */
+export function nextUnlock(now = Date.now()) {
+  const n = unlocksPassed(now);
+  return { at: DAY_CAP_START + n * DAY_CAP_PERIOD_MS, cap: DAY_CAP_BASE + DAY_CAP_STEP * (n + 1) };
+}
+
+/**
+ * 「新的一天」：loginDays 已經 >= 目前上限就不換日，回傳 { ok: false, cap, next }（已超過上限的玩家不扣回）；
+ * 成功回傳 { ok: true }。now 可由參數傳入（測試用）。
+ */
+export function newDay(state, now = Date.now()) {
+  const cap = dayCap(now);
+  if (state.loginDays >= cap) return { ok: false, cap, next: nextUnlock(now) };
   // 黑市付不出錢會「勞動抵債」讓時間變負的：換日時先還（-3 → 7）
   state.time = MAX_TIME + Math.min(0, state.time);
   state.loginDays += 1;
   state.dailyDone = {}; // 特殊材料每個修整日每種 1 次（special.js）
   state.xiweiTime = 0;
+  return { ok: true };
 }
 
 /** 消耗本次檢定用到的紀念品，回傳實際用掉的清單 */
