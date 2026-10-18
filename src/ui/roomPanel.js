@@ -41,30 +41,36 @@ export function mountRoomPanel(container) {
           r.members.length
             ? h('ul', { class: 'room__members' }, r.members.map((m) => h('li', { class: 'room__member', dataset: { online: m.online ? '1' : '0' }, text: m.name })))
             : null));
-      // GM 工具：不分類，三個一排（排版在 session.css 的 .room__tools）
-      const gmBtn = (text, onclick, main) => h('button', { type: 'button', class: `btn btn--small${main ? '' : ' btn--ghost'}`, onclick }, text);
+      // GM 工具：整個包成一張有外框的卡片，按鈕依用途分組、每組有小標題、等寬排成格子（排版在 session.css 的 .room__gm）
+      // main＝主要操作（金色框）；quiet＝淡一點的框（容易誤按的操作）
+      const gmBtn = (text, onclick, kind) => h('button', { type: 'button', class: `btn btn--small${kind === 'main' ? ' btn--primary' : kind === 'quiet' ? ' btn--quiet' : ''}`, onclick }, text);
+      const group = (title, buttons, extra = '') => h('div', { class: `room__group${extra}` },
+        h('h3', { class: 'section-title', text: title }),
+        h('div', { class: 'room__tools' }, buttons));
+      const groups = [];
       if (r.me?.isGm) {
-        parts.push(h('div', { class: 'room__tools' },
-          gmBtn('新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, true),
-          gmBtn('發放獎勵', lazyTool(() => import('./rewardSheet.js'), 'openRewardSheet', '發放獎勵'), true),
-          gmBtn('模擬戰', lazyTool(() => import('./simPanel.js'), 'openSimPanel', '模擬戰')),
-          gmBtn('玩家角色', lazyTool(() => import('./gmCharEdit.js'), 'openGmCharEditor', '玩家角色')),
-          gmBtn('匯入機器人存檔', lazyTool(() => import('./botImport.js'), 'openBotImportSheet', '匯入機器人存檔')),
-          gmBtn('匯入角色卡', lazyTool(() => import('./sheetImport.js'), 'openSheetImportSheet', '匯入角色卡')),
-          gmBtn('從備份還原角色', lazyTool(() => import('./backupRestore.js'), 'openBackupRestoreSheet', '從備份還原角色')),
-          gmBtn('特殊配方與材料', lazyTool(() => import('./specialEdit.js'), 'openSpecialEditor', '特殊配方與材料')),
-          gmBtn('專屬技能', lazyTool(() => import('./skillEdit.js'), 'openSkillEditor', '專屬技能'))));
+        groups.push(
+          group('戰鬥', [
+            gmBtn('新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, 'main'),
+            gmBtn('發放獎勵', lazyTool(() => import('./rewardSheet.js'), 'openRewardSheet', '發放獎勵'), 'main'),
+            gmBtn('模擬戰', lazyTool(() => import('./simPanel.js'), 'openSimPanel', '模擬戰'))]),
+          group('玩家資料', [
+            gmBtn('玩家角色', lazyTool(() => import('./gmCharEdit.js'), 'openGmCharEditor', '玩家角色')),
+            gmBtn('匯入機器人存檔', lazyTool(() => import('./botImport.js'), 'openBotImportSheet', '匯入機器人存檔')),
+            gmBtn('匯入角色卡', lazyTool(() => import('./sheetImport.js'), 'openSheetImportSheet', '匯入角色卡')),
+            gmBtn('從備份還原角色', lazyTool(() => import('./backupRestore.js'), 'openBackupRestoreSheet', '從備份還原角色'))]),
+          group('設定', [
+            gmBtn('特殊配方與材料', lazyTool(() => import('./specialEdit.js'), 'openSpecialEditor', '特殊配方與材料')),
+            gmBtn('專屬技能', lazyTool(() => import('./skillEdit.js'), 'openSkillEditor', '專屬技能'))]));
       }
-      const btns = [];
       if (r.me?.isAdmin) {
-        btns.push(r.gm.override
-          ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => setGmOverride('release') }, '還給原 GM')
-          : h('button', {
-              type: 'button', class: 'btn btn--ghost btn--small',
-              onclick: async (e) => { if (await askConfirm(e.currentTarget, { title: '暫代 GM？', lines: ['原本的 GM 在你還回去之前沒有 GM 權限，所有人都會看到。'], okText: '暫代' })) setGmOverride('take'); },
-            }, '暫代 GM'));
+        // 交接放最下面、樣式較淡，避免誤按
+        groups.push(group('交接', [r.gm.override
+          ? gmBtn('還給原 GM', () => setGmOverride('release'), 'quiet')
+          : gmBtn('暫代 GM', async (e) => { if (await askConfirm(e.currentTarget, { title: '暫代 GM？', lines: ['原本的 GM 在你還回去之前沒有 GM 權限，所有人都會看到。'], okText: '暫代' })) setGmOverride('take'); }, 'quiet')],
+        ' room__group--handover'));
       }
-      if (btns.length) parts.push(h('div', { class: 'row room__btns' }, btns));
+      if (groups.length) parts.push(h('div', { class: 'room__gm' }, h('h2', { class: 'section-title', text: 'GM 工具' }), groups));
     }
     if (r.notice) parts.push(h('p', { class: 'notice notice--bad', text: r.notice }));
     container.append(h('section', { class: 'room', dataset: { phase: r.phase } }, parts));

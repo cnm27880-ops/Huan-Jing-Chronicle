@@ -57,7 +57,7 @@ export function createGearView({ root, getState, commit }) {
     const group = (title, list) => h('div', { class: 'gear-stat-group' },
       h('p', { class: 'field-label', text: title }),
       h('div', { class: 'gear-stat-grid' }, list.map((s) => statCell(p, s, s === '生命' ? h('small', { class: 'gear-stat__sub num', text: `目前 ${fmt(state.hp)}` }) : null))));
-    return h('section', { class: 'card' },
+    return h('section', { class: 'card gear-stats' },
       h('h2', { class: 'section-title', text: '數值面板' }),
       group('攻擊', ATK_STATS),
       group('防禦', DEF_STATS),

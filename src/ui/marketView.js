@@ -116,9 +116,9 @@ export function createMarketView({ root, getState, commit }) {
       onclick: () => onGo(clamp(qtyOf(key))),
     }, button(q));
     return h('li', { class: `trade-row${tier !== null ? ' rarity' : ''}`, dataset: { tier: tier ?? 'none', rarity: tier ?? 'none' } },
-      h('span', { class: 'trade-row__icon', 'aria-hidden': 'true', text: iconOf(item) }),
       h('div', { class: 'trade-row__info' },
         h('div', { class: 'trade-row__head' },
+          h('span', { class: 'trade-row__icon', 'aria-hidden': 'true', text: iconOf(item) }),
           h('strong', { class: 'rarity__name', text: plainName(item) }),
           rarityTag(tier),
           have != null ? h('small', { class: 'trade-row__have', text: `持有 ${fmt(have)}` }) : null),
