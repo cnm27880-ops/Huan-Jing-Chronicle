@@ -51,6 +51,7 @@ const B64 = /^[A-Za-z0-9+/]+={0,2}$/;
 const VITAL_KEY = /^[\u4e00-\u9fff]{1,4}$/; // 資源名稱（靈氣、魔力…）
 
 const isInt = (v, min, max) => Number.isInteger(v) && v >= min && v <= max;
+const MAX_HIDDEN_VITALS = 100; // 資源條隱藏名單最多幾人
 const VITALS_SEQ_AHEAD_MS = 60_000; // 隊友狀態的 seq 最多可以比伺服器時間超前這麼多（見 onVitals）
 const TRACKS_TEXT = (o) => ['A', 'B', 'C'].filter((t) => o?.[t] > 0).map((t) => `${o[t]}${t}`).join(' ') || '0';
 const cleanStr = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '');
@@ -197,6 +198,7 @@ export class RoomCore {
       blackMarket: this.blackMarket(),
       mail: this.pendingMail(user.uid),
       special: this.special(),
+      hiddenVitals: this.hiddenVitals(),
       skills: this.customSkills(),
       images: this.imagesView(),
       vitals: this.vitalsView(),
@@ -267,6 +269,7 @@ export class RoomCore {
       case 'charList': return this.onCharList(user, rid);
       case 'charImport': return this.onCharImport(user, msg, rid);
       case 'specialSet': case 'specialDel': return this.onSpecial(user, msg, rid);
+      case 'hideVitals': return this.onHideVitals(user, msg, rid);
       case 'skillSet': case 'skillDel': return this.onSkillEdit(user, msg, rid);
       case 'mailSend': return this.onMailSend(user, msg, rid);
       case 'reward': return this.onReward(user, msg, rid);
@@ -1081,6 +1084,31 @@ export class RoomCore {
     this.setMeta('special', JSON.stringify(sp));
     const ev = this.record({ who: '系統', kind: 'audit', label, lines: lines.filter(Boolean) }, user);
     return { out: [{ to: 'self', msg: { t: 'specialOk', rid } }, ...this.broadcastEvent(ev).out, ...this.sysActivity(user, label, lines.filter(Boolean)), { to: 'all', msg: { t: 'special', special: sp } }], close: null };
+  }
+
+  // ---------- 不顯示於資源條的玩家（只是畫面過濾：角色資料、備份、GM 清單都不受影響） ----------
+  /** 隱藏名單（uid 陣列），存在 meta；舊房間沒有這筆＝空，所有人都顯示 */
+  hiddenVitals() {
+    try {
+      const v = JSON.parse(this.getMeta('hidden_vitals') ?? '[]');
+      return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [];
+    } catch { return []; }
+  }
+
+  /** GM 設定某位玩家要不要從資源條隱藏；記一條異動並通知所有人 */
+  onHideVitals(user, msg, rid) {
+    if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以設定資源條的顯示。');
+    const uid = cleanStr(msg.uid, 40);
+    if (!uid || typeof msg.hidden !== 'boolean') return err(rid, 'bad_hide', '資料格式錯誤。');
+    const list = this.hiddenVitals().filter((x) => x !== uid);
+    if (msg.hidden) {
+      if (list.length >= MAX_HIDDEN_VITALS) return err(rid, 'bad_hide', '隱藏的人數太多了。');
+      list.push(uid);
+    }
+    this.setMeta('hidden_vitals', JSON.stringify(list));
+    const label = `${user.name} 把「${cleanStr(msg.name, 40) || uid}」${msg.hidden ? '從資源條隱藏' : '恢復顯示在資源條'}`;
+    const ev = this.record({ who: '系統', kind: 'audit', label, lines: [] }, user);
+    return { out: [{ to: 'self', msg: { t: 'hideOk', rid } }, ...this.broadcastEvent(ev).out, ...this.sysActivity(user, label, []), { to: 'all', msg: { t: 'hiddenVitals', uids: list } }], close: null };
   }
 
   // ---------- 專屬技能（GM 新增的；內建的技能目錄在 src/data/skills.js，不能改） ----------

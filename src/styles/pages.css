@@ -46,7 +46,7 @@
    修整日（restView.js）
    ============================================================ */
 .rest-root { max-width: var(--page-max); margin: 0 auto; padding: 0 var(--space-5) var(--space-6); }
-.rest-root > .tabs-line { margin-bottom: var(--space-4); }
+.rest-root > .tabs-seg { margin-bottom: var(--space-4); }
 
 /* 上方狀態：名字、天數、經驗、金幣；時間與熟練並排，沒有方框 */
 .rest-hud { display: grid; gap: var(--space-3); padding: var(--space-4) 0 var(--space-3); }
@@ -59,7 +59,7 @@
 .rest-hud__num strong { color: var(--gold); font-size: 1.05rem; }
 .rest-hud__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-3) var(--space-6); }
 .hud-box { display: grid; gap: 6px; align-content: start; }
-.hud-box__head { display: flex; align-items: center; gap: var(--space-2); }
+.hud-box__head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 .hud-box__label { color: var(--soft); font-size: 0.8rem; }
 .hud-box__value { color: var(--ink); font-size: 1.05rem; }
 .hud-box__head .day-confirm { margin-left: auto; }
@@ -368,20 +368,26 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 .mk-grid { display: grid; gap: var(--gap-card); align-items: start; }
 /* 購買區與販賣區約 3：2，卡片寬度相近；每列幾張由下面的自動排欄決定（寬螢幕購買 3、販賣 2，空間不足自動減少） */
 @media (min-width: 1000px) { .mk-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
-.trade-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr)); column-gap: var(--gap-card); margin: 0; padding: 0; list-style: none; }
-/* 每張商品卡上下排：名稱與稀有度／價格資訊／數量輸入加按鈕；卡片本身不加框，只有底部淡線（稀有度左側色條照舊） */
-.trade-row { display: grid; align-content: start; gap: var(--space-2); min-width: 0; padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); }
+.trade-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); column-gap: var(--gap-card); margin: 0; padding: 0; list-style: none; }
+/* 每張商品卡單列：左邊名稱、稀有度、持有數；中間價格（原價、黑心價、共多少合成一行）；右邊數量框加固定寬度的買／賣鈕。
+   卡片本身不加框，只有底部淡線（稀有度左側色條照舊）；窄到放不下（手機）才改成上下兩層 */
+.trade-row { display: grid; grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 1.3fr) auto; align-items: center; column-gap: var(--space-3); min-width: 0; padding: var(--space-2) 0; border-bottom: 1px solid var(--line-soft); }
 .trade-row.rarity { padding-left: var(--space-3); }
 .trade-row__icon { flex: none; font-size: 1.2rem; line-height: 1; }
 .trade-row__icon:empty { display: none; }
 .trade-row__info { display: grid; gap: 2px; min-width: 0; }
 .trade-row__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2); }
 .trade-row__have { color: var(--soft); }
-.trade-row__price { color: var(--ink2); font-size: 0.82rem; }
-.trade-row__sub { color: var(--soft); font-size: 0.78rem; }
+.trade-row__money { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); min-width: 0; }
+.trade-row__price { color: var(--ink2); font-size: 0.82rem; white-space: nowrap; }
+.trade-row__sub { color: var(--soft); font-size: 0.78rem; white-space: nowrap; }
 .trade-row__act { display: flex; align-items: center; gap: var(--space-2); }
-.trade-row__qty { flex: none; width: 4rem; padding-inline: 4px; text-align: center; }
-.trade-row__act .btn { flex: 1; min-width: 0; white-space: nowrap; }
+.trade-row__qty { flex: none; width: 3.2rem; padding-inline: 4px; text-align: center; }
+.trade-row__act .btn { flex: none; width: 5.6rem; min-width: 0; padding-inline: 4px; white-space: nowrap; }
+@media (max-width: 520px) {
+  .trade-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
+  .trade-row__money { grid-column: 1 / -1; grid-row: 2; }
+}
 @media (max-width: 759px) {
   .mk-root { padding-inline: var(--space-3); }
   .mk-session { margin-left: 0; flex-basis: 100%; }
@@ -467,6 +473,8 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 /* 「新的一天」二次確認：在同一格裡展開 */
 .day-confirm { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
 .day-confirm__ask { color: var(--rose); font-size: 0.74rem; font-weight: 700; }
+.hud-box__head .day-confirm--list { flex: 1 1 100%; margin-left: 0; }
+.day-confirm__list { flex-basis: 100%; margin: 0.2rem 0 0; padding: 0 0 0 1.1rem; font-size: 0.78rem; color: var(--ink2); line-height: 1.5; overflow-wrap: anywhere; }
 /* ---------- 結果、紀錄、數值 ---------- */
 .stat { background: var(--raise); border: 0; box-shadow: 0 0 0 1px var(--line); border-radius: 10px; }
 /* ---------- 區塊標題：12px、金色、後接漸淡細線，前面不加符號 ---------- */

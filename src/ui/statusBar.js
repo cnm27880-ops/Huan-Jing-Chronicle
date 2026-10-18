@@ -11,6 +11,7 @@ import { FOODS, STOMACH_SLOTS, MAX_TIME } from '../game/rules.js';
 import {
   proficiency, newDay, eat, countOf, eatOrQueue, eatPreset, overwriteLoss, addPreset, presetLabel, clearQueue, restQueue,
 } from '../game/engine.js';
+import { dayReminders } from '../game/dayReminder.js';
 import { logActivity } from '../state/activityLog.js';
 
 /** 菜單編輯：新增（點料理加入，最多 3 份）與刪除。吃東西不在這裡，點胃袋的「＋」才吃 */
@@ -130,6 +131,7 @@ function newDayButton(state, commit) {
   let timer = null;
   const showIdle = () => {
     clearTimeout(timer);
+    box.classList.remove('day-confirm--list');
     box.replaceChildren(h('button', { type: 'button', class: 'status__day', onclick: showAsk }, '新的一天'));
   };
   function showAsk() {
@@ -143,12 +145,15 @@ function newDayButton(state, commit) {
         commit();
       },
     }, '確定');
+    const todo = dayReminders(state); // 純顯示：還有事沒做就列在同一個確認格裡，全做完維持原本的文字
+    box.classList.toggle('day-confirm--list', todo.length > 0);
     box.replaceChildren(
-      h('span', { class: 'day-confirm__ask', text: '確定換日？' }),
+      h('span', { class: 'day-confirm__ask', text: todo.length ? '還有事沒做，確定換日？' : '確定換日？' }),
       yes,
-      h('button', { type: 'button', class: 'status__day status__day--no', onclick: showIdle }, '取消'));
+      h('button', { type: 'button', class: 'status__day status__day--no', onclick: showIdle }, '取消'),
+      todo.length ? h('ul', { class: 'day-confirm__list', 'aria-label': '換日前還沒做的事' }, todo.map((t) => h('li', { text: t }))) : null);
     yes.focus();
-    timer = setTimeout(() => { if (box.isConnected) showIdle(); }, 5000);
+    timer = setTimeout(() => { if (box.isConnected) showIdle(); }, todo.length ? 15000 : 5000); // 有清單要多留時間讀
   }
   showIdle();
   return box;

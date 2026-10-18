@@ -211,6 +211,47 @@ textarea.field { padding: 8px 10px; }
 .tabs-line__sub { margin-left: 6px; font-size: 0.72rem; letter-spacing: 0.04em; color: var(--faint); }
 @media (max-width: 520px) { .tabs-line { gap: var(--space-4); } .tabs-line__sub { display: none; } }
 
+/* ---------- 分段頁籤（全站主分頁共用：修整日、交易、跑團左欄）：整條滿版、等分、文字置中、觸控高度至少 44px ---------- */
+.tabs-seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 2px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-box);
+}
+.tabs-seg__tab {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1px;
+  min-width: 0;
+  min-height: max(var(--ctl-h), 44px);
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
+  color: var(--soft);
+  text-align: center;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-ctl);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.tabs-seg__tab:hover { color: var(--gold); }
+.tabs-seg__tab[aria-selected='true'] { color: var(--gold); background: var(--goldbg); border-bottom-color: var(--gold); }
+.tabs-seg__tab:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.tabs-seg__tab:disabled { opacity: 0.5; cursor: not-allowed; }
+.tabs-seg__sub { font-size: 0.72rem; letter-spacing: 0.04em; color: var(--faint); }
+.tabs-seg__tab[aria-selected='true'] .tabs-seg__sub { color: var(--soft); }
+@media (max-width: 520px) { .tabs-seg__tab { font-size: 0.88rem; letter-spacing: 0.02em; } .tabs-seg__sub { font-size: 0.68rem; letter-spacing: 0; } }
+
+
 /* ---------- 數字對齊：所有數字用等寬數字，表格式排列時才會對齊 ---------- */
 .num, .tnum { font-variant-numeric: lining-nums tabular-nums; }
 
@@ -304,6 +345,7 @@ textarea.field { padding: 8px 10px; }
   column-gap: var(--gap-card);
 }
 /* 有說明文字的物品（紀念品效果）跨欄顯示：手機整列一欄，寬螢幕跨兩欄（窄到排不出兩欄時不跨，避免多出隱形欄位） */
+.bag-group .tile { grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr); } /* 名稱與數量緊貼，不把數量推到最右 */
 .bag-group .tile:has(.tile__note) { grid-column: 1 / -1; }
 @media (min-width: 820px) { .bag-group .tile:has(.tile__note) { grid-column: span 2; } }
 .tile {

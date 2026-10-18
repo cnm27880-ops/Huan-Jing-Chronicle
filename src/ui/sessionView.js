@@ -26,6 +26,9 @@ import { createBattleView, isBattleEvent } from './battleView.js';
 import { battleSel as sel } from './battleSelect.js';
 
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
+const DICE_FOLD_KEY = 'huanjing:dice:collapsed:v1';
+const readDiceCollapsed = () => { try { return localStorage.getItem(DICE_FOLD_KEY) === '1'; } catch { return false; } }; // 只有手機看得到收合鈕；讀不到就當展開
+const saveDiceCollapsed = (v) => { try { localStorage.setItem(DICE_FOLD_KEY, v ? '1' : '0'); } catch { /* 存不了就算了，下次照預設 */ } };
 const LEFT_TABS = [['moves', '招式'], ['items', '藥水與狀態'], ['skills', '技能檢定']];
 // 跑團紀錄只放「檢定、自訂骰、戰鬥」；鑑定、黑市、鑲嵌、GM 異動等都在「日誌」頁
 const sessionEvent = (e) => e.kind === 'check' || e.kind === 'dice' || isBattleEvent(e);
@@ -37,6 +40,7 @@ export function createSessionView({ root, getState, commit }) {
     sheet: '', // 手機／平板目前打開的抽屜：'' | 'left' | 'center'
     hudOpen: false, // 手機膠囊 HUD 是否展開
     sides: 20, count: 1, mod: 0, text: '',
+    diceCollapsed: readDiceCollapsed(), // 手機骰盤收合成一條投骰鈕
     adv: false, // 下一次技能檢定用優勢骰（會消耗一個「張亮的驚人發現」這類紀念品）
   };
   const stage = createEncounterCard({ getState, commit, rerender: () => render() });
@@ -54,8 +58,9 @@ export function createSessionView({ root, getState, commit }) {
   const feedHead = h('div', { class: 'sx-feedhead' });
   const feedBox = h('div', { class: 'sx-feed', role: 'log', 'aria-label': '擲骰紀錄' });
   const diceBox = h('div', { class: 'sx-dice' });
+  const selfBox = h('div', { class: 'sx-self' }); // 右欄第一張：自己的完整資源卡（手機改用頂部膠囊 HUD）
   const party = createPartyPanel(); // 隊友資源條（玩家端；GM 不顯示）
-  const right = h('aside', { class: 'sx-col sx-right', 'aria-label': '紀錄與擲骰' }, top, party.node, roomDetails, feedHead, feedBox, diceBox);
+  const right = h('aside', { class: 'sx-col sx-right', 'aria-label': '紀錄與擲骰' }, top, selfBox, party.node, roomDetails, feedHead, feedBox, diceBox);
   const barBtn = (id, label, controls) => h('button', {
     type: 'button', class: 'sx-bar__btn', dataset: { id }, 'aria-controls': controls, 'aria-expanded': 'false',
     onclick: () => openSheet(id),
@@ -195,8 +200,8 @@ export function createSessionView({ root, getState, commit }) {
   function renderLeft() {
     const state = getState();
     const y = left.scrollTop;
-    const tabs = h('div', { class: 'sx-tabs tabs-line', role: 'tablist', 'aria-label': '左欄分頁' }, LEFT_TABS.map(([id, label]) => h('button', {
-      type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.leftTab === id),
+    const tabs = h('div', { class: 'sx-tabs tabs-seg', role: 'tablist', 'aria-label': '左欄分頁' }, LEFT_TABS.map(([id, label]) => h('button', {
+      type: 'button', role: 'tab', class: 'tabs-seg__tab', 'aria-selected': String(ui.leftTab === id),
       onclick: () => { ui.leftTab = id; renderLeft(); setSheet(ui.sheet); },
     }, label)));
     const panel = ui.leftTab === 'skills'
@@ -205,12 +210,16 @@ export function createSessionView({ root, getState, commit }) {
         ? h('div', { class: 'sx-stack' }, battle.potionCard(state), battle.statusCard(state))
         : battle.moveCard(state);
     left.replaceChildren(
-      h('div', { class: 'sx-left__hud' }, battle.hud(state)),
       h('div', { class: 'sx-sheethead' },
         h('span', { class: 'sx-sheethead__grip', 'aria-hidden': 'true' }),
         h('button', { type: 'button', class: 'sheet__close', onclick: () => setSheet('') }, '收起')),
       tabs, panel);
     left.scrollTop = y;
+  }
+
+  /** 右欄第一張：自己的完整資源卡（點生命／資源開調整面板，寫入紀錄；跟原本左欄那張是同一個元件） */
+  function renderSelf() {
+    selfBox.replaceChildren(battle.hud(getState()));
   }
 
   // ---------- 中欄與手機頂部 ----------
@@ -266,33 +275,43 @@ export function createSessionView({ root, getState, commit }) {
   }
 
 
-  /** 快速擲骰：骰子面數、顆數、加減值，或直接輸入骰式 */
+  /**
+   * 快速擲骰，兩層：第一層骰型（D4～D100，單列、放不下就橫向捲動）；第二層「顆、加減、自訂骰式、投骰」同一列，
+   * 標籤改成輸入框裡的提示字。手機（≤900px）可收合成只剩一條投骰鈕，展開／收合記在這台裝置。
+   */
   function renderDice() {
     const expr = expression();
-    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), title: expr.error ? '骰式格式不對' : `擲 ${expr.text}`, onclick: rollCustom }, '投骰');
+    const rollTitle = () => (expression().error ? '骰式格式不對' : `擲 ${expression().text}`);
+    diceBox.dataset.collapsed = ui.diceCollapsed ? '1' : '0';
+    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), title: rollTitle(), onclick: rollCustom }, ui.diceCollapsed ? `投骰 ${expr.error ? '' : expr.text}` : '投骰');
+    const fold = h('button', {
+      type: 'button', class: 'btn btn--quiet btn--small sx-dice__fold', 'aria-expanded': String(!ui.diceCollapsed), 'aria-label': ui.diceCollapsed ? '展開骰盤' : '收合骰盤',
+      onclick: () => { ui.diceCollapsed = !ui.diceCollapsed; saveDiceCollapsed(ui.diceCollapsed); renderDice(); },
+    }, ui.diceCollapsed ? '展開' : '收合');
+    if (ui.diceCollapsed) { diceBox.replaceChildren(h('div', { class: 'sx-dice__row sx-dice__row--fold' }, fold, rollBtn)); return; }
     diceBox.replaceChildren(
-      h('div', { class: 'sx-dice__sides', role: 'radiogroup', 'aria-label': '骰子面數' }, SIDES.map((n) => h('button', {
-        type: 'button', class: 'sx-side', role: 'radio', 'aria-checked': String(!ui.text.trim() && ui.sides === n),
-        onclick: () => { ui.sides = n; ui.text = ''; renderDice(); },
-      }, `D${n}`))),
+      h('div', { class: 'sx-dice__top' },
+        h('div', { class: 'sx-dice__sides', role: 'radiogroup', 'aria-label': '骰子面數' }, SIDES.map((n) => h('button', {
+          type: 'button', class: 'sx-side', role: 'radio', 'aria-checked': String(!ui.text.trim() && ui.sides === n),
+          onclick: () => { ui.sides = n; ui.text = ''; renderDice(); },
+        }, `D${n}`))),
+        fold),
       h('div', { class: 'sx-dice__row' },
-        h('label', { class: 'sx-dice__f' }, h('span', { text: '顆' }),
-          h('input', {
-            class: 'field', type: 'number', inputmode: 'numeric', min: 1, max: MAX_DICE, value: ui.count, 'aria-label': '幾顆',
-            onchange: (e) => { ui.count = Math.min(MAX_DICE, Math.max(1, Math.trunc(Number(e.target.value)) || 1)); ui.text = ''; renderDice(); },
-          })),
-        h('label', { class: 'sx-dice__f' }, h('span', { text: '加減' }),
-          h('input', {
-            class: 'field', type: 'number', inputmode: 'numeric', value: ui.mod, 'aria-label': '加減值',
-            onchange: (e) => { ui.mod = Math.trunc(Number(e.target.value)) || 0; ui.text = ''; renderDice(); },
-          })),
+        h('input', {
+          class: 'field sx-dice__n', type: 'number', inputmode: 'numeric', min: 1, max: MAX_DICE, value: ui.count, placeholder: '顆', title: '幾顆', 'aria-label': '幾顆',
+          onchange: (e) => { ui.count = Math.min(MAX_DICE, Math.max(1, Math.trunc(Number(e.target.value)) || 1)); ui.text = ''; renderDice(); },
+        }),
+        h('input', {
+          class: 'field sx-dice__n', type: 'number', inputmode: 'numeric', value: ui.mod || '', placeholder: '加減', title: '加減值', 'aria-label': '加減值',
+          onchange: (e) => { ui.mod = Math.trunc(Number(e.target.value)) || 0; ui.text = ''; renderDice(); },
+        }),
         h('input', {
           class: 'field sx-dice__expr', type: 'text', placeholder: '或輸入 2D6+3', value: ui.text, autocomplete: 'off', 'aria-label': '直接輸入骰式',
           oninput: (e) => {
             ui.text = e.target.value;
             const ex = expression();
             rollBtn.disabled = Boolean(ex.error);
-            rollBtn.title = ex.error ? '骰式格式不對' : `擲 ${ex.text}`;
+            rollBtn.title = rollTitle();
             diceBox.querySelectorAll('.sx-dice__sides .sx-side').forEach((c) => c.setAttribute('aria-checked', String(!ui.text.trim() && c.textContent === `D${ui.sides}`)));
           },
           onkeydown: (e) => { if (e.key === 'Enter') rollCustom(); },
@@ -304,13 +323,16 @@ export function createSessionView({ root, getState, commit }) {
     const r = getRoomStatus();
     roomDetails.hidden = r.phase === 'local';
     const online = r.members.filter((m) => m.online).length;
-    roomSummary.textContent = r.phase === 'online' ? `房間・${online} / ${r.members.length} 人在線` : r.phase === 'denied' ? '房間（本機模式）' : '房間（連線中…）';
+    // 標題列：房間・N / M 人在線　GM 某某〔暫代〕（GM 不另外佔一整排）
+    const nameOf = (uid) => r.gm.names[uid] ?? r.members.find((m) => m.uid === uid)?.name ?? '（尚未加入）';
+    const gmText = r.gm.uids.length ? r.gm.uids.map(nameOf).join('、') : '未設定';
+    roomSummary.textContent = r.phase === 'online' ? `房間・${online} / ${r.members.length} 人在線　GM ${gmText}${r.gm.override ? '〔暫代〕' : ''}` : r.phase === 'denied' ? '房間（本機模式）' : '房間（連線中…）';
   }
 
   /** 中欄要重畫的房間狀態：變了才重畫（打字中的左欄表單不受隊友狀態更新影響） */
   const sigOf = () => {
     const r = getRoomStatus();
-    return JSON.stringify([r.phase, r.me?.isGm, getEncounter(), r.images, r.vitals, r.members.map((m) => [m.uid, m.online]), r.gm?.uids]);
+    return JSON.stringify([r.phase, r.me?.isGm, getEncounter(), r.images, r.vitals, r.hiddenVitals, r.members.map((m) => [m.uid, m.online]), r.gm?.uids]);
   };
 
   // ---------- 組合 ----------
@@ -338,6 +360,7 @@ export function createSessionView({ root, getState, commit }) {
     renderRoomSummary();
     renderFeedHead();
     party.render();
+    renderSelf();
     renderCenter();
     renderLeft();
     renderTop();

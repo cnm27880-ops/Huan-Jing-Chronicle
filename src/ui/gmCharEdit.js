@@ -6,7 +6,7 @@
 import { h, fmt } from './dom.js';
 import { openSheet } from './sheet.js';
 import { listCharacters, fetchCharacter } from '../state/charSync.js';
-import { roomRequest } from '../state/rollLog.js';
+import { roomRequest, getRoomStatus, setVitalsHidden } from '../state/rollLog.js';
 import { askText } from './confirmPop.js';
 import { blankCharacter } from '../game/importBot.js';
 import { derivedStats } from '../game/stats.js';
@@ -77,12 +77,28 @@ export function openGmCharEditor() {
     sheet.refresh();
   }
 
+  /** 不顯示於資源條：只是跑團頁右欄的畫面過濾，角色資料、備份、這份清單都不受影響 */
+  async function toggleHidden(c) {
+    const hidden = !getRoomStatus().hiddenVitals.includes(c.uid);
+    ui.busy = true; ui.message = ''; sheet.refresh();
+    try {
+      await setVitalsHidden(c.uid, hidden, c.charName || c.name);
+      ui.message = `「${c.charName || c.name}」已${hidden ? '從資源條隱藏' : '恢復顯示在資源條'}。`;
+    } catch (e) { ui.message = `失敗：${e.message}`; }
+    ui.busy = false;
+    sheet.refresh();
+  }
+
   function listView() {
     if (ui.error) return h('p', { class: 'notice notice--bad', text: ui.error });
     if (!ui.list) return h('p', { class: 'hint', text: '讀取中…' });
     if (!ui.list.length) return h('p', { class: 'notice', text: '還沒有任何玩家的角色存在伺服器上。' });
     return h('div', {}, ui.message ? h('p', { class: 'notice', text: ui.message }) : null, h('ul', { class: 'import-list' }, ui.list.map((c) => h('li', { class: 'import-row' },
       h('strong', { text: c.charName || c.name }), h('small', { class: 'hint', text: `${c.name}・第 ${c.version} 版・${when(c.updatedAt)}` }),
+      h('button', {
+        type: 'button', class: 'toggle', 'aria-pressed': String(getRoomStatus().hiddenVitals.includes(c.uid)), disabled: ui.busy ? true : null,
+        title: '只影響跑團頁的資源條，不動角色資料', onclick: () => toggleHidden(c),
+      }, '不顯示於資源條'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: ui.busy ? true : null, onclick: () => open(c.uid) }, '開啟'),
       h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.busy ? true : null, onclick: (e) => resetBlank(c, e.currentTarget) }, '換成空白')))));
   }
