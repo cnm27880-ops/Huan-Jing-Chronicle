@@ -30,6 +30,8 @@ function upgrade(state) {
   for (const k of NEW_FIELDS) {
     if (state[k] === undefined) state[k] = clone(SAMPLE_CHARACTER[k]);
   }
+  state.buffs.atkBy = state.buffs.atkBy ?? {}; // 同名藥水不疊加用的各藥水貢獻（舊存檔沒有）
+  state.buffs.defBy = state.buffs.defBy ?? {};
   state.adjust = state.adjust ?? {}; // 手動調整與啟動中的技能（statMode 'skills' 的角色才用得到，見 skillTable.js）
   state.skillOn = state.skillOn ?? {};
   state.moveUse = state.moveUse ?? {}; // 招式使用紀錄（名稱 → 次數），GM 的模擬戰讀這個，見 moveUse.js

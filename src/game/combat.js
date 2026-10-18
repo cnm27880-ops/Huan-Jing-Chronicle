@@ -486,6 +486,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   }
 
   state.buffs.atk = 0;
+  state.buffs.atkBy = {};
   const h0 = hits[0];
   return {
     move, target: h0.target, mode, atk, def: h0.def, result: h0.result, potion, ignoreAbs: h0.ignoreAbs, abs: h0.abs,
@@ -552,6 +553,7 @@ export function monsterAttack(state, enc, monsterId, mode = 0, rng = Math.random
   const atk = extraAtk ? Object.fromEntries(TRACKS.map((t) => [t, base[t] > 0 ? base[t] + extraAtk : base[t]])) : base;
   const result = clash(atk, def.dice, rng);
   state.buffs.def = 0;
+  state.buffs.defBy = {};
   const wasDowned = isDowned(state);
   const absorbed = damagePlayer(state, result.total);
   // 響應：賽博駭客——受到靈魂傷害但沒破防，攻擊方立刻扣「精神意志面板」顆 D4 的生命；一回合只能 1 次
@@ -574,10 +576,29 @@ export function monsterAttack(state, enc, monsterId, mode = 0, rng = Math.random
 }
 
 // ---------- 藥水 ----------
+/** 藥水加成的空白狀態：總和 atk／def ＋各藥水名稱的貢獻 atkBy／defBy（所有建立 buffs 的地方都用同一個形狀） */
+export const newBuffs = () => ({ atk: 0, def: 0, atkBy: {}, defBy: {} });
+
+/** 把名為 name 的藥水貢獻設成 value（取代舊值，總和跟著變）；回傳是否取代了同名的舊加成 */
+function stackBuff(buffs, key, name, value) {
+  const by = key + 'By';
+  buffs[by] = buffs[by] ?? {};
+  const old = buffs[by][name] ?? 0;
+  buffs[key] = (buffs[key] ?? 0) - old + value;
+  buffs[by][name] = value;
+  return old > 0;
+}
+
+/** 這種藥水的下次攻擊／防禦加成是不是已經在身上（再喝不會增加）；回復藥水一律 false */
+export function buffActive(state, name) {
+  const def = POTIONS[name];
+  return Boolean((def?.atk && state.buffs?.atkBy?.[name] > 0) || (def?.def && state.buffs?.defBy?.[name] > 0));
+}
+
 /**
  * 喝藥水：消耗 1 個、累積毒性、回血或加成「下次攻擊／防禦」。
  * 毒性上限 15：加上這瓶會超過 15 就不能喝；戰鬥結束時清零（見 endBattle）。
- * 黃/綠藥水 = 暫時的真傷／絕防骰數（真傷只加在用到的軌道，絕防加在三軌）；多瓶相加。
+ * 黃/綠藥水 = 暫時的真傷／絕防骰數（真傷只加在用到的軌道，絕防加在三軌）；不同名相加、同名取代（不疊加）。
  */
 export function drinkPotion(state, name, rng = Math.random) {
   const def = POTIONS[name];
@@ -606,8 +627,10 @@ export function drinkPotion(state, name, rng = Math.random) {
       out.restored[res] = state.resources[res] - before;
     }
   }
-  if (def.atk) { state.buffs.atk += def.atk; out.atk = def.atk; }
-  if (def.def) { state.buffs.def += def.def; out.def = def.def; }
+  // 同名藥水不疊加（使用者 2026-10-19）：再喝同一種只是把那一種的貢獻換成這一瓶的值；不同名照樣相加。
+  // buffs.atk／def 仍是總和，atkBy／defBy 記各藥水名稱各貢獻多少（舊存檔沒有就當空的）
+  if (def.atk) { out.atkReplaced = stackBuff(state.buffs, 'atk', name, def.atk); out.atk = def.atk; }
+  if (def.def) { out.defReplaced = stackBuff(state.buffs, 'def', name, def.def); out.def = def.def; }
   return out;
 }
 
@@ -635,7 +658,7 @@ export function giveHealPotion(giver, target, name, rng = Math.random) {
 export function endBattle(state) {
   const out = { toxicity: state.toxicity, monsters: state.encounter.monsters.length };
   state.toxicity = 0;
-  state.buffs = { atk: 0, def: 0 };
+  state.buffs = newBuffs();
   state.shield = { hp: 0, res: 0 };
   state.encounter = newEncounter();
   return out;

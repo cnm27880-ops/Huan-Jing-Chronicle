@@ -9,7 +9,7 @@ import { toast, rollFailed } from './controls.js';
 import { TRACKS, POTIONS, TOXICITY_MAX } from '../game/rules.js';
 import {
   attackDice, pooledAttack, endBattle, monsterAbs, ATTACK_MODES, defenseDice, formatAbc, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
-  drinkPotion, useSupport, isDowned, planResponses, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES, resolveChosenTrack,
+  drinkPotion, buffActive, useSupport, isDowned, planResponses, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES, resolveChosenTrack,
   daoDunDice, useSwell,
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
@@ -226,6 +226,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
             onclick: async (e) => {
               const pd = POTIONS[n];
               if (pd.heal && !pd.atk && !pd.def && state.hp >= maxHp(state) && !(await askConfirm(e.currentTarget, { title: '血量已經是滿的', lines: ['喝了回血會浪費。還是要喝嗎？'], okText: '還是喝' }))) return;
+              if (buffActive(state, n) && !(await askConfirm(e.currentTarget, { title: '加成不會增加', lines: [`已經有${n}的效果，再喝不會增加，毒性還是會加，要喝嗎？`], okText: '還是喝' }))) return;
               let r;
               let draw;
               try { ({ r, draw } = await rollWith(state, (st, rng) => drinkPotion(st, n, rng))); } catch (e) { return rollFailed(e); }

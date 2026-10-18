@@ -23,7 +23,7 @@
 // ============================================================
 import {
   newEncounter, addMobs, addBosses, playerAttack, monsterAttack, defenseDice, attackDice, isDowned,
-  drinkPotion, giveHealPotion, monsterDef, monsterAbs, monsterAtk, pooledAttack, resolveChosenTrack,
+  newBuffs, drinkPotion, giveHealPotion, monsterDef, monsterAbs, monsterAtk, pooledAttack, resolveChosenTrack,
 } from './combat.js';
 import { POTIONS, TOXICITY_MAX, TRACKS } from './rules.js';
 import { maxHp } from './stats.js';
@@ -154,7 +154,7 @@ function usePotions(actor, team, enc, rng, enemyB) {
 export function prepPlayer(src, { supply = null, cap = 1 } = {}) {
   const p = structuredClone(src);
   restoreAllResources(p);
-  p.toxicity = 0; p.buffs = { atk: 0, def: 0 }; p.shield = { hp: 0, res: 0 };
+  p.toxicity = 0; p.buffs = newBuffs(); p.shield = { hp: 0, res: 0 };
   if (supply && POTIONS[supply]?.heal) { // 假設血藥備足：毒性 15 剛好喝完（至少備到喝得滿）
     const need = Math.ceil(TOXICITY_MAX / POTIONS[supply].toxicity);
     if (countOf(p, supply) < need) addItem(p, supply, need - countOf(p, supply));

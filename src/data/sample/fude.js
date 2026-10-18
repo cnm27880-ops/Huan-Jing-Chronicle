@@ -83,7 +83,7 @@ export const SAMPLE_CHARACTER = {
   gems: [], // 已鑑定、還沒鑲嵌的寶石 { id, stat, value, roll }
   nextGemId: 1,
   toxicity: 0,
-  buffs: { atk: 0, def: 0 },
+  buffs: { atk: 0, def: 0, atkBy: {}, defBy: {} },
   // 已學會、會影響戰鬥規則的技能等級（試算表「已學會的技能」）：暴徒/魔女/終焉武裝 是被動規則，其餘是招式或響應
   skills: { 暴徒: 1, 魔女: 10, 終焉武裝: 5, 域外魔祖: 3, 萬物歸一: 5, 吞天噬血陣: 5 },
   // 目前資源（生命用 hp）；最大值由面板計算。數值取自試算表
