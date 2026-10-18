@@ -4,10 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseAbc, formatAbc, attackDice, defenseDice, clash, generateAbcSplit, newEncounter, addMobs, addBosses,
-  playerAttack, monsterAttack, drinkPotion, isDowned, endBattle, healPlayer,
+  playerAttack, monsterAttack, drinkPotion, buffActive, isDowned, endBattle, healPlayer,
 } from '../src/game/combat.js';
 import { derivedStats, maxHp } from '../src/game/stats.js';
 import { eat } from '../src/game/engine.js';
+import { normalizeCharacter } from '../src/state/store.js';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 
 const fresh = () => JSON.parse(JSON.stringify(SAMPLE_CHARACTER));
@@ -193,7 +194,7 @@ test('結束戰鬥：毒性歸零、藥水加成清除、敵人清空', () => {
   const r = endBattle(s);
   assert.equal(r.monsters, 2);
   assert.equal(s.toxicity, 0);
-  assert.deepEqual(s.buffs, { atk: 0, def: 0 });
+  assert.deepEqual(s.buffs, { atk: 0, def: 0, atkBy: {}, defBy: {} });
   assert.equal(s.encounter.monsters.length, 0);
 });
 
@@ -500,4 +501,54 @@ test('守密人：目標中途倒下，後面的段數取消', () => {
   enc.monsters.push(dummy(1));
   const r = playerAttack(s, enc, 'g', '小怪1', 0, d4(4));
   assert.equal(r.hits.length, 1);
+});
+
+test('同名藥水不疊加：再喝只取代，總和不變；毒性照加、藥水照扣', () => {
+  const s = fresh();
+  const stock = s.inventory['狂暴湯'];
+  drinkPotion(s, '狂暴湯');
+  const r = drinkPotion(s, '狂暴湯');
+  assert.equal(s.buffs.atk, 5);
+  assert.equal(r.atkReplaced, true);
+  assert.equal(s.toxicity, 2); // 狂暴湯毒性 1，喝兩次
+  assert.equal(s.inventory['狂暴湯'], stock - 2);
+  assert.equal(buffActive(s, '狂暴湯'), true);
+  assert.equal(buffActive(s, '力量泉'), false);
+  assert.equal(buffActive(s, '回春湯'), false);
+  drinkPotion(s, '玄武湯');
+  drinkPotion(s, '玄武湯');
+  assert.equal(s.buffs.def, 5);
+});
+
+test('不同名藥水仍然相加；同名取代只換那一種的貢獻', () => {
+  const s = fresh();
+  drinkPotion(s, '狂暴湯');
+  drinkPotion(s, '力量泉');
+  drinkPotion(s, '狂暴湯');
+  assert.equal(s.buffs.atk, 12);
+  assert.deepEqual(s.buffs.atkBy, { 狂暴湯: 5, 力量泉: 7 });
+});
+
+test('結算後加成與各藥水記錄一起歸零', () => {
+  const s = fresh();
+  drinkPotion(s, '狂暴湯');
+  drinkPotion(s, '玄武湯');
+  const enc = newEncounter();
+  enc.monsters.push({ id: '小怪1', kind: 'mob', hp: 1000, maxHp: 1000, atk: { A: 1, B: 0, C: 0 }, def: { A: 0, B: 0, C: 0 } });
+  playerAttack(s, enc, 'm1', '小怪1', 0, d4(2));
+  assert.equal(s.buffs.atk, 0);
+  assert.deepEqual(s.buffs.atkBy, {});
+  monsterAttack(s, enc, '小怪1', 0, d4(1));
+  assert.equal(s.buffs.def, 0);
+  assert.deepEqual(s.buffs.defBy, {});
+  assert.equal(drinkPotion(s, '狂暴湯').atkReplaced, false); // 歸零後再喝不算同名
+});
+
+test('舊存檔沒有各藥水記錄也能載入、能喝', () => {
+  const s = fresh();
+  s.buffs = { atk: 3, def: 0 };
+  drinkPotion(s, '狂暴湯');
+  assert.equal(s.buffs.atk, 8); // 舊的 3 是來源不明的，保留
+  const loaded = normalizeCharacter({ ...fresh(), buffs: { atk: 2, def: 1 } });
+  assert.deepEqual(loaded.buffs, { atk: 2, def: 1, atkBy: {}, defBy: {} });
 });

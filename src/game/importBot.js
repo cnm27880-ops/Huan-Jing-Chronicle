@@ -29,7 +29,7 @@ export function blankCharacter(name) {
     restStomach: [], sessionStomach: [], keepsakes: {}, inventory: {}, sortOrder: [],
     baseStats: Object.fromEntries(STAT_KEYS.map((k) => [k, 0])),
     equipment: { weapon: null, armor: null, acc1: null, acc2: null },
-    gear: [], nextGearId: 1, gems: [], nextGemId: 1, toxicity: 0, buffs: { atk: 0, def: 0 },
+    gear: [], nextGearId: 1, gems: [], nextGemId: 1, toxicity: 0, buffs: { atk: 0, def: 0, atkBy: {}, defBy: {} },
     skills: {}, resources: Object.fromEntries(RESOURCES.map((r) => [r, 0])), shield: { hp: 0, res: 0 },
     moves: [basicMove()], encounter: { monsters: [], next: { mob: 1, boss: 1 } }, migrated: {},
   };
