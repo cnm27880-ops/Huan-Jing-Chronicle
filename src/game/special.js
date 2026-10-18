@@ -8,7 +8,7 @@
 // 特殊材料：每個修整日每種 1 次，擲 1D20 + 所選技能加值，總分多少就得多少個（使用者確認）；原文沒寫 DC，不設 DC。
 // 餵肉球：材料換「徐曉迪的肉」，5 個肉收割成 1 個怪物肉。
 // ============================================================
-import { LIFE_SKILLS, ART_SKILLS, FOODS, POTIONS } from './rules.js';
+import { LIFE_SKILLS, ART_SKILLS, FOODS, POTIONS, CLEANSE_ITEMS } from './rules.js';
 import { modifier, countOf, addItem, removeItem, keepsakeApplies, consumeKeepsakes, tickRestStomach, d20 } from './engine.js';
 
 export const SPECIAL_RECIPES = {
@@ -44,7 +44,7 @@ let custom = { recipes: {}, materials: {} };
 
 /** 名稱已經被遊戲裡別的東西用掉了（內建配方、材料、食物、藥水、肉球） */
 export function reservedName(name) {
-  return name in SPECIAL_RECIPES || name in DAILY_MATERIALS || name in FOODS || name in POTIONS || name in MEAT_FEED || name === MEAT || name === MONSTER_MEAT;
+  return name in SPECIAL_RECIPES || name in DAILY_MATERIALS || name in FOODS || name in POTIONS || name in CLEANSE_ITEMS || name in MEAT_FEED || name === MEAT || name === MONSTER_MEAT;
 }
 
 /** 檢查並整理一個 GM 新增的配方。回傳 { ok, name, def } 或 { ok:false, error }（名稱重複的檢查由呼叫端用 existing 處理） */

@@ -8,6 +8,7 @@ import { eat, endSession } from '../src/game/engine.js';
 import { drinkPotion, useCleanse, giveHealPotion } from '../src/game/combat.js';
 import { derivedStats } from '../src/game/stats.js';
 import { proficiency } from '../src/game/engine.js';
+import { validateCustomRecipe } from '../src/game/special.js';
 
 const mk = (extra = {}) => ({ ...blankCharacter('測試'), ...extra });
 const skills = (o) => ({ ...blankCharacter('x').lifeSkills, ...o });
@@ -174,4 +175,9 @@ test('純潔聖宴：清除所有毒素、扣背包；毒性為 0 不能用；�
   assert.ok(eat(s, '純潔聖宴', 'session')); // 吃不了（回傳錯誤訊息）
   assert.match(useCleanse(mk({ toxicity: 3 }), '純潔聖宴').error, /背包裡沒有/);
   assert.match(useCleanse(s, '回春湯').error, /不能這樣使用/);
+});
+
+test('GM 新增配方不能取用新物品名稱（強效藥水、套餐、神級效果、純潔聖宴）', () => {
+  const def = { type: '進階藥水', skill: '調劑', dc: 12, materials: { 福瑞毛: 2 }, effect: '' };
+  for (const n of ['強效黃藥水', '碳水炸彈套餐', '神怒滴露', '汙濁饗宴', '肉棒王宴', '純潔聖宴']) assert.equal(validateCustomRecipe(n, def).ok, false, n);
 });
