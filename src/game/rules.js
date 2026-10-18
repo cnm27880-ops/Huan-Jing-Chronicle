@@ -95,6 +95,28 @@ export const RECIPES = {
 export const CRAFT_COST_AMOUNT = 6;
 
 /**
+ * 合成（GM 定案 2026-10-19，數字照抄；之後 GM 要調只改這張表）：
+ * 強效藥水＝6 瓶原藥水＋12 福瑞毛（調劑）；套餐＝兩種各 3 份料理＋6 怪物肉（烹飪）。
+ * 成品就是同名的物品，效果在 POTIONS／FOODS。
+ */
+const POTION_SYNTH = (base, dc) => ({ type: '強效藥水', skill: '調劑', dc, materials: { [base]: 6, 福瑞毛: 12 } });
+const MEAL_SYNTH = (a, b, dc) => ({ type: '套餐', skill: '烹飪', dc, materials: { [a]: 3, [b]: 3, 怪物肉: 6 } });
+export const SYNTH_RECIPES = {
+  強效黃藥水: POTION_SYNTH('黃藥水', 30),
+  強效綠藥水: POTION_SYNTH('綠藥水', 30),
+  強效強擊藥: POTION_SYNTH('強擊藥', 35),
+  強效堅盾藥: POTION_SYNTH('堅盾藥', 35),
+  強效狂暴湯: POTION_SYNTH('狂暴湯', 40),
+  強效玄武湯: POTION_SYNTH('玄武湯', 40),
+  強效力量泉: POTION_SYNTH('力量泉', 45),
+  強效抗性泉: POTION_SYNTH('抗性泉', 45),
+  碳水炸彈套餐: MEAL_SYNTH('炒飯', '拉麵', 35),
+  小確幸套餐: MEAL_SYNTH('什錦飯', '大肉棒', 35),
+  大土豪套餐: MEAL_SYNTH('豪華蓋飯', '碳烤肉排', 45),
+  尊爵不凡套餐: MEAL_SYNTH('滿漢全席', '傳奇盛宴', 45),
+};
+
+/**
  * 食物：proficiency = 熟練加值（只有熟練食物有）
  * 持續時間依吃的場合：修整胃袋 10 次修整檢定；跑團胃袋到本次跑團結束
  * effect 文字取自 GM 試算表「生產表」
@@ -110,6 +132,14 @@ export const FOODS = {
   傳奇盛宴: { effect: '熟練 +4', proficiency: 4 },
   祕製桃花酒: { effect: '熟練 +2', proficiency: 2 },
   惜未央: { effect: '熟練 +2，吃下時獲得 1 時間（每次刷新最多 2 次）', proficiency: 2 },
+  // 套餐（合成，GM 定案 2026-10-19）：比照一般食物，占胃袋 1 格
+  碳水炸彈套餐: { effect: '生命上限 +40，真實傷害與絕對防禦 +5' },
+  小確幸套餐: { effect: '熟練 +4', proficiency: 4 },
+  大土豪套餐: { effect: '生命上限 +60，真實傷害與絕對防禦 +7' },
+  尊爵不凡套餐: { effect: '熟練 +5', proficiency: 5 },
+  // 神級料理（GM 定案 2026-10-19；純潔聖宴不是胃袋食物，見 CLEANSE_ITEMS）
+  汙濁饗宴: { effect: '生命上限 +100，真實傷害與絕對防禦 +10' },
+  肉棒王宴: { effect: '熟練 +6', proficiency: 6 },
 };
 export const STOMACH_SLOTS = 3;
 export const REST_FOOD_CHECKS = 10;
@@ -145,12 +175,20 @@ export const FOOD_STATS = {
   什錦飯: { 生命: 10 },
   豪華蓋飯: { 生命: 20, [TRUE_ATK]: 2, [TRUE_DEF]: 2 },
   滿漢全席: { 生命: 40, [TRUE_ATK]: 4, [TRUE_DEF]: 4 },
+  碳水炸彈套餐: { 生命: 40, [TRUE_ATK]: 5, [TRUE_DEF]: 5 },
+  大土豪套餐: { 生命: 60, [TRUE_ATK]: 7, [TRUE_DEF]: 7 },
+  汙濁饗宴: { 生命: 100, [TRUE_ATK]: 10, [TRUE_DEF]: 10 },
+};
+
+/** 立即使用、不進胃袋的料理（戰鬥頁藥水區有使用鈕）：純潔聖宴＝清除所有毒素，毒性為 0 時不能用 */
+export const CLEANSE_ITEMS = {
+  純潔聖宴: { effect: '清除所有毒素（立即使用，不進胃袋）' },
 };
 
 /**
  * 藥水（試算表「生產表」）。toxicity = 累積毒性；
  * heal = 回復 NdM 生命；atk / def = 下次攻擊（防禦）骰加成
- * 神級滴露（神怒/神皮/神愛）試算表沒有效果，尚未收錄。
+ * 強效藥水（合成）與神級滴露的效果是 GM 定案（2026-10-19）。
  */
 export const POTIONS = {
   紅藥水: { toxicity: 2, heal: { n: 2, sides: 10 } },
@@ -165,9 +203,31 @@ export const POTIONS = {
   生命泉: { toxicity: 2, heal: { n: 10, sides: 16 } },
   力量泉: { toxicity: 1, atk: 7 },
   抗性泉: { toxicity: 1, def: 7 },
+  // 強效藥水（合成，GM 定案 2026-10-19）：和原藥水是不同名稱，所以可以相加
+  強效黃藥水: { toxicity: 1, atk: 3 },
+  強效綠藥水: { toxicity: 1, def: 3 },
+  強效強擊藥: { toxicity: 1, atk: 9 },
+  強效堅盾藥: { toxicity: 1, def: 9 },
+  強效狂暴湯: { toxicity: 1, atk: 15 },
+  強效玄武湯: { toxicity: 1, def: 15 },
+  強效力量泉: { toxicity: 1, atk: 21 },
+  強效抗性泉: { toxicity: 1, def: 21 },
+  // 神級滴露（GM 定案 2026-10-19）
+  神怒滴露: { toxicity: 0, atk: 20 },
+  神皮滴露: { toxicity: 0, def: 20 },
+  神愛滴露: { toxicity: 1, heal: { n: 10, sides: 20 } },
   動物春藥: { toxicity: 2, restore: { 魔力: 40 } }, // 回復最大魔力的 40%（特殊配方，無條件捨去，需驗證）
 };
 export const TOXICITY_MAX = 15;
+
+/** 藥水效果的一行文字（戰鬥頁藥水鈕與修整日合成共用） */
+export const potionEffectText = (p) => [
+  p.heal ? `回復 ${p.heal.n}D${p.heal.sides} 生命` : null,
+  ...Object.entries(p.restore ?? {}).map(([res, pct]) => `回復 ${pct}% ${res}`),
+  p.atk ? `下次攻擊 真傷 +${p.atk} 骰` : null,
+  p.def ? `下次防禦 絕防 +${p.def} 骰` : null,
+  `毒性 +${p.toxicity}`,
+].filter(Boolean).join('，');
 
 /** 裝備：鍛造得到通用物品，「鑑定」時才骰數值（試算表「生產表」第 99–123 列） */
 export const GEAR_TIERS = ['初階', '進階', '大師', '傳說'];

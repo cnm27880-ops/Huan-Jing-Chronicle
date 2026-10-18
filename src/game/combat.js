@@ -11,7 +11,7 @@
 // 倒地：HP 歸零只是「倒地」，不會死亡（使用者口述）。玩家生命會「倒扣」成負數，要補回正數（> 0）才站得起來（使用者 2026-10-12）。
 // ============================================================
 import {
-  TRACKS, TRACK_ATK_STAT, TRACK_DEF_STAT, TRUE_ATK, TRUE_DEF, POTIONS, TOXICITY_MAX,
+  TRACKS, TRACK_ATK_STAT, TRACK_DEF_STAT, TRUE_ATK, TRUE_DEF, POTIONS, TOXICITY_MAX, CLEANSE_ITEMS,
 } from './rules.js';
 import { rollSum } from './dice.js';
 import { derivedStats, maxHp } from './stats.js';
@@ -632,6 +632,16 @@ export function drinkPotion(state, name, rng = Math.random) {
   if (def.atk) { out.atkReplaced = stackBuff(state.buffs, 'atk', name, def.atk); out.atk = def.atk; }
   if (def.def) { out.defReplaced = stackBuff(state.buffs, 'def', name, def.def); out.def = def.def; }
   return out;
+}
+
+/** 使用純潔聖宴這類「清除毒素」的料理（rules.js 的 CLEANSE_ITEMS）：毒性為 0 不能用；不進胃袋 */
+export function useCleanse(state, name) {
+  if (!CLEANSE_ITEMS[name]) return { error: `${name}不能這樣使用。` };
+  if (!(state.toxicity > 0)) return { error: '毒性已經是 0，不需要清除。' };
+  if (!removeItem(state, name)) return { error: `背包裡沒有${name}。` };
+  const cleared = state.toxicity;
+  state.toxicity = 0;
+  return { name, cleared, toxicity: 0 };
 }
 
 /**

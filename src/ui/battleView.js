@@ -6,10 +6,10 @@
 import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
 import { toast, rollFailed } from './controls.js';
-import { TRACKS, POTIONS, TOXICITY_MAX } from '../game/rules.js';
+import { TRACKS, POTIONS, TOXICITY_MAX, CLEANSE_ITEMS, potionEffectText } from '../game/rules.js';
 import {
   attackDice, pooledAttack, endBattle, monsterAbs, ATTACK_MODES, defenseDice, formatAbc, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
-  drinkPotion, buffActive, useSupport, isDowned, planResponses, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES, resolveChosenTrack,
+  drinkPotion, useCleanse, buffActive, useSupport, isDowned, planResponses, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES, resolveChosenTrack,
   daoDunDice, useSwell,
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
@@ -39,13 +39,7 @@ const BATTLE_KINDS = new Set(['attack', 'defend', 'potion', 'skill', 'divider'])
 const BATTLE_NOTE = /^(調整|戰鬥結束|魔女|遭遇)/;
 export const isBattleEvent = (ev) => BATTLE_KINDS.has(ev.kind) || (ev.kind === 'note' && BATTLE_NOTE.test(ev.label ?? ''));
 
-const potionText = (p) => [
-  p.heal ? `回復 ${p.heal.n}D${p.heal.sides} 生命` : null,
-  ...Object.entries(p.restore ?? {}).map(([res, pct]) => `回復 ${pct}% ${res}`),
-  p.atk ? `下次攻擊 真傷 +${p.atk} 骰` : null,
-  p.def ? `下次防禦 絕防 +${p.def} 骰` : null,
-  `毒性 +${p.toxicity}`,
-].filter(Boolean).join('，');
+const potionText = potionEffectText;
 
 /**
  * rerender()：資料或選擇有變時重畫整個跑團頁；onFire()：按下招式的「出招」（打中間選好的目標）；
@@ -218,8 +212,22 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
 
   function potionCard(state) {
     const have = Object.keys(POTIONS).filter((n) => countOf(state, n) > 0);
+    const cleanse = Object.keys(CLEANSE_ITEMS).filter((n) => countOf(state, n) > 0);
     return h('section', { class: 'sx-sec' },
       h('h2', { class: 'section-title', text: '藥水' }),
+      cleanse.length ? h('div', { class: 'potion-grid' }, cleanse.map((n) => h('button', {
+        type: 'button', class: 'potion', title: CLEANSE_ITEMS[n].effect, disabled: state.toxicity <= 0, 'aria-disabled': String(state.toxicity <= 0),
+        onclick: () => {
+          const r = useCleanse(state, n);
+          if (r.error) return toast(r.error);
+          publish({ who: state.name, kind: 'potion', label: `使用${n}`, big: '清毒', lines: [`清除所有毒素（${r.cleared} → 0）`] });
+          commit();
+        },
+      },
+      h('span', { class: 'potion__icon', 'aria-hidden': 'true', text: iconOf(n) }),
+      h('span', { class: 'potion__name', text: n }),
+      h('span', { class: 'potion__qty', text: `×${fmt(countOf(state, n))}` }),
+      h('small', { class: 'potion__fx', text: state.toxicity <= 0 ? '毒性為 0，不需要使用' : CLEANSE_ITEMS[n].effect })))) : null,
       have.length
         ? h('div', { class: 'potion-grid' }, have.map((n) => h('button', {
             type: 'button', class: 'potion', title: potionText(POTIONS[n]), disabled: state.toxicity + POTIONS[n].toxicity > TOXICITY_MAX, 'aria-disabled': String(state.toxicity + POTIONS[n].toxicity > TOXICITY_MAX),
@@ -250,7 +258,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           h('span', { class: 'potion__name', text: n }),
           h('span', { class: 'potion__qty', text: `×${fmt(countOf(state, n))}` }),
           h('small', { class: 'potion__fx', text: potionText(POTIONS[n]) }))))
-        : h('p', { class: 'notice', text: '背包裡沒有藥水。到修整日調劑就會得到。' }),
+        : cleanse.length ? null : h('p', { class: 'notice', text: '背包裡沒有藥水。到修整日調劑就會得到。' }),
       feedBox(state));
   }
 
