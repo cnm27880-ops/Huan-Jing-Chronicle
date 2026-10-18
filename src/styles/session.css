@@ -40,7 +40,12 @@
 [data-track='B'] > b, .trk[data-track='B'], .track[data-track='B'] .track__name b { color: var(--sky); }
 [data-track='C'] > b, .trk[data-track='C'], .track[data-track='C'] .track__name b { color: var(--lilac); }
 .trk[data-track='S'] { color: var(--soft); }
-.bt-hud__res { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); }
+/* 生命條整排寬；其餘六格（靈氣、魔力、能量、鬥氣、算力、毒性）三個一排，每格標籤與數字上下疊放 */
+.bt-hud__res { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
+.bt-hud__res .hud-meter { grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 6px 8px; container-type: inline-size; }
+.bt-hud__res .hud-meter__name { font-size: 0.74rem; white-space: nowrap; }
+/* 數字不換行、不截斷：格子窄（手機約 110px）時字級跟著格寬縮小（cqw＝格子寬度的百分比） */
+.bt-hud__res .hud-meter__val { justify-self: start; font-size: 0.8rem; font-size: clamp(0.62rem, 13cqw, 0.85rem); white-space: nowrap; }
 .bt-hud__tags { margin: 0; }
 .hud-meter {
   --m: var(--gold2);
@@ -120,17 +125,20 @@
 .feedbox { display: grid; gap: var(--space-2); padding: 8px 10px; background: var(--paper); border-radius: 10px; box-shadow: var(--sx-ring); }
 .feedbox .field-label { margin: 0; }
 
-/* 藥水：一列一種，沒有格子框 */
-.potion-grid { display: grid; gap: 6px; }
+/* 藥水：依性質分組（回復／攻擊加骰／防禦加骰，組內低階到高階），每組有小標題，兩個一排；沒有持有的組別不顯示 */
+.potion-group { display: grid; gap: var(--space-2); }
+.potion-group + .potion-group { margin-top: var(--space-1); }
+.potion-group > .section-title { margin: 0; }
+.potion-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-grid); }
 .potion {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px var(--space-3); align-items: baseline; width: 100%; padding: 8px 10px; font: inherit; color: var(--ink);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px var(--space-2); align-items: baseline; width: 100%; padding: 8px 10px; font: inherit; color: var(--ink);
   text-align: left; background: var(--raise); border: 0; border-radius: 10px; box-shadow: var(--sx-ring); cursor: pointer; transition: box-shadow 0.15s ease;
 }
 .potion:hover:not(:disabled) { box-shadow: var(--sx-ring-hi); }
 .potion:disabled, .potion[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
 .potion__icon { grid-row: 1 / span 2; align-self: center; font-size: 1.2rem; }
 .potion__icon:empty { display: none; }
-.potion__name { font-size: 0.92rem; }
+.potion__name { overflow-wrap: anywhere; font-size: 0.92rem; }
 .potion__qty { color: var(--soft); font-size: 0.82rem; }
 .potion__fx { grid-column: 2 / -1; color: var(--soft); font-size: 0.74rem; line-height: 1.5; }
 .potion__icon:empty + .potion__name { grid-column: 1; }
@@ -373,7 +381,14 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .room__members { display: flex; flex-wrap: wrap; gap: 2px var(--space-3); margin: 0; padding: 0; list-style: none; color: var(--soft); font-size: 0.82rem; }
 .room__member[data-online='0'] { opacity: 0.45; }
 .room__member[data-online='1']::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; background: var(--res-tox); border-radius: 50%; }
-.room__tools, .room__btns { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* GM 工具：一張有外框的卡片，按鈕依用途分組（戰鬥／玩家資料／設定／交接），組有小標題，按鈕等寬排成格子 */
+.room__gm { display: grid; gap: var(--space-3); padding: var(--card-pad); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-box); }
+.room__gm > .section-title { margin: 0; }
+.room__group { display: grid; gap: var(--space-2); }
+.room__group > .section-title { margin: 0; }
+.room__tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr)); gap: var(--space-2); }
+.room__tools .btn { min-width: 0; white-space: normal; text-align: center; }
+.room__group--handover { padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
 
 .sx-feedhead { display: flex; flex: none; justify-content: flex-end; }
 .sx-feed { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }

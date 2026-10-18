@@ -65,11 +65,12 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   }
 
   // ---------- 頂部固定列：生命與資源（點了才調整） ----------
-  const HUD_KEYS = (state) => ['生命', ...OTHER_RESOURCES, ...(typeof state.toxicity === 'number' ? ['毒性'] : [])];
+  // 資源沒有就顯示 0 / 0（毒性存檔裡沒有數字時當 0），六個小格才排得整齊
+  const HUD_KEYS = () => ['生命', ...OTHER_RESOURCES, '毒性'];
 
   function readout(state, key) {
     if (key === '生命') return { now: state.hp, max: maxHp(state) };
-    if (key === '毒性') return { now: state.toxicity, max: TOXICITY_MAX };
+    if (key === '毒性') return { now: Number(state.toxicity) || 0, max: TOXICITY_MAX };
     return { now: resourceNow(state, key), max: resourceMax(state, key) };
   }
 
@@ -210,12 +211,33 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         }, `餵 ${n}（×${fmt(countOf(state, n))}）`))));
   }
 
+  /**
+   * 藥水分組：看藥水資料的效果欄位（atk 攻擊加骰、def 防禦加骰、heal 回復），不看名稱，
+   * 之後新增的強效藥水與神級滴露只要資料有這些欄位就會自動歸組。組內由低階排到高階（效果數值小的在前）。
+   * 沒有持有的組別不回傳（畫面就不顯示標題）。
+   */
+  const POTION_GROUPS = [
+    { id: 'heal', title: '回復' },
+    { id: 'atk', title: '攻擊加骰' },
+    { id: 'def', title: '防禦加骰' },
+  ];
+  const potionGroupId = (p) => (p.atk ? 'atk' : p.def ? 'def' : p.heal ? 'heal' : null);
+  const potionPower = (p) => (p.atk ?? p.def ?? (p.heal ? p.heal.n * (p.heal.sides + 1) : 0)); // 回復用平均值的兩倍（n × (面數 + 1)）排大小
+  function potionGroups(names) {
+    return POTION_GROUPS
+      .map(({ id, title }) => ({
+        title,
+        names: names.filter((n) => potionGroupId(POTIONS[n]) === id).sort((a, b) => potionPower(POTIONS[a]) - potionPower(POTIONS[b])),
+      }))
+      .filter((g) => g.names.length);
+  }
+
   function potionCard(state) {
     const have = Object.keys(POTIONS).filter((n) => countOf(state, n) > 0);
     const cleanse = Object.keys(CLEANSE_ITEMS).filter((n) => countOf(state, n) > 0);
     return h('section', { class: 'sx-sec' },
       h('h2', { class: 'section-title', text: '藥水' }),
-      cleanse.length ? h('div', { class: 'potion-grid' }, cleanse.map((n) => h('button', {
+      cleanse.length ? h('div', { class: 'potion-group' }, h('h3', { class: 'section-title', text: '清毒' }), h('div', { class: 'potion-grid' }, cleanse.map((n) => h('button', {
         type: 'button', class: 'potion', title: CLEANSE_ITEMS[n].effect, disabled: state.toxicity <= 0, 'aria-disabled': String(state.toxicity <= 0),
         onclick: () => {
           const r = useCleanse(state, n);
@@ -227,9 +249,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       h('span', { class: 'potion__icon', 'aria-hidden': 'true', text: iconOf(n) }),
       h('span', { class: 'potion__name', text: n }),
       h('span', { class: 'potion__qty', text: `×${fmt(countOf(state, n))}` }),
-      h('small', { class: 'potion__fx', text: state.toxicity <= 0 ? '毒性為 0，不需要使用' : CLEANSE_ITEMS[n].effect })))) : null,
+      h('small', { class: 'potion__fx', text: state.toxicity <= 0 ? '毒性為 0，不需要使用' : CLEANSE_ITEMS[n].effect }))))) : null,
       have.length
-        ? h('div', { class: 'potion-grid' }, have.map((n) => h('button', {
+        ? potionGroups(have).map(({ title, names }) => h('div', { class: 'potion-group' }, h('h3', { class: 'section-title', text: title }), h('div', { class: 'potion-grid' }, names.map((n) => h('button', {
             type: 'button', class: 'potion', title: potionText(POTIONS[n]), disabled: state.toxicity + POTIONS[n].toxicity > TOXICITY_MAX, 'aria-disabled': String(state.toxicity + POTIONS[n].toxicity > TOXICITY_MAX),
             onclick: async (e) => {
               const pd = POTIONS[n];
@@ -257,7 +279,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           h('span', { class: 'potion__icon', 'aria-hidden': 'true', text: iconOf(n) }),
           h('span', { class: 'potion__name', text: n }),
           h('span', { class: 'potion__qty', text: `×${fmt(countOf(state, n))}` }),
-          h('small', { class: 'potion__fx', text: potionText(POTIONS[n]) }))))
+          h('small', { class: 'potion__fx', text: potionText(POTIONS[n]) }))))))
         : cleanse.length ? null : h('p', { class: 'notice', text: '背包裡沒有藥水。到修整日調劑就會得到。' }),
       feedBox(state));
   }

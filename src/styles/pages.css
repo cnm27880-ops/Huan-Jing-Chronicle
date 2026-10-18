@@ -45,7 +45,7 @@
 /* ============================================================
    修整日（restView.js）
    ============================================================ */
-.rest-root { max-width: 1200px; margin: 0 auto; padding: 0 var(--space-5) var(--space-6); }
+.rest-root { max-width: var(--page-max); margin: 0 auto; padding: 0 var(--space-5) var(--space-6); }
 .rest-root > .tabs-line { margin-bottom: var(--space-4); }
 
 /* 上方狀態：名字、天數、經驗、金幣；時間與熟練並排，沒有方框 */
@@ -96,8 +96,8 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 .status__day--no { color: var(--soft); background: none; border-color: transparent; }
 
 /* 版面：左邊設定、右邊結果（結果跟著捲動）；窄螢幕單欄 */
-.rest-grid { display: grid; gap: var(--space-4); align-items: start; }
-.rest-main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.rest-grid { display: grid; gap: var(--gap-card); align-items: start; }
+.rest-main { display: flex; flex-direction: column; gap: var(--gap-card); min-width: 0; }
 .rest-results { min-width: 0; }
 @media (min-width: 1000px) {
   .rest-grid { grid-template-columns: minmax(0, 1fr) 380px; }
@@ -197,7 +197,7 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-3) var(--space-5);
-  max-width: 1200px;
+  max-width: var(--page-max);
   margin: 0 auto;
   padding: var(--space-5) var(--space-5) var(--space-3);
 }
@@ -207,7 +207,7 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 .bag-bar__tools { display: flex; align-items: center; justify-content: flex-end; flex: 1; gap: var(--space-2); max-width: 560px; }
 .bag-bar__tools .field { flex: 1; width: auto; max-width: 260px; }
 .bag-bar__tools .btn { white-space: nowrap; }
-.bag { box-sizing: border-box; display: grid; gap: var(--space-5); max-width: 1200px; margin: 0 auto; padding: var(--space-3) var(--space-5) var(--space-6); }
+.bag { box-sizing: border-box; display: grid; gap: var(--gap-card); max-width: var(--page-max); margin: 0 auto; padding: var(--space-3) var(--space-5) var(--space-6); }
 .bag-group__head {
   box-sizing: border-box;
   display: flex;
@@ -251,21 +251,27 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
   box-sizing: border-box;
   display: grid;
   align-items: start;
-  gap: var(--space-4);
-  max-width: 1200px;
+  gap: var(--gap-card);
+  max-width: var(--page-max);
   margin: 0 auto;
   padding: var(--space-4) var(--space-5) var(--space-6);
 }
-.gear-col { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }
+.gear-col { display: grid; gap: var(--gap-card); align-content: start; min-width: 0; }
 @media (min-width: 1000px) { .gear-root { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); } }
 @media (max-width: 759px) { .gear-root { padding-inline: var(--space-3); } }
 
-/* 數值：標籤＋數字，沒有格子框 */
-.gear-stat-group + .gear-stat-group { margin-top: var(--space-4); }
-.gear-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr)); gap: var(--space-3) var(--space-4); }
+/* 數值面板（表格式）：整個面板是一張有框的卡片；每列左邊是分組名，數字用統一的 6 欄格線等寬對齊（攻擊、防禦用前 4 格，資源用滿 6 格）；列與列之間只有淡細線，數字不加框 */
+.gear-stat-group { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); align-items: start; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--line-soft); }
+.gear-stat-group:first-of-type { border-top: 0; padding-top: 0; }
+.gear-stat-group .field-label { margin: 0; padding-top: 2px; color: var(--gold); letter-spacing: 0.08em; }
+.gear-stat-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--space-3) var(--space-2); }
 .gear-stat { display: grid; gap: 2px; min-width: 0; }
-.gear-stat__name { color: var(--soft); font-size: 0.78rem; }
-.gear-stat__value { color: var(--ink); font-family: var(--font-num); font-size: 1.2rem; font-weight: 600; line-height: 1.2; }
+.gear-stat__name { color: var(--soft); font-size: 0.78rem; white-space: nowrap; }
+.gear-stat__value { color: var(--ink); font-family: var(--font-num); font-size: 1.1rem; font-weight: 600; line-height: 1.2; }
+@media (max-width: 759px) {
+  .gear-stat-group { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+  .gear-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .gear-stat__sub { color: var(--faint); font-size: 0.72rem; }
 .gear-food { margin-top: var(--space-4); }
 
@@ -351,7 +357,7 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 /* ============================================================
    交易（marketView.js）：頂端數字列、底線分頁、商品列
    ============================================================ */
-.mk-root { box-sizing: border-box; display: grid; gap: var(--space-4); max-width: 1200px; margin: 0 auto; padding: var(--space-4) var(--space-5) var(--space-6); }
+.mk-root { box-sizing: border-box; display: grid; gap: var(--gap-card); max-width: var(--page-max); margin: 0 auto; padding: var(--space-4) var(--space-5) var(--space-6); }
 .mk-hud { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-6); }
 .mk-stat { display: inline-flex; align-items: baseline; gap: 6px; }
 .mk-stat small { color: var(--soft); font-size: 0.78rem; }
@@ -359,27 +365,25 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 .mk-stat[data-tone='bad'] strong { color: var(--rose); }
 .mk-session { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--soft); font-size: 0.85rem; }
 .mk-session.is-on { color: var(--gold); }
-.mk-grid { display: grid; gap: var(--space-4); align-items: start; }
-@media (min-width: 1000px) { .mk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.trade-list { display: grid; margin: 0; padding: 0; list-style: none; }
-.trade-row { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); }
-.trade-row:last-child { border-bottom: 0; }
+.mk-grid { display: grid; gap: var(--gap-card); align-items: start; }
+/* 購買區與販賣區約 3：2，卡片寬度相近；每列幾張由下面的自動排欄決定（寬螢幕購買 3、販賣 2，空間不足自動減少） */
+@media (min-width: 1000px) { .mk-grid { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
+.trade-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr)); column-gap: var(--gap-card); margin: 0; padding: 0; list-style: none; }
+/* 每張商品卡上下排：名稱與稀有度／價格資訊／數量輸入加按鈕；卡片本身不加框，只有底部淡線（稀有度左側色條照舊） */
+.trade-row { display: grid; align-content: start; gap: var(--space-2); min-width: 0; padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); }
 .trade-row.rarity { padding-left: var(--space-3); }
-.trade-row__icon { flex: none; width: 1.6rem; font-size: 1.3rem; line-height: 1; text-align: center; }
+.trade-row__icon { flex: none; font-size: 1.2rem; line-height: 1; }
 .trade-row__icon:empty { display: none; }
-.trade-row__info { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.trade-row__info { display: grid; gap: 2px; min-width: 0; }
 .trade-row__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2); }
 .trade-row__have { color: var(--soft); }
 .trade-row__price { color: var(--ink2); font-size: 0.82rem; }
 .trade-row__sub { color: var(--soft); font-size: 0.78rem; }
-.trade-row__act { display: flex; align-items: center; flex: none; gap: var(--space-2); }
-.trade-row__qty { width: 4rem; padding-inline: 4px; text-align: center; }
-.trade-row__act .btn { min-width: 5.5rem; white-space: nowrap; }
+.trade-row__act { display: flex; align-items: center; gap: var(--space-2); }
+.trade-row__qty { flex: none; width: 4rem; padding-inline: 4px; text-align: center; }
+.trade-row__act .btn { flex: 1; min-width: 0; white-space: nowrap; }
 @media (max-width: 759px) {
   .mk-root { padding-inline: var(--space-3); }
-  .trade-row { flex-wrap: wrap; }
-  .trade-row__act { flex: 1 1 100%; }
-  .trade-row__act .btn { flex: 1; min-width: 0; }
   .mk-session { margin-left: 0; flex-basis: 100%; }
 }
 
@@ -406,7 +410,8 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 /* ============================================================
    技能方格（skillTile.js；修整日「學習」用）：一格一行、左側色條表位階，沒有框
    ============================================================ */
-.skill-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); align-items: start; gap: 6px; margin: 6px 0 10px; }
+/* 依寬度自動排欄：寬螢幕約四欄、筆電兩欄、手機一欄（名稱、標籤、等級、狀態塞不進半寬）；min(100%, …) 避免窄螢幕溢出 */
+.skill-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); align-items: start; gap: var(--gap-grid); margin: 6px 0 10px; }
 /* 整格鋪一層淡淡的位階色（初階綠、進階藍、大師紫、傳說金），1px 細邊線；選取時邊線換成位階色 */
 .skill-tile {
   --t: var(--faint); --t-rgb: var(--faint-rgb, 128, 128, 128);

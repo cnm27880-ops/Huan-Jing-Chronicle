@@ -47,14 +47,15 @@ export function createBagView({ root, getState, commit }) {
           h('span', { text: `${fmt(names.length)} 種　金幣 ${fmt(state.gold)}` })),
         h('div', { class: 'bag-bar__tools' },
           search,
-          h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => openGiftSheet(getState, commit) }, '贈送／交易'),
+          h('button', { type: 'button', class: 'btn', onclick: () => openGiftSheet(getState, commit) }, '贈送／交易'),
           h('button', { type: 'button', class: 'btn btn--primary', onclick: () => openAddSheet(state, commit) }, '放進背包'))),
       h('div', { class: 'bag' },
         groups.filter((g) => g.items.length).map((g) => {
           const open = Boolean(q) || !ui.collapsed.has(g.id);
-          const grid = h('div', { class: g.id === 'keepsake' ? 'showcase' : 'tile-grid', hidden: !open },
+          // 每個區塊用同一套格線與同樣的卡片尺寸（有說明文字的紀念品由 CSS 跨欄）
+          const grid = h('div', { class: 'tile-grid', hidden: !open },
             g.items.map((n) => itemTile(n, countOf(state, n), {
-              size: g.id === 'keepsake' ? 'lg' : 'md',
+              size: 'md',
               extra: g.id === 'keepsake' && state.keepsakes[n]
                 ? h('span', { class: 'tile__note', text: state.keepsakes[n].desc })
                 : null,

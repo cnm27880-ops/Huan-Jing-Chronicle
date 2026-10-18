@@ -3,12 +3,13 @@
    尺寸、圓角、間距用 tokens.css 的變數；顏色用 theme.css 的變數；這裡不寫死任何數字色碼。
    規格見 DESIGN.md「控制項」。
 
-   原則：
-   - 只有最外層的 .panel 有邊框；裡面的列表項目不要再加框，用留白與底部細線分隔（.list）。
-   - 按鈕只有三級（高度一致，並排時對齊）：
-       Primary   .btn--primary（整列大按鈕 .btn--go）：每個畫面 1～2 顆，列表每一列都有的動作不要用 Primary
-       Secondary .btn（預設）：一般操作
-       Ghost     .btn--ghost：取消、返回、切換、GM 輔助等低頻工具，沒有框也沒有底色，只有文字
+   原則（2026-10-18 版面與框線規則，詳見 DESIGN.md）：
+   - 容器（面板、卡片、按鈕）一律有外框；容器裡的清單項目不要各自加框，用留白與底部淡細線分隔（.list）。
+   - 按鈕有細框：
+       Primary   .btn--primary（整列大按鈕 .btn--go）：金色框，每個畫面 1～2 顆，列表每一列都有的動作不要用 Primary
+       Secondary .btn（預設）：一般細框
+       Quiet     .btn--quiet：淡一點的細框（容易誤按的操作，例如「還給原 GM」）
+       Ghost     .btn--ghost：只留給關閉、收合這類輔助鈕，沒有框也沒有底色，只有文字
    - 手機（窄螢幕或觸控）所有控制項 44px 以上（--ctl-h 在 tokens.css 的媒體查詢裡變大）。
    ============================================================ */
 
@@ -105,6 +106,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 .btn--ghost:active:not(:disabled) { background: none; color: var(--gold); }
 .btn--ghost[aria-expanded='true'] { color: var(--gold); }
 
+/* Quiet：Secondary 的淡色版（框與字都淡一點，仍然看得到框） */
+.btn--quiet { color: var(--soft); border-color: var(--line-soft); }
+.btn--quiet:hover:not(:disabled) { color: var(--gold); border-color: var(--ctl-line-hi); }
+
 /* 危險操作：Secondary 的紅色版，只有字與邊線變色，不加底色 */
 .btn--danger {
   color: var(--rose);
@@ -146,10 +151,10 @@ textarea.field { padding: 8px 10px; }
   .field, .amount__input { font-size: 16px; }
 }
 
-/* ---------- 面板：只有最外層的區塊有邊框，裡面用留白與細線分隔 ---------- */
+/* ---------- 面板：容器有外框，裡面的項目不各自加框，用留白與細線分隔 ---------- */
 .panel {
   box-sizing: border-box;
-  padding: var(--space-4);
+  padding: var(--card-pad);
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius-box);
@@ -240,7 +245,7 @@ textarea.field { padding: 8px 10px; }
 .card,
 .results {
   box-sizing: border-box;
-  padding: var(--space-4);
+  padding: var(--card-pad);
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius-box);
@@ -286,6 +291,21 @@ textarea.field { padding: 8px 10px; }
   box-shadow: none;
 }
 .showcase { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+/* 背包：每個區塊（紀念品、料理、藥劑…）都是一張有框的卡片，裡面用同一套格線；寬螢幕約 5～6 個一列，手機兩欄（--cell-min 在 tokens.css） */
+.bag-group {
+  box-sizing: border-box;
+  padding: var(--card-pad);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-box);
+}
+.bag-group .tile-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--cell-min)), 1fr));
+  column-gap: var(--gap-card);
+}
+/* 有說明文字的物品（紀念品效果）跨欄顯示：手機整列一欄，寬螢幕跨兩欄（窄到排不出兩欄時不跨，避免多出隱形欄位） */
+.bag-group .tile:has(.tile__note) { grid-column: 1 / -1; }
+@media (min-width: 820px) { .bag-group .tile:has(.tile__note) { grid-column: span 2; } }
 .tile {
   box-sizing: border-box;
   position: relative;
