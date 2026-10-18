@@ -44,7 +44,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/enemy.js` | 敵人等級（普通／菁英 2 打／BOSS 3 打）與技能 A 攻擊強化、B 防禦強化、C 喝血（三種都每回合歸零）的次數與效果（伺服器與前端共用）（純函式） |
 | `src/game/ally.js` | 友方 NPC（純函式，伺服器與前端共用）：檢查輸入、攻擊怪物、被怪物打（生命倒扣）、改生命、移除、插進先攻隨機位置（`insertRandom`，增援也用）；只有 GM 操作。伺服器在 `room-core.js` 的 `onAlly`，畫面在 `encounterCard.js` 的「友方」 |
 | `src/game/nudge.js` | 戰鬥提醒與隊友資源條的判斷（純函式）：資源動用比例、資源條、隊伍摘要、偵測隊友倒地／危急／全隊吃緊、防連發、手上能做的事 |
-| `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄、自己那張完整資源卡下方；GM 不顯示；GM 設為「不顯示於資源條」的玩家會被濾掉）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示） |
+| `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄、自己那張完整資源卡下方；GM 不顯示；GM 設為「不顯示於資源條」的玩家會被濾掉）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示；同樣不提被隱藏的玩家） |
 | `src/ui/confirmPop.js` | 網頁自己的對話框（取代瀏覽器的 confirm／prompt）：`askConfirm`／`askText`，有給按鈕貼在旁邊、沒給就置中；**全站不要再用 `confirm()`／`prompt()`／`alert()`** |
 | `src/ui/modalStack.js` | 彈窗堆疊：全站唯一的 Esc 監聽器，Esc 一次只關畫面最上面那層（`sheet.js`、`confirmPop.js`、`valueSheet.js`、`reveal.js`、`nudgeModal.js`、`dossier.js`、`sessionView.js` 的抽屜都用 `pushLayer` 註冊，**這些檔案不要再自己監聽 Escape**）；modal 開著時背景（`#main`、頂部列、被蓋住的彈窗）設 `inert`、`<html data-modal="open">`（不鎖 body 捲動，body 本來就 `overflow: hidden`）；戰鬥提醒 `dismissible: false`；輸入法組字中、封面還在時不處理 Esc。層級順序 `TIERS` 要和 `tokens.css` 的 `--z-*` 一致（`tests/modal-stack.test.js` 檢查）（判斷邏輯是純函式） |
 | `src/game/fairness.js` | 模擬戰的公平性（純函式）：量每位玩家一次出手的傷害並排強弱、小怪血量依最弱玩家設、「第一名只出六成力」的情境（`FAIR` 常數可調） |

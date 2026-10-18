@@ -28,6 +28,7 @@ import { battleSel as sel } from './battleSelect.js';
 const SIDES = [4, 6, 8, 10, 12, 20, 100];
 const DICE_FOLD_KEY = 'huanjing:dice:collapsed:v1';
 const readDiceCollapsed = () => { try { return localStorage.getItem(DICE_FOLD_KEY) === '1'; } catch { return false; } }; // 只有手機看得到收合鈕；讀不到就當展開
+const MOBILE_MQ = '(max-width: 900px)'; // 收合只在手機有效（電腦沒有收合鈕，不能卡在收合）
 const saveDiceCollapsed = (v) => { try { localStorage.setItem(DICE_FOLD_KEY, v ? '1' : '0'); } catch { /* 存不了就算了，下次照預設 */ } };
 const LEFT_TABS = [['moves', '招式'], ['items', '藥水與狀態'], ['skills', '技能檢定']];
 // 跑團紀錄只放「檢定、自訂骰、戰鬥」；鑑定、黑市、鑲嵌、GM 異動等都在「日誌」頁
@@ -75,6 +76,7 @@ export function createSessionView({ root, getState, commit }) {
   let roomPanel = null;
   let unsubRoom = null;
   let roomSig = '';
+  let mobileMq = null;
   let deferred = false; // 正在中欄輸入框打字時，房間更新先不重畫（免得打到一半的數字不見），離開輸入框再畫
   const typingIn = (el) => el.contains(document.activeElement) && document.activeElement.matches('input, select, textarea');
   center.addEventListener('focusout', () => setTimeout(() => {
@@ -281,14 +283,15 @@ export function createSessionView({ root, getState, commit }) {
    */
   function renderDice() {
     const expr = expression();
+    const folded = ui.diceCollapsed && window.matchMedia(MOBILE_MQ).matches;
     const rollTitle = () => (expression().error ? '骰式格式不對' : `擲 ${expression().text}`);
-    diceBox.dataset.collapsed = ui.diceCollapsed ? '1' : '0';
-    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), title: rollTitle(), onclick: rollCustom }, ui.diceCollapsed ? `投骰 ${expr.error ? '' : expr.text}` : '投骰');
+    diceBox.dataset.collapsed = folded ? '1' : '0';
+    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), title: rollTitle(), onclick: rollCustom }, folded ? `投骰 ${expr.error ? '' : expr.text}` : '投骰');
     const fold = h('button', {
       type: 'button', class: 'btn btn--quiet btn--small sx-dice__fold', 'aria-expanded': String(!ui.diceCollapsed), 'aria-label': ui.diceCollapsed ? '展開骰盤' : '收合骰盤',
       onclick: () => { ui.diceCollapsed = !ui.diceCollapsed; saveDiceCollapsed(ui.diceCollapsed); renderDice(); },
     }, ui.diceCollapsed ? '展開' : '收合');
-    if (ui.diceCollapsed) { diceBox.replaceChildren(h('div', { class: 'sx-dice__row sx-dice__row--fold' }, fold, rollBtn)); return; }
+    if (folded) { diceBox.replaceChildren(h('div', { class: 'sx-dice__row sx-dice__row--fold' }, fold, rollBtn)); return; }
     diceBox.replaceChildren(
       h('div', { class: 'sx-dice__top' },
         h('div', { class: 'sx-dice__sides', role: 'radiogroup', 'aria-label': '骰子面數' }, SIDES.map((n) => h('button', {
@@ -343,6 +346,8 @@ export function createSessionView({ root, getState, commit }) {
       roomPanel = mountRoomPanel(roomBox);
       mountLog();
       renderDice();
+      mobileMq = window.matchMedia(MOBILE_MQ);
+      mobileMq.addEventListener('change', renderDice); // 轉直橫、改視窗寬度：收合狀態跟著套用或解除
       roomSig = sigOf();
       unsubRoom = subscribeRoom(() => {
         renderRoomSummary();
@@ -370,6 +375,7 @@ export function createSessionView({ root, getState, commit }) {
   /** 離開跑團頁：停掉紀錄與房間的自動更新，背景擲骰時不用重畫看不到的畫面 */
   function leave() {
     unsubRoom?.(); unsubRoom = null;
+    mobileMq?.removeEventListener('change', renderDice); mobileMq = null;
     feed?.destroy(); feed = null;
     roomPanel?.destroy(); roomPanel = null;
     setSheet('');

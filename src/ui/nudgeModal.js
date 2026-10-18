@@ -25,7 +25,8 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
 
   const snapshot = (r) => {
     const gm = new Set(r.gm?.uids ?? []);
-    return Object.fromEntries(Object.entries(r.vitals ?? {}).filter(([uid]) => !gm.has(uid)));
+    const hidden = new Set(r.hiddenVitals ?? []); // GM 設為「不顯示於資源條」的玩家，提醒視窗也不提她（自己的狀態還是要算）
+    return Object.fromEntries(Object.entries(r.vitals ?? {}).filter(([uid]) => !gm.has(uid) && (!hidden.has(uid) || uid === r.me?.uid)));
   };
 
   /** 要救誰：倒地／危急的那位；全隊吃緊就救最危險的那位隊友（不含自己） */

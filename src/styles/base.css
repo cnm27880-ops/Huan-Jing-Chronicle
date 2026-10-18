@@ -345,7 +345,7 @@ textarea.field { padding: 8px 10px; }
   column-gap: var(--gap-card);
 }
 /* 有說明文字的物品（紀念品效果）跨欄顯示：手機整列一欄，寬螢幕跨兩欄（窄到排不出兩欄時不跨，避免多出隱形欄位） */
-.bag-group .tile { grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr); } /* 名稱與數量緊貼，不把數量推到最右 */
+.bag-group .tile { grid-template-columns: auto minmax(0, max-content) minmax(max-content, 1fr); } /* 名稱與數量緊貼，不把數量推到最右 */
 .bag-group .tile:has(.tile__note) { grid-column: 1 / -1; }
 @media (min-width: 820px) { .bag-group .tile:has(.tile__note) { grid-column: span 2; } }
 .tile {
