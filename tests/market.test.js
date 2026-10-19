@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  hallQuote, hallTrade, hallLeft, blackBuy, blackSell, exchangeVouchers, exchangeLeft,
+  hallQuote, hallTrade, hallLeft, blackBuy, blackSell, exchangeVouchers,
   setBlackSession, specialTrade, specialLeft, gearPriceName, marketToday,
 } from '../src/game/market.js';
 import { newDay } from '../src/game/engine.js';
@@ -77,7 +77,7 @@ test('黑市買：付不出錢就勞動抵債，1 時間＝200 金幣，時間�
   assert.equal(s.time, 4);
 });
 
-test('黑市賣：2D4+2 成壓價，得到代金券；代金券每天最多換 1500 金幣', () => {
+test('黑市賣：2D4+2 成壓價，得到代金券；代金券可 1:1 換金幣、沒有每日上限', () => {
   const s = fresh();
   s.inventory.玄武湯 = 3;
   const v = s.inventory.代金券;
@@ -87,9 +87,9 @@ test('黑市賣：2D4+2 成壓價，得到代金券；代金券每天最多換 1
   assert.equal(s.inventory.代金券, v + 750);
   const gold = s.gold;
   assert.deepEqual(exchangeVouchers(s, 1000), { n: 1000 });
-  assert.match(exchangeVouchers(s, 600).error, /最多再換 500/);
-  assert.equal(exchangeLeft(s), 500);
-  assert.equal(s.gold, gold + 1000);
+  assert.deepEqual(exchangeVouchers(s, 600), { n: 600 }); // 同一天超過 1500 也可以
+  assert.equal(s.gold, gold + 1600);
+  assert.match(exchangeVouchers(s, 999999).error, /代金券不足/);
 });
 
 test('特殊黑市：只在黑市團、代金券固定價、每團買＋賣合計 50 個', () => {
