@@ -75,13 +75,18 @@ export function rollFailed(e) {
   throw e;
 }
 
-// 數字輸入框跟著位數變寬：瀏覽器不支援 CSS field-sizing 時，輸入時用字元數撐寬（支援的瀏覽器由 base.css 處理）
-if (typeof document !== 'undefined' && !(window.CSS?.supports?.('field-sizing', 'content'))) {
-  const grow = (e) => {
-    const el = e.target;
-    if (!(el instanceof HTMLInputElement) || el.type !== 'number' || !el.matches('.field, .amount__input')) return;
-    el.style.width = `${Math.max(String(el.value).length, 2) + 3}ch`;
-  };
-  document.addEventListener('input', grow);
-  document.addEventListener('focusin', grow);
+// 數字輸入框跟著位數變寬：輸入時（與新出現時）依字數撐寬，最小寬度由 base.css 決定
+if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' && document.documentElement) {
+  const SEL = 'input[type="number"].field, input[type="number"].amount__input';
+  const grow = (el) => { el.style.width = `calc(${Math.max(String(el.value).length, 2)}ch + 36px)`; };
+  const onType = (e) => { if (e.target instanceof HTMLInputElement && e.target.matches(SEL)) grow(e.target); };
+  document.addEventListener('input', onType);
+  document.addEventListener('focusin', onType);
+  new MutationObserver((list) => {
+    for (const m of list) for (const n of m.addedNodes) {
+      if (n.nodeType !== 1) continue;
+      if (n.matches?.(SEL)) grow(n);
+      n.querySelectorAll?.(SEL).forEach(grow);
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
 }

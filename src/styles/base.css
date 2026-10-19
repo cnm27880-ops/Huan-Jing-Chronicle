@@ -151,9 +151,9 @@ textarea.field { padding: 8px 10px; }
   .field, .amount__input { font-size: 16px; }
 }
 
-/* 數字輸入框：跟著輸入的位數變寬（Chrome／Edge／新版 Safari 用 field-sizing；其他瀏覽器由 controls.js 補上寬度） */
+/* 數字輸入框：預設寬度＋最小寬度；位數變多時由 controls.js 依字數撐寬（試過 CSS field-sizing，number 輸入框在 Chrome 會變得很寬、把旁邊的按鈕擠出去） */
 input.field[type='number'],
-.amount__input { field-sizing: content; min-width: 3.2rem; max-width: 100%; }
+.amount__input { box-sizing: border-box; width: 3.6rem; min-width: 3.2rem; max-width: 100%; }
 /* 下拉選單：有最小寬度（不會縮成只剩箭頭），展開的選項用深色底、淺色字（原本瀏覽器預設白底配淺色字，看不到） */
 select.field { min-width: 9rem; max-width: 100%; cursor: pointer; color-scheme: dark; }
 select.field option,
