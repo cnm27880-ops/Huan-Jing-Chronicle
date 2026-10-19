@@ -74,3 +74,14 @@ export function rollFailed(e) {
   if (e instanceof RollError) return toast(e.message);
   throw e;
 }
+
+// 數字輸入框跟著位數變寬：瀏覽器不支援 CSS field-sizing 時，輸入時用字元數撐寬（支援的瀏覽器由 base.css 處理）
+if (typeof document !== 'undefined' && !(window.CSS?.supports?.('field-sizing', 'content'))) {
+  const grow = (e) => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || el.type !== 'number' || !el.matches('.field, .amount__input')) return;
+    el.style.width = `${Math.max(String(el.value).length, 2) + 3}ch`;
+  };
+  document.addEventListener('input', grow);
+  document.addEventListener('focusin', grow);
+}

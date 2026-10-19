@@ -266,7 +266,6 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .mob__pct { color: var(--soft); font-size: 0.75rem; }
 .mob__hp { grid-column: 1 / -1; display: block; height: 6px; overflow: hidden; background: var(--paper); border-radius: var(--r-pill); }
 .mob__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--rose2), var(--rose)); transition: width 0.25s ease; }
-.mob__def { grid-column: 1 / -1; padding-right: 3.4rem; color: var(--faint); font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mob__pick .pick-no { top: 6px; right: 6px; }
 .mob__hit { position: absolute; right: 6px; bottom: 6px; padding: 1px 8px; font: inherit; font-size: 0.72rem; color: var(--soft); background: var(--paper); border: 0; border-radius: var(--r-pill); box-shadow: var(--sx-ring); cursor: pointer; }
 .mob__hit:hover:not(:disabled) { color: var(--rose); box-shadow: var(--sx-ring-rose); }
@@ -316,7 +315,7 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .rpill--btn { width: 100%; padding: 0 8px; font-family: inherit; color: inherit; text-align: left; border: 0; cursor: pointer; }
 .rpill--btn:hover { box-shadow: inset 0 0 0 1px rgba(var(--rc-rgb), 0.6); }
 .mate--self .mate__hpbtn:focus-visible, .rpill--btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.sx-party__bar { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--ctl-h); padding: 3px 12px; font: inherit; font-size: 0.85rem; color: var(--ink); text-align: left; background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.06), transparent 50%), var(--card); border: 0; border-radius: var(--r-panel); box-shadow: var(--sx-ring); cursor: pointer; }
+.sx-party__bar { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--ctl-h-sm); padding: 1px 12px; font: inherit; font-size: 0.85rem; color: var(--ink); text-align: left; background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.06), transparent 50%), var(--card); border: 0; border-radius: var(--r-panel); box-shadow: var(--sx-ring); cursor: pointer; }
 .sx-party__bar:hover { box-shadow: var(--sx-ring-hi); }
 .sx-party__dots { display: flex; flex: 1; flex-wrap: wrap; gap: 5px; min-width: 0; }
 
@@ -378,8 +377,8 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .rpill[data-res='算力'] { --rc: var(--res-calc); --rc-rgb: var(--res-calc-rgb); }
 .rpill[data-res='毒性'] { --rc: var(--res-tox); --rc-rgb: var(--res-tox-rgb); }
 
-.sx-room { flex: none; padding: 4px 12px; }
-.sx-room__sum { min-height: var(--ctl-h-sm); padding: 4px 0; color: var(--soft); font-size: 0.82rem; line-height: 1.4; overflow-wrap: anywhere; cursor: pointer; }
+.sx-room { flex: none; padding: 0 12px; }
+.sx-room__sum { min-height: var(--ctl-h-sm); padding: 1px 0; color: var(--soft); font-size: 0.82rem; line-height: 1.4; overflow-wrap: anywhere; cursor: pointer; }
 .sx-room[open] .sx-room__sum { color: var(--gold); }
 .sx-room__body { display: grid; gap: var(--space-3); max-height: 40vh; overflow-y: auto; padding: var(--space-2) 0 var(--space-3); }
 .room { display: grid; gap: var(--space-3); }

@@ -225,7 +225,6 @@ export function createMarketView({ root, getState, commit }) {
       stat('代金券', fmt(countOf(state, VOUCHER))),
       stat('時間', `${state.time} / ${MAX_TIME}`, state.time < 0 ? 'bad' : ''),
       stat('今日原價', `${hallLeft(state)} / ${HALL_DAILY_LIMIT}`),
-      stat('今日可換', `${fmt(exchangeLeft(state))}`),
       sessionToggle(state, m));
   }
 

@@ -26,6 +26,7 @@ import { battleSel as sel } from './battleSelect.js';
 import { playShadowFx } from './shadowFx.js';
 import { alliesOf, SUPPORT_KINDS } from '../game/ally.js';
 import { teammates } from './giftSheet.js';
+import { attachMonsterTip } from './monsterTip.js';
 
 const num = (v, min = 0) => Math.max(min, Math.floor(Number(v)) || 0);
 const pctOf = (cur, max) => (max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0);
@@ -550,6 +551,11 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const downed = isDowned(m);
     const modes = sel.modes[m.id] ?? (sel.modes[m.id] = { atk: 0, def: 0 });
     const picked = sel.targets.includes(m.id);
+    const art = h('button', {
+      type: 'button', class: 'boss__art', 'aria-pressed': String(picked), disabled: downed, ...fxAttrs(m.id),
+      'aria-label': `${picked ? '取消選取' : '選取'} ${m.id} 為目標`, onclick: () => toggleTarget(state, m),
+    }, portrait(m, 'boss__img'), orderBadge(m.id));
+    attachMonsterTip(art, () => currentEnc(getState())?.monsters.find((x) => x.id === m.id));
     return h('section', { class: `boss${downed ? ' is-downed' : ''}`, 'aria-label': `BOSS ${m.id}`, dataset: { picked: picked ? '1' : '0' } },
       bosses.length > 1
         ? h('div', { class: 'boss__tabs', role: 'tablist', 'aria-label': '切換 BOSS' }, bosses.map((b) => h('button', {
@@ -558,10 +564,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
           }, b.id, sel.targets.includes(b.id) ? ` ・${sel.targets.indexOf(b.id) + 1}` : '')))
         : null,
       layeredBar(m, downed),
-      h('button', {
-        type: 'button', class: 'boss__art', 'aria-pressed': String(picked), disabled: downed, ...fxAttrs(m.id),
-        'aria-label': `${picked ? '取消選取' : '選取'} ${m.id} 為目標`, onclick: () => toggleTarget(state, m),
-      }, portrait(m, 'boss__img'), orderBadge(m.id)),
+      art,
       h('div', { class: 'boss__stats' },
         h('div', { class: 'boss__group' },
           h('p', { class: 'boss__k' },
@@ -591,9 +594,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
   function mobCard(state, m) {
     const downed = isDowned(m);
     const picked = sel.targets.includes(m.id);
-    const abs = monsterAbs(m);
-    return h('li', { class: `mob${downed ? ' is-downed' : ''}`, ...fxAttrs(m.id, { picked: picked ? '1' : '0' }) },
-      h('div', { class: 'mob__card' }, // 盾牌按鈕要貼在這張卡上，不能貼在整個 li（下面還有技能標籤，按鈕會跑到卡片外面）
+    const card = h('div', { class: 'mob__card' }, // 盾牌按鈕要貼在這張卡上，不能貼在整個 li（下面還有技能標籤，按鈕會跑到卡片外面）
       h('button', {
         type: 'button', class: 'mob__pick', 'aria-pressed': String(picked), disabled: downed,
         'aria-label': `${m.id}，生命 ${m.hp} / ${m.maxHp}${downed ? '，已倒下' : ''}，點一下${picked ? '取消選取' : '選為目標'}`,
@@ -603,14 +604,16 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('span', { class: 'mob__name', text: m.id }),
       h('span', { class: 'mob__hp', 'aria-hidden': 'true' }, h('span', { class: 'mob__fill', style: `width:${pctOf(m.hp, m.maxHp)}%` })),
       h('span', { class: 'mob__pct num', text: `${Math.ceil(pctOf(m.hp, m.maxHp))}%` }),
-      h('span', { class: 'mob__def num', text: `${TRACKS.map((t) => `${t}${fmt(m.def[t])}`).join(' ')}${abs ? `・絕${fmt(abs)}` : ''}` }),
       orderBadge(m.id)),
       h('button', {
         type: 'button', class: 'mob__hit', disabled: downed, dataset: { armed: ui.armed === m.id ? '1' : '0' },
         title: ui.armed === m.id ? '再點一次確認' : `承受 ${m.id} 的攻擊（${formatAbc(m.atk)}），要點兩下`,
         'aria-label': ui.armed === m.id ? `再點一次確認承受 ${m.id} 的攻擊` : `承受 ${m.id} 的攻擊（要點兩下）`,
         onclick: () => confirmHit(m.id, () => doDefend(state, m)),
-      }, ui.armed === m.id ? '確認' : '承受')),
+      }, ui.armed === m.id ? '確認' : '承受'));
+    attachMonsterTip(card, () => currentEnc(getState())?.monsters.find((x) => x.id === m.id));
+    return h('li', { class: `mob${downed ? ' is-downed' : ''}`, ...fxAttrs(m.id, { picked: picked ? '1' : '0' }) },
+      card,
       skillBar(state, currentEnc(state), m));
   }
 
