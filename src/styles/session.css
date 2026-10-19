@@ -378,7 +378,10 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .rpill[data-res='毒性'] { --rc: var(--res-tox); --rc-rgb: var(--res-tox-rgb); }
 
 .sx-room { flex: none; padding: 0 12px; }
-.sx-room__sum { min-height: var(--ctl-h-sm); padding: 1px 0; color: var(--soft); font-size: 0.82rem; line-height: 1.4; overflow-wrap: anywhere; cursor: pointer; }
+.sx-room__sum { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--ctl-h-sm); padding: 0; color: var(--soft); font-size: 0.82rem; line-height: 1.3; text-align: center; overflow-wrap: anywhere; cursor: pointer; }
+.sx-room__sum::before { content: '▸'; font-size: 0.7em; }
+.sx-room[open] > .sx-room__sum::before { content: '▾'; }
+@media (hover: hover) and (pointer: fine) { .sx-room__sum { min-height: 22px; } }
 .sx-room[open] .sx-room__sum { color: var(--gold); }
 .sx-room__body { display: grid; gap: var(--space-3); max-height: 40vh; overflow-y: auto; padding: var(--space-2) 0 var(--space-3); }
 .room { display: grid; gap: var(--space-3); }

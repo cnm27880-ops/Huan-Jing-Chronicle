@@ -436,7 +436,9 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
    技能方格（skillTile.js；修整日「學習」用）：一格一行、左側色條表位階，沒有框
    ============================================================ */
 /* 依寬度自動排欄：寬螢幕約四欄、筆電兩欄、手機一欄（名稱、標籤、等級、狀態塞不進半寬）；min(100%, …) 避免窄螢幕溢出 */
-.skill-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); align-items: start; gap: var(--gap-grid); margin: 6px 0 10px; }
+.skill-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; gap: var(--gap-grid); margin: 6px 0 10px; }
+@media (max-width: 1000px) { .skill-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .skill-tiles { grid-template-columns: minmax(0, 1fr); } }
 /* 整格鋪一層淡淡的位階色（初階綠、進階藍、大師紫、傳說金），1px 細邊線；選取時邊線換成位階色 */
 .skill-tile {
   --t: var(--faint); --t-rgb: var(--faint-rgb, 128, 128, 128);
