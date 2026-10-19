@@ -25,6 +25,9 @@ import { countOf } from '../game/engine.js';
 import { iconOf } from './items.js';
 import { publish, rollWith } from '../state/rollLog.js';
 import { cloakCard } from './cloakCard.js';
+import { resPill } from './partyBars.js';
+import { barsOf } from '../game/nudge.js';
+import { vitalsOf } from '../state/vitals.js';
 import { shadowOf, isHidden, STEALTH_ROUNDS, SHADOW_SKILL as SHADOW_SKILL_NAME } from '../game/shadowCloak.js';
 import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
@@ -137,6 +140,34 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       meter(state, keys[0]),
       h('div', { class: 'bt-hud__res' }, keys.slice(1).map((k) => meter(state, k))),
       tags.length ? h('div', { class: 'chip-row chip-row--info bt-hud__tags' }, tags) : null);
+  }
+
+  /**
+   * 資源條的第一張（右欄）：自己的卡片，樣式比照下面的隊友卡（頭像生命環、生命條、資源膠囊），多顯示 A防／B防／C防。
+   * 互動跟原本的完整資源卡一樣：點生命或任一資源膠囊開調整面板，確定後寫進擲骰紀錄；狀態標籤（護盾、藥水加成、隱身…）也在這張卡
+   */
+  function selfMate(state) {
+    const v = vitalsOf(state);
+    const pct = v.maxHp > 0 ? Math.max(0, Math.min(1, v.hp / v.maxHp)) : 0;
+    const st = v.downed ? 'down' : pct < 0.3 ? 'low' : pct < 0.6 ? 'mid' : 'ok';
+    const d = defenseDice(state).dice;
+    const tags = statusTags(state);
+    return h('li', { class: `mate mate--self${isHidden(state) ? ' is-cloaked' : ''}`, dataset: { state: st } },
+      h('span', { class: 'mate__avatar', style: `--hp:${Math.round(pct * 100)}`, role: 'img', 'aria-label': `生命 ${v.hp} / ${v.maxHp}` },
+        h('span', { class: 'mate__initial', text: [...(state.name || '?')][0] })),
+      h('div', { class: 'mate__main' },
+        h('div', { class: 'mate__top' },
+          h('span', { class: 'mate__name', text: state.name }),
+          h('span', { class: 'mate__def', 'aria-label': `防禦骰 A ${d.A}、B ${d.B}、C ${d.C}` },
+            TRACKS.map((t) => h('span', { class: 'bt-hud__trk', dataset: { track: t } }, h('b', { text: `${t}防` }), h('span', { class: 'num', text: fmt(d[t]) }))))),
+        h('button', {
+          type: 'button', class: 'mate__hpline mate__hpbtn', dataset: { hud: '生命' }, 'aria-haspopup': 'dialog',
+          'aria-label': `生命 ${v.hp} / ${v.maxHp}，點一下調整`, onclick: (e) => openAdjust('生命', e.currentTarget),
+        },
+        h('span', { class: 'mate__bar' }, h('span', { class: 'mate__fill', style: `width:${pct * 100}%` })),
+        h('span', { class: 'mate__hp num', text: `${fmt(v.hp)}/${fmt(v.maxHp)}${v.shield ? ` 盾${fmt(v.shield)}` : ''}` }))),
+      h('div', { class: 'mate__bars' }, barsOf(v).map((b) => resPill({ ...b, onClick: (e) => openAdjust(b.key, e.currentTarget) }))),
+      tags.length ? h('div', { class: 'chip-row chip-row--info mate__tags' }, tags) : null);
   }
 
   /** 手機頂部的膠囊 HUD：只放生命與資源的數字，點了展開完整 HUD */
@@ -715,5 +746,5 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         h('small', { class: 'stat__detail', text: d.parts[t].map((p) => `${p.label} ${fmt(p.value)}`).join(' + ') })))));
   }
 
-  return { hud, miniHud, moveCard, fireBar, potionCard, statusCard, defenseCard };
+  return { hud, selfMate, miniHud, moveCard, fireBar, potionCard, statusCard, defenseCard };
 }

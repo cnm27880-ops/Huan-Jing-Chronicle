@@ -19,7 +19,6 @@
 .sx-left, .sx-center { display: flex; flex-direction: column; gap: var(--space-3); }
 
 .sx-right { display: flex; flex-direction: column; gap: var(--space-2); overflow: hidden; }
-.sx-right > .sx-self { flex: none; }
 .sx-stack { display: grid; gap: var(--space-3); }
 .sx-scrim, .sx-bar, .sx-sheethead, .sx-top { display: none; }
 /* 面板：淡色底＋1px 細邊線＋圓角（跑團頁保留原本的面板感，只是線條變細） */
@@ -303,7 +302,20 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .firebar { display: none; }
 
 /* ---------- 右欄：隊友、房間、紀錄、擲骰 ---------- */
-.sx-party { position: relative; flex: none; }
+.sx-party { display: grid; flex: none; gap: var(--space-2); }
+.sx-party__team { position: relative; }
+.sx-party__self[hidden], .sx-party__team[hidden] { display: none; }
+/* 自己那張（資源條第一張）：樣式同隊友卡，生命條與資源膠囊放大成可以點的按鈕；三防膠囊靠右 */
+.mate--self .mate__def { display: flex; flex: none; gap: 3px; margin-left: auto; }
+.mate--self .mate__tags { grid-column: 1 / -1; margin: 0; }
+.mate--self .mate__hpbtn { width: 100%; min-height: var(--ctl-h-sm); padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.mate--self .mate__hpbtn:hover .mate__bar { box-shadow: var(--sx-ring-hi); }
+.mate--self .mate__bar { height: 8px; }
+.mate--self .mate__hp { font-size: 0.85rem; }
+.mate--self .rpill { height: var(--ctl-h-sm); font-size: 0.78rem; }
+.rpill--btn { width: 100%; padding: 0 8px; font-family: inherit; color: inherit; text-align: left; border: 0; cursor: pointer; }
+.rpill--btn:hover { box-shadow: inset 0 0 0 1px rgba(var(--rc-rgb), 0.6); }
+.mate--self .mate__hpbtn:focus-visible, .rpill--btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .sx-party__bar { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--ctl-h); padding: 3px 12px; font: inherit; font-size: 0.85rem; color: var(--ink); text-align: left; background: linear-gradient(180deg, rgba(var(--gold-rgb), 0.06), transparent 50%), var(--card); border: 0; border-radius: var(--r-panel); box-shadow: var(--sx-ring); cursor: pointer; }
 .sx-party__bar:hover { box-shadow: var(--sx-ring-hi); }
 .sx-party__dots { display: flex; flex: 1; flex-wrap: wrap; gap: 5px; min-width: 0; }
@@ -495,7 +507,7 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 @media (max-width: 900px) {
   .sx-top { display: block; flex: none; }
   .sx-dice .sx-dice__fold { display: inline-flex; }
-  .sx-self { display: none; } /* 手機用頂部膠囊 HUD（點開就是完整資源卡） */
+  .sx-party__self { display: none; } /* 手機用頂部膠囊 HUD（點開就是完整資源卡） */
   .sx-right > .sx-room, .sx-right > .sx-party { flex: none; }
   .boss__art { height: clamp(200px, 40vh, 340px); }
   .boss__modes { grid-template-columns: repeat(3, minmax(0, 1fr)); }

@@ -151,7 +151,7 @@ function newDayButton(state, commit) {
       h('span', { class: 'day-confirm__ask', text: todo.length ? '還有事沒做，確定換日？' : '確定換日？' }),
       yes,
       h('button', { type: 'button', class: 'status__day status__day--no', onclick: showIdle }, '取消'),
-      todo.length ? h('ul', { class: 'day-confirm__list', 'aria-label': '換日前還沒做的事' }, todo.map((t) => h('li', { text: t }))) : null);
+      ...(todo.length ? [h('ul', { class: 'day-confirm__list', 'aria-label': '換日前還沒做的事' }, todo.map((t) => h('li', { text: t })))] : [])); // replaceChildren 收到 null 會寫出「null」文字
     yes.focus();
     timer = setTimeout(() => { if (box.isConnected) showIdle(); }, todo.length ? 15000 : 5000); // 有清單要多留時間讀
   }
