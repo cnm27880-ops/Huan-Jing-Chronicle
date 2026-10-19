@@ -4,7 +4,8 @@
 // 伺服器端見 worker/src/room-core.js 的 onVitals。
 // ============================================================
 import * as defaultRoom from './rollLog.js';
-import { maxHp } from '../game/stats.js';
+import { maxHp, derivedStats } from '../game/stats.js';
+import { ATK_STATS, DEF_STATS } from '../game/rules.js';
 import { OTHER_RESOURCES, resourceNow, resourceMax } from '../game/resources.js';
 import { isDowned } from '../game/combat.js';
 
@@ -20,6 +21,8 @@ export function vitalsOf(state) {
   }
   const v = { name: String(state.name ?? '').slice(0, 40), hp: Math.floor(Number(state.hp)) || 0, // 生命可以是負數（倒扣）
     maxHp: int(maxHp(state)), downed: isDowned(state), res };
+  const ds = derivedStats(state);
+  v.stats = Object.fromEntries([...ATK_STATS, ...DEF_STATS].map((k) => [k, Math.floor(Number(ds[k]?.total)) || 0])); // 分析頁讓大家互相比較用的攻防數值
   if (typeof state.toxicity === 'number') v.tox = int(state.toxicity);
   if (state.shield?.hp > 0) v.shield = int(state.shield.hp);
   return v;

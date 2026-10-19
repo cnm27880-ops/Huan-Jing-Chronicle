@@ -199,8 +199,10 @@ export function createSessionView({ root, getState, commit }) {
       })));
   }
 
+  let fireSig = ''; // 上次畫左欄時「出招」按鈕的狀態，房間更新後比對有沒有變
   function renderLeft() {
     const state = getState();
+    fireSig = JSON.stringify(stage.fireInfo());
     const y = left.scrollTop;
     const tabs = h('div', { class: 'sx-tabs tabs-seg', role: 'tablist', 'aria-label': '左欄分頁' }, LEFT_TABS.map(([id, label]) => h('button', {
       type: 'button', role: 'tab', class: 'tabs-seg__tab', 'aria-selected': String(ui.leftTab === id),
@@ -353,7 +355,7 @@ export function createSessionView({ root, getState, commit }) {
         if (typingIn(center)) deferred = true; else renderCenter();
         renderTop();
         party.render();
-        if (sel.targets.join() !== before) renderLeft(); // 目標倒下或被移除：左欄「出招」按鈕的目標文字跟著更新
+        if (sel.targets.join() !== before || JSON.stringify(stage.fireInfo()) !== fireSig) renderLeft(); // 目標倒下／被移除，或先攻順序被交換、輪到誰換了（「還沒輪到你」的提示）：左欄「出招」按鈕跟著更新
         renderFeedHead();
       });
     }

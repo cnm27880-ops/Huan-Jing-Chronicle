@@ -52,6 +52,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/moveUse.js` | 招式使用紀錄（純函式）：`recordMoveUse`（玩家出招／用輔助成功後，在角色 `moveUse` 累計招式名稱次數，記在 `combat.js` 的 `playerAttack`／`useSupport`）、`usageList`、`usagePlan`（依紀錄排出模擬戰的出招優先順序）；GM 的模擬戰用 |
 | `src/game/templates.js`、`worker/src/templates.js` | 範本版本（模擬戰，GM 專用）：前端比較兩個版本的數值差異與結果差異（`diffSpecs`／`compareVersions`，用現在的玩家重跑）、命名與存檔當時成績；伺服器驗證敵人清單（`cleanSpecs`／`cleanSnap`），存在房間 meta 表（`room-core.js` 的 `tplList`／`tplSave`／`tplDel`，只有 GM） |
 | `src/game/tuning.js` | 模擬戰的目標（4～8 回合、勝率至少 75%、每場約耗一半資源）、評價與策略建議、自動調整（保守版／激進版兩個方案 `PLANS`）：先找回合數的結構下限、必要時拿掉最弱的怪，再二分搜尋血量與攻擊強度（自訂強度 `scaleSpecs`／固定敵人 `scaleEncounter` 都能調）；新增輸出占比評分 `shareInfo`（純函式） |
+| `src/ui/analysisView.js` | 「分析」大分頁（`#analysis`，日誌旁邊）：把房間每位玩家回報的攻防數值（`vitals.stats`，伺服器 `onVitals` 驗證）與資源上限排成可排序的比較表，標最高／最低、顯示平均與中位數；GM 隱藏的玩家一般玩家看不到。純函式 `analysisPlayers`／`columnStats` |
+| `src/ui/monsterTip.js` | 怪物詳細資料浮動窗（三攻三防、絕防、生命、等級）：電腦滑鼠移上去、手機長按 0.45 秒；小怪卡與 BOSS 立繪共用 |
 | `src/game/activity.js`、`src/state/activityLog.js`、`src/ui/logsView.js` | 玩家日誌：內容格式（修整／學習／物品）、回報點（房間伺服器，離線存本機）、「日誌」大分頁（`#logs`，所有玩家都看得到每位玩家的）；伺服器端在 `room-core.js` 的 `actPost`／`actList`，每人留 500 筆 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試（2026-10-12 跑團後的修正在 `tests/playtest-fixes.test.js`；遭遇戰的房間邏輯在 `worker/test/encounter.test.js`，立繪與隊友狀態在 `worker/test/images.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |

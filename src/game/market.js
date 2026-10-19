@@ -45,7 +45,6 @@ export const BLACK_SELL = {
 export const BLACK_BUY_DICE = { n: 1, sides: 10, add: 2 }; // 結果 3 → ×1.3；12 → ×2.2
 export const BLACK_SELL_DICE = { n: 2, sides: 4, add: 2 }; // 結果 5 → ×0.5；10 → ×1（原文：後續劇情可能變 2D3+4）
 export const LABOR_GOLD_PER_TIME = 200; // 付不出錢：強制勞動 1 時間 = 200 金幣
-export const VOUCHER_EXCHANGE_DAILY = 1500; // 每天最多把 1500 代金券 1:1 換成金幣
 
 /** 特殊黑市（只在黑市團期間）：固定價，以代金券計；每次開團每人買＋賣合計 50 個 */
 export const SPECIAL_BUY = { 永恆草: 1000, 傳說肉: 1000, 隕星石: 1000, 初階技能書: 1000, 進階技能書: 5000 };
@@ -64,12 +63,11 @@ export const gearPriceName = (g) => `${g.tier === '初階' ? '低階' : g.tier}$
 export function marketToday(state) {
   state.market ??= {};
   const m = state.market;
-  if (m.day !== state.loginDays) Object.assign(m, { day: state.loginDays, hallUsed: 0, exchanged: 0 });
+  if (m.day !== state.loginDays) Object.assign(m, { day: state.loginDays, hallUsed: 0 });
   m.session ??= { open: false, used: 0 };
   return m;
 }
 export const hallLeft = (state) => Math.max(0, HALL_DAILY_LIMIT - marketToday(state).hallUsed);
-export const exchangeLeft = (state) => Math.max(0, VOUCHER_EXCHANGE_DAILY - marketToday(state).exchanged);
 export const specialLeft = (state) => Math.max(0, SPECIAL_SESSION_LIMIT - marketToday(state).session.used);
 
 const okQty = (qty) => Number.isInteger(qty) && qty > 0;
@@ -161,14 +159,12 @@ export function blackSell(state, item, qty, rng = Math.random, gearIds = null) {
   return { item, qty, unit, roll, rate: roll / 10, total };
 }
 
-/** 代金券 1:1 換金幣，每天最多 1500 */
+/** 代金券 1:1 換金幣（沒有每日上限，GM 2026-10-19 定案） */
 export function exchangeVouchers(state, n) {
   if (!okQty(n)) return { error: '數量不對。' };
-  if (n > exchangeLeft(state)) return { error: `今天最多再換 ${exchangeLeft(state)} 張。` };
   if (countOf(state, VOUCHER) < n) return { error: `代金券不足：只有 ${countOf(state, VOUCHER)} 張。` };
   removeItem(state, VOUCHER, n);
   state.gold += n;
-  marketToday(state).exchanged += n;
   return { n };
 }
 

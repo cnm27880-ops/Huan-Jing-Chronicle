@@ -89,6 +89,7 @@ async function init() {
     session: () => import('./ui/sessionView.js'),
     market: () => import('./ui/marketView.js'),
     logs: () => import('./ui/logsView.js'),
+    analysis: () => import('./ui/analysisView.js'),
   };
   const VIEW_FACTORIES = {
     rest: (m) => m.createRestView({ root: $('#view-rest'), getState, commit }),
@@ -97,6 +98,7 @@ async function init() {
     session: (m) => m.createSessionView({ root: $('#view-session'), getState, commit }),
     market: (m) => m.createMarketView({ root: $('#view-market'), getState, commit }),
     logs: (m) => m.createLogsView({ root: $('#view-logs') }),
+    analysis: (m) => m.createAnalysisView({ root: $('#view-analysis'), getState }),
   };
   const viewLoads = {};
   /** 取得某個分頁的 view（沒載入過就下載並建立，同一個只會建立一次）；載入失敗丟錯誤，下次可以再試 */
@@ -189,7 +191,7 @@ async function init() {
     const raw = (location.hash || '#map').slice(1);
     const id = raw === 'battle' ? 'session' : raw; // 戰鬥頁已改成跑團頁裡的戰鬥面板（舊連結導到跑團頁）
     const previous = currentView;
-    currentView = ['map', 'rest', 'bag', 'gear', 'session', 'market', 'logs'].includes(id) ? id : 'map';
+    currentView = ['map', 'rest', 'bag', 'gear', 'session', 'market', 'logs', 'analysis'].includes(id) ? id : 'map';
     if (location.hash && raw !== currentView) history.replaceState(null, '', `#${currentView}`); // 舊連結（#battle）或打錯的網址：把網址列修成實際顯示的頁面（replaceState 不會觸發 hashchange、也不多一筆歷史）
     if (previous !== currentView) views[previous]?.leave?.(); // 離開的頁面可以停掉背景更新（跑團頁的紀錄）
     document.querySelectorAll('[data-view]').forEach((el) => {
@@ -199,7 +201,7 @@ async function init() {
       if (a.dataset.viewLink === currentView) a.setAttribute('aria-current', 'page');
       else a.removeAttribute('aria-current');
     });
-    moreBtn.toggleAttribute('data-active', ['gear', 'market', 'logs'].includes(currentView)); // 裝備、交易、日誌收在「更多」裡，手機版讓「更多」亮起
+    moreBtn.toggleAttribute('data-active', ['gear', 'market', 'logs', 'analysis'].includes(currentView)); // 裝備、交易、日誌、分析收在「更多」裡，手機版讓「更多」亮起
     const token = ++showToken;
     applyWait();
     if (currentView === 'map') { map.reset(false); return; }
@@ -234,7 +236,7 @@ async function init() {
   });
   function applyWait() {
     const status = getRoomStatus();
-    const wait = currentView !== 'map' && currentView !== 'logs' && Boolean(sync?.isWaiting()) && status.phase === 'online' && !status.me?.isGm;
+    const wait = currentView !== 'map' && currentView !== 'logs' && currentView !== 'analysis' && Boolean(sync?.isWaiting()) && status.phase === 'online' && !status.me?.isGm;
     waitView.hidden = !wait;
     const el = document.querySelector(`[data-view="${currentView}"]`);
     if (el && wait) el.hidden = true;

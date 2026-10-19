@@ -151,6 +151,16 @@ textarea.field { padding: 8px 10px; }
   .field, .amount__input { font-size: 16px; }
 }
 
+/* 數字輸入框：跟著輸入的位數變寬（Chrome／Edge／新版 Safari 用 field-sizing；其他瀏覽器由 controls.js 補上寬度） */
+input.field[type='number'],
+.amount__input { field-sizing: content; min-width: 3.2rem; max-width: 100%; }
+/* 下拉選單：有最小寬度（不會縮成只剩箭頭），展開的選項用深色底、淺色字（原本瀏覽器預設白底配淺色字，看不到） */
+select.field { min-width: 9rem; max-width: 100%; cursor: pointer; color-scheme: dark; }
+select.field option,
+select.field optgroup { background-color: var(--card); color: var(--ink); }
+select.field option:checked { background-color: var(--raise); color: var(--gold); }
+select.field option:disabled { color: var(--faint); }
+
 /* ---------- 面板：容器有外框，裡面的項目不各自加框，用留白與細線分隔 ---------- */
 .panel {
   box-sizing: border-box;

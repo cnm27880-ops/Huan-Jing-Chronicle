@@ -13,8 +13,8 @@ import { gearName, effectText } from '../game/equipment.js';
 import { MAX_TIME } from '../game/rules.js';
 import {
   VOUCHER, HALL_DAILY_LIMIT, HALL_BUY, HALL_SELL, BLACK_BUY, BLACK_SELL, BLACK_BUY_DICE, BLACK_SELL_DICE,
-  LABOR_GOLD_PER_TIME, VOUCHER_EXCHANGE_DAILY, SPECIAL_BUY, SPECIAL_SELL, SPECIAL_SESSION_LIMIT,
-  marketToday, hallLeft, exchangeLeft, specialLeft, hallQuote, hallTrade, blackBuy, blackSell,
+  LABOR_GOLD_PER_TIME, SPECIAL_BUY, SPECIAL_SELL, SPECIAL_SESSION_LIMIT,
+  marketToday, hallLeft, specialLeft, hallQuote, hallTrade, blackBuy, blackSell,
   exchangeVouchers, specialTrade, gearPriceName, syncBlackSession,
 } from '../game/market.js';
 import { publish, rollWith, getBlackMarket, setBlackMarket, getRoomStatus } from '../state/rollLog.js';
@@ -171,7 +171,7 @@ export function createMarketView({ root, getState, commit }) {
 
   function blackPane(state) {
     const vouchers = countOf(state, VOUCHER);
-    const canEx = Math.min(exchangeLeft(state), vouchers);
+    const canEx = vouchers;
     return [
       section('黑市・購買', `付金幣。成交價 = 買價 × 數量 ×（1 + ${diceText(BLACK_BUY_DICE)} 成），也就是 ×${BUY_MIN}～×${BUY_MAX}。付不出錢就強制勞動抵債：1 時間 = ${LABOR_GOLD_PER_TIME} 金幣（時間可以變負的，換日時先還）。`,
         list(Object.entries(BLACK_BUY).map(([item, unit]) => row(state, {
@@ -186,7 +186,7 @@ export function createMarketView({ root, getState, commit }) {
           button: (q) => `擲骰賣 ${q}`, onGo: (q) => doBlackSell(state, item, q, commit),
         }))),
         gearHint(state, BLACK_SELL)),
-      section('代金券換金幣', `每天最多 ${fmt(VOUCHER_EXCHANGE_DAILY)} 張，1 比 1。今天還能換 ${fmt(exchangeLeft(state))} 張。`,
+      section('代金券換金幣', '1 比 1，沒有每日上限。',
         h('ul', { class: 'trade-list' }, row(state, {
           key: 'ex', item: VOUCHER, have: vouchers, max: canEx, price: '1 張 = 1 金幣',
           button: (q) => `換 ${fmt(q)}`, disabled: canEx < 1,
@@ -225,7 +225,6 @@ export function createMarketView({ root, getState, commit }) {
       stat('代金券', fmt(countOf(state, VOUCHER))),
       stat('時間', `${state.time} / ${MAX_TIME}`, state.time < 0 ? 'bad' : ''),
       stat('今日原價', `${hallLeft(state)} / ${HALL_DAILY_LIMIT}`),
-      stat('今日可換', `${fmt(exchangeLeft(state))}`),
       sessionToggle(state, m));
   }
 

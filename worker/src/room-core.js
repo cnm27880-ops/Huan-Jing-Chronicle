@@ -1034,6 +1034,11 @@ export class RoomCore {
         if (VITAL_KEY.test(k) && Array.isArray(pair) && pair.length === 2 && isInt(pair[0], 0, BIG) && isInt(pair[1], 0, BIG)) clean.res[k] = pair;
       }
     }
+    if (v.stats && typeof v.stats === 'object' && !Array.isArray(v.stats)) { // 攻防數值（分析頁，全員可看）
+      const stats = {};
+      for (const [k, n] of Object.entries(v.stats).slice(0, 12)) if (VITAL_KEY.test(k) && isInt(n, -BIG, BIG)) stats[k] = n;
+      if (Object.keys(stats).length) clean.stats = stats;
+    }
     // seq（前端用 Date.now() 加單調遞增）：比已存的舊就靜默忽略，免得放了很久的另一台裝置把新狀態蓋回舊的。
     // 沒帶 seq（還沒更新的前端）照舊直接收。超前太多（時鐘錯亂）壓回「現在 + 60 秒」，免得把這位玩家後面的回報全部擋掉。
     if (isInt(v.seq, 0, Number.MAX_SAFE_INTEGER)) {
