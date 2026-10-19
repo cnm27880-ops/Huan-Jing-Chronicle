@@ -44,7 +44,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/enemy.js` | 敵人等級（普通／菁英 2 打／BOSS 3 打）與技能 A 攻擊強化、B 防禦強化、C 喝血（三種都每回合歸零）的次數與效果（伺服器與前端共用）（純函式） |
 | `src/game/ally.js` | 友方 NPC（純函式，伺服器與前端共用）：檢查輸入、攻擊怪物、被怪物打（生命倒扣）、改生命、移除、插進先攻隨機位置（`insertRandom`，增援也用）；只有 GM 操作。伺服器在 `room-core.js` 的 `onAlly`，畫面在 `encounterCard.js` 的「友方」 |
 | `src/game/nudge.js` | 戰鬥提醒與隊友資源條的判斷（純函式）：資源動用比例、資源條、隊伍摘要、偵測隊友倒地／危急／全隊吃緊、防連發、手上能做的事 |
-| `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄、自己那張完整資源卡下方；GM 不顯示；GM 設為「不顯示於資源條」的玩家會被濾掉）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示；同樣不提被隱藏的玩家） |
+| `src/ui/partyBars.js`、`src/ui/nudgeModal.js` | 隊友資源條（跑團頁右欄；第一張固定是自己，樣式比照隊友卡＋三防，可點開調整，由 `createPartyPanel({ selfCard })` 放入；GM 不顯示；GM 設為「不顯示於資源條」的玩家會被濾掉）與戰鬥提醒視窗（戰鬥中出事才跳、必須按掉；GM 不顯示；同樣不提被隱藏的玩家） |
 | `src/ui/confirmPop.js` | 網頁自己的對話框（取代瀏覽器的 confirm／prompt）：`askConfirm`／`askText`，有給按鈕貼在旁邊、沒給就置中；**全站不要再用 `confirm()`／`prompt()`／`alert()`** |
 | `src/ui/modalStack.js` | 彈窗堆疊：全站唯一的 Esc 監聽器，Esc 一次只關畫面最上面那層（`sheet.js`、`confirmPop.js`、`valueSheet.js`、`reveal.js`、`nudgeModal.js`、`dossier.js`、`sessionView.js` 的抽屜都用 `pushLayer` 註冊，**這些檔案不要再自己監聽 Escape**）；modal 開著時背景（`#main`、頂部列、被蓋住的彈窗）設 `inert`、`<html data-modal="open">`（不鎖 body 捲動，body 本來就 `overflow: hidden`）；戰鬥提醒 `dismissible: false`；輸入法組字中、封面還在時不處理 Esc。層級順序 `TIERS` 要和 `tokens.css` 的 `--z-*` 一致（`tests/modal-stack.test.js` 檢查）（判斷邏輯是純函式） |
 | `src/game/fairness.js` | 模擬戰的公平性（純函式）：量每位玩家一次出手的傷害並排強弱、小怪血量依最弱玩家設、「第一名只出六成力」的情境（`FAIR` 常數可調） |
@@ -99,7 +99,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/badgePanel.js` | 生活徽章面板（原本在修整日學習分頁，現在放裝備頁右欄）：製作、改名、「我已經做過了」 |
 | `src/ui/reveal.js` | 鑑定開獎動畫（翻牌、數值跳動；只是畫面，數值鑑定時就已存好） |
 | `src/ui/marketView.js` | 交易頁（交易大廳／黑市／特殊黑市）＋裝備頁「賣出」面板 |
-| `src/ui/battleView.js` | 戰鬥的個人部分（左欄招式／藥水／狀態；HUD 現在放在**右欄第一張**，由 `sessionView.js` 的 `renderSelf` 放置）：HUD（生命／資源／防禦三軌／狀態標籤）、手機膠囊 HUD、招式條（選中的有「出招」）、藥水、狀態與防禦骰 |
+| `src/ui/battleView.js` | 戰鬥的個人部分（左欄招式／藥水／狀態；資源條第一張的「自己」卡是 `selfMate()`，完整 HUD `hud()` 只給手機膠囊展開用）：自己的資源卡、HUD（生命／資源／防禦三軌／狀態標籤）、手機膠囊 HUD、招式條（選中的有「出招」）、藥水、狀態與防禦骰 |
 | `src/ui/valueSheet.js` | 數值調整面板：手機底部彈出、電腦小彈出框（戰鬥頁點生命／資源時用） |
 | `src/ui/sessionView.js` | 跑團頁的三欄工作台（版面規格見 `DESIGN.md`「跑團頁」）：左欄 HUD＋招式／藥水與狀態／技能檢定分頁、中欄遭遇戰舞台、右欄房間＋紀錄（全部／擲骰／戰鬥，新的在下）＋快速擲骰（擲完播 `diceFx.js` 特效）；平板與手機的底部抽屜與快捷列；離開頁面會停掉紀錄更新 |
 | `src/ui/encounterCard.js` | 遭遇戰舞台（跑團頁中欄）：先攻軸（隨機、玩家可交換、GM 開打後鎖定）、BOSS 大立繪與 3 段血條（只是視覺）、三種防禦（點選）與三種攻擊（點兩下＝承受，第一下只待命）同時列出、小怪矩陣、多選目標（上限＝招式目標數）、出招與承受攻擊（打擊特效依傷害軌道：物理劈砍／能量爆裂／靈魂漩渦，多段招式連播，CSS 在 `session.css` 檔尾的 `fx-slash`／`fx-burst`／`fx-soul`）、GM 的新增敵人／敵人管理／立繪庫（上傳前在瀏覽器縮成 WebP）。已加入房間：敵人由 GM 建立、存在伺服器、全員共享，怪物生命只有伺服器改（玩家回報傷害）；本機模式照舊自己建立 |

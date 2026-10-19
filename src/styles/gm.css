@@ -25,6 +25,7 @@
 .simbar__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--rose2), var(--rose)); }
 /* GM 匯入機器人存檔 */
 .import-list, .import-results { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+.import-row__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
 .import-row { padding: 10px; background: var(--raise); border: 1px solid var(--line); border-radius: 10px; display: grid; gap: 4px; }
 .import-results li { color: var(--ink2); font-size: 0.85rem; }
 /* 技能清單（有技能目錄的角色） */

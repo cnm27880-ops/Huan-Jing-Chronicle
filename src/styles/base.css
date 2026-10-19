@@ -345,7 +345,13 @@ textarea.field { padding: 8px 10px; }
   column-gap: var(--gap-card);
 }
 /* 有說明文字的物品（紀念品效果）跨欄顯示：手機整列一欄，寬螢幕跨兩欄（窄到排不出兩欄時不跨，避免多出隱形欄位） */
-.bag-group .tile { grid-template-columns: auto minmax(0, max-content) minmax(max-content, 1fr); } /* 名稱與數量緊貼，不把數量推到最右 */
+/* 背包物品卡：圖示、名稱、數量排成一行並緊貼（不把數量推到最右）；稀有度標籤與說明文字各佔下一行。
+   用 flex 而不是固定欄位：沒有圖示的物品（例如紀念品）欄位不會錯位 */
+.bag-group .tile { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-2); }
+.bag-group .tile__name { flex: 0 1 auto; }
+.bag-group .tile__qty { flex: none; }
+.bag-group .tile .rarity-tag, .bag-group .tile__note { flex: 1 0 100%; }
+.bag-group .tile__icon:not(:empty) ~ .rarity-tag { margin-left: calc(1.25rem + var(--space-2)); }
 .bag-group .tile:has(.tile__note) { grid-column: 1 / -1; }
 @media (min-width: 820px) { .bag-group .tile:has(.tile__note) { grid-column: span 2; } }
 .tile {
@@ -412,8 +418,8 @@ button.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px
 .amount__input { min-width: 0; text-align: center; -moz-appearance: textfield; }
 .amount__input::-webkit-outer-spin-button,
 .amount__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.amount__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.amount__chip { min-height: var(--ctl-h-sm); padding: 0 var(--ctl-px-sm); font-size: 0.85rem; }
+.amount__chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 5.5rem), 1fr)); gap: var(--space-2); } /* 快速數量：整排均分、放大，不擠在左邊 */
+.amount__chip { min-height: var(--ctl-h); padding: 0 var(--ctl-px-sm); font-size: 0.95rem; }
 .amount__chip[aria-pressed='true'] { color: var(--gold); background: var(--ctl-primary-bg); border-color: var(--ctl-primary-line); }
 
 /* ---------- 選項（單選）：沒有框，底部 2px 線；選中時文字與線變金色 ---------- */

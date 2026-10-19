@@ -59,9 +59,9 @@ export function createSessionView({ root, getState, commit }) {
   const feedHead = h('div', { class: 'sx-feedhead' });
   const feedBox = h('div', { class: 'sx-feed', role: 'log', 'aria-label': '擲骰紀錄' });
   const diceBox = h('div', { class: 'sx-dice' });
-  const selfBox = h('div', { class: 'sx-self' }); // 右欄第一張：自己的完整資源卡（手機改用頂部膠囊 HUD）
-  const party = createPartyPanel(); // 隊友資源條（玩家端；GM 不顯示）
-  const right = h('aside', { class: 'sx-col sx-right', 'aria-label': '紀錄與擲骰' }, top, selfBox, party.node, roomDetails, feedHead, feedBox, diceBox);
+  // 資源條：第一張是自己（樣式比照隊友卡＋三防，可點開調整面板；手機改用頂部膠囊 HUD），後面是隊友（玩家端；GM 不顯示隊友）
+  const party = createPartyPanel({ selfCard: () => battle.selfMate(getState()) });
+  const right = h('aside', { class: 'sx-col sx-right', 'aria-label': '紀錄與擲骰' }, top, party.node, roomDetails, feedHead, feedBox, diceBox);
   const barBtn = (id, label, controls) => h('button', {
     type: 'button', class: 'sx-bar__btn', dataset: { id }, 'aria-controls': controls, 'aria-expanded': 'false',
     onclick: () => openSheet(id),
@@ -219,11 +219,6 @@ export function createSessionView({ root, getState, commit }) {
     left.scrollTop = y;
   }
 
-  /** 右欄第一張：自己的完整資源卡（點生命／資源開調整面板，寫入紀錄；跟原本左欄那張是同一個元件） */
-  function renderSelf() {
-    selfBox.replaceChildren(battle.hud(getState()));
-  }
-
   // ---------- 中欄與手機頂部 ----------
   function renderCenter() {
     const y = center.scrollTop;
@@ -365,7 +360,6 @@ export function createSessionView({ root, getState, commit }) {
     renderRoomSummary();
     renderFeedHead();
     party.render();
-    renderSelf();
     renderCenter();
     renderLeft();
     renderTop();

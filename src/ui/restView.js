@@ -39,7 +39,7 @@ export function createRestView({ root, getState, commit }) {
     gatherAction: '採藥',
     craftAction: '烹飪',
     craftDiff: '普通',
-    craftMode: 'craft', // 製作分頁裡的兩個區：craft 一般製作／synth 合成（強效藥水、套餐）
+    synthTimes: 1, // 合成的次數（跟上面一般製作的次數分開記，兩區在同一頁）
     synthRecipe: '強效黃藥水',
     specialRecipe: '祕製桃花酒',
     matSkill: {}, // 每種特殊材料選的檢定技能
@@ -102,13 +102,13 @@ export function createRestView({ root, getState, commit }) {
   }
 
   /** 次數＋紀念品＋加值，最後是大按鈕 */
-  function runBlock(state, a, { label, hint, max, quick, onRun, kctx }) {
+  function runBlock(state, a, { label, hint, max, quick, onRun, kctx, timesKey = 'times' }) {
     const mod = modifier(state, a, 'rest', [...ui.keepsakes], kctx);
     return [
       section('次數與加值',
         h('div', { class: 'rest-field' },
           h('p', { class: 'field-label', text: hint }),
-          amountPicker({ value: ui.times, max, quick, onChange: (n) => { ui.times = n; render(); } })),
+          amountPicker({ value: ui[timesKey], max, quick, onChange: (n) => { ui[timesKey] = n; render(); } })),
         keepsakeToggles(state, a, kctx),
         modLine(mod)),
       h('div', { class: 'rest-go' },
@@ -133,26 +133,19 @@ export function createRestView({ root, getState, commit }) {
   }
 
   // ---------- 製作 ----------
-  /** 製作分頁上方的切換：一般製作／合成 */
-  const craftModeSwitch = () => h('div', { class: 'tabs-line', role: 'tablist', 'aria-label': '製作或合成' },
-    [['craft', '製作'], ['synth', '合成']].map(([id, label]) => h('button', {
-      type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.craftMode === id),
-      onclick: () => { ui.craftMode = id; ui.times = 1; render(); },
-    }, h('span', { text: label }))));
-
   // ---------- 合成（強效藥水、套餐；配方表在 rules.js 的 SYNTH_RECIPES） ----------
   function synthPanel(state) {
     const name = SYNTH_RECIPES[ui.synthRecipe] ? ui.synthRecipe : Object.keys(SYNTH_RECIPES)[0];
     const r = SYNTH_RECIPES[name];
     const max = synthMaxTimes(state, name);
-    ui.times = Math.max(1, Math.min(ui.times, Math.max(max, 1)));
+    ui.synthTimes = Math.max(1, Math.min(ui.synthTimes, Math.max(max, 1)));
     const groups = [...new Set(Object.values(SYNTH_RECIPES).map((x) => x.type))];
     const effect = POTIONS[name] ? potionEffectText(POTIONS[name]) : FOODS[name]?.effect ?? '';
     return [
       ...groups.map((g) => section(g === '套餐' ? '合成：套餐（烹飪）' : '合成：強效藥水（調劑）',
         h('div', { class: 'diff-grid', role: 'radiogroup' }, Object.entries(SYNTH_RECIPES).filter(([, x]) => x.type === g).map(([n, x]) => h('button', {
           type: 'button', class: `diff${synthMaxTimes(state, n) ? '' : ' is-none'}`, role: 'radio', 'aria-checked': String(n === name),
-          onclick: () => { ui.synthRecipe = n; ui.times = 1; render(); },
+          onclick: () => { ui.synthRecipe = n; ui.synthTimes = 1; render(); },
         },
         h('span', { class: 'diff__head' }, h('strong', { text: n }), h('span', { class: 'diff__dc num', text: `DC ${x.dc}` })),
         h('span', { class: 'diff__can', text: synthMaxTimes(state, n) ? `可做 ${fmt(synthMaxTimes(state, n))} 次` : '材料不足' })))))),
@@ -167,21 +160,19 @@ export function createRestView({ root, getState, commit }) {
       ...(max <= 0
         ? [h('p', { class: 'notice notice--bad', text: `${name}的材料不足。` })]
         : runBlock(state, r.skill, {
-            kctx: { kind: 'synth' }, label: `合成 ${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀；不算進 500 次徽章', max, quick: [1, 5, 10],
-            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSynth(state, name, ui.times, [...ui.keepsakes]) }),
+            kctx: { kind: 'synth' }, label: `合成 ${name} ${ui.synthTimes} 次`, timesKey: 'synthTimes', hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀；不算進 500 次徽章', max, quick: [1, 5, 10],
+            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSynth(state, name, ui.synthTimes, [...ui.keepsakes]) }),
           })),
     ];
   }
 
   function craftPanel(state) {
-    if (ui.craftMode === 'synth') return [craftModeSwitch(), ...synthPanel(state)];
     const a = ui.craftAction;
     const d = ui.craftDiff;
     const recipe = RECIPES[a][d];
     const max = craftableTimes(state, a, d);
     ui.times = Math.max(1, Math.min(ui.times, Math.max(max, 1)));
     return [
-      craftModeSwitch(),
       section('選擇製作', actionCards(state, CRAFT_ACTIONS, a, (x) => { ui.craftAction = x; render(); })),
       section('難度與配方',
         h('div', { class: 'diff-grid', role: 'radiogroup' },
@@ -205,6 +196,7 @@ export function createRestView({ root, getState, commit }) {
             kctx: { kind: 'craft', diff: d }, label: `${a}（${d}）${ui.times} 次`, hint: '製作不消耗時間', max, quick: [1, 5, 10],
             onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: a, diff: d, ...craft(state, a, d, ui.times, [...ui.keepsakes]) }),
           })),
+      ...synthPanel(state), // 合成（強效藥水、套餐）直接接在製作下面，不另開分頁
     ];
   }
 

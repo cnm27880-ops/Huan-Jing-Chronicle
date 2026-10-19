@@ -16,11 +16,15 @@ const hpState = (v) => (v.downed ? 'down' : hpPct(v) < 0.3 ? 'low' : hpPct(v) < 
  * 資源小膠囊：底色是這種資源的顏色，名字在左、數字在右。資源填到「還剩多少」（空了＝用光，標紅）；
  * 毒性相反，是一點一點「累積」上去（空＝沒中毒、滿＝不能再喝藥）。給隊友卡與提醒視窗共用。
  */
-export function resPill({ key, now, max, left, text }) {
-  return h('span', { class: `rpill${key !== '毒性' && left <= 0 ? ' is-empty' : ''}`, dataset: { res: key }, title: text, role: 'img', 'aria-label': text },
+export function resPill({ key, now, max, left, text, onClick }) {
+  const cls = `rpill${key !== '毒性' && left <= 0 ? ' is-empty' : ''}`;
+  const kids = [
     h('span', { class: 'rpill__fill', style: `width:${Math.round(left * 100)}%` }),
     h('span', { class: 'rpill__name', text: key }),
-    h('span', { class: 'rpill__val num', text: `${fmt(now)}/${fmt(max)}` }));
+    h('span', { class: 'rpill__val num', text: `${fmt(now)}/${fmt(max)}` })];
+  // 自己的那張可以點：開調整面板（data-hud 讓調整完能把焦點還給它）
+  if (onClick) return h('button', { type: 'button', class: `${cls} rpill--btn`, dataset: { res: key, hud: key }, title: text, 'aria-haspopup': 'dialog', 'aria-label': `${text}，點一下調整`, onclick: onClick }, ...kids);
+  return h('span', { class: cls, dataset: { res: key }, title: text, role: 'img', 'aria-label': text }, ...kids);
 }
 
 export function mateCard(v, { online = true, inBattle = false } = {}) {
@@ -59,7 +63,7 @@ function partyDot(v, { idle = false } = {}) {
  * 單擊精簡列展開／收合；展開後在面板上雙擊也能收合；有人倒地或生命危急時會自動展開（只展開、不改記住的偏好），
  * 所以就算玩家收起來，出事時還是看得到。收合偏好記在這台裝置（localStorage）。
  */
-export function createPartyPanel({ room = defaultRoom } = {}) {
+export function createPartyPanel({ room = defaultRoom, selfCard = null } = {}) {
   const { getRoomStatus, getEncounter } = room;
   const label = h('span', { class: 'sx-party__label' });
   const dots = h('span', { class: 'sx-party__dots' });
@@ -67,7 +71,10 @@ export function createPartyPanel({ room = defaultRoom } = {}) {
   const chevron = h('span', { class: 'sx-party__chev', 'aria-hidden': 'true', text: '▾' });
   const bar = h('button', { type: 'button', class: 'sx-party__bar', 'aria-expanded': 'true', title: '單擊展開／收合隊友資源' }, label, dots, chips, chevron);
   const pop = h('div', { class: 'sx-party__pop', title: '雙擊收合' });
-  const node = h('div', { class: 'sx-party', hidden: true }, bar, pop);
+  // 第一張固定是自己（selfCard() 回傳一個 <li>，樣式比照隊友卡，再多三防；單機、GM 也看得到自己的）；隊友列只有玩家在房間裡才出現
+  const selfList = h('ul', { class: 'party__list sx-party__self', hidden: true });
+  const team = h('div', { class: 'sx-party__team', hidden: true }, bar, pop);
+  const node = h('div', { class: 'sx-party' }, selfList, team);
   let open = readOpen();
   let lastDowned = 0;
   let lastDanger = false;
@@ -86,8 +93,11 @@ export function createPartyPanel({ room = defaultRoom } = {}) {
   function render() {
     const r = getRoomStatus();
     const gm = new Set(r.gm?.uids ?? []);
-    if (r.phase !== 'online' || r.me?.isGm) { node.hidden = true; return; }
-    node.hidden = false;
+    const self = selfCard?.() ?? null;
+    selfList.hidden = !self;
+    selfList.replaceChildren(...(self ? [self] : []));
+    if (r.phase !== 'online' || r.me?.isGm) { team.hidden = true; return; }
+    team.hidden = false;
     const onlineIds = new Set(r.members.filter((m) => m.online).map((m) => m.uid));
     const hidden = new Set(r.hiddenVitals ?? []); // GM 設定「不顯示於資源條」的玩家（只是畫面過濾）
     const mates = Object.entries(r.vitals ?? {}).filter(([uid]) => uid !== r.me?.uid && !gm.has(uid) && !hidden.has(uid));

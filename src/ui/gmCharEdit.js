@@ -95,12 +95,13 @@ export function openGmCharEditor() {
     if (!ui.list.length) return h('p', { class: 'notice', text: '還沒有任何玩家的角色存在伺服器上。' });
     return h('div', {}, ui.message ? h('p', { class: 'notice', text: ui.message }) : null, h('ul', { class: 'import-list' }, ui.list.map((c) => h('li', { class: 'import-row' },
       h('strong', { text: c.charName || c.name }), h('small', { class: 'hint', text: `${c.name}・第 ${c.version} 版・${when(c.updatedAt)}` }),
-      h('button', {
-        type: 'button', class: 'toggle', 'aria-pressed': String(getRoomStatus().hiddenVitals.includes(c.uid)), disabled: ui.busy ? true : null,
-        title: '只影響跑團頁的資源條，不動角色資料', onclick: () => toggleHidden(c),
-      }, '不顯示於資源條'),
-      h('button', { type: 'button', class: 'btn btn--small', disabled: ui.busy ? true : null, onclick: () => open(c.uid) }, '開啟'),
-      h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.busy ? true : null, onclick: (e) => resetBlank(c, e.currentTarget) }, '換成空白')))));
+      h('div', { class: 'import-row__acts' },
+        h('button', { type: 'button', class: 'btn btn--small', disabled: ui.busy ? true : null, onclick: () => open(c.uid) }, '開啟'),
+        h('button', {
+          type: 'button', class: 'toggle', 'aria-pressed': String(getRoomStatus().hiddenVitals.includes(c.uid)), disabled: ui.busy ? true : null,
+          title: '只影響跑團頁的資源條，不動角色資料、備份與這份清單', onclick: () => toggleHidden(c),
+        }, getRoomStatus().hiddenVitals.includes(c.uid) ? '不顯示於資源條（已隱藏）' : '不顯示於資源條'),
+        h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.busy ? true : null, onclick: (e) => resetBlank(c, e.currentTarget) }, '換成空白'))))));
   }
 
   /** 把技能指定給玩家（例如 GM 新增的專屬技能）：直接設定等級；GM 自己決定要不要補技能書與經驗 */
