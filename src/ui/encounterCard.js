@@ -268,6 +268,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
   /** 左欄「出招」按鈕要顯示的目標 */
   function fireInfo() {
     const state = getState();
+    if (!currentEnc(state)) return { text: '', ready: false }; // 還沒有遭遇戰資料（剛載入）：不處理
     pruneTargets(state);
     const blocked = turnBlock(currentEnc(state));
     if (blocked) return { text: blocked, ready: false };

@@ -429,7 +429,7 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 .an__cell[data-tone='top'] { color: var(--gold); }
 .an__cell[data-tone='low'] { color: var(--rose); }
 .an__cell--none { color: var(--faint); text-align: center; }
-.an tfoot td, .an tfoot th { color: var(--soft); background: none; border-bottom: 0; }
+.an tfoot td, .an tfoot th { color: var(--soft); border-bottom: 0; }
 @media (max-width: 759px) { .analysis { width: calc(100% - 2 * var(--space-3)); } }
 
 /* ============================================================

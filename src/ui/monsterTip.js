@@ -11,6 +11,7 @@ const LONG_PRESS_MS = 450;
 const TOUCH_SHOW_MS = 5000;
 let tip = null;
 let hideTimer = null;
+let watch = null; // 浮動窗的來源元素被重畫掉（滑鼠沒有觸發離開）時，定時檢查並收起
 
 const abcText = (abc) => TRACKS.map((t) => `${t} ${fmt(abc[t] ?? 0)}`).join('　');
 
@@ -49,8 +50,10 @@ function showTip(el, getMonster) {
   const below = r.bottom + 8 + hgt <= innerHeight;
   tip.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
   tip.style.top = `${Math.max(8, below ? r.bottom + 8 : r.top - 8 - hgt)}px`;
+  clearInterval(watch);
+  watch = setInterval(() => { if (!el.isConnected) hideTip(); }, 250);
 }
-const hideTip = () => { clearTimeout(hideTimer); if (tip) tip.dataset.show = '0'; };
+const hideTip = () => { clearTimeout(hideTimer); clearInterval(watch); if (tip) tip.dataset.show = '0'; };
 
 /**
  * 掛在一個元素上：getMonster() 每次顯示時才呼叫（拿到最新數值）。
