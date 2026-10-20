@@ -417,50 +417,74 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
    分析（analysisView.js）：玩家數值比較表，桌機三大群組全展開、手機用分頁免橫滑
    ============================================================ */
 .analysis { box-sizing: border-box; width: calc(100% - 2 * var(--space-5)); max-width: 1320px; margin: var(--space-4) auto var(--space-6); }
-.an__bar { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-bottom: var(--space-2); }
-.an__bar .an__tabs { display: none; flex: 1; min-width: 0; border-bottom: 0; }
+.an__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.an__head .section-title { flex: 1; min-width: 0; }
+.an__tabs { display: none; border-bottom: 0; margin-bottom: var(--space-2); }
 .an__scroll { overflow-x: auto; }
 .an { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.an th, .an td { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); text-align: right; white-space: nowrap; }
-.an thead th { color: var(--soft); font-weight: normal; font-size: 0.78rem; }
-.an .an__ghead { text-align: center; color: var(--gold); letter-spacing: 0.08em; border-bottom-color: var(--ctl-line-hi, var(--line-soft)); }
-.an [data-first='1'] { border-left: 1px solid var(--ctl-line-hi, var(--line-soft)); }
+.an th, .an td { padding: 8px 6px; border-bottom: 1px solid var(--line-soft); text-align: right; white-space: nowrap; background: transparent; }
+.an .col-header th { color: var(--soft); font-weight: normal; font-size: 0.78rem; }
+.an [data-first='1'] { border-left: 1px solid var(--an-head-line); }
+.an .is-total { background: var(--an-tint); }
 .an__sort, .an__who { padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 .an__sort:hover, .an th[aria-sort='ascending'] .an__sort, .an th[aria-sort='descending'] .an__sort { color: var(--gold); }
-.an .an__name { position: sticky; left: 0; z-index: 1; min-width: 9em; text-align: left; color: var(--ink); background: var(--card); }
-.an tr.is-me .an__name .an__nm { color: var(--gold); }
+.an .an__name { position: sticky; left: 0; z-index: 1; min-width: 8.5em; text-align: left; color: var(--ink); background: var(--card); }
+.an tr.me-row td { background: var(--an-me-bg); }
+.an tr.me-row td.is-total { background: linear-gradient(var(--an-me-bg), var(--an-me-bg)), var(--an-tint); }
+.an tr.me-row .an__name { background: linear-gradient(var(--an-me-bg), var(--an-me-bg)), var(--card); }
+.an tr.me-row .an__nm { color: var(--gold); }
 .an__who { display: inline-flex; align-items: baseline; gap: 6px; text-align: left; }
 .an__who:hover .an__nm { color: var(--gold); }
-.an__base { font-size: 0.68rem; color: var(--gold); border: 1px solid var(--ctl-primary-line); border-radius: var(--radius-sm); padding: 0 4px; }
-.an__hp { margin-left: 8px; font-size: 0.78rem; color: var(--soft); }
-.an__tag { display: block; margin-top: 2px; font-size: 0.7rem; color: var(--faint); letter-spacing: 0.04em; }
-.an__cell { background: linear-gradient(90deg, rgba(var(--gold-rgb), 0.12) var(--an-pct, 0%), transparent var(--an-pct, 0%)); }
-.an__cell[data-tone='top'] { color: var(--gold); }
-.an__cell--total .an__n { font-weight: 600; }
-.an__n { display: block; }
-.an__d { display: block; font-size: 0.68rem; color: var(--faint); }
-.an__d[data-sign='+'] { color: var(--gold); }
-.an__cell--none { color: var(--faint); text-align: center; }
-.an__cell--unsynced { color: var(--faint); text-align: center; font-size: 0.78rem; background: none; }
-.an__insights { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-top: var(--space-4); }
-.an__insight { padding: var(--space-3); border: 1px solid var(--line-soft); border-radius: var(--radius-box); }
-.an__insight-title { margin: 0 0 4px; color: var(--gold); font-size: 0.85rem; }
-.an__insight-text { margin: 0; color: var(--soft); font-size: 0.82rem; line-height: 1.6; }
+.an__diff { white-space: nowrap; }
+.an__base { white-space: nowrap; font-size: 0.68rem; color: var(--gold); border: 1px solid var(--ctl-primary-line); border-radius: var(--radius-sm); padding: 0 4px; }
+.an__tag { display: inline-block; margin-top: 4px; padding: 1px 6px; font-size: 11px; line-height: 1.5; letter-spacing: 0.04em; color: var(--soft); background: var(--an-chip-bg); border-radius: 2px; }
+.an__hp-m { display: none; font-size: 11px; color: var(--soft); }
+.an .is-none { color: var(--faint); text-align: center; }
+
+/* 數值格：透明背景 + 數字正下方 3px 細線（不把整個 td 塗成色塊） */
+.stat-cell { display: inline-flex; flex-direction: column; align-items: flex-end; min-width: 48px; }
+.stat-val-line { display: flex; align-items: baseline; gap: 4px; }
+.stat-val { font-size: 14px; font-variant-numeric: tabular-nums; }
+.stat-val.is-king { color: var(--gold); font-weight: 700; }
+.stat-diff { font-size: 11px; color: var(--soft); font-variant-numeric: tabular-nums; }
+.stat-diff.is-pos { color: var(--an-pos); }
+.stat-mini-bar { width: 48px; height: 3px; margin-top: 4px; background: var(--an-track); border-radius: 1px; overflow: hidden; }
+.stat-mini-fill { height: 100%; background: var(--an-fill); }
+.stat-val.is-king ~ .stat-mini-bar .stat-mini-fill, .is-king-cell .stat-mini-fill { background: var(--gold); }
+
+/* 群組大表頭（進攻傷害／防禦韌性／五系資源） */
+.an tr.group-header th { text-align: center; font-size: 12px; letter-spacing: 0.14em; color: var(--gold); padding: 8px; background: var(--an-head-bg); border-bottom: 1px solid var(--an-head-line); border-left: 1px solid var(--an-head-line); }
+.an tr.group-header th.an__name { border-left: 0; text-align: left; }
+/* 尚未同步：跨欄置中 */
+.an td.unsynced-cell { text-align: center !important; color: var(--faint); font-size: 12px; letter-spacing: 0.08em; }
+
+/* 底部戰力解讀列（單一橫條、左金線、重點字高亮） */
+.insight-bar { margin-top: 18px; padding: 14px 18px; background: var(--an-head-bg); border: 1px solid var(--line-soft); border-left: 3px solid var(--gold); display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; font-size: 13px; line-height: 1.7; }
+.insight-title { font-size: 12px; color: var(--gold); letter-spacing: 0.1em; margin-bottom: 4px; font-weight: 600; }
+.insight-text { margin: 0; color: var(--soft); }
+.insight-text strong { color: var(--ink); font-weight: 700; }
+.insight-num { color: var(--gold); font-variant-numeric: tabular-nums; }
+
 /* 手機與平板：用分頁一次只顯示一個群組，不需要橫向滑動 */
 @media (max-width: 899px) {
-  .an__bar .an__tabs { display: flex; flex: 1 1 100%; }
-  .an__bar { flex-wrap: wrap; }
-  .an__diff { margin-left: auto; }
-  .an__groups { display: none; }
+  .an__tabs { display: flex; }
+  .an__groups, .an tr.group-header { display: none; }
+  .an [data-g='base'] { display: none; }
   .an[data-tab='atk'] [data-g]:not([data-g='atk']), .an[data-tab='def'] [data-g]:not([data-g='def']), .an[data-tab='res'] [data-g]:not([data-g='res']) { display: none; }
   .an [data-first='1'] { border-left: 0; }
   .an { font-size: 0.8rem; }
-  .an th, .an td { padding: 5px 4px; }
-  .an thead th { font-size: 0.7rem; }
-  .an .an__name { min-width: 0; width: 6.5em; max-width: 6.5em; white-space: normal; }
+  .an th, .an td { padding: 6px 3px; }
+  .an .col-header th { font-size: 0.7rem; }
+  .an .an__name { min-width: 0; width: 6em; max-width: 6em; white-space: normal; }
   .an__nm { overflow-wrap: anywhere; }
-  .an__hp { display: block; margin-left: 0; }
-  .an__insights { grid-template-columns: 1fr; }
+  .an__hp-m { display: block; }
+  .an__who { flex-wrap: wrap; gap: 2px 6px; }
+  .an__diff { font-size: 0.75rem; padding-inline: 8px; }
+  .stat-cell { min-width: 0; }
+  .stat-val-line { flex-direction: column; align-items: flex-end; gap: 0; }
+  .stat-val { font-size: 13px; }
+  .stat-mini-bar { width: 34px; }
+  .insight-bar { grid-template-columns: 1fr; gap: 14px; }
 }
 @media (max-width: 759px) { .analysis { width: calc(100% - 2 * var(--space-3)); } }
 

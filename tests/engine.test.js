@@ -250,3 +250,14 @@ test('單吃排隊的料理照舊每份有空格就補；舊存檔沒有分組�
   assert.deepEqual(s.restStomach.map((x) => x.food), ['炒飯', '炒飯']);
   assert.equal(s.restQueue.length, 0);
 });
+
+test('菜單吃多組：第一組放不下整組排隊，佇列上限要算準', () => {
+  const s = fresh();
+  s.restStomach = [{ food: '拉麵', left: 5 }, { food: '拉麵', left: 5 }]; s.restQueue = []; delete s.restQueueGroups;
+  s.inventory['大肉棒'] = 200;
+  assert.equal(eatPreset(s, ['大肉棒', '大肉棒'], 2, 'rest'), null);
+  assert.equal(s.restStomach.length, 2); // 只剩 1 格，放不下 2 份的一組：整組排隊
+  assert.equal(s.restQueue.length, 4);
+  s.restQueue = []; delete s.restQueueGroups;
+  assert.match(eatPreset(s, ['大肉棒', '大肉棒'], 50, 'rest'), /佇列放不下/); // 100 份 > 99
+});

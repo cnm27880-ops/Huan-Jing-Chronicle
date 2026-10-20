@@ -74,6 +74,15 @@
   --touch: 44px;
 
   /* ---------- 控制項（按鈕、輸入框）與分隔線：規格見 DESIGN.md「控制項」，元件寫在 base.css ---------- */
+  /* 分析頁（analysisView.js） */
+  --an-tint: rgba(var(--gold-rgb), 0.04);          /* 總傷／總防欄的極淡底色 */
+  --an-me-bg: rgba(var(--gold-rgb), 0.07);         /* 自己那一列 */
+  --an-head-bg: rgba(var(--ink-rgb), 0.02);
+  --an-head-line: rgba(var(--gold-rgb), 0.22);
+  --an-track: rgba(var(--ink-rgb), 0.06);          /* 比例細線的底 */
+  --an-fill: rgba(var(--ink-rgb), 0.35);           /* 比例細線（非最高） */
+  --an-chip-bg: rgba(255, 255, 255, 0.05);         /* 流派膠囊標籤 */
+  --an-pos: #7bc47f;                               /* 領先基準的差值（柔和綠） */
   --line-soft: rgba(var(--ink-rgb), 0.08);        /* 去框列表的底部分隔線 */
   --ctl-bg: rgba(var(--ink-rgb), 0.04);           /* Secondary 按鈕、輸入框的底色 */
   --ctl-line: rgba(var(--gold-rgb), 0.18);        /* Secondary 按鈕、輸入框的邊線（古銅金 18%） */
