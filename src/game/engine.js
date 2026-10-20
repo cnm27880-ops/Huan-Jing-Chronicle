@@ -136,13 +136,28 @@ export const PRESET_MAX = 10;
 
 export const restQueue = (state) => (state.restQueue ??= []);
 
+/**
+ * 佇列的分組（restQueueGroups，跟 restQueue 一一對應）：[{ n, chain }]，n＝這組有幾份。
+ * 菜單吃多組時，每一組是一個單位（chain: true）：要等「上一組的料理全部用完」且胃袋放得下整組才一起進胃袋，
+ * 例如菜單只有 1 根大肉棒吃 5 組，同一時間胃袋裡只會有 1 根，不會第二組就塞進第 2 格。
+ * 單吃的料理每份自成一組（n: 1、沒有 chain）。分組跟佇列對不上（舊存檔、其他地方改過佇列）就當每份都是單吃。
+ */
+export function queueGroups(state) {
+  const q = restQueue(state);
+  const g = state.restQueueGroups;
+  if (!Array.isArray(g) || g.reduce((a, x) => a + (x?.n ?? 0), 0) !== q.length) state.restQueueGroups = q.map(() => ({ n: 1 }));
+  return state.restQueueGroups;
+}
+
 /** 修整時吃：有空格直接進胃袋，滿了就排進等候佇列 */
 export function eatOrQueue(state, food) {
   if (!FOODS[food]) return '這不是可以吃的食物。';
   if (state.restStomach.length < STOMACH_SLOTS) return eat(state, food, 'rest');
   if (restQueue(state).length >= QUEUE_MAX) return `等候佇列已滿，最多 ${QUEUE_MAX} 份。`;
   if (!removeItem(state, food)) return `背包裡沒有${food}。`;
+  queueGroups(state);
   restQueue(state).push(food);
+  state.restQueueGroups.push({ n: 1 });
   return null;
 }
 
@@ -151,6 +166,7 @@ export function clearQueue(state) {
   const q = restQueue(state);
   q.forEach((f) => addItem(state, f));
   state.restQueue = [];
+  state.restQueueGroups = [];
   return q.length;
 }
 
@@ -159,7 +175,17 @@ export function tickRestStomach(state) {
   state.restStomach.forEach((s) => (s.left -= 1));
   state.restStomach = state.restStomach.filter((s) => s.left > 0);
   const q = restQueue(state);
-  while (q.length && state.restStomach.length < STOMACH_SLOTS) enterStomach(state, q.shift(), 'rest');
+  const groups = queueGroups(state);
+  while (groups.length) {
+    const g = groups[0];
+    const free = STOMACH_SLOTS - state.restStomach.length;
+    if (g.chain ? free < g.n || state.restStomach.some((x) => x.chain) : free < 1) break;
+    for (let i = 0; i < g.n; i++) {
+      enterStomach(state, q.shift(), 'rest');
+      if (g.chain) state.restStomach.at(-1).chain = true;
+    }
+    groups.shift();
+  }
 }
 
 /** 效果相同、可以互相代替的料理（不含自己），依 FOOD_EQUIV 的順序 */
@@ -218,6 +244,18 @@ export function eatPreset(state, foods, sets, ctx, { overwrite = false, subs = [
   if (ctx !== 'rest' && all.length > free) return `跑團胃袋只剩 ${free} 格，吃不下 ${all.length} 份。`;
   if (ctx === 'rest' && all.length > free + QUEUE_MAX - restQueue(state).length) return `等候佇列放不下（最多 ${QUEUE_MAX} 份）。`;
   stomach.splice(0, lost.length); // 覆蓋：被蓋掉的料理直接消失，不退回
+  if (ctx === 'rest' && sets > 1) {
+    // 多組：一組是一個單位。第一組放得下就整組進胃袋，其餘整組排隊，等上一組用完才輪到下一組
+    queueGroups(state);
+    const size = foods.length;
+    for (let i = 0; i < sets; i++) {
+      const set = all.slice(i * size, (i + 1) * size);
+      set.forEach((f) => removeItem(state, f));
+      if (i === 0 && size <= STOMACH_SLOTS - stomach.length) set.forEach((f) => { enterStomach(state, f, 'rest'); stomach.at(-1).chain = true; });
+      else { restQueue(state).push(...set); state.restQueueGroups.push({ n: size, chain: true }); }
+    }
+    return null;
+  }
   all.forEach((f) => eatOrQueueUnchecked(state, f, ctx));
   return null;
 }
@@ -236,7 +274,7 @@ function eatOrQueueUnchecked(state, food, ctx) {
   removeItem(state, food);
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
   if (stomach.length < STOMACH_SLOTS) enterStomach(state, food, ctx);
-  else restQueue(state).push(food);
+  else { queueGroups(state); restQueue(state).push(food); state.restQueueGroups.push({ n: 1 }); }
 }
 
 // ---------- 福瑞保溫針織袋（特殊配方，RULES_OVERVIEW §9；使用者 2026-10-12 要求放在跑團頁「技能檢定」的跑團胃袋下方） ----------

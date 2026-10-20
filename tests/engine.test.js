@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gatherTier, FOOD_EQUIV, FOODS } from '../src/game/rules.js';
-import { proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, overwriteLoss, fixItemAliases, newDay, dayCap, nextUnlock } from '../src/game/engine.js';
+import { tickRestStomach, proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, overwriteLoss, fixItemAliases, newDay, dayCap, nextUnlock } from '../src/game/engine.js';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 
 const fresh = () => JSON.parse(JSON.stringify(SAMPLE_CHARACTER));
@@ -215,4 +215,38 @@ test('食物互通：同一組的效果必須完全一樣', () => {
     assert.ok(a, '互通清單裡有不是食物的名稱');
     rest.forEach((b) => assert.deepEqual({ ...b, effect: 0 }, { ...a, effect: 0 }));
   }
+});
+
+test('菜單吃多組：一組是一個單位，上一組用完才輪到下一組', () => {
+  const s = fresh();
+  s.restStomach = []; s.restQueue = []; delete s.restQueueGroups;
+  s.inventory['大肉棒'] = 10;
+  assert.equal(eatPreset(s, ['大肉棒', '大肉棒'], 5, 'rest'), null);
+  assert.deepEqual(s.restStomach.map((x) => x.food), ['大肉棒', '大肉棒']); // 第三格不會被第 2 組的第一根填滿
+  assert.equal(s.restQueue.length, 8);
+  for (let i = 0; i < 9; i++) { tickRestStomach(s); assert.equal(s.restStomach.length, 2); assert.equal(s.restQueue.length, 8); }
+  tickRestStomach(s); // 第 10 次：第 1 組用完，第 2 組整組進來
+  assert.equal(s.restStomach.length, 2);
+  assert.equal(s.restQueue.length, 6);
+  assert.equal(s.inventory['大肉棒'] ?? 0, 0);
+});
+
+test('菜單只有 1 份吃多組：同時間胃袋只放 1 份', () => {
+  const s = fresh();
+  s.restStomach = []; s.restQueue = []; delete s.restQueueGroups;
+  s.inventory['大肉棒'] = 3;
+  assert.equal(eatPreset(s, ['大肉棒'], 3, 'rest'), null);
+  assert.equal(s.restStomach.length, 1);
+  assert.equal(s.restQueue.length, 2);
+  for (let i = 0; i < 10; i++) tickRestStomach(s);
+  assert.equal(s.restStomach.length, 1);
+  assert.equal(s.restQueue.length, 1);
+});
+
+test('單吃排隊的料理照舊每份有空格就補；舊存檔沒有分組也能用', () => {
+  const s = fresh();
+  s.restStomach = [{ food: '拉麵', left: 1 }]; s.restQueue = ['炒飯', '炒飯']; delete s.restQueueGroups;
+  tickRestStomach(s);
+  assert.deepEqual(s.restStomach.map((x) => x.food), ['炒飯', '炒飯']);
+  assert.equal(s.restQueue.length, 0);
 });
