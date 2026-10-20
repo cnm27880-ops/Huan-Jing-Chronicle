@@ -74,8 +74,9 @@ export function openFoodSheet(state, ctx, commit) {
         h('button', {
           type: 'button', class: 'btn btn--primary btn--small',
           onclick: () => {
-            const err = eatPreset(state, p, sets, ctx);
-            err ? toast(err) : done(`${where}吃下菜單「${presetLabel(p)}」× ${sets} 組`);
+            const subs = [];
+            const err = eatPreset(state, p, sets, ctx, { subs });
+            err ? toast(err) : done(`${where}吃下菜單「${presetLabel(p)}」× ${sets} 組${subs.length ? `（用相同效果的料理代替：${subs.join('、')}）` : ''}`);
           },
         }, `吃 ${sets} 組`),
         h('button', {
@@ -89,8 +90,9 @@ export function openFoodSheet(state, ctx, commit) {
               okText: '覆蓋', danger: true,
             });
             if (!ok) return;
-            const err = eatPreset(state, p, sets, ctx, { overwrite: true });
-            err ? toast(err) : done(`${where}覆蓋吃下菜單「${presetLabel(p)}」× ${sets} 組（蓋掉 ${presetLabel(lost.map((s) => s.food))}）`);
+            const subs = [];
+            const err = eatPreset(state, p, sets, ctx, { overwrite: true, subs });
+            err ? toast(err) : done(`${where}覆蓋吃下菜單「${presetLabel(p)}」× ${sets} 組（蓋掉 ${presetLabel(lost.map((s) => s.food))}${subs.length ? `；用相同效果的料理代替：${subs.join('、')}` : ''}）`);
           },
         }, '覆蓋吃')));
 

@@ -24,7 +24,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `GAME_RULES.md` | 遊戲規則規格（擲骰以機器人為準） |
 | `DESIGN.md` | 視覺設計規格（黑金主題） |
 | `RULES_OVERVIEW.md` | 規則原文整理（創角、每日養成、技能學習升級、資源、寶石、配方、特殊材料）；階段 2 的依據，含待確認清單 |
-| `src/game/rules.js` | 規則數值：採集池、配方、DC、食物（照搬機器人） |
+| `src/game/rules.js` | 規則數值：採集池、配方、DC、食物（照搬機器人）；`FOOD_EQUIV` 是效果相同、菜單可互相代替的料理（傳奇盛宴↔小確幸套餐、大肉棒↔祕製桃花酒；`engine.js` 的 `eatPreset` 不夠時自動補） |
 | `src/game/engine.js` | 規則邏輯：加值、熟練、胃袋、採集、製作、跑團檢定（純函式） |
 | `src/game/dice.js` | 骰子基礎：擲骰、自訂骰式解析（rng 可替換） |
 | `src/game/stats.js` | 數值面板：基礎 + 裝備 + 食物，附明細 |
@@ -52,7 +52,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/moveUse.js` | 招式使用紀錄（純函式）：`recordMoveUse`（玩家出招／用輔助成功後，在角色 `moveUse` 累計招式名稱次數，記在 `combat.js` 的 `playerAttack`／`useSupport`）、`usageList`、`usagePlan`（依紀錄排出模擬戰的出招優先順序）；GM 的模擬戰用 |
 | `src/game/templates.js`、`worker/src/templates.js` | 範本版本（模擬戰，GM 專用）：前端比較兩個版本的數值差異與結果差異（`diffSpecs`／`compareVersions`，用現在的玩家重跑）、命名與存檔當時成績；伺服器驗證敵人清單（`cleanSpecs`／`cleanSnap`），存在房間 meta 表（`room-core.js` 的 `tplList`／`tplSave`／`tplDel`，只有 GM） |
 | `src/game/tuning.js` | 模擬戰的目標（4～8 回合、勝率至少 75%、每場約耗一半資源）、評價與策略建議、自動調整（保守版／激進版兩個方案 `PLANS`）：先找回合數的結構下限、必要時拿掉最弱的怪，再二分搜尋血量與攻擊強度（自訂強度 `scaleSpecs`／固定敵人 `scaleEncounter` 都能調）；新增輸出占比評分 `shareInfo`（純函式） |
-| `src/ui/analysisView.js` | 「分析」大分頁（`#analysis`，日誌旁邊）：把房間每位玩家回報的攻防數值（`vitals.stats`，伺服器 `onVitals` 驗證）與資源上限排成可排序的比較表，標最高／最低、顯示平均與中位數；GM 隱藏的玩家一般玩家看不到。純函式 `analysisPlayers`／`columnStats` |
+| `src/ui/analysisView.js` | 「分析」大分頁（`#analysis`，日誌旁邊）：把房間每位玩家回報的攻防數值（`vitals.stats`，伺服器 `onVitals` 驗證）與資源上限排成可排序的比較表。桌機三大群組（進攻傷害／防禦韌性／五系資源，各 5 欄，含四傷總和、四防總和）雙層表頭全展開；手機（< 900px）用底線分頁一次只顯示一組，不橫滑。只標該欄最高（金字）不標最低；「顯示與我的差值 (±)」開關（點玩家名稱可換基準）；表下 3 張戰力觀測摘要卡（`insights`）；名稱下有流派標籤（`archetypeOf`）。GM 隱藏的玩家一般玩家看不到。純函式 `analysisPlayers`／`columnStats`／`diffOf`／`insights` |
 | `src/ui/monsterTip.js` | 怪物詳細資料浮動窗（三攻三防、絕防、生命、等級）：電腦滑鼠移上去、手機長按 0.45 秒；小怪卡與 BOSS 立繪共用 |
 | `src/game/activity.js`、`src/state/activityLog.js`、`src/ui/logsView.js` | 玩家日誌：內容格式（修整／學習／物品）、回報點（房間伺服器，離線存本機）、「日誌」大分頁（`#logs`，所有玩家都看得到每位玩家的）；伺服器端在 `room-core.js` 的 `actPost`／`actList`，每人留 500 筆 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |

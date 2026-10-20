@@ -141,6 +141,15 @@ export const FOODS = {
   汙濁饗宴: { effect: '生命上限 +100，真實傷害與絕對防禦 +10' },
   肉棒王宴: { effect: '熟練 +6', proficiency: 6 },
 };
+/**
+ * 效果完全相同、菜單可以互相代替的料理（使用者 2026-10-20）：菜單上的料理不夠時，拿同一組的補。
+ * 順序＝補的優先順序。新增效果相同的食物，加進這裡就會互通（tests 會檢查每組效果一致）。
+ * 惜未央有額外給時間的效果，不放進來。
+ */
+export const FOOD_EQUIV = [
+  ['傳奇盛宴', '小確幸套餐'],
+  ['大肉棒', '祕製桃花酒'],
+];
 export const STOMACH_SLOTS = 3;
 export const REST_FOOD_CHECKS = 10;
 export const BASE_PROFICIENCY = 1;

@@ -2,7 +2,7 @@
 // 確認網頁的判定結果與機器人完全一致
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { gatherTier } from '../src/game/rules.js';
+import { gatherTier, FOOD_EQUIV, FOODS } from '../src/game/rules.js';
 import { proficiency, modifier, eat, gather, craft, eatOrQueue, eatPreset, addPreset, presetLabel, clearQueue, overwriteLoss, fixItemAliases, newDay, dayCap, nextUnlock } from '../src/game/engine.js';
 import { SAMPLE_CHARACTER } from '../src/data/sample/fude.js';
 
@@ -191,4 +191,28 @@ test('新的一天：已超過上限的玩家不扣回，只是不能再換日',
   assert.equal(newDay(s, tw('2026-10-26T22:59:59')).ok, false);
   assert.equal(newDay(s, tw('2026-10-26T23:00:00')).ok, true);
   assert.equal(s.loginDays, 78);
+});
+
+test('菜單：料理不夠時用效果相同的補，原本的先吃', () => {
+  const s = fresh();
+  s.inventory['傳奇盛宴'] = 1;
+  s.inventory['小確幸套餐'] = 2;
+  s.inventory['碳烤肉排'] = 2;
+  s.foodPresets = [['傳奇盛宴', '碳烤肉排']];
+  const subs = [];
+  assert.equal(eatPreset(s, s.foodPresets[0], 2, 'rest', { subs }), null);
+  assert.equal(s.inventory['傳奇盛宴'] ?? 0, 0);
+  assert.equal(s.inventory['小確幸套餐'], 1); // 只補了一份
+  assert.deepEqual(subs, ['傳奇盛宴 → 小確幸套餐 ×1']);
+  s.inventory['大肉棒'] = 0;
+  s.inventory['祕製桃花酒'] = 0;
+  assert.match(eatPreset(s, ['大肉棒'], 1, 'rest'), /不夠/); // 沒有可代替的就照舊報錯
+});
+
+test('食物互通：同一組的效果必須完全一樣', () => {
+  for (const g of FOOD_EQUIV) {
+    const [a, ...rest] = g.map((f) => FOODS[f]);
+    assert.ok(a, '互通清單裡有不是食物的名稱');
+    rest.forEach((b) => assert.deepEqual({ ...b, effect: 0 }, { ...a, effect: 0 }));
+  }
 });
