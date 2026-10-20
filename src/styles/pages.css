@@ -414,22 +414,54 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 @media (max-width: 759px) { .logs { width: calc(100% - 2 * var(--space-3)); } }
 
 /* ============================================================
-   分析（analysisView.js）：玩家數值比較表，窄螢幕可橫向捲動、玩家名稱欄固定在左邊
+   分析（analysisView.js）：玩家數值比較表，桌機三大群組全展開、手機用分頁免橫滑
    ============================================================ */
-.analysis { box-sizing: border-box; width: calc(100% - 2 * var(--space-5)); max-width: 1180px; margin: var(--space-4) auto var(--space-6); }
+.analysis { box-sizing: border-box; width: calc(100% - 2 * var(--space-5)); max-width: 1320px; margin: var(--space-4) auto var(--space-6); }
+.an__bar { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-bottom: var(--space-2); }
+.an__bar .an__tabs { display: none; flex: 1; min-width: 0; border-bottom: 0; }
 .an__scroll { overflow-x: auto; }
 .an { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.an th, .an td { padding: 6px 10px; border-bottom: 1px solid var(--line-soft); text-align: right; white-space: nowrap; }
+.an th, .an td { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); text-align: right; white-space: nowrap; }
 .an thead th { color: var(--soft); font-weight: normal; font-size: 0.78rem; }
-.an__sort { padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.an .an__ghead { text-align: center; color: var(--gold); letter-spacing: 0.08em; border-bottom-color: var(--ctl-line-hi, var(--line-soft)); }
+.an [data-first='1'] { border-left: 1px solid var(--ctl-line-hi, var(--line-soft)); }
+.an__sort, .an__who { padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 .an__sort:hover, .an th[aria-sort='ascending'] .an__sort, .an th[aria-sort='descending'] .an__sort { color: var(--gold); }
-.an .an__name { position: sticky; left: 0; z-index: 1; text-align: left; color: var(--ink); background: var(--card); }
-.an tr.is-me .an__name { color: var(--gold); }
+.an .an__name { position: sticky; left: 0; z-index: 1; min-width: 9em; text-align: left; color: var(--ink); background: var(--card); }
+.an tr.is-me .an__name .an__nm { color: var(--gold); }
+.an__who { display: inline-flex; align-items: baseline; gap: 6px; text-align: left; }
+.an__who:hover .an__nm { color: var(--gold); }
+.an__base { font-size: 0.68rem; color: var(--gold); border: 1px solid var(--ctl-primary-line); border-radius: var(--radius-sm); padding: 0 4px; }
+.an__hp { margin-left: 8px; font-size: 0.78rem; color: var(--soft); }
+.an__tag { display: block; margin-top: 2px; font-size: 0.7rem; color: var(--faint); letter-spacing: 0.04em; }
 .an__cell { background: linear-gradient(90deg, rgba(var(--gold-rgb), 0.12) var(--an-pct, 0%), transparent var(--an-pct, 0%)); }
 .an__cell[data-tone='top'] { color: var(--gold); }
-.an__cell[data-tone='low'] { color: var(--rose); }
+.an__cell--total .an__n { font-weight: 600; }
+.an__n { display: block; }
+.an__d { display: block; font-size: 0.68rem; color: var(--faint); }
+.an__d[data-sign='+'] { color: var(--gold); }
 .an__cell--none { color: var(--faint); text-align: center; }
-.an tfoot td, .an tfoot th { color: var(--soft); border-bottom: 0; }
+.an__cell--unsynced { color: var(--faint); text-align: center; font-size: 0.78rem; background: none; }
+.an__insights { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-top: var(--space-4); }
+.an__insight { padding: var(--space-3); border: 1px solid var(--line-soft); border-radius: var(--radius-box); }
+.an__insight-title { margin: 0 0 4px; color: var(--gold); font-size: 0.85rem; }
+.an__insight-text { margin: 0; color: var(--soft); font-size: 0.82rem; line-height: 1.6; }
+/* 手機與平板：用分頁一次只顯示一個群組，不需要橫向滑動 */
+@media (max-width: 899px) {
+  .an__bar .an__tabs { display: flex; flex: 1 1 100%; }
+  .an__bar { flex-wrap: wrap; }
+  .an__diff { margin-left: auto; }
+  .an__groups { display: none; }
+  .an[data-tab='atk'] [data-g]:not([data-g='atk']), .an[data-tab='def'] [data-g]:not([data-g='def']), .an[data-tab='res'] [data-g]:not([data-g='res']) { display: none; }
+  .an [data-first='1'] { border-left: 0; }
+  .an { font-size: 0.8rem; }
+  .an th, .an td { padding: 5px 4px; }
+  .an thead th { font-size: 0.7rem; }
+  .an .an__name { min-width: 0; width: 6.5em; max-width: 6.5em; white-space: normal; }
+  .an__nm { overflow-wrap: anywhere; }
+  .an__hp { display: block; margin-left: 0; }
+  .an__insights { grid-template-columns: 1fr; }
+}
 @media (max-width: 759px) { .analysis { width: calc(100% - 2 * var(--space-3)); } }
 
 /* ============================================================

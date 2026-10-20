@@ -5,7 +5,7 @@
 // ============================================================
 import {
   LIFE_SKILLS, ART_SKILLS, GATHER_POOLS, gatherTier, RECIPES, CRAFT_COST_AMOUNT,
-  FOODS, STOMACH_SLOTS, REST_FOOD_CHECKS, BASE_PROFICIENCY, MAX_TIME,
+  FOODS, FOOD_EQUIV, STOMACH_SLOTS, REST_FOOD_CHECKS, BASE_PROFICIENCY, MAX_TIME,
   DAY_CAP_BASE, DAY_CAP_STEP, DAY_CAP_START, DAY_CAP_PERIOD_MS,
 } from './rules.js';
 import { rollDie } from './dice.js';
@@ -162,6 +162,9 @@ export function tickRestStomach(state) {
   while (q.length && state.restStomach.length < STOMACH_SLOTS) enterStomach(state, q.shift(), 'rest');
 }
 
+/** 效果相同、可以互相代替的料理（不含自己），依 FOOD_EQUIV 的順序 */
+export const foodSubstitutes = (food) => FOOD_EQUIV.filter((g) => g.includes(food)).flatMap((g) => g.filter((x) => x !== food));
+
 // ---------- 菜單（一組最多 3 份，例如 1 傳奇盛宴 + 2 碳烤肉排） ----------
 /** 檢查並新增菜單。foods：食物名稱陣列（1～3 份）。回傳錯誤文字或 null */
 export function addPreset(state, foods) {
@@ -185,16 +188,31 @@ export function presetLabel(foods) {
 /**
  * 一次吃 sets 組菜單。全有或全無：背包不夠、放不下就不動任何東西。
  * 修整：先填空格，其餘排進等候佇列；跑團：沒有佇列，只能填空格。回傳錯誤文字或 null
+ * 菜單上的料理背包不夠時，會用效果相同的料理補（FOOD_EQUIV，例如傳奇盛宴不夠就拿小確幸套餐）；原本的先吃。
+ * opts.subs 傳一個陣列進來，會放入代替的紀錄，例如「傳奇盛宴 → 小確幸套餐 ×2」
  */
-export function eatPreset(state, foods, sets, ctx, { overwrite = false } = {}) {
-  const all = Array.from({ length: sets }, () => foods).flat();
+export function eatPreset(state, foods, sets, ctx, { overwrite = false, subs = [] } = {}) {
+  const wanted = Array.from({ length: sets }, () => foods).flat();
   const lost = overwrite ? overwriteLoss(state, foods, ctx) : [];
+  if (wanted.some((f) => !FOODS[f])) return '有不是食物的東西。';
   const need = {};
-  all.forEach((f) => (need[f] = (need[f] ?? 0) + 1));
-  for (const [f, n] of Object.entries(need)) {
-    if (!FOODS[f]) return '有不是食物的東西。';
-    if (countOf(state, f) < n) return `背包裡的${f}不夠（要 ${n} 份，只有 ${countOf(state, f)} 份）。`;
+  wanted.forEach((f) => (need[f] = (need[f] ?? 0) + 1));
+  const quota = {}; // 先用原本的料理：每種最多吃背包有的份數
+  const left = {}; // 背包扣掉原本要吃的之後，各種料理還剩幾份（拿來代替用）
+  for (const f of Object.keys(need)) { quota[f] = Math.min(need[f], countOf(state, f)); left[f] = countOf(state, f) - quota[f]; }
+  const spare = (f) => left[f] ?? (left[f] = countOf(state, f));
+  const all = [];
+  const swapped = {};
+  for (const f of wanted) {
+    if (quota[f] > 0) { quota[f]--; all.push(f); continue; }
+    const sub = foodSubstitutes(f).find((s) => spare(s) > 0);
+    if (!sub) return `背包裡的${f}不夠（要 ${need[f]} 份，只有 ${countOf(state, f)} 份）。`;
+    left[sub]--;
+    all.push(sub);
+    const key = `${f} → ${sub}`;
+    swapped[key] = (swapped[key] ?? 0) + 1;
   }
+  Object.entries(swapped).forEach(([k, n]) => subs.push(`${k} ×${n}`));
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
   const free = STOMACH_SLOTS - stomach.length + lost.length;
   if (ctx !== 'rest' && all.length > free) return `跑團胃袋只剩 ${free} 格，吃不下 ${all.length} 份。`;
