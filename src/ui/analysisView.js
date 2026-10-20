@@ -26,7 +26,7 @@ export const GROUPS = [
     { id: TOTAL_DEF, label: TOTAL_DEF, total: true, get: (v) => sumOf(v, DEF_STATS) }], missing: 'stats' },
   { id: 'res', label: '五系資源', cols: RES_COLS.map((k) => ({ id: k, label: k, get: (v) => v.res?.[k]?.[1] })) },
 ];
-const HP_COL = { id: 'maxHp', label: '生命', get: (v) => v.maxHp };
+const HP_COL = { id: 'maxHp', label: '生命', group: 'base', get: (v) => v.maxHp };
 const ALL_COLS = [HP_COL, ...GROUPS.flatMap((g) => g.cols.map((c) => ({ ...c, group: g.id })))];
 const colOf = (id) => ALL_COLS.find((c) => c.id === id);
 
@@ -77,32 +77,43 @@ const holders = (rows, get) => {
   return max > 0 ? { max, names: best.filter((r) => get(r.v) === max).map((r) => r.name) } : null;
 };
 
-/** 3 張戰力觀測摘要卡 [{ icon, title, text }]（還沒有數據時回傳空陣列） */
+/**
+ * 3 段戰力觀測摘要 [{ title, parts, text }]（還沒有數據時回傳空陣列）。
+ * parts 是分段文字，kind：'name' 玩家名稱（加粗變亮）、'num' 關鍵數值（金色等寬）、'text' 一般字；text 是接起來的純文字
+ */
 export function insights(rows) {
+  const T = (v) => ({ kind: 'text', v });
+  const N = (v) => ({ kind: 'name', v });
+  const V = (v) => ({ kind: 'num', v: typeof v === 'number' ? fmt(v) : v });
+  const names = (list) => list.flatMap((n, i) => (i ? [T('、'), N(n)] : [N(n)]));
+  const make = (title, parts) => ({ title, parts, text: parts.map((x) => x.v).join('') });
   const out = [];
   const topAtk = holders(rows, (v) => sumOf(v, ATK_STATS));
   if (topAtk) {
     const r = rows.find((x) => sumOf(x.v, ATK_STATS) === topAtk.max);
     const best = [...ATK_STATS].sort((a, b) => r.v.stats[b] - r.v.stats[a])[0];
-    out.push({ icon: '⚔️', title: '進攻火力之冠', text: `${topAtk.names.join('、')} 的四傷總和 ${fmt(topAtk.max)} 全隊最高，最強的一項是${best} ${fmt(r.v.stats[best])}。` });
+    out.push(make('進攻火力之冠', [...names(topAtk.names), T(' 的四傷總和 '), V(topAtk.max), T(' 全隊最高，最強的一項是'), T(best + ' '), V(r.v.stats[best]), T('。')]));
   }
   const topDef = holders(rows, (v) => sumOf(v, DEF_STATS));
   if (topDef) {
     const hp = holders(rows, (v) => v.maxHp);
     const res = holders(rows, (v) => v.stats?.抗性免疫);
-    const extra = [hp && `生命最高是 ${hp.names.join('、')}（${fmt(hp.max)}）`, res && `抗性免疫最高是 ${res.names.join('、')}（${fmt(res.max)}）`].filter(Boolean);
-    out.push({ icon: '🛡️', title: '防禦韌性之冠', text: `${topDef.names.join('、')} 的四防總和 ${fmt(topDef.max)} 全隊最高${extra.length ? `；${extra.join('，')}` : ''}。` });
+    const parts = [...names(topDef.names), T(' 的四防總和 '), V(topDef.max), T(' 全隊最高')];
+    if (hp) parts.push(T('；生命最高是 '), ...names(hp.names), T('（'), V(hp.max), T('）'));
+    if (res) parts.push(T(hp ? '，' : '；'), T('抗性免疫最高是 '), ...names(res.names), T('（'), V(res.max), T('）'));
+    out.push(make('防禦韌性之冠', [...parts, T('。')]));
   }
   const res = RES_COLS.map((k) => [k, holders(rows, (v) => v.res?.[k]?.[1])]).filter(([, t]) => t);
-  if (res.length) out.push({ icon: '🔮', title: '資源領域極限', text: res.map(([k, t]) => `${k} ${t.names.join('、')}（${fmt(t.max)}）`).join('　') });
+  if (res.length) out.push(make('資源領域極限', res.flatMap(([k, t], i) => [...(i ? [T('　')] : []), T(k + ' '), ...names(t.names), T('（'), V(t.max), T('）')])));
   return out;
 }
 
 export function createAnalysisView({ root, getState }) {
-  const ui = { sort: 'maxHp', desc: true, active: false, tab: 'atk', diff: false, base: null };
+  const ui = { sort: 'maxHp', desc: true, active: false, tab: 'atk', diff: true, base: null };
   let unsub = null;
 
   function sortedRows(rows) {
+    if (ui.sort === 'name') return [...rows].sort((a, b) => (ui.desc ? -1 : 1) * a.name.localeCompare(b.name));
     const col = colOf(ui.sort) ?? HP_COL;
     const val = (r) => { const n = col.get(r.v); return Number.isFinite(n) ? n : -Infinity; };
     return [...rows].sort((a, b) => (ui.desc ? val(b) - val(a) : val(a) - val(b)) || a.name.localeCompare(b.name));
@@ -110,18 +121,28 @@ export function createAnalysisView({ root, getState }) {
 
   function cell(r, col, st, baseRow) {
     const n = col.get(r.v);
-    if (!Number.isFinite(n)) return h('td', { class: 'an__cell an__cell--none', dataset: { g: col.group }, text: '—' });
+    const tdClass = `num${col.total ? ' is-total' : ''}`;
+    if (!Number.isFinite(n)) return h('td', { class: `${tdClass} is-none`, dataset: { g: col.group, first: col.first ? '1' : '' }, text: '—' });
     const pct = st && st.max > 0 ? Math.max(0, Math.min(100, (n / st.max) * 100)) : 0;
-    const top = st && st.max !== st.min && n === st.max;
+    const king = Boolean(st) && st.max !== st.min && n === st.max;
     const d = ui.diff && baseRow && baseRow !== r ? diffOf(col, r.v, baseRow.v) : null;
-    return h('td', { class: `an__cell num${col.total ? ' an__cell--total' : ''}`, dataset: { g: col.group, tone: top ? 'top' : '', first: col.first ? '1' : '' }, style: `--an-pct:${pct}%` },
-      h('span', { class: 'an__n', text: fmt(n) }),
-      d == null ? null : h('span', { class: 'an__d', dataset: { sign: d > 0 ? '+' : d < 0 ? '-' : '0' }, text: `${d > 0 ? '+' : ''}${fmt(d)}` }));
+    return h('td', { class: tdClass, dataset: { g: col.group, first: col.first ? '1' : '' } },
+      h('div', { class: `stat-cell${king ? ' is-king-cell' : ''}` },
+        h('div', { class: 'stat-val-line' },
+          h('span', { class: `stat-val${king ? ' is-king' : ''}`, text: fmt(n) }),
+          d == null ? null : h('span', { class: `stat-diff${d > 0 ? ' is-pos' : ''}`, text: `(${d > 0 ? '+' : ''}${fmt(d)})` })),
+        h('div', { class: 'stat-mini-bar' }, h('div', { class: 'stat-mini-fill', style: `width:${pct}%` }))));
   }
 
-  /** 一個群組整個還沒同步（攻防）：合併成一格淡色說明 */
+  /** 一個群組整個還沒同步（攻防）：合併成一格置中的淡色說明 */
   function mergedNone(g) {
-    return h('td', { class: 'an__cell an__cell--unsynced', colspan: g.cols.length, dataset: { g: g.id, first: '1' }, text: '尚未同步新版攻防' });
+    return h('td', { class: 'unsynced-cell', colspan: g.cols.length, dataset: { g: g.id, first: '1' }, text: '— 尚未同步新版攻防 —' });
+  }
+
+  function sortHead(col, label, extra = {}) {
+    return h('th', { scope: 'col', dataset: extra.dataset ?? {}, class: extra.class ?? '', 'aria-sort': ui.sort === col.id ? (ui.desc ? 'descending' : 'ascending') : 'none' },
+      h('button', { type: 'button', class: 'an__sort', onclick: () => { if (ui.sort === col.id) ui.desc = !ui.desc; else { ui.sort = col.id; ui.desc = true; } render(); } },
+        label, ui.sort === col.id ? (ui.desc ? ' ▼' : ' ▲') : ''));
   }
 
   function render() {
@@ -132,29 +153,29 @@ export function createAnalysisView({ root, getState }) {
     const baseRow = rows.find((r) => r.uid === ui.base) ?? rows.find((r) => r.me) ?? null;
     const canDiff = rows.length > 1 && Boolean(baseRow);
     const cols = (g) => g.cols.map((c, i) => ({ ...c, group: g.id, first: i === 0 }));
+    const hpCol = { ...HP_COL, first: true };
 
     const table = h('table', { class: 'an', dataset: { tab: ui.tab } },
       h('thead', {},
-        h('tr', { class: 'an__groups' },
-          h('th', { class: 'an__name an__ghead', scope: 'col', text: '玩家與生存' }),
-          GROUPS.map((g) => h('th', { class: 'an__ghead', scope: 'colgroup', colspan: g.cols.length, dataset: { g: g.id, first: '1' }, text: g.label }))),
-        h('tr', {},
-          h('th', { class: 'an__name', scope: 'col', 'aria-sort': ui.sort === 'maxHp' ? (ui.desc ? 'descending' : 'ascending') : 'none' },
-            h('button', { type: 'button', class: 'an__sort', onclick: () => { if (ui.sort === 'maxHp') ui.desc = !ui.desc; else { ui.sort = 'maxHp'; ui.desc = true; } render(); } },
-              '玩家 · 生命', ui.sort === 'maxHp' ? (ui.desc ? ' ▼' : ' ▲') : '')),
-          GROUPS.flatMap((g) => cols(g).map((c) => h('th', { scope: 'col', dataset: { g: g.id, first: c.first ? '1' : '' }, 'aria-sort': ui.sort === c.id ? (ui.desc ? 'descending' : 'ascending') : 'none' },
-            h('button', { type: 'button', class: 'an__sort', onclick: () => { if (ui.sort === c.id) ui.desc = !ui.desc; else { ui.sort = c.id; ui.desc = true; } render(); } },
-              c.label, ui.sort === c.id ? (ui.desc ? ' ▼' : ' ▲') : '')))))),
+        h('tr', { class: 'group-header' },
+          h('th', { class: 'an__name', scope: 'colgroup', colspan: 2, text: '玩家與生存' }),
+          GROUPS.map((g) => h('th', { scope: 'colgroup', colspan: g.cols.length, dataset: { g: g.id, first: '1' }, text: g.label }))),
+        h('tr', { class: 'col-header' },
+          sortHead({ id: 'name' }, '玩家', { class: 'an__name' }),
+          sortHead(HP_COL, '生命', { dataset: { g: 'base', first: '1' } }),
+          GROUPS.flatMap((g) => cols(g).map((c) => sortHead(c, c.label, { dataset: { g: g.id, first: c.first ? '1' : '' }, class: c.total ? 'is-total' : '' }))))),
       h('tbody', {}, sortedRows(rows).map((r) => {
         const tag = archetypeOf(r.v);
-        return h('tr', { class: r.me ? 'is-me' : '' },
+        const isBase = baseRow === r && ui.diff && rows.length > 1;
+        return h('tr', { class: r.me ? 'me-row' : '' },
           h('th', { class: 'an__name', scope: 'row' },
-            h('button', { type: 'button', class: 'an__who', title: '設為比較基準', 'aria-pressed': String(baseRow === r && ui.diff),
+            h('button', { type: 'button', class: 'an__who', title: '設為比較基準', 'aria-pressed': String(isBase),
               onclick: () => { ui.base = r.uid; ui.diff = true; render(); } },
               h('span', { class: 'an__nm', text: r.me ? `${r.name}（我）` : r.name }),
-              baseRow === r && ui.diff && rows.length > 1 ? h('span', { class: 'an__base', text: '基準' }) : null),
-            h('span', { class: 'an__hp num', text: Number.isFinite(r.v.maxHp) ? `❤ ${fmt(r.v.maxHp)}` : '' }),
+              isBase ? h('span', { class: 'an__base', text: '基準' }) : null),
+            Number.isFinite(r.v.maxHp) ? h('span', { class: 'an__hp-m num', text: `生命 ${fmt(r.v.maxHp)}` }) : null, // 手機沒有生命欄，放在名稱下面
             tag ? h('span', { class: 'an__tag', text: tag }) : null),
+          cell(r, hpCol, stats.maxHp, baseRow),
           GROUPS.flatMap((g) => (g.missing && !g.cols.some((c) => Number.isFinite(c.get(r.v)))
             ? [mergedNone(g)]
             : cols(g).map((c) => cell(r, c, stats[c.id], baseRow))))); // 少了個別欄位時單格顯示「—」
@@ -163,23 +184,21 @@ export function createAnalysisView({ root, getState }) {
     const tabs = h('div', { class: 'tabs-line an__tabs', role: 'tablist', 'aria-label': '數值群組' },
       GROUPS.map((g) => h('button', { type: 'button', role: 'tab', class: 'tabs-line__tab', 'aria-selected': String(ui.tab === g.id),
         onclick: () => { ui.tab = g.id; render(); } }, `${g.label} (${g.cols.length})`)));
-    const bar = h('div', { class: 'an__bar' },
-      tabs,
-      h('button', { type: 'button', class: 'toggle an__diff', 'aria-pressed': String(ui.diff && canDiff), disabled: !canDiff,
-        title: canDiff ? '' : '要有兩位以上的玩家才能比較',
-        onclick: () => { ui.diff = !ui.diff; render(); } }, '顯示與我的差值 (±)'));
+    const diffBtn = h('button', { type: 'button', class: 'toggle an__diff', 'aria-pressed': String(ui.diff && canDiff), disabled: !canDiff,
+      title: canDiff ? '' : '要有兩位以上的玩家才能比較',
+      onclick: () => { ui.diff = !ui.diff; render(); } }, '顯示與我的差值 (±)');
 
     const cards = insights(rows);
     const body = rows.length
-      ? [bar, h('div', { class: 'an__scroll' }, table),
-        cards.length ? h('div', { class: 'an__insights' }, cards.map((c) => h('div', { class: 'an__insight' },
-          h('p', { class: 'an__insight-title', text: `${c.icon} ${c.title}` }),
-          h('p', { class: 'an__insight-text', text: c.text })))) : null]
+      ? [tabs, h('div', { class: 'an__scroll' }, table),
+        cards.length ? h('div', { class: 'insight-bar' }, cards.map((c) => h('div', { class: 'insight' },
+          h('div', { class: 'insight-title', text: c.title }),
+          h('p', { class: 'insight-text' }, c.parts.map((x) => (x.kind === 'text' ? x.v : h(x.kind === 'name' ? 'strong' : 'span', { class: x.kind === 'num' ? 'insight-num num' : 'insight-name', text: x.v }))))))) : null]
       : [h('p', { class: 'notice', text: '還沒有任何玩家的數據。玩家連上房間並存檔後就會出現在這裡。' })];
     root.replaceChildren(h('section', { class: 'card analysis' },
-      h('h2', { class: 'section-title', text: '數值分析' }),
+      h('div', { class: 'an__head' }, h('h2', { class: 'section-title', text: '數值分析' }), rows.length ? diffBtn : null),
       h('p', { class: 'hint', text: room.phase === 'online'
-        ? '每位玩家目前的攻防數值（含裝備、食物）與資源上限，點欄位標題可以排序。金色＝該欄最高，底下的條是相對最高值的比例；點玩家名稱可設為比較基準。數值在玩家存檔後自動更新。'
+        ? '每位玩家目前的攻防數值（含裝備、食物）與資源上限，點欄位標題可以排序。金色＝該欄最高，底下的細線是相對最高值的比例；點玩家名稱可設為比較基準。數值在玩家存檔後自動更新。'
         : '目前沒有加入房間，只看得到自己的數字。登入並加入房間後，就能和所有玩家比較。' }),
       body));
   }

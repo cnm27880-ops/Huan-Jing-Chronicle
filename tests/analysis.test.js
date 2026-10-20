@@ -69,5 +69,7 @@ test('戰力摘要：三張卡，點出各項最高者', () => {
   assert.match(cards[1].text, /金先生.*486/);
   assert.match(cards[1].text, /生命最高是 福德/);
   assert.match(cards[2].text, /魔力 福德（500）/);
+  assert.ok(cards[0].parts.some((x) => x.kind === 'name' && x.v === '金先生'));
+  assert.ok(cards[0].parts.some((x) => x.kind === 'num' && x.v === '300'));
   assert.deepEqual(insights([{ name: '甲', v: {} }]), []);
 });
