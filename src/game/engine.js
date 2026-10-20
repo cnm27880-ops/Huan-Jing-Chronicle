@@ -242,7 +242,12 @@ export function eatPreset(state, foods, sets, ctx, { overwrite = false, subs = [
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
   const free = STOMACH_SLOTS - stomach.length + lost.length;
   if (ctx !== 'rest' && all.length > free) return `跑團胃袋只剩 ${free} 格，吃不下 ${all.length} 份。`;
-  if (ctx === 'rest' && all.length > free + QUEUE_MAX - restQueue(state).length) return `等候佇列放不下（最多 ${QUEUE_MAX} 份）。`;
+  if (ctx === 'rest') {
+    // 多組：第一組放得下才進胃袋，放不下整組都排隊；一組以內：空格先填，其餘排隊
+    const multi = sets > 1;
+    const direct = multi ? (foods.length <= free ? foods.length : 0) : Math.min(all.length, free);
+    if (all.length - direct > QUEUE_MAX - restQueue(state).length) return `等候佇列放不下（最多 ${QUEUE_MAX} 份）。`;
+  }
   stomach.splice(0, lost.length); // 覆蓋：被蓋掉的料理直接消失，不退回
   if (ctx === 'rest' && sets > 1) {
     // 多組：一組是一個單位。第一組放得下就整組進胃袋，其餘整組排隊，等上一組用完才輪到下一組
