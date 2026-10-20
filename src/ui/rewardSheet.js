@@ -11,19 +11,24 @@ import { KNOWN_ITEMS } from './items.js';
 import { getRoomStatus, roomRequest } from '../state/rollLog.js';
 
 const QUICK = ['殘缺技能書', '初階技能書', '進階技能書', '大師技能書']; // 常發的技能書：點一下加進清單
+/**
+ * 可以發的對象（純函式）：房間裡的玩家，不含 GM。
+ * 例外：暫代 GM 的人自己有角色，也要能領（不然自己的獎勵發不出去），所以他自己留在名單裡
+ */
+export function rewardTargets(r) {
+  const gm = new Set(r.gm?.uids ?? []);
+  const standIn = r.gm?.override && r.gm.override === r.me?.uid ? r.me.uid : null;
+  return (r.members ?? []).filter((m) => !gm.has(m.uid) || m.uid === standIn)
+    .map((m) => ({ uid: m.uid, online: m.online, label: r.vitals?.[m.uid]?.name && r.vitals[m.uid].name !== m.name ? `${r.vitals[m.uid].name}（${m.name}）` : m.name }));
+}
+
 const int = (v) => Math.max(0, Math.floor(Number(v)) || 0);
 
 export function openRewardSheet() {
   const ui = { picked: null, gold: 0, exp: 0, time: 0, note: '', items: [{ name: '', qty: 1 }], busy: false, message: '' };
   let sheet;
 
-  /** 可以發的對象：房間裡的玩家（不含 GM）；角色名有回報過就一起顯示 */
-  const players = () => {
-    const r = getRoomStatus();
-    const gm = new Set(r.gm?.uids ?? []);
-    return (r.members ?? []).filter((m) => !gm.has(m.uid))
-      .map((m) => ({ uid: m.uid, online: m.online, label: r.vitals?.[m.uid]?.name && r.vitals[m.uid].name !== m.name ? `${r.vitals[m.uid].name}（${m.name}）` : m.name }));
-  };
+  const players = () => rewardTargets(getRoomStatus());
 
   const cleanItems = () => {
     const out = {};
