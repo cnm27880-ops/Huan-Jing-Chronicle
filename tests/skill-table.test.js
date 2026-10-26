@@ -287,13 +287,26 @@ test('GM 新增專屬技能：放進目錄後面板會算數值、不進抽書�
   assert.equal(MAX_CUSTOM_SKILLS, 60);
 });
 
-test('技能感悟：同階最優先抵通用書 1 比 1；不同階不動；學新技能（0→1）不能用', () => {
+test('技能感悟：學新技能（0→1）可 1 比 1 抵不足的同名書，且先於升級用', () => {
+  const s = { ...mk({}), exp: 99999, spentExp: 99999, inventory: { 初階技能感悟: 4, 周天吐納法: 1 } };
+  const plan = upgradePlan(s, '周天吐納法', 1);
+  assert.deepEqual(plan.fodder, { 初階技能感悟: 2 }); // 缺 2 本同名書
+  assert.deepEqual(plan.books, { 周天吐納法: 1 });
+  assert.ok(plan.ok);
+  const none = upgradePlan({ ...s, inventory: { 初階技能感悟: 2 } }, '周天吐納法', 1);
+  assert.equal(none.ok, false); // 3 本都靠感悟只有 2 個 → 還差 1 本同名書
+  assert.equal(none.missing.周天吐納法, 1);
+  const r = upgradeSkillTo({ ...s, inventory: { ...s.inventory } }, '周天吐納法', 1);
+  assert.ok(r.ok);
+});
+
+test('技能感悟：同階最優先抵通用書 1 比 1；不同階不動', () => {
   const s = { ...mk({ 周天吐納法: 1 }), exp: 99999, spentExp: 99999, inventory: { 初階技能感悟: 2, 進階技能感悟: 5, 初階技能書: 9, 周天吐納法: 4 } };
   assert.deepEqual(fodderBooks(s, '初階').map((f) => f.name), ['初階技能感悟', '周天吐納法']); // 感悟排最前
   const plan = upgradePlan(s, '周天吐納法', 3); // 2 級 2 本 + 3 級 3 本 = 5 本
   assert.deepEqual(plan.fodder, { 初階技能感悟: 2, 周天吐納法: 3 });
   assert.equal(plan.books['初階技能書'], undefined);
-  const learn = upgradePlan({ ...s, skills: {} }, '周天吐納法', 1); // 學新技能只看 3 本同名書
+  const learn = upgradePlan({ ...s, skills: {} }, '周天吐納法', 1); // 學新技能：4 本同名書夠，不動感悟
   assert.deepEqual(learn.fodder, {});
   assert.equal(learn.missing['初階技能感悟'], undefined);
 });

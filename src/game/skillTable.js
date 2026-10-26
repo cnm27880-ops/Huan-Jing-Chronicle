@@ -286,7 +286,7 @@ export function toggleKeepBook(state, name) {
   return Boolean(keep[name]);
 }
 
-/** 技能感悟：升級專用肥料，1 個抵 1 本同階通用技能書（最優先用）；不能拿來學新技能 */
+/** 技能感悟：1 個抵 1 本同階通用技能書（升級最優先用）；學新技能（0→1）時也能 1 比 1 抵不足的同名書（難度同技能書） */
 export const INSIGHT_TIERS = { 初階技能感悟: '初階', 進階技能感悟: '進階', 大師技能感悟: '大師', 傳說技能感悟: '傳說' };
 export const isInsight = (name) => Object.hasOwn(INSIGHT_TIERS, name);
 
@@ -330,11 +330,24 @@ export function upgradePlan(state, name, target) {
     books[item] = (books[item] ?? 0) + n;
   }
   const fodder = {}; // 通用書不夠時優先用肥料抵，1 比 1，同階
+  // 學新技能（0→1）：同名書不夠的部分，同階技能感悟 1 比 1 抵（先於升級用，感悟不夠分就先保學習）
+  const insightName = Object.keys(INSIGHT_TIERS).find((k) => INSIGHT_TIERS[k] === tier);
+  let learnCover = 0;
+  if (from === 0 && insightName) {
+    learnCover = Math.min(Math.max(0, LEARN_BOOKS - countOf(state, name)), countOf(state, insightName));
+    if (learnCover) {
+      fodder[insightName] = learnCover;
+      books[name] -= learnCover;
+      if (!books[name]) delete books[name];
+    }
+  }
   const generic = bookOf(name);
   let need = books[generic] ?? 0;
   for (const f of need ? fodderBooks(state, tier, from === 0 ? name : null) : []) {
-    const take = Math.min(need, f.n);
-    fodder[f.name] = take;
+    const n = f.name === insightName ? f.n - learnCover : f.n;
+    const take = Math.min(need, n);
+    if (take <= 0) continue;
+    fodder[f.name] = (fodder[f.name] ?? 0) + take;
     need -= take;
     if (!need) break;
   }

@@ -123,12 +123,16 @@
 .swell { display: grid; gap: var(--space-2); }
 .feedbox { display: grid; gap: var(--space-2); padding: 8px 10px; background: var(--paper); border-radius: 10px; box-shadow: var(--sx-ring); }
 .feedbox .field-label { margin: 0; }
+.feedbox .row { flex-wrap: wrap; }
+.feedbox .row .field { flex: 1 1 100%; min-width: 0; }
+.feedbox .row .btn { flex: 1 1 auto; white-space: normal; }
 
 /* 藥水：依性質分組（回復／攻擊加骰／防禦加骰，組內低階到高階），每組有小標題，兩個一排；沒有持有的組別不顯示 */
 .potion-group { display: grid; gap: var(--space-2); }
 .potion-group + .potion-group { margin-top: var(--space-1); }
 .potion-group > .section-title { margin: 0; }
-.potion-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-grid); }
+.potion-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-grid); min-width: 0; }
+.potion-group, .swell { min-width: 0; }
 .potion {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px var(--space-2); align-items: baseline; width: 100%; padding: 8px 10px; font: inherit; color: var(--ink);
   text-align: left; background: var(--raise); border: 0; border-radius: 10px; box-shadow: var(--sx-ring); cursor: pointer; transition: box-shadow 0.15s ease;
@@ -271,7 +275,11 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .mob__hit:hover:not(:disabled) { color: var(--rose); box-shadow: var(--sx-ring-rose); }
 .mob__hit[data-armed='1'] { color: var(--ink); background: var(--rosebg); box-shadow: var(--sx-ring-rose); }
 .mob > .eskills { margin-top: 2px; }
-.allies { display: grid; gap: var(--space-2); }
+.allies { display: grid; gap: var(--space-2); min-width: 0; }
+.allies .mobs { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+.allies .mob .row { flex-wrap: wrap; }
+.allies .mob .row .field { flex: 1 1 6em; min-width: 0; }
+.allies .mob .row .btn { flex: 0 1 auto; white-space: normal; }
 .mob[data-ally='1'] .mob__pick { cursor: default; }
 
 /* 可收合的「新增」區塊（全站共用的 add-box）：只有上方細線，標題文字像連結 */

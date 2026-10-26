@@ -55,7 +55,7 @@ export function openItemSheet(state, name, commit) {
           h('p', { class: 'item-sheet__have' }, '持有 ', h('strong', { text: fmt(have) })))),
       def ? h('p', { class: 'item-sheet__desc', text: def.desc }) : null,
       food ? h('p', { class: 'item-sheet__desc', text: `效果：${food.effect}` }) : null,
-      INSIGHT_TIERS[name] ? h('p', { class: 'item-sheet__desc', text: `升級用肥料：1 個抵 1 本${INSIGHT_TIERS[name]}通用技能書（升級時最優先使用，不能拿來學新技能）` }) : null,
+      INSIGHT_TIERS[name] ? h('p', { class: 'item-sheet__desc', text: `1 個抵 1 本${INSIGHT_TIERS[name]}通用技能書（升級時最優先使用）；學新技能時也能抵不足的同名書` }) : null,
       usable
         ? h('div', { class: 'item-sheet__eat' },
             h('p', { class: 'item-sheet__desc', text: `使用 → ${Object.entries(usable.gives).map(([k, q]) => `${k} ×${q}`).join('、')}` }),
