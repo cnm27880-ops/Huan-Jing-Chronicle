@@ -298,6 +298,7 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .manage { display: grid; margin: 0; padding: 0; list-style: none; }
 .manage__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: 4px 0; }
 .manage__name { flex: 1 1 8rem; min-width: 0; overflow-wrap: anywhere; }
+.manage__hp { flex: 0 1 7em; min-width: 0; max-width: 7em; }
 .preset-save { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .preset-save .field { flex: 1 1 10rem; width: auto; }
 .library { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--space-2); margin: 0; padding: 0; list-style: none; }

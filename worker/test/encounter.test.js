@@ -297,3 +297,21 @@ test('浮腫之軀：固定點數治療走信箱（support: points）', () => {
   assert.deepEqual([mail.support, mail.amount], ['points', 6]);
   assert.equal(errorOf(send(core, P1, { t: 'mailSend', to: '400', kind: 'support', skill: '浮腫之軀', support: 'points', amount: 0 }))?.code, 'bad_mail');
 });
+
+test('GM 調整怪物生命：可歸零／回血／超過最大生命會拉高上限；玩家被拒、格式錯誤被擋', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: SPEC });
+  const hp = (id) => core.encounter().monsters.find((m) => m.id === id);
+  assert.equal(errorOf(send(core, P1, { t: 'encHp', id: '小怪1', hp: 1 }))?.code, 'forbidden');
+  assert.equal(encOf(send(core, GM, { t: 'encHp', id: '小怪1', hp: 30 })).monsters[0].hp, 30);
+  assert.equal(hp('小怪1').maxHp, 100);
+  send(core, GM, { t: 'encHp', id: '小怪1', hp: 0 });
+  assert.equal(hp('小怪1').hp, 0);
+  send(core, GM, { t: 'encHp', id: '小怪1', hp: 150 });
+  assert.equal(hp('小怪1').hp, 150);
+  assert.equal(hp('小怪1').maxHp, 150);
+  for (const bad of [{ id: '小怪1', hp: -1 }, { id: '小怪1', hp: 1.5 }, { id: '小怪1', hp: 'x' }, { id: '沒這隻', hp: 5 }]) {
+    assert.equal(errorOf(send(core, GM, { t: 'encHp', ...bad }))?.code, 'bad_enc');
+  }
+  assert.equal(hp('小怪2').hp, 100);
+});
