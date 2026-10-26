@@ -9,7 +9,7 @@ import { KNOWN_ITEMS, skillBookNames, rarityOf, iconOf, plainName } from './item
 import { FOODS, STOMACH_SLOTS } from '../game/rules.js';
 import { addItem, removeItem, countOf, eat, eatOrQueue, useKeepsake } from '../game/engine.js';
 import { USABLE_ITEMS, useSpecialItem } from '../game/special.js';
-import { INSIGHT_TIERS } from '../game/skillTable.js';
+import { INSIGHT_TIERS, INSIGHT_COMBINE, insightUpgradeOf, combineInsight } from '../game/skillTable.js';
 import { logActivity } from '../state/activityLog.js';
 
 export function openItemSheet(state, name, commit) {
@@ -37,6 +37,15 @@ export function openItemSheet(state, name, commit) {
       commit();
       countOf(state, name) ? sheet.refresh() : close();
     };
+    const doCombine = () => {
+      const r = combineInsight(state, name, 1);
+      if (!r.ok) return toast(r.error);
+      const got = Object.entries(r.gives).map(([k, q]) => `${k} ×${q}`).join('、');
+      toast(`合成 ${got}`);
+      logActivity(state, { cat: 'item', text: `合成 ${got}`, lines: [`消耗 ${name} ×${r.cost[name]}`] });
+      commit();
+      sheet.refresh();
+    };
     const usable = USABLE_ITEMS[name];
     const doUseSpecial = () => {
       const r = useSpecialItem(state, name);
@@ -55,7 +64,12 @@ export function openItemSheet(state, name, commit) {
           h('p', { class: 'item-sheet__have' }, '持有 ', h('strong', { text: fmt(have) })))),
       def ? h('p', { class: 'item-sheet__desc', text: def.desc }) : null,
       food ? h('p', { class: 'item-sheet__desc', text: `效果：${food.effect}` }) : null,
-      INSIGHT_TIERS[name] ? h('p', { class: 'item-sheet__desc', text: `1 個抵 1 本${INSIGHT_TIERS[name]}通用技能書（升級時最優先使用）；學新技能時也能抵不足的同名書` }) : null,
+      INSIGHT_TIERS[name] ? h('p', { class: 'item-sheet__desc', text: `升級用肥料：1 個抵 1 本${INSIGHT_TIERS[name]}通用技能書（升級時最優先使用，不能拿來學新技能）` }) : null,
+      insightUpgradeOf(name)
+        ? h('div', { class: 'item-sheet__eat' },
+            h('p', { class: 'item-sheet__desc', text: `合成：${INSIGHT_COMBINE} 個 → 1 個${insightUpgradeOf(name)}（不擲骰）` }),
+            h('button', { type: 'button', class: 'btn btn--primary', disabled: have < INSIGHT_COMBINE, onclick: doCombine }, `合成 1 個${insightUpgradeOf(name)}`))
+        : null,
       usable
         ? h('div', { class: 'item-sheet__eat' },
             h('p', { class: 'item-sheet__desc', text: `使用 → ${Object.entries(usable.gives).map(([k, q]) => `${k} ×${q}`).join('、')}` }),

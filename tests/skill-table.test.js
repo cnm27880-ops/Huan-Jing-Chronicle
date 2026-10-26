@@ -100,7 +100,7 @@ test('skillParts 只在 skills 模式有內容', () => {
 });
 
 // ---------- 愚者對調與技能升級 ----------
-import { setSkillLevel, upgradeSkill, upgradeSkillTo, upgradePlan, maxAffordableLevel, upgradeCost, markSwapsDone, fodderBooks, toggleKeepBook } from '../src/game/skillTable.js';
+import { setSkillLevel, upgradeSkill, upgradeSkillTo, upgradePlan, maxAffordableLevel, upgradeCost, markSwapsDone, fodderBooks, toggleKeepBook, combineInsight } from '../src/game/skillTable.js';
 
 test('愚者：升到 1 級先加屬性再對調，差額記進手動調整，同一級不重複', () => {
   const s = mk({}, { baseStats: { ...blankCharacter('x').baseStats, 體魄強韌: 10, 物理傷害: 30 } });
@@ -287,17 +287,20 @@ test('GM 新增專屬技能：放進目錄後面板會算數值、不進抽書�
   assert.equal(MAX_CUSTOM_SKILLS, 60);
 });
 
-test('技能感悟：學新技能（0→1）可 1 比 1 抵不足的同名書，且先於升級用', () => {
-  const s = { ...mk({}), exp: 99999, spentExp: 99999, inventory: { 初階技能感悟: 4, 周天吐納法: 1 } };
-  const plan = upgradePlan(s, '周天吐納法', 1);
-  assert.deepEqual(plan.fodder, { 初階技能感悟: 2 }); // 缺 2 本同名書
-  assert.deepEqual(plan.books, { 周天吐納法: 1 });
-  assert.ok(plan.ok);
-  const none = upgradePlan({ ...s, inventory: { 初階技能感悟: 2 } }, '周天吐納法', 1);
-  assert.equal(none.ok, false); // 3 本都靠感悟只有 2 個 → 還差 1 本同名書
-  assert.equal(none.missing.周天吐納法, 1);
-  const r = upgradeSkillTo({ ...s, inventory: { ...s.inventory } }, '周天吐納法', 1);
+test('技能感悟升階：每階 6 合 1；不夠不扣；傳說不能合；學新技能仍不能用感悟', () => {
+  const s = { ...mk({}), inventory: { 初階技能感悟: 13, 傳說技能感悟: 9 } };
+  const r = combineInsight(s, '初階技能感悟', 2);
   assert.ok(r.ok);
+  assert.equal(s.inventory.初階技能感悟, 1);
+  assert.equal(s.inventory.進階技能感悟, 2);
+  const bad = combineInsight(s, '初階技能感悟', 1);
+  assert.equal(bad.ok, false);
+  assert.equal(s.inventory.初階技能感悟, 1); // 沒扣
+  assert.equal(combineInsight(s, '傳說技能感悟', 1).ok, false);
+  assert.equal(combineInsight(s, '初階技能書', 1).ok, false);
+  const learn = upgradePlan({ ...mk({}), exp: 99999, spentExp: 99999, inventory: { 初階技能感悟: 5 } }, '周天吐納法', 1);
+  assert.deepEqual(learn.fodder, {});
+  assert.equal(learn.ok, false);
 });
 
 test('技能感悟：同階最優先抵通用書 1 比 1；不同階不動', () => {
