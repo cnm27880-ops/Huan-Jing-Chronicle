@@ -276,7 +276,7 @@ export class RoomCore {
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'tradeList': return this.onTradeList(user, rid);
       case 'tradeRespond': return this.onTradeRespond(user, msg, rid);
-      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
+      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encHp': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
       case 'encAlly': case 'encAllyDel': case 'encAllyAtk': case 'encAllyTake': case 'encAllyHp': case 'encAllySup': return this.onAlly(user, msg, rid);
       case 'encImg': return this.onEncImg(user, msg, rid);
       case 'imgPut': return this.onImgPut(user, msg, rid);
@@ -695,6 +695,16 @@ export class RoomCore {
       enc.turn = enc.order.length ? Math.min(enc.turn, enc.order.length - 1) : 0;
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user);
+    }
+    if (msg.t === 'encHp') { // GM 直接改怪物生命（BOSS、小怪都可以）；填的比最大生命高就連最大生命一起拉高
+      const m = typeof msg.id === 'string' ? enc.monsters.find((x) => x.id === msg.id) : null;
+      if (!m) return err(rid, 'bad_enc', '找不到這隻敵人，可能已被移除。');
+      if (!isInt(msg.hp, 0, 10_000_000)) return err(rid, 'bad_enc', '生命要是 0 以上的整數。');
+      const before = m.hp;
+      m.hp = msg.hp;
+      if (m.hp > m.maxHp) m.maxHp = m.hp;
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：GM 調整 ${m.id} 生命 ${before} → ${m.hp} / ${m.maxHp}` });
     }
     if (msg.t === 'encClear') { // 友方 NPC 一起清掉
       this.saveEncounter({ ...newEncounter(), round: 0, order: [], turn: 0, locked: false });

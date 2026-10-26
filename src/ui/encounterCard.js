@@ -171,6 +171,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     allyFoe: {}, // 友方 NPC id → 要承受哪隻怪物的攻擊
     allyTo: {}, // 友方 NPC id → 輔助對象（玩家 uid）
     allyHp: {}, // 友方 NPC id → GM 要改成的生命
+    mobHp: {}, // 敵人 id → GM 要改成的生命（敵人管理）
   };
   let armTimer = null;
   /** 承受攻擊要點兩次：第一次點亮「再點一次確認」，3 秒內再點同一個才執行，點別的或逾時就取消 */
@@ -700,14 +701,32 @@ export function createEncounterCard({ getState, commit, rerender }) {
     if (online()) act({ t: 'encRemove', id: m.id }); else { removeMonster(state.encounter, m.id); commit(); }
   }
 
-  /** 敵人管理：換立繪（GM）、移除 */
+  /** GM 直接改敵人生命（BOSS、小怪都可以；填的比最大生命高就連上限一起拉高）。房間模式由伺服器改，本機模式改自己的 */
+  function setEnemyHp(state, m, raw) {
+    const v = Math.floor(Number(raw));
+    delete ui.mobHp[m.id];
+    if (!Number.isFinite(v) || v < 0) return toast('生命要填 0 以上的整數。');
+    if (online()) return act({ t: 'encHp', id: m.id, hp: v });
+    m.hp = v;
+    if (m.hp > m.maxHp) m.maxHp = m.hp;
+    commit();
+  }
+
+  /** 敵人管理：調整生命（GM）、換立繪（GM）、移除 */
   function manageBox(state, enc) {
     if (!enc.monsters.length) return null;
     const gmOnline = online() && isGm();
+    const canHp = !online() || isGm();
     return h('section', { class: 'gm-tools__sec' },
       h('h3', { class: 'tray__title', text: `場上的敵人（${enc.monsters.length}）` }),
       h('ul', { class: 'manage' }, enc.monsters.map((m) => h('li', { class: 'manage__row' },
-        h('span', { class: 'manage__name', text: `${glyph(m)} ${m.id}` }),
+        h('span', { class: 'manage__name', text: `${glyph(m)} ${m.id}　${fmt(m.hp)} / ${fmt(m.maxHp)}` }),
+        canHp ? h('input', {
+          class: 'field manage__hp', type: 'number', inputmode: 'numeric', min: 0, value: ui.mobHp[m.id] ?? m.hp, 'aria-label': `${m.id} 的生命`,
+          oninput: (e) => { ui.mobHp[m.id] = e.target.value; },
+        }) : null,
+        canHp ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => setEnemyHp(state, m, ui.mobHp[m.id] ?? m.hp) }, '設定生命') : null,
+        canHp ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: m.hp >= m.maxHp, onclick: () => setEnemyHp(state, m, m.maxHp) }, '補滿') : null,
         gmOnline ? imageSelect(m.img ?? '', (v) => act({ t: 'encImg', id: m.id, img: v || null }), `${m.id} 的立繪`) : null,
         gmOnline ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', disabled: ui.uploading, onclick: () => pickAndUpload(m.id, m.kind === 'boss' ? 768 : 256) }, '上傳立繪') : null,
         h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => removeEnemy(state, m) }, '移除')))));
