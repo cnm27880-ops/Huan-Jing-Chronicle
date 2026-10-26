@@ -204,6 +204,23 @@ export function createRestView({ root, getState, commit }) {
   const lootTiles = (loot) =>
     h('div', { class: 'loot' }, Object.entries(loot).sort((x, y) => y[1] - x[1]).map(([n, q]) => itemTile(n, q, { size: 'sm' })));
 
+  /** 超過這個數量就不畫骰面（太卡），改顯示統計 */
+  const DICE_FACE_MAX = 100;
+  function rollStats(rolls, gatherKind) {
+    const totals = rolls.map((x) => x.total);
+    const n = rolls.length;
+    const rows = gatherKind
+      ? TIERS.map((t) => [t, rolls.filter((x) => x.tier === t).length]).filter(([, c]) => c > 0)
+      : [['成功', rolls.filter((x) => x.success).length], ['失敗', rolls.filter((x) => !x.success).length]];
+    return [
+      h('p', { class: 'hint', text: `骰子超過 ${DICE_FACE_MAX} 顆，改顯示統計（不畫骰面）` }),
+      h('ul', { class: 'learn-cost' }, rows.map(([label, c]) => h('li', { class: 'learn-cost__row' },
+        h('span', { text: label }),
+        h('span', { class: 'num', text: `${fmt(c)}（${(c / n * 100).toFixed(1)}%）` })))),
+      h('p', { class: 'hint', text: `總分：最低 ${Math.min(...totals)}、最高 ${Math.max(...totals)}、平均 ${(totals.reduce((a, b) => a + b, 0) / n).toFixed(1)}` }),
+    ];
+  }
+
   /** 結果卡：和擲骰紀錄同一種樣式（左側色條、右上膠囊徽章、六角骰面） */
   function resultCard(r, latest) {
     if (r.kind === 'note') return h('li', { class: 'rres rres--note', text: r.text });
@@ -218,14 +235,18 @@ export function createRestView({ root, getState, commit }) {
         h('strong', { class: 'rres__title', text: gatherKind ? `${r.action} ×${r.rolls.length}` : `${r.action}（${r.diff}）×${r.rolls.length}` }),
         h('span', { class: 'rres__badge', dataset: { tone } , text: gatherKind ? `經驗 +${fmt(r.exp)}` : `成功 ${ok} / ${r.rolls.length}` })),
       gatherKind && best >= 3 ? h('p', { class: 'rres__flash', text: `擲出${TIERS[best]}！` }) : null,
-      h('div', { class: 'dice-faces' },
-        r.rolls.map((x) => h('span', {
-          class: 'die',
-          dataset: { tier: gatherKind ? TIERS.indexOf(x.tier) : x.success ? 'ok' : 'fail', final: x.total, roll: latest ? '1' : '0' },
-          title: `1D20（${x.roll}）+ ${x.mod} = ${x.total}${gatherKind ? `　${x.tier}` : x.success ? '　成功' : '　失敗'}`,
-          text: x.total,
-        }))),
-      h('p', { class: 'dice-legend', text: gatherKind ? '每一骰的總分；顏色是評級（綠 簡單、藍 普通、紫 困難、金 史詩、白 神級）' : '每一骰的總分；藍色成功、紅色失敗' }),
+      r.rolls.length > DICE_FACE_MAX
+        ? rollStats(r.rolls, gatherKind)
+        : [
+          h('div', { class: 'dice-faces' },
+            r.rolls.map((x) => h('span', {
+              class: 'die',
+              dataset: { tier: gatherKind ? TIERS.indexOf(x.tier) : x.success ? 'ok' : 'fail', final: x.total, roll: latest ? '1' : '0' },
+              title: `1D20（${x.roll}）+ ${x.mod} = ${x.total}${gatherKind ? `　${x.tier}` : x.success ? '　成功' : '　失敗'}`,
+              text: x.total,
+            }))),
+          h('p', { class: 'dice-legend', text: gatherKind ? '每一骰的總分；顏色是評級（綠 簡單、藍 普通、紫 困難、金 史詩、白 神級）' : '每一骰的總分；藍色成功、紅色失敗' }),
+        ],
       Object.keys(r.loot).length ? lootTiles(r.loot) : h('p', { class: 'hint', text: '全部失敗，原料全毀。' }),
       used.length ? h('p', { class: 'hint', text: `用掉紀念品 ${used.length} 個${r.rolls.some((x) => x.doubled) ? '（成功的製作產出雙倍）' : ''}` }) : null);
   }

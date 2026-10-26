@@ -425,7 +425,7 @@ button.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px
 .amount { display: grid; gap: var(--space-2); }
 .amount__row { display: grid; grid-template-columns: var(--ctl-h) minmax(0, 1fr) var(--ctl-h); gap: var(--space-2); }
 .amount__step { padding: 0; font-size: 1.1rem; }
-.amount__input { min-width: 0; text-align: center; -moz-appearance: textfield; }
+.amount__input { width: 100%; min-width: 0; max-width: none; text-align: center; -moz-appearance: textfield; } /* 撐滿左右 −／＋ 中間的空間 */
 .amount__input::-webkit-outer-spin-button,
 .amount__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .amount__chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 5.5rem), 1fr)); gap: var(--space-2); } /* 快速數量：整排均分、放大，不擠在左邊 */
