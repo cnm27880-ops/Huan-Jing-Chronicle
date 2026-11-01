@@ -65,11 +65,10 @@ function partyDot(v, { idle = false } = {}) {
  */
 export function createPartyPanel({ room = defaultRoom, selfCard = null, selfVitals = null } = {}) {
   const { getRoomStatus, getEncounter } = room;
-  const label = h('span', { class: 'sx-party__label' });
   const dots = h('span', { class: 'sx-party__dots' });
   const chips = h('span', { class: 'sx-party__chips' });
   const chevron = h('span', { class: 'sx-party__chev', 'aria-hidden': 'true', text: '▾' });
-  const bar = h('button', { type: 'button', class: 'sx-party__bar', 'aria-expanded': 'true', title: '單擊展開／收合隊友資源' }, label, dots, chips, chevron);
+  const bar = h('button', { type: 'button', class: 'sx-party__bar', 'aria-expanded': 'true', title: '單擊展開／收合隊伍資源' }, dots, chips, chevron);
   const pop = h('div', { class: 'sx-party__pop', title: '雙擊收合' });
   // 第一張固定是自己（selfCard() 回傳一個 <li>，樣式比照隊友卡，再多三防；單機、GM 也看得到自己的）；隊友列只有玩家在房間裡才出現
   const selfList = h('ul', { class: 'party__list sx-party__self', hidden: true });
@@ -106,7 +105,6 @@ export function createPartyPanel({ room = defaultRoom, selfCard = null, selfVita
     const d = partyDigest(mates.map(([, v]) => v), { inBattle });
     node.dataset.level = d.level;
     const me = selfVitals?.() ?? null;
-    label.textContent = `隊友 ${mates.length}`;
     dots.replaceChildren(...(me ? [partyDot(me)] : []), ...mates.map(([, v]) => partyDot(v, { idle: inBattle && !v.downed && usageOf(v) < NUDGE.idleUsage })));
     chips.replaceChildren(...[
       d.downed ? h('span', { class: 'sx-chip', dataset: { tone: 'bad' }, text: `${d.downed} 倒地` }) : null,
@@ -114,7 +112,7 @@ export function createPartyPanel({ room = defaultRoom, selfCard = null, selfVita
     ].filter(Boolean));
     pop.replaceChildren(
       h('ul', { class: 'party__list' }, ...(self ? [self] : []), mates.map(([uid, v]) => mateCard(v, { online: onlineIds.has(uid), inBattle }))),
-      mates.length ? null : h('p', { class: 'hint', text: '隊友上線並操作過角色後，這裡會顯示他們的生命與資源。每一個膠囊都填到「還剩多少」，空了＝用光。' }));
+      ...(mates.length ? [] : [h('p', { class: 'hint', text: '隊友上線並操作過角色後，這裡會顯示他們的生命與資源。每一個膠囊都填到「還剩多少」，空了＝用光。' })])); // replaceChildren 會把 null 變成文字「null」，所以不放 null
     // 出事了就自動展開（有人新倒地、或有人生命危急）；已經展開的不動，收起來的偏好也不會被改掉
     const danger = mates.some(([, v]) => !v.downed && v.maxHp > 0 && v.hp / v.maxHp < NUDGE.danger);
     if (seen && !open && (d.downed > lastDowned || (danger && !lastDanger))) open = true;
