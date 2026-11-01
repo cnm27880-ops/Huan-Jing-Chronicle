@@ -323,7 +323,8 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .sx-party__pop .mate--self .mate__bar { height: 6px; }
 .sx-party__pop .mate--self .mate__hp { font-size: 0.72rem; }
 .sx-party__pop .mate--self .mate__hpbtn { min-height: 0; }
-.sx-party__pop .mate--self .rpill { height: 18px; font-size: inherit; }
+.sx-party__pop .mate--self .rpill { height: 18px; font-size: 0.7rem; line-height: normal; } /* 和隊友的膠囊同字級（按鈕元素預設字級較大，要明確寫出來） */
+.sx-party__pop .mate--self .rpill .rpill__name, .sx-party__pop .mate--self .rpill .rpill__val { font-size: inherit; }
 .mate--self .mate__hp { font-size: 0.85rem; }
 .mate--self .rpill { height: var(--ctl-h-sm); font-size: 0.78rem; }
 .rpill--btn { width: 100%; padding: 0 8px; font-family: inherit; color: inherit; text-align: left; border: 0; cursor: pointer; }
