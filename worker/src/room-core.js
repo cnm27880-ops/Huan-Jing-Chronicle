@@ -29,7 +29,7 @@ import {
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
-const POST_KINDS = new Set(['note', 'skill', 'attack', 'defend', 'potion', 'identify', 'deal']);
+const POST_KINDS = new Set(['note', 'skill', 'attack', 'defend', 'potion', 'identify', 'deal', 'chat']);
 // 不屬於跑團的事件（鑑定、黑市交易、GM 異動）：不存進 200 筆的紀錄歷史（才不會擠掉檢定與戰鬥），
 // 玩家看的是「日誌」頁（activity）。deal／identify 只用來消耗伺服器骰點；audit 只即時廣播（charSync 靠它通知等待中的玩家）
 const SIDE_KINDS = new Set(['identify', 'deal', 'audit']);
@@ -797,6 +797,18 @@ export class RoomCore {
     if (msg.t === 'encAllySup') { // 輔助：對玩家補血／上護盾，走信箱（百分比照對方的最大生命）
       if (!a.support) return err(rid, 'bad_enc', `${a.name} 沒有輔助能力。`);
       if (isDowned(a)) return err(rid, 'bad_enc', `${a.name} 倒地了，無法行動。`);
+      if (typeof msg.toAlly === 'string') { // 對另一位友方 NPC 施放：只有補血（NPC 沒有護盾），百分比照對方的最大生命
+        const t = findAlly(enc, msg.toAlly);
+        if (!t || t.id === a.id) return err(rid, 'bad_enc', '找不到要輔助的另一位友方 NPC。');
+        if (a.support.kind !== 'heal') return err(rid, 'bad_enc', '友方 NPC 沒有護盾，護盾只能對玩家施放。');
+        const r = healAlly(enc, t.id, Math.max(1, Math.floor((t.maxHp * a.support.pct) / 100)));
+        this.saveEncounter(enc);
+        const ev = this.record({
+          who: a.name, kind: 'skill', label: `${a.name} 對 ${t.name} 施放補血`, big: `${a.support.pct}%`, srv: true,
+          lines: [`${t.name} 生命 ${r.before} → ${t.hp} / ${t.maxHp}${r.revived ? '　站起來了！' : ''}`],
+        }, user);
+        return { out: [...this.encOk(enc, rid, user).out, { to: 'all', msg: { t: 'event', event: ev } }], close: null };
+      }
       return this.onMailSend(user, { to: msg.to, kind: 'support', skill: a.name, support: a.support.kind, pct: a.support.pct, res: 0 }, rid);
     }
     if (msg.t === 'encAllyAtk') {

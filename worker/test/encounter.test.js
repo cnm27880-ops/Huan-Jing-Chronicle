@@ -334,3 +334,28 @@ test('玩家餵回復藥水給友方 NPC：回復量由伺服器擲、不超過�
   const gone = send(core, P1, { t: 'encAllyFeed', rid: 'f', id: '友軍9', potion });
   assert.ok(errorOf(gone));
 });
+
+test('友方 NPC 的補血輔助可以對另一位 NPC 施放（百分比照對方最大生命）；護盾、自己、不存在的對象被拒', () => {
+  const core = room();
+  const healer = { name: '牧師', hp: 50, atk: '', def: '', abs: 0, support: { kind: 'heal', pct: 20 } };
+  const tank = { name: '盾兵', hp: 200, atk: '', def: '', abs: 0, support: null };
+  send(core, GM, { t: 'encAlly', npc: healer });
+  send(core, GM, { t: 'encAlly', npc: tank });
+  send(core, GM, { t: 'encAllyHp', id: '友軍2', hp: 10 });
+  const res = send(core, GM, { t: 'encAllySup', rid: 'x', id: '友軍1', toAlly: '友軍2' });
+  assert.equal(errorOf(res), undefined);
+  assert.equal(encOf(res).allies[1].hp, 50); // 10 + 200 × 20% = 50
+  assert.ok(errorOf(send(core, GM, { t: 'encAllySup', id: '友軍1', toAlly: '友軍1' })));
+  assert.ok(errorOf(send(core, GM, { t: 'encAllySup', id: '友軍1', toAlly: '友軍9' })));
+  send(core, GM, { t: 'encAlly', npc: { ...healer, name: '護盾師', support: { kind: 'shield', pct: 20 } } });
+  assert.ok(errorOf(send(core, GM, { t: 'encAllySup', id: '友軍3', toAlly: '友軍2' })));
+});
+
+test('聊天訊息：任何成員都能發、全員廣播、過長會被截斷', () => {
+  const core = room();
+  const res = send(core, P1, { t: 'post', rid: 'c', event: { kind: 'chat', label: '大家好 ww' } });
+  const ev = res.out.find((o) => o.msg.t === 'event')?.msg.event;
+  assert.equal(ev.kind, 'chat');
+  assert.equal(ev.label, '大家好 ww');
+  assert.equal(res.out.find((o) => o.msg.t === 'event').to, 'all');
+});

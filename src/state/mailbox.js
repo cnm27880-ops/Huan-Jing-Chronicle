@@ -36,7 +36,7 @@ export function createMailbox({ getState, commit, ready = () => Promise.resolve(
       const result = applyMail(getState(), got);
       logActivity(getState(), { cat: 'item', text: result.title, lines: result.lines ?? [] });
       commit();
-      showMailNotice(result);
+      if (got.kind !== 'potion' || result.bounce) showMailNotice(result); // 被餵藥：擲骰紀錄裡已有公開訊息，不跳浮動通知（退回的例外）
       if (result.bounce) { // 不能收（例如毒性已滿）：退回給寄件人
         try { await sendMail({ to: result.bounce.to, kind: 'gift', items: result.bounce.items, bounced: true }); } catch { /* 對方信箱滿了就算了 */ }
       }

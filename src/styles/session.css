@@ -417,6 +417,7 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .roll__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2); }
 .roll__who { color: var(--gold); font-weight: 600; }
 .roll__label { color: var(--ink2); font-size: 0.88rem; }
+.roll__chat { margin: 2px 0 0; color: var(--ink); font-size: 0.92rem; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; } /* 聊天內容 */
 .roll__time { margin-left: auto; color: var(--faint); font-size: 0.72rem; }
 .roll__badge { flex-basis: 100%; color: var(--sky); font-size: 0.82rem; font-weight: 600; font-variant-numeric: lining-nums tabular-nums; }
 .roll__badge[data-tone='fail'] { color: var(--rose); }
