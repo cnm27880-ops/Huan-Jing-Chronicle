@@ -115,6 +115,23 @@ export function createMarketView({ root, getState, commit }) {
       type: 'button', class: 'btn', disabled: disabled || (max != null && max < 1),
       onclick: () => onGo(clamp(qtyOf(key))),
     }, button(q));
+    const setQty = (n) => {
+      const v = clamp(n);
+      ui.qty[key] = v;
+      qtyInput.value = v;
+      if (subEl) subEl.textContent = sub(v);
+      btn.textContent = button(v);
+    };
+    const qtyInput = h('input', {
+      class: 'field trade-row__qty', type: 'number', inputmode: 'numeric', min: 1, max: Number.isFinite(max) ? max : null, value: q,
+      'aria-label': `${item} 數量`,
+      oninput: (e) => {
+        const n = clamp(e.target.value);
+        ui.qty[key] = n;
+        if (subEl) subEl.textContent = sub(n);
+        btn.textContent = button(n);
+      },
+    });
     return h('li', { class: `trade-row${tier !== null ? ' rarity' : ''}`, dataset: { tier: tier ?? 'none', rarity: tier ?? 'none' } },
       h('div', { class: 'trade-row__info' },
         h('div', { class: 'trade-row__head' },
@@ -127,16 +144,10 @@ export function createMarketView({ root, getState, commit }) {
         h('span', { class: 'trade-row__price', text: price }),
         subEl),
       h('div', { class: 'trade-row__act' },
-        h('input', {
-          class: 'field trade-row__qty', type: 'number', inputmode: 'numeric', min: 1, max: Number.isFinite(max) ? max : null, value: q,
-          'aria-label': `${item} 數量`,
-          oninput: (e) => {
-            const n = clamp(e.target.value);
-            ui.qty[key] = n;
-            if (subEl) subEl.textContent = sub(n);
-            btn.textContent = button(n);
-          },
-        }),
+        qtyInput,
+        Number.isFinite(max) && max > 1
+          ? h('button', { type: 'button', class: 'btn btn--ghost btn--small', 'aria-label': `${item} 數量設為最大`, onclick: () => setQty(max) }, 'MAX')
+          : null,
         btn));
   }
 

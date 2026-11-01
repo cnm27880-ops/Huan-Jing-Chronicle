@@ -130,12 +130,15 @@ export function craftSpecial(state, name, times, keepsakes = [], rng = Math.rand
 }
 
 /** 使用特殊物品（花雕怪味魚滴露等）。回傳 { ok, error?, gives? } */
-export function useSpecialItem(state, name) {
+export function useSpecialItem(state, name, times = 1) {
   const u = USABLE_ITEMS[name];
   if (!u) return { ok: false, error: '這個東西不能在這裡使用。' };
-  if (!removeItem(state, name)) return { ok: false, error: `背包裡沒有${name}。` };
-  for (const [item, n] of Object.entries(u.gives)) addItem(state, item, n);
-  return { ok: true, gives: u.gives };
+  const t = Math.floor(Number(times));
+  if (!(t >= 1)) return { ok: false, error: '數量要至少 1。' };
+  if (!removeItem(state, name, t)) return { ok: false, error: `${name} 不夠：要 ${t} 個。` };
+  const gives = {};
+  for (const [item, n] of Object.entries(u.gives)) { addItem(state, item, n * t); gives[item] = n * t; }
+  return { ok: true, gives };
 }
 
 // ---------- 特殊材料（每個修整日每種 1 次） ----------

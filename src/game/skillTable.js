@@ -293,7 +293,7 @@ export const isInsight = (name) => Object.hasOwn(INSIGHT_TIERS, name);
 /** 感悟升階（使用者 2026-10-26）：每階 6 個合成 1 個高一階的，不擲骰、不花時間（傳說已是最高階，不能合） */
 export const INSIGHT_COMBINE = 6;
 const INSIGHT_ORDER = Object.keys(INSIGHT_TIERS);
-export const insightUpgradeOf = (name) => INSIGHT_ORDER[INSIGHT_ORDER.indexOf(name) + 1] ?? null;
+export const insightUpgradeOf = (name) => (isInsight(name) ? INSIGHT_ORDER[INSIGHT_ORDER.indexOf(name) + 1] ?? null : null);
 /** 合成 times 次；回傳 { ok, error?, gives, cost }，材料不夠就一樣都不扣 */
 export function combineInsight(state, name, times = 1) {
   const to = isInsight(name) ? insightUpgradeOf(name) : null;

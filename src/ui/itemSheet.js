@@ -47,8 +47,8 @@ export function openItemSheet(state, name, commit) {
       sheet.refresh();
     };
     const usable = USABLE_ITEMS[name];
-    const doUseSpecial = () => {
-      const r = useSpecialItem(state, name);
+    const doUseSpecial = (times = 1) => {
+      const r = useSpecialItem(state, name, times);
       if (!r.ok) return toast(r.error);
       const got = Object.entries(r.gives).map(([k, q]) => `${k} ×${q}`).join('、');
       toast(`使用 ${name}：${got}`);
@@ -67,13 +67,14 @@ export function openItemSheet(state, name, commit) {
       INSIGHT_TIERS[name] ? h('p', { class: 'item-sheet__desc', text: `升級用肥料：1 個抵 1 本${INSIGHT_TIERS[name]}通用技能書（升級時最優先使用，不能拿來學新技能）` }) : null,
       insightUpgradeOf(name)
         ? h('div', { class: 'item-sheet__eat' },
-            h('p', { class: 'item-sheet__desc', text: `合成：${INSIGHT_COMBINE} 個 → 1 個${insightUpgradeOf(name)}（不擲骰）` }),
+            h('p', { class: 'item-sheet__desc', text: `合成：${INSIGHT_COMBINE} 個 → 1 個${insightUpgradeOf(name)}` }),
             h('button', { type: 'button', class: 'btn btn--primary', disabled: have < INSIGHT_COMBINE, onclick: doCombine }, `合成 1 個${insightUpgradeOf(name)}`))
         : null,
       usable
         ? h('div', { class: 'item-sheet__eat' },
             h('p', { class: 'item-sheet__desc', text: `使用 → ${Object.entries(usable.gives).map(([k, q]) => `${k} ×${q}`).join('、')}` }),
-            h('button', { type: 'button', class: 'btn btn--primary', disabled: have < 1, onclick: doUseSpecial }, '使用 1 個'))
+            h('button', { type: 'button', class: 'btn btn--primary', disabled: have < 1, onclick: () => doUseSpecial(1) }, '使用 1 個'),
+            have > 1 ? h('button', { type: 'button', class: 'btn', onclick: () => doUseSpecial(have) }, `全部使用（${fmt(have)} 個）`) : null)
         : null,
       def?.use && have > 0
         ? h('div', { class: 'item-sheet__eat' }, h('button', { type: 'button', class: 'btn btn--primary', onclick: doUse }, '使用 1 個'))
