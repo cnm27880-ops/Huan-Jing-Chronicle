@@ -404,6 +404,7 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 .log-entry { display: grid; gap: 4px; padding: var(--space-3) 0; border-bottom: 1px solid var(--line-soft); }
 .log-entry:last-child { border-bottom: 0; }
 .log-entry__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-3); }
+.log-entry__edit { margin-left: auto; } /* GM 的編輯鈕靠右（只有位置，外觀在 base.css） */
 .log-entry__time { color: var(--faint); font-size: 0.78rem; }
 .log-entry__who { color: var(--gold); }
 .log-entry__player { color: var(--soft); }

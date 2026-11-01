@@ -196,6 +196,11 @@ export const claimMail = (id) => request({ t: 'mailClaim', id });
 const actSubs = new Set();
 /** 日誌頁註冊：有人新增一筆日誌就呼叫 fn(entry)；回傳取消訂閱的函式 */
 export function subscribeActivity(fn) { actSubs.add(fn); return () => actSubs.delete(fn); }
+const actGoneSubs = new Set();
+/** 日誌頁註冊：GM 刪了一筆日誌就呼叫 fn(id)；回傳取消訂閱的函式 */
+export function subscribeActivityGone(fn) { actGoneSubs.add(fn); return () => actGoneSubs.delete(fn); }
+/** GM 刪除一筆日誌（id 是日誌的 uuid）；失敗丟 RollError */
+export const deleteActivity = (id) => request({ t: 'actDel', id });
 /** 回報一筆日誌（沒連上房間回 false）。entry = { cat, text, lines, who } */
 export const sendActivity = (entry) => Boolean(isOnline() && client?.send({ t: 'actPost', ...entry }));
 /** 查日誌：filter = { uid?, cat?, before? }，回傳 { entries, more, next }；失敗丟 RollError */
@@ -213,6 +218,9 @@ function onRoomMessage(msg) {
       break;
     case 'act':
       if (msg.entry) actSubs.forEach((fn) => fn(msg.entry));
+      break;
+    case 'actGone':
+      if (msg.id) actGoneSubs.forEach((fn) => fn(msg.id));
       break;
     case 'mail':
       deliverMail(msg.mails);
@@ -259,7 +267,7 @@ function onRoomMessage(msg) {
       if (room.me) room.me = { ...room.me, isGm: msg.gm.uids.includes(room.me.uid) };
       notifyRoom();
       break;
-    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'rewardSent': case 'mailClaimed': case 'trades': case 'tradeOk': case 'specialOk': case 'hideOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': case 'presets': case 'acts': case 'bmOk': {
+    case 'rolled': case 'drawn': case 'posted': case 'encOk': case 'mailSent': case 'rewardSent': case 'mailClaimed': case 'trades': case 'tradeOk': case 'specialOk': case 'hideOk': case 'skillOk': case 'char': case 'charSaved': case 'charList': case 'imgOk': case 'presets': case 'acts': case 'actOk': case 'bmOk': {
       const p = pending.get(msg.rid);
       if (p) { clearTimeout(p.timer); pending.delete(msg.rid); p.resolve(msg); }
       break;
