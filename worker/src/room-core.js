@@ -12,7 +12,7 @@ import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/r
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
 import { useEnemySkill, spendEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
 import {
-  validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, healAlly, insertRandom, alliesOf, findAlly, MAX_ALLIES, SUPPORT_KINDS,
+  validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, healAlly, retreatTurn, insertRandom, alliesOf, findAlly, MAX_ALLIES, SUPPORT_KINDS,
 } from '../../src/game/ally.js';
 import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
@@ -276,7 +276,7 @@ export class RoomCore {
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'tradeList': return this.onTradeList(user, rid);
       case 'tradeRespond': return this.onTradeRespond(user, msg, rid);
-      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encHp': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
+      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encHp': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encPrev': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
       case 'encAlly': case 'encAllyDel': case 'encAllyAtk': case 'encAllyTake': case 'encAllyHp': case 'encAllySup': return this.onAlly(user, msg, rid);
       case 'encAllyFeed': return this.onAllyFeed(user, msg, rid);
       case 'encImg': return this.onEncImg(user, msg, rid);
@@ -733,6 +733,13 @@ export class RoomCore {
       this.saveEncounter(enc);
       const names = enc.order.map((o, i) => `${i + 1}. ${o.kind === 'monster' ? o.id : o.name}`);
       return this.encOk(enc, rid, user, { label: '遭遇：開打，先攻順序鎖定', lines: names });
+    }
+    if (msg.t === 'encPrev') { // 退回上一位（有人被跳過時）：已用掉的敵人技能不補滿
+      if (!enc.locked) return err(rid, 'bad_enc', '請先按「開打」鎖定先攻順序。');
+      const r = retreatTurn(enc);
+      if (r.error) return err(rid, 'bad_enc', r.error);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：退回上一位（第 ${enc.round} 回合）` });
     }
     // encNext：換下一位；已倒下的怪物自動跳過；繞完一圈回合數 +1
     if (!enc.order.length) return err(rid, 'bad_enc', '還沒有先攻順序，請先抽先攻。');

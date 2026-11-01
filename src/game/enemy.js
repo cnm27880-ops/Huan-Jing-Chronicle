@@ -117,3 +117,11 @@ export const pendingEnemyB = (enc, m) => (enemyLeft(enc, m).chargeB > 0 ? rankIn
 
 /** 新的一回合（沒有先攻順序時，GM 手動進下一回合）：只要把回合數 +1，次數與蓄力就自動歸零 */
 export const nextRound = (enc) => { enc.round = (enc.round ?? 0) + 1; return enc.round; };
+
+/**
+ * 退回上一回合時用：把「上一回合已用掉的技能次數與蓄力」改記成退回後的回合，這樣不會被當成新回合而補滿
+ * （次數是靠回合數判斷新舊的，見 current()）。GM 退回是因為有人被跳過，敵人已經用掉的技能不該恢復。
+ */
+export function carrySkillUses(enc, from, to) {
+  for (const m of enc.monsters ?? []) if (m.uses && m.uses.round === from) m.uses.round = to;
+}

@@ -480,6 +480,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('button', { type: 'button', class: 'btn btn--small', title: '回合數 +1，敵人的技能次數與蓄力恢復（有先攻順序時，繞完一圈會自動進下一回合）', onclick: () => act({ t: 'encRound' }) }, '新回合'),
       h('button', { type: 'button', class: 'btn btn--small', onclick: () => { ui.swapFrom = null; act({ t: 'encInit' }); } }, '抽先攻'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.order?.length || enc.locked, onclick: () => act({ t: 'encStart' }) }, '開打（鎖定）'),
+      h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, title: '退回上一位（有人的回合被跳過時用；敵人已用掉的技能不會恢復）', onclick: () => act({ t: 'encPrev' }) }, '上一位'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, onclick: () => act({ t: 'encNext' }) }, '下一位'));
   }
 

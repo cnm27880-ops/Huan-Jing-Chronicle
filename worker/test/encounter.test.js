@@ -359,3 +359,19 @@ test('聊天訊息：任何成員都能發、全員廣播、過長會被截斷',
   assert.equal(ev.label, '大家好 ww');
   assert.equal(res.out.find((o) => o.msg.t === 'event').to, 'all');
 });
+
+test('上一位（encPrev）：只有 GM、開打後才能用；退回上一回合時回合數 -1，但敵人已用掉的技能次數不補滿', () => {
+  const core = room((n) => n);
+  send(core, GM, { t: 'encAdd', kind: 'elite', spec: { ...SPEC, count: 1 } });
+  send(core, GM, { t: 'encInit' }, { online: ['100', '300', '400'] });
+  assert.equal(errorOf(send(core, P1, { t: 'encPrev' }))?.code, 'forbidden');
+  assert.equal(errorOf(send(core, GM, { t: 'encPrev' }))?.code, 'bad_enc'); // 還沒開打
+  const n = encOf(send(core, GM, { t: 'encStart' })).order.length;
+  assert.equal(errorOf(send(core, GM, { t: 'encPrev' }))?.code, 'bad_enc'); // 第 1 回合第一位不能再退
+  for (let i = 0; i < n; i++) send(core, GM, { t: 'encNext' }); // 繞一圈進第 2 回合
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'a', id: '菁英1', use: 'atk' })).left, 1); // 第 2 回合用掉 1 次攻擊
+  const back = encOf(send(core, GM, { t: 'encPrev' }));
+  assert.deepEqual([back.turn, back.round], [n - 1, 1]);
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'b', id: '菁英1', use: 'atk' })).left, 0); // 沒補滿：只剩最後 1 次
+  assert.match(errorOf(send(core, P1, { t: 'encUse', rid: 'c', id: '菁英1', use: 'atk' })).message, /已經攻擊 2 次/);
+});
