@@ -12,7 +12,7 @@ import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/r
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
 import { useEnemySkill, spendEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
 import {
-  validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, insertRandom, alliesOf, findAlly, MAX_ALLIES, SUPPORT_KINDS,
+  validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, healAlly, insertRandom, alliesOf, findAlly, MAX_ALLIES, SUPPORT_KINDS,
 } from '../../src/game/ally.js';
 import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
@@ -278,6 +278,7 @@ export class RoomCore {
       case 'tradeRespond': return this.onTradeRespond(user, msg, rid);
       case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encHp': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
       case 'encAlly': case 'encAllyDel': case 'encAllyAtk': case 'encAllyTake': case 'encAllyHp': case 'encAllySup': return this.onAlly(user, msg, rid);
+      case 'encAllyFeed': return this.onAllyFeed(user, msg, rid);
       case 'encImg': return this.onEncImg(user, msg, rid);
       case 'imgPut': return this.onImgPut(user, msg, rid);
       case 'imgDel': return this.onImgDel(user, msg, rid);
@@ -745,6 +746,23 @@ export class RoomCore {
     }
     this.saveEncounter(enc);
     return this.encOk(enc, rid, user);
+  }
+
+  /** 餵回復藥水給友方 NPC：任何成員都可以（藥水由餵的人先在自己背包扣，失敗時前端會還回去）；回復量伺服器擲，NPC 沒有毒性 */
+  onAllyFeed(user, msg, rid) {
+    const def = POTIONS[msg.potion];
+    if (!def?.heal) return err(rid, 'bad_enc', '只有回復藥水可以餵給友方 NPC。');
+    const enc = this.encounter();
+    const a = typeof msg.id === 'string' ? findAlly(enc, msg.id) : null;
+    if (!a) return err(rid, 'bad_enc', '找不到這位友方 NPC，可能已離開戰鬥。');
+    const heal = rollSum(def.heal.n, def.heal.sides, this.rng);
+    const r = healAlly(enc, a.id, heal);
+    this.saveEncounter(enc);
+    const ev = this.record({
+      who: user.name, kind: 'potion', label: `${user.name} 餵 ${a.name}：${msg.potion}`, big: heal, srv: true,
+      lines: [`回復 ${def.heal.n}D${def.heal.sides} = ${heal} 生命`, `${a.name} 生命 ${r.before} → ${a.hp} / ${a.maxHp}${r.revived ? '　站起來了！' : ''}`],
+    }, user);
+    return { out: [...this.encOk(enc, rid, user, null, { heal }).out, { to: 'all', msg: { t: 'event', event: ev } }], close: null };
   }
 
   // ---------- 友方 NPC（使用者 2026-10-12；規則在 src/game/ally.js） ----------

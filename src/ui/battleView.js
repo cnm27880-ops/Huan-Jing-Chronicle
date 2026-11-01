@@ -33,7 +33,8 @@ import { trackLine, targetLine } from '../game/events.js';
 import { openValueSheet } from './valueSheet.js';
 import { battleSel as sel } from './battleSelect.js';
 import { teammates } from './giftSheet.js';
-import { sendMail } from '../state/rollLog.js';
+import { sendMail, getEncounter, encounterAction } from '../state/rollLog.js';
+import { alliesOf } from '../game/ally.js';
 import { takeItems, refundItems } from '../game/mail.js';
 import { SKILL_TABLE } from '../game/skillTable.js';
 
@@ -218,7 +219,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     if (!takeItems(state, { [name]: 1 })) return toast(`背包裡沒有${name}。`);
     commit();
     try {
-      const res = await sendMail({ to: ui.feedTo, kind: 'potion', potion: name });
+      const res = ui.feedTo.startsWith('ally:')
+        ? await encounterAction({ t: 'encAllyFeed', id: ui.feedTo.slice(5), potion: name })
+        : await sendMail({ to: ui.feedTo, kind: 'potion', potion: name });
       toast(`已餵出${name}（回復 ${res.heal}），紀錄會顯示在戰鬥紀錄裡。`);
     } catch (e) {
       refundItems(state, { [name]: 1 });
@@ -229,14 +232,17 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
 
   function feedBox(state) {
     const mates = teammates();
+    const npcs = alliesOf(getEncounter());
     const heals = Object.keys(POTIONS).filter((n) => POTIONS[n].heal && countOf(state, n) > 0);
-    if (!mates.length || !heals.length) return null;
+    if ((!mates.length && !npcs.length) || !heals.length) return null;
+    if (ui.feedTo.startsWith('ally:') && !npcs.some((a) => `ally:${a.id}` === ui.feedTo)) ui.feedTo = ''; // NPC 已離開戰鬥
     return h('div', { class: 'feedbox' },
-      h('p', { class: 'field-label', text: '餵給隊友（對方不用同意；倒地的也能拉起來，毒性算對方的）' }),
+      h('p', { class: 'field-label', text: '餵給隊友或友方 NPC（對方不用同意；倒地的也能拉起來，毒性算玩家自己的、NPC 沒有毒性）' }),
       h('div', { class: 'row' },
         h('select', { class: 'field', 'aria-label': '餵給誰', onchange: (e) => { ui.feedTo = e.target.value; rerender(); } },
           h('option', { value: '', text: '選擇隊友…' }),
-          mates.map((m) => h('option', { value: m.uid, selected: ui.feedTo === m.uid ? true : null, text: `${m.name}${m.online ? '' : '（離線）'}` }))),
+          mates.map((m) => h('option', { value: m.uid, selected: ui.feedTo === m.uid ? true : null, text: `${m.name}${m.online ? '' : '（離線）'}` })),
+          npcs.map((a) => h('option', { value: `ally:${a.id}`, selected: ui.feedTo === `ally:${a.id}` ? true : null, text: `🤝 ${a.name}（${a.hp}/${a.maxHp}）` }))),
         heals.map((n) => h('button', {
           type: 'button', class: 'btn btn--small', disabled: ui.feedTo ? null : true, onclick: () => feedPotion(state, n),
         }, `餵 ${n}（×${fmt(countOf(state, n))}）`))));

@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RoomCore } from '../src/room-core.js';
 import { makeDb } from './helpers.js';
+import { POTIONS } from '../../src/game/rules.js';
 
 const GM = { uid: '100', name: 'GM', avatar: null };
 const P1 = { uid: '300', name: '玩家一', avatar: null };
@@ -314,4 +315,22 @@ test('GM 調整怪物生命：可歸零／回血／超過最大生命會拉高�
     assert.equal(errorOf(send(core, GM, { t: 'encHp', ...bad }))?.code, 'bad_enc');
   }
   assert.equal(hp('小怪2').hp, 100);
+});
+
+test('玩家餵回復藥水給友方 NPC：回復量由伺服器擲、不超過最大生命、全員看得到；非回復藥水被拒', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', rid: 'a', kind: 'mob', spec: SPEC });
+  const npc = { name: '傭兵', hp: 100, atk: '10A', def: '5A', abs: 0, support: null };
+  send(core, GM, { t: 'encAlly', rid: 'b', npc });
+  send(core, GM, { t: 'encAllyHp', rid: 'c', id: '友軍1', hp: -5 });
+  const potion = Object.keys(POTIONS).find((n) => POTIONS[n].heal && !POTIONS[n].atk && !POTIONS[n].def);
+  const res = send(core, P1, { t: 'encAllyFeed', rid: 'd', id: '友軍1', potion });
+  assert.equal(errorOf(res), undefined);
+  const a = encOf(res).allies[0];
+  assert.ok(a.hp > -5 && a.hp <= a.maxHp);
+  assert.ok(res.out.some((o) => o.msg.t === 'event' && o.msg.event.label.includes('餵 傭兵')));
+  const bad = send(core, P1, { t: 'encAllyFeed', rid: 'e', id: '友軍1', potion: '不存在的藥水' });
+  assert.ok(errorOf(bad));
+  const gone = send(core, P1, { t: 'encAllyFeed', rid: 'f', id: '友軍9', potion });
+  assert.ok(errorOf(gone));
 });

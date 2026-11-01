@@ -116,6 +116,18 @@ export function setAllyHp(enc, allyId, hp) {
   return { ally, before };
 }
 
+/** 回復 NPC 生命（餵藥用，任何玩家都能餵）：不超過最大生命；倒地的拉到正數才算站起來。NPC 沒有毒性。 */
+export function healAlly(enc, allyId, amount) {
+  const ally = findAlly(enc, allyId);
+  if (!ally) return { error: '找不到這位友方 NPC，可能已離開戰鬥。' };
+  const n = Math.floor(Number(amount));
+  if (!Number.isInteger(n) || n < 0) return { error: '回復量錯誤。' };
+  const before = ally.hp;
+  const wasDowned = isDowned(ally);
+  ally.hp = Math.min(ally.maxHp, ally.hp + n);
+  return { ally, before, healed: ally.hp - before, revived: wasDowned && !isDowned(ally) };
+}
+
 /** 新的先攻位置：把一個參與者插進順序的隨機位置（已開打時插在目前輪到的位置之前的，下一回合才輪到；輪到的人不變） */
 export function insertRandom(enc, entry, rng) {
   const n = enc.order.length + 1;
