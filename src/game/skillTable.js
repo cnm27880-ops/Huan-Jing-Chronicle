@@ -290,23 +290,6 @@ export function toggleKeepBook(state, name) {
 export const INSIGHT_TIERS = { 初階技能感悟: '初階', 進階技能感悟: '進階', 大師技能感悟: '大師', 傳說技能感悟: '傳說' };
 export const isInsight = (name) => Object.hasOwn(INSIGHT_TIERS, name);
 
-/** 感悟升階（使用者 2026-10-26）：每階 6 個合成 1 個高一階的，不擲骰、不花時間（傳說已是最高階，不能合） */
-export const INSIGHT_COMBINE = 6;
-const INSIGHT_ORDER = Object.keys(INSIGHT_TIERS);
-export const insightUpgradeOf = (name) => (isInsight(name) ? INSIGHT_ORDER[INSIGHT_ORDER.indexOf(name) + 1] ?? null : null);
-/** 合成 times 次；回傳 { ok, error?, gives, cost }，材料不夠就一樣都不扣 */
-export function combineInsight(state, name, times = 1) {
-  const to = isInsight(name) ? insightUpgradeOf(name) : null;
-  const n = Math.floor(Number(times));
-  if (!to) return { ok: false, error: '這個物品不能合成升階。' };
-  if (!(n >= 1)) return { ok: false, error: '數量要至少 1。' };
-  const cost = n * INSIGHT_COMBINE;
-  if (countOf(state, name) < cost) return { ok: false, error: `${name} 不夠：要 ${cost} 個，只有 ${countOf(state, name)} 個。` };
-  removeItem(state, name, cost);
-  addItem(state, to, n);
-  return { ok: true, gives: { [to]: n }, cost: { [name]: cost } };
-}
-
 /**
  * 升級時可以當「肥料」的抽出書（物品名＝技能名），1 本抵 1 本「同階」通用技能書；抽出書不能變回通用書（會無限抽）。
  * 優先順序：0 同階技能感悟　1 已學會技能的多餘書　2 還沒學、已湊滿 3 本、且不在保留名單的書
