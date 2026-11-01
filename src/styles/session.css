@@ -319,6 +319,11 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .mate--self .mate__hpbtn { width: 100%; min-height: var(--ctl-h-sm); padding: 0; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 .mate--self .mate__hpbtn:hover .mate__bar { box-shadow: var(--sx-ring-hi); }
 .mate--self .mate__bar { height: 8px; }
+/* 收合欄位裡的「自己」：和隊友卡一樣大（自己獨立顯示時才用上面較大的尺寸） */
+.sx-party__pop .mate--self .mate__bar { height: 6px; }
+.sx-party__pop .mate--self .mate__hp { font-size: 0.72rem; }
+.sx-party__pop .mate--self .mate__hpbtn { min-height: 0; }
+.sx-party__pop .mate--self .rpill { height: 18px; font-size: inherit; }
 .mate--self .mate__hp { font-size: 0.85rem; }
 .mate--self .rpill { height: var(--ctl-h-sm); font-size: 0.78rem; }
 .rpill--btn { width: 100%; padding: 0 8px; font-family: inherit; color: inherit; text-align: left; border: 0; cursor: pointer; }
@@ -330,7 +335,6 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 
 .sx-chip { padding: 1px 9px; color: var(--soft); font-size: 0.72rem; background: var(--paper); border-radius: var(--r-pill); box-shadow: var(--sx-ring); }
 .sx-chip[data-tone='bad'] { color: var(--rose); background: var(--rosebg); box-shadow: var(--sx-ring-rose); }
-.sx-party__label { flex: none; color: var(--gold); font-size: 0.88rem; font-weight: 700; letter-spacing: 0.08em; }
 .sx-party[data-level='danger'] .sx-party__bar { box-shadow: var(--sx-ring-rose); }
 .sx-party__chev { flex: none; width: 1em; color: var(--gold2); font-size: 0.8rem; }
 .sx-party__chips { flex: none; }
