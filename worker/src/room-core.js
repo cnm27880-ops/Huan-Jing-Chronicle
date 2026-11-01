@@ -1029,20 +1029,14 @@ export class RoomCore {
     return clean ? [this.addActivity(user, clean, '系統')] : [];
   }
 
-  /** GM 刪除一筆日誌（msg.id＝日誌的 uuid，不用 seq：刪掉最新一筆後 seq 會被下一筆沿用，拿來刪會誤刪別筆）：全員的日誌頁即時移除，並留一筆系統日誌記錄誰刪了什麼 */
+  /** GM 刪除一筆日誌（msg.id＝日誌的 uuid，不用 seq：刪掉最新一筆後 seq 會被下一筆沿用，拿來刪會誤刪別筆）：全員的日誌頁即時移除 */
   onActDel(user, msg, rid) {
     if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以刪除日誌。');
     if (typeof msg.id !== 'string' || !msg.id || msg.id.length > 64) return err(rid, 'bad_activity', '日誌編號錯誤。');
     const row = this.db.exec("SELECT seq, json FROM activity WHERE json_extract(json, '$.id') = ?", msg.id)[0];
     if (!row) return err(rid, 'bad_activity', '找不到這筆日誌，可能已被刪除。');
-    let e = {};
-    try { e = JSON.parse(row.json); } catch { /* 壞掉的也能刪 */ }
-    this.db.exec('DELETE FROM activity WHERE seq = ?', row.seq);
-    return {
-      out: [{ to: 'self', msg: { t: 'actOk', rid } }, { to: 'all', msg: { t: 'actGone', id: msg.id } },
-        ...this.sysActivity(user, `GM 刪除了一筆日誌（${e.who || e.name || '玩家'}）`, [cleanStr(e.text, 200)].filter(Boolean))],
-      close: null,
-    };
+    this.db.exec('DELETE FROM activity WHERE seq = ?', row.seq); // 不另外留「刪除紀錄」（使用者 2026-11-01：不然會沒完沒了）
+    return { out: [{ to: 'self', msg: { t: 'actOk', rid } }, { to: 'all', msg: { t: 'actGone', id: msg.id } }], close: null };
   }
 
   /** 查日誌：msg.uid（只看某位）、msg.cat（只看某類）、msg.before（seq，往前翻頁）；最新的在前，一次最多 ACTIVITY_PAGE 筆 */
