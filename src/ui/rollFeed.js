@@ -123,6 +123,13 @@ export function renderRoll(ev, { fresh = false } = {}) {
         h('time', { class: 'roll__time', text: clock(ev.t) }),
         ev.lines?.length ? `　${ev.lines.join('　')}` : null));
   }
+  if (ev.kind === 'chat') { // 玩家聊天：一行名字＋內容（文字一律走 textContent）
+    return h('li', { class: 'roll roll--chat', dataset: { tone: '', fresh: fresh ? '1' : '0' } },
+      h('div', { class: 'roll__head' },
+        h('span', { class: 'roll__who', text: ev.who }),
+        h('time', { class: 'roll__time', text: clock(ev.t) })),
+      h('p', { class: 'roll__chat', text: ev.label }));
+  }
   const battle = ev.kind === 'attack' || ev.kind === 'defend' ? readTracks(ev) : null;
   const faces = battle ? null : readFaces(ev);
   const badge = badgeText(ev);

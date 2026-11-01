@@ -12,7 +12,7 @@ import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/r
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
 import { useEnemySkill, spendEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
 import {
-  validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, insertRandom, alliesOf, findAlly, MAX_ALLIES, SUPPORT_KINDS,
+  validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, healAlly, retreatTurn, insertRandom, alliesOf, findAlly, MAX_ALLIES, SUPPORT_KINDS,
 } from '../../src/game/ally.js';
 import { cleanActivity } from '../../src/game/activity.js';
 import { parseIdList, roomAccessState } from './allowlist.js';
@@ -29,7 +29,7 @@ import {
 } from './config.js';
 
 // 前端自己組好文字、再交給伺服器記錄的事件種類（擲骰與檢定由伺服器自己組，不在這裡）
-const POST_KINDS = new Set(['note', 'skill', 'attack', 'defend', 'potion', 'identify', 'deal']);
+const POST_KINDS = new Set(['note', 'skill', 'attack', 'defend', 'potion', 'identify', 'deal', 'chat']);
 // 不屬於跑團的事件（鑑定、黑市交易、GM 異動）：不存進 200 筆的紀錄歷史（才不會擠掉檢定與戰鬥），
 // 玩家看的是「日誌」頁（activity）。deal／identify 只用來消耗伺服器骰點；audit 只即時廣播（charSync 靠它通知等待中的玩家）
 const SIDE_KINDS = new Set(['identify', 'deal', 'audit']);
@@ -276,8 +276,9 @@ export class RoomCore {
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'tradeList': return this.onTradeList(user, rid);
       case 'tradeRespond': return this.onTradeRespond(user, msg, rid);
-      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encHp': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
+      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encHp': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encPrev': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
       case 'encAlly': case 'encAllyDel': case 'encAllyAtk': case 'encAllyTake': case 'encAllyHp': case 'encAllySup': return this.onAlly(user, msg, rid);
+      case 'encAllyFeed': return this.onAllyFeed(user, msg, rid);
       case 'encImg': return this.onEncImg(user, msg, rid);
       case 'imgPut': return this.onImgPut(user, msg, rid);
       case 'imgDel': return this.onImgDel(user, msg, rid);
@@ -733,6 +734,13 @@ export class RoomCore {
       const names = enc.order.map((o, i) => `${i + 1}. ${o.kind === 'monster' ? o.id : o.name}`);
       return this.encOk(enc, rid, user, { label: '遭遇：開打，先攻順序鎖定', lines: names });
     }
+    if (msg.t === 'encPrev') { // 退回上一位（有人被跳過時）：已用掉的敵人技能不補滿
+      if (!enc.locked) return err(rid, 'bad_enc', '請先按「開打」鎖定先攻順序。');
+      const r = retreatTurn(enc);
+      if (r.error) return err(rid, 'bad_enc', r.error);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：退回上一位（第 ${enc.round} 回合）` });
+    }
     // encNext：換下一位；已倒下的怪物自動跳過；繞完一圈回合數 +1
     if (!enc.order.length) return err(rid, 'bad_enc', '還沒有先攻順序，請先抽先攻。');
     if (!enc.locked) return err(rid, 'bad_enc', '請先按「開打」鎖定先攻順序。');
@@ -745,6 +753,23 @@ export class RoomCore {
     }
     this.saveEncounter(enc);
     return this.encOk(enc, rid, user);
+  }
+
+  /** 餵回復藥水給友方 NPC：任何成員都可以（藥水由餵的人先在自己背包扣，失敗時前端會還回去）；回復量伺服器擲，NPC 沒有毒性 */
+  onAllyFeed(user, msg, rid) {
+    const def = POTIONS[msg.potion];
+    if (!def?.heal) return err(rid, 'bad_enc', '只有回復藥水可以餵給友方 NPC。');
+    const enc = this.encounter();
+    const a = typeof msg.id === 'string' ? findAlly(enc, msg.id) : null;
+    if (!a) return err(rid, 'bad_enc', '找不到這位友方 NPC，可能已離開戰鬥。');
+    const heal = rollSum(def.heal.n, def.heal.sides, this.rng);
+    const r = healAlly(enc, a.id, heal);
+    this.saveEncounter(enc);
+    const ev = this.record({
+      who: user.name, kind: 'potion', label: `${user.name} 餵 ${a.name}：${msg.potion}`, big: heal, srv: true,
+      lines: [`回復 ${def.heal.n}D${def.heal.sides} = ${heal} 生命`, `${a.name} 生命 ${r.before} → ${a.hp} / ${a.maxHp}${r.revived ? '　站起來了！' : ''}`],
+    }, user);
+    return { out: [...this.encOk(enc, rid, user, null, { heal }).out, { to: 'all', msg: { t: 'event', event: ev } }], close: null };
   }
 
   // ---------- 友方 NPC（使用者 2026-10-12；規則在 src/game/ally.js） ----------
@@ -779,6 +804,18 @@ export class RoomCore {
     if (msg.t === 'encAllySup') { // 輔助：對玩家補血／上護盾，走信箱（百分比照對方的最大生命）
       if (!a.support) return err(rid, 'bad_enc', `${a.name} 沒有輔助能力。`);
       if (isDowned(a)) return err(rid, 'bad_enc', `${a.name} 倒地了，無法行動。`);
+      if (typeof msg.toAlly === 'string') { // 對另一位友方 NPC 施放：只有補血（NPC 沒有護盾），百分比照對方的最大生命
+        const t = findAlly(enc, msg.toAlly);
+        if (!t || t.id === a.id) return err(rid, 'bad_enc', '找不到要輔助的另一位友方 NPC。');
+        if (a.support.kind !== 'heal') return err(rid, 'bad_enc', '友方 NPC 沒有護盾，護盾只能對玩家施放。');
+        const r = healAlly(enc, t.id, Math.max(1, Math.floor((t.maxHp * a.support.pct) / 100)));
+        this.saveEncounter(enc);
+        const ev = this.record({
+          who: a.name, kind: 'skill', label: `${a.name} 對 ${t.name} 施放補血`, big: `${a.support.pct}%`, srv: true,
+          lines: [`${t.name} 生命 ${r.before} → ${t.hp} / ${t.maxHp}${r.revived ? '　站起來了！' : ''}`],
+        }, user);
+        return { out: [...this.encOk(enc, rid, user).out, { to: 'all', msg: { t: 'event', event: ev } }], close: null };
+      }
       return this.onMailSend(user, { to: msg.to, kind: 'support', skill: a.name, support: a.support.kind, pct: a.support.pct, res: 0 }, rid);
     }
     if (msg.t === 'encAllyAtk') {

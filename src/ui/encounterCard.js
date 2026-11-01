@@ -480,6 +480,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('button', { type: 'button', class: 'btn btn--small', title: '回合數 +1，敵人的技能次數與蓄力恢復（有先攻順序時，繞完一圈會自動進下一回合）', onclick: () => act({ t: 'encRound' }) }, '新回合'),
       h('button', { type: 'button', class: 'btn btn--small', onclick: () => { ui.swapFrom = null; act({ t: 'encInit' }); } }, '抽先攻'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.order?.length || enc.locked, onclick: () => act({ t: 'encStart' }) }, '開打（鎖定）'),
+      h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, title: '退回上一位（有人的回合被跳過時用；敵人已用掉的技能不會恢復）', onclick: () => act({ t: 'encPrev' }) }, '上一位'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, onclick: () => act({ t: 'encNext' }) }, '下一位'));
   }
 
@@ -742,7 +743,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const foes = enc.monsters.filter((m) => !isDowned(m));
     const foe = foes.some((m) => m.id === ui.allyFoe[a.id]) ? ui.allyFoe[a.id] : foes[0]?.id ?? '';
     const mates = teammates();
-    const to = mates.some((m) => m.uid === ui.allyTo[a.id]) ? ui.allyTo[a.id] : mates[0]?.uid ?? '';
+    // 輔助對象：玩家（uid），或另一位友方 NPC（'ally:編號'，只有補血；NPC 沒有護盾）
+    const npcTargets = a.support?.kind === 'heal' ? alliesOf(enc).filter((x) => x.id !== a.id) : [];
+    const targets = [...mates.map((m) => ({ key: m.uid, name: m.name })), ...npcTargets.map((x) => ({ key: `ally:${x.id}`, name: `🤝 ${x.name}（${x.hp}/${x.maxHp}）` }))];
+    const to = targets.some((t) => t.key === ui.allyTo[a.id]) ? ui.allyTo[a.id] : targets[0]?.key ?? '';
     const target = sel.targets[0];
     return h('li', { class: `mob${down ? ' is-downed' : ''}`, dataset: { ally: '1' } },
       h('div', { class: 'mob__pick', 'aria-label': `${a.name}，生命 ${a.hp} / ${a.maxHp}` },
@@ -769,13 +773,13 @@ export function createEncounterCard({ getState, commit, rerender }) {
                 }, ui.armed === `ally:${a.id}` ? '再點一次：承受' : `承受 ${foe} 的攻擊`)
               : null)
         : null,
-      gm && a.support && !down && mates.length
+      gm && a.support && !down && targets.length
         ? h('div', { class: 'row' },
             h('select', { class: 'field', 'aria-label': `${a.name} 的輔助對象`, onchange: (e) => { ui.allyTo[a.id] = e.target.value; } },
-              mates.map((m) => h('option', { value: m.uid, selected: m.uid === to ? true : null, text: m.name }))),
+              targets.map((t) => h('option', { value: t.key, selected: t.key === to ? true : null, text: t.name }))),
             h('button', {
               type: 'button', class: 'btn btn--small',
-              onclick: async () => { try { await encounterAction({ t: 'encAllySup', id: a.id, to }); toast(`${a.name} 對 ${mates.find((m) => m.uid === to)?.name ?? '隊友'} 施放了${SUPPORT_KINDS[a.support.kind]}。`); } catch (e) { toast(e.message || '操作失敗。'); } },
+              onclick: async () => { try { await encounterAction(to.startsWith('ally:') ? { t: 'encAllySup', id: a.id, toAlly: to.slice(5) } : { t: 'encAllySup', id: a.id, to }); toast(`${a.name} 對 ${targets.find((t) => t.key === to)?.name.replace('🤝 ', '') ?? '隊友'} 施放了${SUPPORT_KINDS[a.support.kind]}。`); } catch (e) { toast(e.message || '操作失敗。'); } },
             }, `輔助：${SUPPORT_KINDS[a.support.kind]} ${a.support.pct}%`))
         : null,
       gm

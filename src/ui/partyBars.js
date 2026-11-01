@@ -63,7 +63,7 @@ function partyDot(v, { idle = false } = {}) {
  * 單擊精簡列展開／收合；展開後在面板上雙擊也能收合；有人倒地或生命危急時會自動展開（只展開、不改記住的偏好），
  * 所以就算玩家收起來，出事時還是看得到。收合偏好記在這台裝置（localStorage）。
  */
-export function createPartyPanel({ room = defaultRoom, selfCard = null } = {}) {
+export function createPartyPanel({ room = defaultRoom, selfCard = null, selfVitals = null } = {}) {
   const { getRoomStatus, getEncounter } = room;
   const label = h('span', { class: 'sx-party__label' });
   const dots = h('span', { class: 'sx-party__dots' });
@@ -94,9 +94,10 @@ export function createPartyPanel({ room = defaultRoom, selfCard = null } = {}) {
     const r = getRoomStatus();
     const gm = new Set(r.gm?.uids ?? []);
     const self = selfCard?.() ?? null;
-    selfList.hidden = !self;
-    selfList.replaceChildren(...(self ? [self] : []));
-    if (r.phase !== 'online' || r.me?.isGm) { team.hidden = true; return; }
+    const solo = r.phase !== 'online' || r.me?.isGm; // 單機或 GM：沒有隊友列，自己的卡片照舊直接顯示
+    selfList.hidden = !self || !solo;
+    selfList.replaceChildren(...(self && solo ? [self] : []));
+    if (solo) { team.hidden = true; return; }
     team.hidden = false;
     const onlineIds = new Set(r.members.filter((m) => m.online).map((m) => m.uid));
     const hidden = new Set(r.hiddenVitals ?? []); // GM 設定「不顯示於資源條」的玩家（只是畫面過濾）
@@ -104,15 +105,16 @@ export function createPartyPanel({ room = defaultRoom, selfCard = null } = {}) {
     const inBattle = Boolean(getEncounter()?.monsters?.some((m) => m.hp > 0));
     const d = partyDigest(mates.map(([, v]) => v), { inBattle });
     node.dataset.level = d.level;
+    const me = selfVitals?.() ?? null;
     label.textContent = `隊友 ${mates.length}`;
-    dots.replaceChildren(...mates.map(([, v]) => partyDot(v, { idle: inBattle && !v.downed && usageOf(v) < NUDGE.idleUsage })));
+    dots.replaceChildren(...(me ? [partyDot(me)] : []), ...mates.map(([, v]) => partyDot(v, { idle: inBattle && !v.downed && usageOf(v) < NUDGE.idleUsage })));
     chips.replaceChildren(...[
       d.downed ? h('span', { class: 'sx-chip', dataset: { tone: 'bad' }, text: `${d.downed} 倒地` }) : null,
       !d.downed && mates.length && d.minPct < 30 ? h('span', { class: 'sx-chip', dataset: { tone: 'bad' }, text: `最低 ${d.minPct}%` }) : null,
     ].filter(Boolean));
-    pop.replaceChildren(mates.length
-      ? h('ul', { class: 'party__list' }, mates.map(([uid, v]) => mateCard(v, { online: onlineIds.has(uid), inBattle })))
-      : h('p', { class: 'hint', text: '隊友上線並操作過角色後，這裡會顯示他們的生命與資源。每一個膠囊都填到「還剩多少」，空了＝用光。' }));
+    pop.replaceChildren(
+      h('ul', { class: 'party__list' }, ...(self ? [self] : []), mates.map(([uid, v]) => mateCard(v, { online: onlineIds.has(uid), inBattle }))),
+      mates.length ? null : h('p', { class: 'hint', text: '隊友上線並操作過角色後，這裡會顯示他們的生命與資源。每一個膠囊都填到「還剩多少」，空了＝用光。' }));
     // 出事了就自動展開（有人新倒地、或有人生命危急）；已經展開的不動，收起來的偏好也不會被改掉
     const danger = mates.some(([, v]) => !v.downed && v.maxHp > 0 && v.hp / v.maxHp < NUDGE.danger);
     if (seen && !open && (d.downed > lastDowned || (danger && !lastDanger))) open = true;

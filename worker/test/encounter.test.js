@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RoomCore } from '../src/room-core.js';
 import { makeDb } from './helpers.js';
+import { POTIONS } from '../../src/game/rules.js';
 
 const GM = { uid: '100', name: 'GM', avatar: null };
 const P1 = { uid: '300', name: '玩家一', avatar: null };
@@ -314,4 +315,63 @@ test('GM 調整怪物生命：可歸零／回血／超過最大生命會拉高�
     assert.equal(errorOf(send(core, GM, { t: 'encHp', ...bad }))?.code, 'bad_enc');
   }
   assert.equal(hp('小怪2').hp, 100);
+});
+
+test('玩家餵回復藥水給友方 NPC：回復量由伺服器擲、不超過最大生命、全員看得到；非回復藥水被拒', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', rid: 'a', kind: 'mob', spec: SPEC });
+  const npc = { name: '傭兵', hp: 100, atk: '10A', def: '5A', abs: 0, support: null };
+  send(core, GM, { t: 'encAlly', rid: 'b', npc });
+  send(core, GM, { t: 'encAllyHp', rid: 'c', id: '友軍1', hp: -5 });
+  const potion = Object.keys(POTIONS).find((n) => POTIONS[n].heal && !POTIONS[n].atk && !POTIONS[n].def);
+  const res = send(core, P1, { t: 'encAllyFeed', rid: 'd', id: '友軍1', potion });
+  assert.equal(errorOf(res), undefined);
+  const a = encOf(res).allies[0];
+  assert.ok(a.hp > -5 && a.hp <= a.maxHp);
+  assert.ok(res.out.some((o) => o.msg.t === 'event' && o.msg.event.label.includes('餵 傭兵')));
+  const bad = send(core, P1, { t: 'encAllyFeed', rid: 'e', id: '友軍1', potion: '不存在的藥水' });
+  assert.ok(errorOf(bad));
+  const gone = send(core, P1, { t: 'encAllyFeed', rid: 'f', id: '友軍9', potion });
+  assert.ok(errorOf(gone));
+});
+
+test('友方 NPC 的補血輔助可以對另一位 NPC 施放（百分比照對方最大生命）；護盾、自己、不存在的對象被拒', () => {
+  const core = room();
+  const healer = { name: '牧師', hp: 50, atk: '', def: '', abs: 0, support: { kind: 'heal', pct: 20 } };
+  const tank = { name: '盾兵', hp: 200, atk: '', def: '', abs: 0, support: null };
+  send(core, GM, { t: 'encAlly', npc: healer });
+  send(core, GM, { t: 'encAlly', npc: tank });
+  send(core, GM, { t: 'encAllyHp', id: '友軍2', hp: 10 });
+  const res = send(core, GM, { t: 'encAllySup', rid: 'x', id: '友軍1', toAlly: '友軍2' });
+  assert.equal(errorOf(res), undefined);
+  assert.equal(encOf(res).allies[1].hp, 50); // 10 + 200 × 20% = 50
+  assert.ok(errorOf(send(core, GM, { t: 'encAllySup', id: '友軍1', toAlly: '友軍1' })));
+  assert.ok(errorOf(send(core, GM, { t: 'encAllySup', id: '友軍1', toAlly: '友軍9' })));
+  send(core, GM, { t: 'encAlly', npc: { ...healer, name: '護盾師', support: { kind: 'shield', pct: 20 } } });
+  assert.ok(errorOf(send(core, GM, { t: 'encAllySup', id: '友軍3', toAlly: '友軍2' })));
+});
+
+test('聊天訊息：任何成員都能發、全員廣播、過長會被截斷', () => {
+  const core = room();
+  const res = send(core, P1, { t: 'post', rid: 'c', event: { kind: 'chat', label: '大家好 ww' } });
+  const ev = res.out.find((o) => o.msg.t === 'event')?.msg.event;
+  assert.equal(ev.kind, 'chat');
+  assert.equal(ev.label, '大家好 ww');
+  assert.equal(res.out.find((o) => o.msg.t === 'event').to, 'all');
+});
+
+test('上一位（encPrev）：只有 GM、開打後才能用；退回上一回合時回合數 -1，但敵人已用掉的技能次數不補滿', () => {
+  const core = room((n) => n);
+  send(core, GM, { t: 'encAdd', kind: 'elite', spec: { ...SPEC, count: 1 } });
+  send(core, GM, { t: 'encInit' }, { online: ['100', '300', '400'] });
+  assert.equal(errorOf(send(core, P1, { t: 'encPrev' }))?.code, 'forbidden');
+  assert.equal(errorOf(send(core, GM, { t: 'encPrev' }))?.code, 'bad_enc'); // 還沒開打
+  const n = encOf(send(core, GM, { t: 'encStart' })).order.length;
+  assert.equal(errorOf(send(core, GM, { t: 'encPrev' }))?.code, 'bad_enc'); // 第 1 回合第一位不能再退
+  for (let i = 0; i < n; i++) send(core, GM, { t: 'encNext' }); // 繞一圈進第 2 回合
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'a', id: '菁英1', use: 'atk' })).left, 1); // 第 2 回合用掉 1 次攻擊
+  const back = encOf(send(core, GM, { t: 'encPrev' }));
+  assert.deepEqual([back.turn, back.round], [n - 1, 1]);
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'b', id: '菁英1', use: 'atk' })).left, 0); // 沒補滿：只剩最後 1 次
+  assert.match(errorOf(send(core, P1, { t: 'encUse', rid: 'c', id: '菁英1', use: 'atk' })).message, /已經攻擊 2 次/);
 });

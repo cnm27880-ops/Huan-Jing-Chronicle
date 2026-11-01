@@ -19,7 +19,8 @@ import { openFoodSheet } from './statusBar.js';
 import { LIFE_SKILLS, ART_SKILLS, STOMACH_SLOTS } from '../game/rules.js';
 import { modifier, proficiency, endSession, countOf, removeItem, FOOD_BAG, foodBagSlots, foodBags, spitToBag, takeFromBag } from '../game/engine.js';
 import { parseDiceExpr, MAX_DICE } from '../game/dice.js';
-import { rollDice, rollCheck, clearLog, getRoomStatus, subscribeRoom, getEncounter } from '../state/rollLog.js';
+import { rollDice, rollCheck, clearLog, getRoomStatus, subscribeRoom, getEncounter, publish } from '../state/rollLog.js';
+import { vitalsOf } from '../state/vitals.js';
 import { iconOf } from './items.js';
 import { createEncounterCard } from './encounterCard.js';
 import { createBattleView, isBattleEvent } from './battleView.js';
@@ -31,8 +32,8 @@ const readDiceCollapsed = () => { try { return localStorage.getItem(DICE_FOLD_KE
 const MOBILE_MQ = '(max-width: 900px)'; // 收合只在手機有效（電腦沒有收合鈕，不能卡在收合）
 const saveDiceCollapsed = (v) => { try { localStorage.setItem(DICE_FOLD_KEY, v ? '1' : '0'); } catch { /* 存不了就算了，下次照預設 */ } };
 const LEFT_TABS = [['moves', '招式'], ['items', '藥水與狀態'], ['skills', '技能檢定']];
-// 跑團紀錄只放「檢定、自訂骰、戰鬥」；鑑定、黑市、鑲嵌、GM 異動等都在「日誌」頁
-const sessionEvent = (e) => e.kind === 'check' || e.kind === 'dice' || isBattleEvent(e);
+// 跑團紀錄只放「檢定、自訂骰、聊天、戰鬥」；鑑定、黑市、鑲嵌、GM 異動等都在「日誌」頁
+const sessionEvent = (e) => e.kind === 'check' || e.kind === 'dice' || e.kind === 'chat' || isBattleEvent(e);
 const LOG_EMPTY = '按下任何一顆骰子，或出招、承受攻擊，結果會出現在這裡。';
 
 export function createSessionView({ root, getState, commit }) {
@@ -60,7 +61,7 @@ export function createSessionView({ root, getState, commit }) {
   const feedBox = h('div', { class: 'sx-feed', role: 'log', 'aria-label': '擲骰紀錄' });
   const diceBox = h('div', { class: 'sx-dice' });
   // 資源條：第一張是自己（樣式比照隊友卡＋三防，可點開調整面板；手機改用頂部膠囊 HUD），後面是隊友（玩家端；GM 不顯示隊友）
-  const party = createPartyPanel({ selfCard: () => battle.selfMate(getState()) });
+  const party = createPartyPanel({ selfCard: () => battle.selfMate(getState()), selfVitals: () => vitalsOf(getState()) });
   const right = h('aside', { class: 'sx-col sx-right', 'aria-label': '紀錄與擲骰' }, top, party.node, roomDetails, feedHead, feedBox, diceBox);
   const barBtn = (id, label, controls) => h('button', {
     type: 'button', class: 'sx-bar__btn', dataset: { id }, 'aria-controls': controls, 'aria-expanded': 'false',
@@ -263,7 +264,21 @@ export function createSessionView({ root, getState, commit }) {
     return parseDiceExpr(`${ui.count}D${ui.sides}${ui.mod ? (ui.mod > 0 ? '+' : '') + ui.mod : ''}`);
   }
 
+  /** 輸入框裡的字是不是骰式：有字又不是骰式＝聊天訊息（只有連上房間才能聊） */
+  const isChat = () => Boolean(ui.text.trim()) && Boolean(expression().error);
+  const MAX_CHAT = 120;
+
+  function sendChat() {
+    const text = ui.text.trim().slice(0, MAX_CHAT);
+    if (!text) return;
+    if (getRoomStatus().phase !== 'online') return toast('連上房間後才能聊天。');
+    publish({ who: getState().name, kind: 'chat', label: text });
+    ui.text = '';
+    renderDice();
+  }
+
   async function rollCustom() {
+    if (isChat()) return sendChat();
     const expr = expression();
     if (expr.error) return;
     try {
@@ -281,22 +296,23 @@ export function createSessionView({ root, getState, commit }) {
   function renderDice() {
     const expr = expression();
     const folded = ui.diceCollapsed && window.matchMedia(MOBILE_MQ).matches;
-    const rollTitle = () => (expression().error ? '骰式格式不對' : `擲 ${expression().text}`);
+    const rollTitle = () => (isChat() ? '傳送聊天訊息' : expression().error ? '骰式格式不對' : `擲 ${expression().text}`);
+    const rollLabel = () => (isChat() ? '傳送' : '投骰');
+    const rollOff = () => expression().error && !isChat();
     diceBox.dataset.collapsed = folded ? '1' : '0';
-    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(expr.error), title: rollTitle(), onclick: rollCustom }, folded ? `投骰 ${expr.error ? '' : expr.text}` : '投骰');
+    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(rollOff()), title: rollTitle(), onclick: rollCustom }, folded ? `投骰 ${expr.error ? '' : expr.text}` : rollLabel());
     const fold = h('button', {
       type: 'button', class: 'btn btn--quiet btn--small sx-dice__fold', 'aria-expanded': String(!ui.diceCollapsed), 'aria-label': ui.diceCollapsed ? '展開骰盤' : '收合骰盤',
       onclick: () => { ui.diceCollapsed = !ui.diceCollapsed; saveDiceCollapsed(ui.diceCollapsed); renderDice(); },
     }, ui.diceCollapsed ? '展開' : '收合');
     if (folded) { diceBox.replaceChildren(h('div', { class: 'sx-dice__row sx-dice__row--fold' }, fold, rollBtn)); return; }
     diceBox.replaceChildren(
+      // 第一列：骰型、顆數、加減（同一排）；第二列：輸入框（骰式或聊天）＋投骰／傳送
       h('div', { class: 'sx-dice__top' },
         h('div', { class: 'sx-dice__sides', role: 'radiogroup', 'aria-label': '骰子面數' }, SIDES.map((n) => h('button', {
           type: 'button', class: 'sx-side', role: 'radio', 'aria-checked': String(!ui.text.trim() && ui.sides === n),
           onclick: () => { ui.sides = n; ui.text = ''; renderDice(); },
         }, `D${n}`))),
-        fold),
-      h('div', { class: 'sx-dice__row' },
         h('input', {
           class: 'field sx-dice__n', type: 'number', inputmode: 'numeric', min: 1, max: MAX_DICE, value: ui.count, placeholder: '顆', title: '幾顆', 'aria-label': '幾顆',
           onchange: (e) => { ui.count = Math.min(MAX_DICE, Math.max(1, Math.trunc(Number(e.target.value)) || 1)); ui.text = ''; renderDice(); },
@@ -305,16 +321,18 @@ export function createSessionView({ root, getState, commit }) {
           class: 'field sx-dice__n', type: 'number', inputmode: 'numeric', value: ui.mod || '', placeholder: '加減', title: '加減值', 'aria-label': '加減值',
           onchange: (e) => { ui.mod = Math.trunc(Number(e.target.value)) || 0; ui.text = ''; renderDice(); },
         }),
+        fold),
+      h('div', { class: 'sx-dice__row' },
         h('input', {
-          class: 'field sx-dice__expr', type: 'text', placeholder: '或輸入 2D6+3', value: ui.text, autocomplete: 'off', 'aria-label': '直接輸入骰式',
+          class: 'field sx-dice__expr', type: 'text', placeholder: '輸入骰式 2D6+3，或直接聊天', maxlength: MAX_CHAT, value: ui.text, autocomplete: 'off', 'aria-label': '輸入骰式或聊天訊息',
           oninput: (e) => {
             ui.text = e.target.value;
-            const ex = expression();
-            rollBtn.disabled = Boolean(ex.error);
+            rollBtn.disabled = Boolean(rollOff());
             rollBtn.title = rollTitle();
+            rollBtn.textContent = rollLabel();
             diceBox.querySelectorAll('.sx-dice__sides .sx-side').forEach((c) => c.setAttribute('aria-checked', String(!ui.text.trim() && c.textContent === `D${ui.sides}`)));
           },
-          onkeydown: (e) => { if (e.key === 'Enter') rollCustom(); },
+          onkeydown: (e) => { if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) rollCustom(); }, // 中文輸入法選字時的 Enter 不算送出
         }),
         rollBtn));
   }

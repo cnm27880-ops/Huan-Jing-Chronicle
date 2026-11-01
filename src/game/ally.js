@@ -10,7 +10,7 @@
 // ============================================================
 import { TRACKS } from './rules.js';
 import { clash, monsterAtk, monsterDef, monsterAbs, isDowned, parseAbc } from './combat.js';
-import { spendEnemyB } from './enemy.js';
+import { spendEnemyB, carrySkillUses } from './enemy.js';
 
 export const MAX_ALLIES = 12;
 export const SUPPORT_KINDS = { heal: '補血', shield: '護盾' };
@@ -114,6 +114,43 @@ export function setAllyHp(enc, allyId, hp) {
   const before = ally.hp;
   ally.hp = Math.min(ally.maxHp, n);
   return { ally, before };
+}
+
+/** 回復 NPC 生命（餵藥用，任何玩家都能餵）：不超過最大生命；倒地的拉到正數才算站起來。NPC 沒有毒性。 */
+export function healAlly(enc, allyId, amount) {
+  const ally = findAlly(enc, allyId);
+  if (!ally) return { error: '找不到這位友方 NPC，可能已離開戰鬥。' };
+  const n = Math.floor(Number(amount));
+  if (!Number.isInteger(n) || n < 0) return { error: '回復量錯誤。' };
+  const before = ally.hp;
+  const wasDowned = isDowned(ally);
+  ally.hp = Math.min(ally.maxHp, ally.hp + n);
+  return { ally, before, healed: ally.hp - before, revived: wasDowned && !isDowned(ally) };
+}
+
+/**
+ * 先攻退回上一位（GM 按錯、或有人的回合被跳過時用）：倒下的怪物與倒地的 NPC 一樣跳過；
+ * 退回上一回合時回合數 -1，但敵人已用掉的技能次數與蓄力保留，不會補滿。已經是第 1 回合第一位就不能再退。
+ * 回傳 { ok, turn, round } 或 { error }
+ */
+export function retreatTurn(enc) {
+  const n = enc.order?.length ?? 0;
+  let turn = enc.turn ?? 0;
+  let round = enc.round ?? 1;
+  for (let step = 0; step < n; step++) {
+    if (turn === 0) {
+      if (round <= 1) return { error: '已經是第 1 回合的第一位，不能再退回了。' };
+      turn = n - 1; round -= 1;
+    } else turn -= 1;
+    const cur = enc.order[turn];
+    const m = cur.kind === 'monster' ? enc.monsters.find((x) => x.id === cur.id) : cur.kind === 'ally' ? findAlly(enc, cur.id) : null;
+    if (cur.kind === 'player' || (m && !isDowned(m))) {
+      if (round !== (enc.round ?? 1)) carrySkillUses(enc, enc.round ?? 1, round);
+      enc.turn = turn; enc.round = round;
+      return { ok: true, turn, round };
+    }
+  }
+  return { error: '前面沒有可以退回的對象（倒下的怪物與倒地的 NPC 會被跳過）。' };
 }
 
 /** 新的先攻位置：把一個參與者插進順序的隨機位置（已開打時插在目前輪到的位置之前的，下一回合才輪到；輪到的人不變） */
