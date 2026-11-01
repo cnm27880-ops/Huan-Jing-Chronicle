@@ -83,7 +83,7 @@ test('日誌：不在白名單的人不能回報也不能查', () => {
   assert.equal(send(core, out, { t: 'actList', rid: 'a' }).close?.code, 4403);
 });
 
-test('日誌：只有 GM 能刪除；刪除後全員收到通知、查不到，並留一筆系統日誌；重複刪除會報錯', () => {
+test('日誌：只有 GM 能刪除；刪除後全員收到通知、查不到，且不再留下刪除紀錄；重複刪除會報錯', () => {
   const GM = { uid: '100', name: 'GM', avatar: null };
   const core = room();
   core.join(GM);
@@ -95,6 +95,6 @@ test('日誌：只有 GM 能刪除；刪除後全員收到通知、查不到，�
   assert.ok(res.out.some((o) => o.to === 'all' && o.msg.t === 'actGone' && o.msg.id === seq));
   const rest = list(core, P2, { cat: 'rest' }).entries;
   assert.ok(!rest.some((e) => e.id === seq));
-  assert.ok(list(core, P2, { cat: 'sys' }).entries.some((e) => e.text.includes('刪除了一筆日誌')));
+  assert.equal(list(core, P2, { cat: 'sys' }).entries.length, 0); // 刪除本身不留日誌
   assert.equal(errorOf(send(core, GM, { t: 'actDel', rid: 'd2', id: seq }))?.code, 'bad_activity');
 });
