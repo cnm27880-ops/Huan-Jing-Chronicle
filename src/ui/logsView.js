@@ -4,7 +4,9 @@
 // 沒加入房間（單機試玩）：只看得到這個瀏覽器自己的紀錄。內容一律用 textContent（防 XSS）。
 // ============================================================
 import { h } from './dom.js';
-import { getRoomStatus, subscribeRoom, listActivity, subscribeActivity } from '../state/rollLog.js';
+import { getRoomStatus, subscribeRoom, listActivity, subscribeActivity, subscribeActivityGone, deleteActivity } from '../state/rollLog.js';
+import { askConfirm } from './confirmPop.js';
+import { toast } from './controls.js';
 import { localActivities } from '../state/activityLog.js';
 import { ACTIVITY_CATS } from '../game/activity.js';
 
@@ -20,6 +22,7 @@ export function createLogsView({ root }) {
   const ui = { uid: '', cat: '', entries: [], more: false, next: null, loading: false, error: '', loaded: false, active: false, wasOnline: false };
   let token = 0; // 切換篩選時，只收最新那次查詢的結果
   let unsubAct = null;
+  let unsubGone = null;
   let unsubRoom = null;
   const online = () => getRoomStatus().phase === 'online';
 
@@ -55,6 +58,20 @@ export function createLogsView({ root }) {
     render();
   }
 
+  /** GM 刪掉了一筆（自己或別的 GM）：從目前的清單拿掉 */
+  function onGone(id) {
+    if (!ui.active || !ui.entries.some((e) => e.id === id)) return;
+    ui.entries = ui.entries.filter((e) => e.id !== id);
+    render();
+  }
+
+  /** GM 的「編輯」：目前只有刪除，按下去先確認 */
+  async function editEntry(e, btn) {
+    const ok = await askConfirm(btn, { title: '編輯日誌', lines: [`${e.who || e.name || '玩家'}：${e.text}`, '要刪除這筆日誌嗎？刪除後所有人都看不到，無法復原。'], okText: '刪除這筆', danger: true });
+    if (!ok) return;
+    try { await deleteActivity(e.id); toast('已刪除這筆日誌。'); } catch (err) { toast(err?.message ?? '刪除失敗。'); }
+  }
+
   function playerOptions() {
     const r = getRoomStatus();
     return (r.members ?? []).map((m) => ({ uid: m.uid, name: r.vitals?.[m.uid]?.name || m.name }));
@@ -67,7 +84,10 @@ export function createLogsView({ root }) {
         h('span', { class: 'log-entry__time num', text: timeText(e.t) }),
         h('strong', { class: 'log-entry__who', text: e.who || e.name || '玩家' }),
         showPlayer ? h('small', { class: 'log-entry__player', text: e.name }) : null,
-        h('span', { class: 'badge log-entry__cat', dataset: { cat: e.cat }, text: ACTIVITY_CATS[e.cat] ?? e.cat })),
+        h('span', { class: 'badge log-entry__cat', dataset: { cat: e.cat }, text: ACTIVITY_CATS[e.cat] ?? e.cat }),
+        online() && getRoomStatus().me?.isGm && e.id
+          ? h('button', { type: 'button', class: 'btn btn--ghost btn--small log-entry__edit', onclick: (ev) => editEntry(e, ev.currentTarget) }, '編輯')
+          : null),
       h('p', { class: 'log-entry__text', text: e.text }),
       e.lines?.length
         ? h('details', { class: 'log-entry__more' },
@@ -111,6 +131,7 @@ export function createLogsView({ root }) {
     render() {
       ui.active = true;
       if (!unsubAct) unsubAct = subscribeActivity(onLive);
+      if (!unsubGone) unsubGone = subscribeActivityGone(onGone);
       if (!unsubRoom) {
         ui.wasOnline = online();
         unsubRoom = subscribeRoom(() => { // 剛連上（或斷線）：換成伺服器（或本機）的資料
@@ -125,6 +146,7 @@ export function createLogsView({ root }) {
     leave() {
       ui.active = false; ui.loaded = false; // 下次進來重新查，才會是最新的
       unsubAct?.(); unsubAct = null;
+      unsubGone?.(); unsubGone = null;
       unsubRoom?.(); unsubRoom = null;
     },
   };
