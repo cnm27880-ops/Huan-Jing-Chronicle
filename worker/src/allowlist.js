@@ -5,10 +5,10 @@ export function parseIdList(raw) {
 
 export const parseAllowlist = parseIdList;
 
-/** 登入白名單：空 = 不限制（階段 1-A 的行為，不變） */
+/** 登入白名單：安全預設，名單為空 = 一律拒絕（設定漏填不能讓大門敞開） */
 export function isAllowed(env, userId) {
   const list = parseIdList(env.DISCORD_ALLOWED_IDS);
-  return list.length === 0 || list.includes(String(userId));
+  return list.length > 0 && list.includes(String(userId));
 }
 
 /** 房間成員：安全預設，名單為空 = 一律拒絕 */

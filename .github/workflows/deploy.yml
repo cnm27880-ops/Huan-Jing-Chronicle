@@ -27,10 +27,12 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22.13' # 釘明確版本；worker 測試用的 node:sqlite 從 22.13 起不用額外旗標
           cache: npm
       - name: Install
         run: npm ci
+      - name: Test
+        run: npm test # 測試失敗就擋下部署
       - name: Build
         run: npm run build
       - name: Setup Pages
@@ -42,3 +44,15 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      # 部署失敗通知（選用）：到 repo 的 Settings → Secrets and variables → Actions 新增 DISCORD_WEBHOOK_URL；
+      # 沒設定就不通知。網址絕對不要寫進這個檔案。
+      - name: Notify failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then echo "沒有設定 DISCORD_WEBHOOK_URL，略過通知"; exit 0; fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "{\"content\":\"幻境編年史網站部署失敗：$RUN_URL\"}" "$DISCORD_WEBHOOK_URL"

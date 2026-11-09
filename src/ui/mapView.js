@@ -36,6 +36,7 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
     stage.classList.toggle('is-animating', animate);
     stage.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
     viewport.dataset.zoomed = state.scale > state.fit * 1.05 ? 'true' : 'false';
+    stage.style.setProperty('--map-inv', String(1 / state.scale)); // 熱點的透明可點範圍用：不管縮多小都至少 MIN_TAP 像素
   }
 
   function computeFit() {
@@ -93,6 +94,31 @@ export function createMapView({ viewport, stage, hotspotLayer, onSelect }) {
     },
     { passive: false }
   );
+
+  // ---------- 按鈕與鍵盤（H10）：縮放按鈕、方向鍵移動、＋／－縮放、0 回到整張圖 ----------
+  const centerPoint = () => ({ x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 });
+  function zoomBy(factor) { const c = centerPoint(); zoomAt(state.scale * factor, c.x, c.y, true); }
+  function panBy(dx, dy) { state.x += dx; state.y += dy; apply(true); }
+  const controls = viewport.parentElement?.querySelector('.map-controls');
+  controls?.addEventListener('click', (e) => {
+    const act = e.target.closest?.('[data-map-zoom]')?.dataset.mapZoom;
+    if (act === 'in') zoomBy(1.5);
+    else if (act === 'out') zoomBy(1 / 1.5);
+    else if (act === 'reset') reset(true);
+  });
+  viewport.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const step = 80;
+    const handled = {
+      ArrowLeft: () => panBy(step, 0), ArrowRight: () => panBy(-step, 0),
+      ArrowUp: () => panBy(0, step), ArrowDown: () => panBy(0, -step),
+      '+': () => zoomBy(1.5), '=': () => zoomBy(1.5), '-': () => zoomBy(1 / 1.5), _: () => zoomBy(1 / 1.5),
+      '0': () => reset(true), Home: () => reset(true),
+    }[e.key];
+    if (!handled) return;
+    e.preventDefault();
+    handled();
+  });
 
   // ---------- 拖曳、雙指縮放、點兩下放大 ----------
   // 注意：不使用 setPointerCapture，否則熱點按鈕會收不到 click

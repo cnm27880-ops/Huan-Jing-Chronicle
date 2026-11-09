@@ -11,7 +11,7 @@ const env = {
   DISCORD_CLIENT_ID: '111',
   DISCORD_CLIENT_SECRET: 'client-secret-xyz',
   DISCORD_REDIRECT_URI: `${API}/auth/callback`,
-  DISCORD_ALLOWED_IDS: '',
+  DISCORD_ALLOWED_IDS: '42',
   SESSION_SECRET: 'test-session-secret',
 };
 const call = (path, init = {}, e = env) => worker.fetch(new Request(API + path, init), e);
@@ -172,9 +172,10 @@ test('Discord 換 token 失敗：導回 login=error，沒有 session', async () 
   } finally { d.restore(); }
 });
 
-test('白名單：空 = 不限制；有名單時只放行名單內', async () => {
-  assert.equal(isAllowed({ DISCORD_ALLOWED_IDS: '' }, '1'), true);
-  assert.equal(isAllowed({ DISCORD_ALLOWED_IDS: ' , ' }, '1'), true);
+test('白名單：空 = 一律拒絕；有名單時只放行名單內', async () => {
+  assert.equal(isAllowed({ DISCORD_ALLOWED_IDS: '' }, '1'), false);
+  assert.equal(isAllowed({ DISCORD_ALLOWED_IDS: ' , ' }, '1'), false)
+  assert.equal(isAllowed({}, '1'), false);
   assert.equal(isAllowed({ DISCORD_ALLOWED_IDS: '1, 2' }, '2'), true);
   assert.equal(isAllowed({ DISCORD_ALLOWED_IDS: '1, 2' }, '3'), false);
 
@@ -184,6 +185,12 @@ test('白名單：空 = 不限制；有名單時只放行名單內', async () =>
   const denied = await fullLogin({ id: '43', username: 'b' }, e);
   assert.equal(denied.res.headers.get('Location'), `${SITE}/?login=denied`);
   assert.equal(cookieOf(denied.res, 'hj_session'), null);
+
+  // 名單為空：任何 Discord 帳號登入都被拒絕
+  const empty = { ...env, DISCORD_ALLOWED_IDS: '' };
+  const emptyLogin = await fullLogin({ id: '42', username: 'a' }, empty);
+  assert.equal(emptyLogin.res.headers.get('Location'), `${SITE}/?login=denied`);
+  assert.equal(cookieOf(emptyLogin.res, 'hj_session'), null);
 
   // 先登入、之後名單收緊：舊 session 也失效
   const token = cookieOf(okLogin.res, 'hj_session');
@@ -306,6 +313,6 @@ test('每次 /auth/me 都重查白名單：未到期的 session 被移出名單�
   assert.equal((await removed.json()).user, null);
   assert.equal(removed.headers.getSetCookie().length, 0);
 
-  // 名單清空 = 不限制，又恢復可用
-  assert.equal((await (await meWith(token, { ...env, DISCORD_ALLOWED_IDS: '' })).json()).user.id, '42');
+  // 名單清空 = 一律拒絕（設定漏填不能放行）
+  assert.equal((await (await meWith(token, { ...env, DISCORD_ALLOWED_IDS: '' })).json()).user, null);
 });

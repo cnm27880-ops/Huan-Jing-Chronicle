@@ -8,6 +8,7 @@
 // 伺服器端規則見 worker/src/room-core.js 的「角色存檔」。
 // ============================================================
 import * as defaultRoom from './rollLog.js';
+import { reportStorageProblem } from './storageIssue.js';
 
 const { roomRequest } = defaultRoom;
 
@@ -22,7 +23,7 @@ function readMeta() {
   return { uid: null, version: 0, dirty: false, waiting: false };
 }
 function writeMeta(meta) {
-  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* 忽略 */ }
+  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (err) { reportStorageProblem(err, '同步狀態'); }
 }
 
 const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) : '不明');
@@ -36,6 +37,7 @@ const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) 
 export function createCharSync({
   getState, adopt, hasLocalSave, confirmFn = (t) => window.confirm(t), notify = () => {}, room = defaultRoom,
   stashLocal = () => {}, unstashLocal = () => false, onAccountSwitch = () => {},
+  isBlocked = () => false, // 本機存檔讀壞、畫面上是示範角色時為 true：絕不能把畫面上的角色上傳去蓋伺服器
 }) {
   const { roomRequest: request, getRoomStatus, subscribeRoom } = room;
   let timer = null;
@@ -65,6 +67,7 @@ export function createCharSync({
   const run = (fn) => { chain = chain.then(async () => { await fn(); if (online()) resetRetry(); }).catch(failed); return chain; };
 
   async function push(base) {
+    if (isBlocked()) return;
     const sent = gen;
     const res = await request({ t: 'charPut', base, data: getState() });
     if (res.ok) {
@@ -107,7 +110,7 @@ export function createCharSync({
     const metaStash = (uid) => `${META_KEY}:stash:${uid}`;
     if (!meta.waiting) { // 等待中表示本機只是示範角色，不用收
       stashLocal(meta.uid);
-      try { localStorage.setItem(metaStash(meta.uid), JSON.stringify(meta)); } catch { /* 忽略 */ }
+      try { localStorage.setItem(metaStash(meta.uid), JSON.stringify(meta)); } catch (err) { reportStorageProblem(err, '同步狀態'); }
     }
     let next = { uid: toUid, version: 0, dirty: false, waiting: false };
     if (unstashLocal(toUid)) {

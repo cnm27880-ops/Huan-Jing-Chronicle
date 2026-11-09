@@ -47,3 +47,40 @@ export async function runBackup(env, now = Date.now()) {
   }
   return done;
 }
+
+export const RETRY_DELAY_MS = 3 * 60_000; // 失敗後等幾分鐘再試一次
+
+/** 通知備份失敗（Discord webhook，網址放 Cloudflare Secrets 的 BACKUP_ALERT_WEBHOOK；沒設定就只寫 log） */
+export async function notifyBackupFailure(env, err, fetchFn = fetch) {
+  const url = env.BACKUP_ALERT_WEBHOOK;
+  if (!url) { console.error('backup: 沒有設定 BACKUP_ALERT_WEBHOOK，無法通知'); return false; }
+  try {
+    const res = await fetchFn(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: `幻境編年史每日備份失敗（已重試一次）：${String(err?.message ?? err).slice(0, 300)}` }),
+    });
+    if (!res.ok) { console.error('backup: 通知回應異常', res.status); return false; }
+    return true;
+  } catch (e) {
+    console.error('backup: 通知發送失敗', e);
+    return false;
+  }
+}
+
+/** 排程用：失敗先記 log、等幾分鐘重試一次，重試仍失敗才通知。回傳成功的結果；最後失敗不丟錯（通知與 log 已處理） */
+export async function runBackupWithRetry(env, { now, delayMs = RETRY_DELAY_MS, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), fetchFn = fetch } = {}) {
+  try {
+    return await runBackup(env, now);
+  } catch (first) {
+    console.error('backup: 第一次失敗，稍後重試', first);
+    await sleep(delayMs);
+    try {
+      return await runBackup(env, now === undefined ? undefined : now + delayMs);
+    } catch (second) {
+      console.error('backup: 重試仍失敗', second);
+      await notifyBackupFailure(env, second, fetchFn);
+      return null;
+    }
+  }
+}

@@ -1,6 +1,10 @@
 node_modules/
 dist/
 .DS_Store
+*.log
+coverage/
+.nyc_output/
+/.wrangler/
 
 # 機密與玩家資料：絕對不要上傳
 .env
@@ -8,3 +12,9 @@ dist/
 .dev.vars
 players_data.json
 *.token
+
+# 備份檔含全團玩家資料（R2 每日備份 .json.gz）：不能進公開 repo
+*.json.gz
+*.gz
+*.zip
+backup/

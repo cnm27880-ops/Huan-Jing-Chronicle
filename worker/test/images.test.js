@@ -136,7 +136,7 @@ const cookie = async (uid) => `hj_session=${await signToken({ uid, name: '玩家
 
 test('立繪網址：登入且在白名單內才轉給房間；其他情況擋下', async () => {
   const seen = [];
-  const ROOM = { idFromName: (n) => n, get: () => ({ fetch: async (req) => { seen.push(req); return new Response('img'); } }) };
+  const ROOM = { idFromName: (n) => n, get: () => ({ fetch: async (req) => { if (new URL(req.url).pathname.startsWith('/sv/')) return Response.json({ v: 0 }); seen.push(req); return new Response('img'); } }) };
   const id = 'a'.repeat(32);
   const get = async (path, headers = {}, method = 'GET') => worker.fetch(new Request(API + path, { method, headers }), { ...workerEnv, ROOM });
   assert.equal((await get(`/rooms/main/img/${id}`)).status, 401);

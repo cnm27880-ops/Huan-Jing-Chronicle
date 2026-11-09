@@ -53,3 +53,41 @@ test('runBackup：寫進 R2 的是可解壓縮的 JSON，並清掉過期的', as
 test('沒綁 R2 時明確報錯（不要悄悄略過）', async () => {
   await assert.rejects(runBackup({ ROOM: {} }), /R2/);
 });
+
+// ---------- M17：失敗重試與通知 ----------
+import { runBackupWithRetry, notifyBackupFailure } from '../src/backup.js';
+
+function flakyEnv(failTimes) {
+  let calls = 0;
+  const stored = new Map();
+  const BACKUP = { put: async (k, v) => { stored.set(k, v); }, list: async () => ({ objects: [...stored.keys()].map((key) => ({ key })) }), delete: async () => {} };
+  const ROOM = { idFromName: (n) => n, get: () => ({ dumpAll: async () => { calls += 1; if (calls <= failTimes) throw new Error('DO 故障'); return { format: 1, takenAt: 1, tables: {} }; } }) };
+  return { env: { BACKUP, ROOM, BACKUP_ALERT_WEBHOOK: 'https://example.invalid/hook' }, calls: () => calls, stored };
+}
+
+test('備份第一次失敗：記 log、等一下重試，重試成功就不通知', async () => {
+  const { env, calls } = flakyEnv(1);
+  const sleeps = []; const posts = [];
+  const done = await runBackupWithRetry(env, { sleep: async (ms) => { sleeps.push(ms); }, fetchFn: async (u, o) => { posts.push([u, o]); return { ok: true }; } });
+  assert.equal(calls(), 2);
+  assert.equal(sleeps.length, 1);
+  assert.equal(posts.length, 0);
+  assert.equal(done.length, 1);
+});
+
+test('備份連續失敗：重試一次後發通知，不丟錯', async () => {
+  const { env, calls } = flakyEnv(5);
+  const posts = [];
+  const done = await runBackupWithRetry(env, { sleep: async () => {}, fetchFn: async (u, o) => { posts.push([u, JSON.parse(o.body)]); return { ok: true }; } });
+  assert.equal(done, null);
+  assert.equal(calls(), 2); // 只重試一次
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0][0], 'https://example.invalid/hook');
+  assert.match(posts[0][1].content, /備份失敗.*DO 故障/);
+});
+
+test('沒設定通知網址或通知本身失敗：只記 log，不影響流程', async () => {
+  assert.equal(await notifyBackupFailure({}, new Error('x')), false);
+  assert.equal(await notifyBackupFailure({ BACKUP_ALERT_WEBHOOK: 'u' }, new Error('x'), async () => { throw new Error('network'); }), false);
+  assert.equal(await notifyBackupFailure({ BACKUP_ALERT_WEBHOOK: 'u' }, new Error('x'), async () => ({ ok: false, status: 500 })), false);
+});
