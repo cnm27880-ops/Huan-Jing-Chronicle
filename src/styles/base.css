@@ -55,7 +55,7 @@
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
-button:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+button:disabled { color: var(--ctl-disabled-text); background: var(--ctl-disabled-bg); border-color: var(--line-soft); cursor: not-allowed; box-shadow: none; } /* 停用：實色淡灰文字，不只靠透明度（對比不掉） */
 
 /* 緊湊 */
 .btn--small {
