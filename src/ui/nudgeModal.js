@@ -11,6 +11,7 @@ import { takeItems, refundItems } from '../game/mail.js';
 import { detectEvents, createNudgeGate, canFeed, myOptions } from '../game/nudge.js';
 import { resPill } from './partyBars.js';
 import { pushLayer } from './modalStack.js';
+import { TOXICITY_MAX } from '../game/rules.js';
 
 const LOCK_MS = 1000; // 「我知道了」要等一下才能按（不是故意刁難：避免連點把提醒直接關掉）
 const pctOf = (v) => (v.maxHp > 0 ? Math.round((v.hp / v.maxHp) * 100) : 0);
@@ -57,7 +58,7 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
   function metaOf(ev) {
     const uid = ev.uid ?? targetOf(ev);
     const v = uid ? vitals[uid] : null;
-    const sub = v ? `生命 ${fmt(v.hp)}/${fmt(v.maxHp)}${typeof v.tox === 'number' ? `・毒性 ${v.tox}/15` : ''}` : '';
+    const sub = v ? `生命 ${fmt(v.hp)}/${fmt(v.maxHp)}${typeof v.tox === 'number' ? `・毒性 ${v.tox}/${TOXICITY_MAX}` : ''}` : '';
     if (ev.kind === 'downed') return { icon: '✚', title: `${ev.name} 倒地了`, sub, v };
     if (ev.kind === 'danger') return { icon: '!', title: `${ev.name} 生命危急`, sub, v };
     return { icon: '≋', title: '全隊吃緊', sub: `${(ev.uids ?? []).map((u) => vitals[u]?.name).filter(Boolean).join('、')} 都有麻煩`, v: null };

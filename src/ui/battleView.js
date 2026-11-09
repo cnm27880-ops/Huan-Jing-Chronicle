@@ -198,7 +198,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         h('button', {
           type: 'button', class: 'btn btn--small',
           onclick: async (e) => {
-            if (!(await askConfirm(e.currentTarget, { title: '結束戰鬥？', lines: ['毒性歸零、藥水加成清除、敵人清空。'], okText: '結束戰鬥', danger: true }))) return;
+            if (!(await askConfirm(e.currentTarget, { title: '結束戰鬥？', lines: ['毒性歸零、藥水加成清除、護盾清除、敵人清空。'], okText: '結束戰鬥', danger: true }))) return;
             const r = endBattle(state); sel.modes = {};
             publish({ who: state.name, kind: 'note', label: '戰鬥結束', lines: [`毒性 ${r.toxicity} → 0`] });
             commit();
@@ -215,7 +215,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       const res = ui.feedTo.startsWith('ally:')
         ? await encounterAction({ t: 'encAllyFeed', id: ui.feedTo.slice(5), potion: name })
         : await sendMail({ to: ui.feedTo, kind: 'potion', potion: name });
-      toast(`已餵出${name}（回復 ${res.heal}），紀錄會顯示在戰鬥紀錄裡。`);
+      toast(`已餵出${name}，對方領取後生效（擲出回復 ${res.heal}，實際回復看戰鬥紀錄）。`);
     } catch (e) {
       refundItems(state, { [name]: 1 });
       commit();
@@ -230,7 +230,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     if ((!mates.length && !npcs.length) || !heals.length) return null;
     if (ui.feedTo.startsWith('ally:') && !npcs.some((a) => `ally:${a.id}` === ui.feedTo)) ui.feedTo = ''; // NPC 已離開戰鬥
     return h('div', { class: 'feedbox' },
-      h('p', { class: 'field-label', text: '餵給隊友或友方 NPC（對方不用同意；倒地的也能拉起來，毒性算玩家自己的、NPC 沒有毒性）' }),
+      h('p', { class: 'field-label', text: '餵給隊友或友方 NPC（對方不用同意；倒地的也能拉起來，毒性算在被餵的那位玩家身上、NPC 沒有毒性）' }),
       h('div', { class: 'row' },
         h('select', { class: 'field', 'aria-label': '餵給誰', onchange: (e) => { ui.feedTo = e.target.value; rerender(); } },
           h('option', { value: '', text: '選擇隊友…' }),

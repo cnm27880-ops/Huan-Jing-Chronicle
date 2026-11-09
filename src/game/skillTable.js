@@ -360,7 +360,7 @@ export function maxAffordableLevel(state, name) {
 
 /** 一次升到 target 級：扣經驗與技能書（不夠就一樣都不動）。回傳 { ok, error?, exp?, books?, level?, swaps? } */
 export function upgradeSkillTo(state, name, target) {
-  if (!usesSkillTable(state)) return { ok: false, error: '這是舊式存檔，請請 GM 用「匯入角色卡」更新。' };
+  if (!usesSkillTable(state)) return { ok: false, error: '這是舊式存檔，請 GM 用「匯入角色卡」更新。' };
   if (!inCatalog(name)) return { ok: false, error: '技能目錄裡沒有這個技能。' };
   const plan = upgradePlan(state, name, target);
   if (!plan) return { ok: false, error: '已經滿級，或目標等級沒有比現在高。' };
