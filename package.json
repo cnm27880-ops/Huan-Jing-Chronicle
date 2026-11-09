@@ -2,6 +2,7 @@
   "name": "huanjing-chronicle",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": ">=22.13.0" },
   "description": "幻境編年史：網遊世界觀網站（原型）",
   "type": "module",
   "scripts": {
