@@ -596,6 +596,14 @@ export function buffActive(state, name) {
   return Boolean((def?.atk && state.buffs?.atkBy?.[name] > 0) || (def?.def && state.buffs?.defBy?.[name] > 0));
 }
 
+/** 擲回復骰並回血（自己喝與餵隊友共用，M3）：回傳 { rolled, healed } */
+function rollHeal(target, heal, rng) {
+  const rolled = rollSum(heal.n, heal.sides, rng);
+  const before = target.hp;
+  healPlayer(target, rolled);
+  return { rolled, healed: target.hp - before };
+}
+
 /**
  * 喝藥水：消耗 1 個、累積毒性、回血或加成「下次攻擊／防禦」。
  * 毒性上限 15：加上這瓶會超過 15 就不能喝；戰鬥結束時清零（見 endBattle）。
@@ -612,11 +620,9 @@ export function drinkPotion(state, name, rng = Math.random) {
   state.toxicity += def.toxicity;
   const out = { name, toxicity: state.toxicity, atLimit: state.toxicity >= TOXICITY_MAX };
   if (def.heal) {
-    const rolled = rollSum(def.heal.n, def.heal.sides, rng);
-    const before = state.hp;
-    healPlayer(state, rolled);
+    const { rolled, healed } = rollHeal(state, def.heal, rng);
     out.rolled = rolled;
-    out.healed = state.hp - before;
+    out.healed = healed;
     out.dice = `${def.heal.n}D${def.heal.sides}`;
   }
   if (def.restore) {
@@ -659,10 +665,8 @@ export function giveHealPotion(giver, target, name, rng = Math.random) {
   if (!removeItem(giver, name)) return { error: `背包裡沒有${name}。` };
   const wasDowned = isDowned(target);
   target.toxicity += def.toxicity;
-  const rolled = rollSum(def.heal.n, def.heal.sides, rng);
-  const before = target.hp;
-  healPlayer(target, rolled);
-  return { name, rolled, healed: target.hp - before, toxicity: target.toxicity, revived: wasDowned && !isDowned(target) };
+  const { rolled, healed } = rollHeal(target, def.heal, rng);
+  return { name, rolled, healed, toxicity: target.toxicity, revived: wasDowned && !isDowned(target) };
 }
 
 /** 結束戰鬥：毒性歸零、藥水加成清除、清空遭遇戰（使用者口述：戰鬥結束毒性清零） */
