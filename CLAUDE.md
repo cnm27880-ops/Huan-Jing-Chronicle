@@ -19,6 +19,7 @@ GM 原本用 Discord 機器人跑的網遊，改成網站。後端（Cloudflare 
 - Worker 的 Discord ID（`DISCORD_ALLOWED_IDS`、`GM_DISCORD_IDS`、`ADMIN_DISCORD_IDS`）目前同時寫在 `worker/wrangler.jsonc` 與後台「執行時變數」；改名單要兩邊一致（部署時以 `wrangler.jsonc` 為準，需驗證）。登入白名單為空 = 拒絕所有人。
 - **部署後手動檢查清單**（測試只用 Node 模擬，沒驗證真的 Cloudflare、Discord、R2；每次部署 Worker 後照著走一遍）：① 用 Discord 登入成功 ② 進房間、看到成員 ③ 擲一次骰，大家都看得到 ④ 改一點角色，重新整理後仍在（角色同步）⑤ 登出後舊分頁不能再操作（session 撤銷）⑥ R2 `huan-jing-backup` 有今天或昨天的新檔案。
 - 備份失敗：會等 3 分鐘重試一次，仍失敗就發 Discord 通知（`worker/src/backup.js` 的 `runBackupWithRetry`）。**要先在 Cloudflare 後台把 Discord webhook 網址存成 Secret，名稱 `BACKUP_ALERT_WEBHOOK`**，沒設定就只寫 log、不通知；設好後請實機驗證一次通知真的發得出去（尚未驗證）。在驗證前，每月手動看一次 R2 有沒有新檔案。
+- 登入網址限流（M15，在 Cloudflare 後台做、不改程式）：後台 → 網域 `yuci8660.uk` → Security → WAF → Rate limiting rules，對 `huan-jing-api.yuci8660.uk` 的路徑開頭為 `/auth/` 設「每個 IP 每分鐘 60 次，超過就封鎖 1 分鐘」這種寬鬆值（免費方案可用的選項與上限以後台實際畫面為準，需驗證）；設完自己登入一次確認沒被擋。尚未設定。
 - 限流只是記憶體計數（重新部署歸零），`/auth/*` 沒有限流；不要宣稱有完整防刷。
 
 ## 技術
