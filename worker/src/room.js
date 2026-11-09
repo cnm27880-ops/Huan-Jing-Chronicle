@@ -38,6 +38,17 @@ export class Room extends DurableObject {
   }
 
   async fetch(request) {
+    // session 版本號（Worker 內部呼叫，瀏覽器碰不到）：GET 取得、POST .../bump 加一並踢掉這個人所有連線
+    const sv = /^\/sv\/(\d{1,32})(\/bump)?$/.exec(new URL(request.url).pathname);
+    if (sv) {
+      if (sv[2]) {
+        if (request.method !== 'POST') return new Response('method', { status: 405 });
+        const v = this.core.bumpSession(sv[1]);
+        for (const w of this.ctx.getWebSockets(sv[1])) { try { w.close(4401, 'session revoked'); } catch { /* ignore */ } }
+        return Response.json({ v });
+      }
+      return Response.json({ v: this.core.sessionVersion(sv[1]) });
+    }
     // 怪物立繪：Worker 已經驗證過登入與白名單才會轉到這裡（index.js 的 roomImage）
     const img = /\/img\/([a-f0-9]{32})$/.exec(new URL(request.url).pathname);
     if (img && request.method === 'GET') {

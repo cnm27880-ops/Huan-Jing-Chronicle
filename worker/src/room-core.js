@@ -136,6 +136,16 @@ export class RoomCore {
   }
   deleteMeta(key) { this.db.exec('DELETE FROM meta WHERE key = ?', key); }
 
+  // ---------- session 版本號（H6：登出／被盜時讓舊 token 失效） ----------
+  // 每位使用者一個版本號，預設 0；token 簽發時帶著當時的版本號，不一致就拒絕。
+  sessionVersion(uid) { return Number(this.getMeta(`sv:${uid}`) ?? 0) || 0; }
+  /** 版本號 +1，這位使用者所有舊 session 立即失效；回傳新版本號 */
+  bumpSession(uid) {
+    const v = this.sessionVersion(uid) + 1;
+    this.setMeta(`sv:${uid}`, v);
+    return v;
+  }
+
   adminIds() { return parseIdList(this.env.ADMIN_DISCORD_IDS); }
   isAdmin(uid) { return this.adminIds().includes(String(uid)); }
 

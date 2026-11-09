@@ -5,7 +5,7 @@ import { signToken, verifyToken, randomToken } from './crypto.js';
 import { parseCookies, setCookie, clearCookie } from './cookies.js';
 import { parseAllowlist, isAllowed, roomAccessState } from './allowlist.js';
 import { avatarUrl } from './avatar.js';
-import { ROOM_IDS } from './config.js';
+import { ROOM_IDS, DEFAULT_ROOM_ID } from './config.js';
 
 export { parseAllowlist, isAllowed }; // 階段 1-A 起就從這裡匯出（測試在用）
 
@@ -58,11 +58,34 @@ function backToSite(env, result, extraCookies = []) {
 
 const publicUser = (s) => ({ id: s.uid, name: s.name, avatarUrl: avatarUrl({ id: s.uid, avatar: s.avatar }) });
 
+// ---------- session 版本號（H6）：存在房間的 Durable Object，登出或被盜時加一，舊 token 立即失效 ----------
+const roomStub = (env) => env.ROOM.get(env.ROOM.idFromName(DEFAULT_ROOM_ID));
+const validUid = (uid) => typeof uid === 'string' && /^\d{1,32}$/.test(uid);
+
+/** 目前的版本號；沒綁 Durable Object（本機測試）視為 0；查不到就丟錯（寧可擋人也不放行已撤銷的 token） */
+async function currentSessionVersion(env, uid) {
+  if (!env.ROOM) return 0;
+  const res = await roomStub(env).fetch(new Request(`https://room/sv/${uid}`));
+  if (!res.ok) throw new Error('session version lookup failed');
+  return Number((await res.json()).v) || 0;
+}
+async function bumpSessionVersion(env, uid) {
+  if (!env.ROOM) return 0;
+  const res = await roomStub(env).fetch(new Request(`https://room/sv/${uid}/bump`, { method: 'POST' }));
+  if (!res.ok) throw new Error('session bump failed');
+  return Number((await res.json()).v) || 0;
+}
+
 async function readSession(request, env, now = Date.now()) {
   if (!env.SESSION_SECRET) return null;
   const token = parseCookies(request.headers.get('Cookie'))[SESSION_COOKIE];
   const s = await verifyToken(token, env.SESSION_SECRET, now);
-  return s && typeof s.uid === 'string' ? s : null;
+  if (!s || !validUid(s.uid)) return null;
+  try {
+    // 舊 token 沒有 sv 欄位 = 0（上線前已登入的人不會被登出）
+    if ((Number(s.sv) || 0) !== await currentSessionVersion(env, s.uid)) return null;
+  } catch { return null; }
+  return s;
 }
 
 // ---------- 路由 ----------
@@ -129,6 +152,7 @@ async function callback(request, env) {
     const now = Date.now();
     const session = await signToken({
       uid: me.id,
+      sv: await currentSessionVersion(env, me.id), // 簽發時的 session 版本號，登出後舊 token 就對不上
       iat: now, // 原始登入時間；續期時保留不變，用來計算 90 天上限
       name: String(me.global_name || me.username || me.id).slice(0, 80),
       avatar: typeof me.avatar === 'string' ? me.avatar : null,
@@ -154,17 +178,35 @@ async function me(request, env) {
   if (typeof s.iat === 'number' && s.exp - now < RENEW_BELOW_MS) {
     const exp = Math.min(now + SESSION_TTL_MS, s.iat + SESSION_MAX_AGE_MS);
     if (exp > s.exp) {
-      const token = await signToken({ uid: s.uid, iat: s.iat, name: s.name, avatar: s.avatar, exp }, env.SESSION_SECRET);
+      const token = await signToken({ uid: s.uid, iat: s.iat, sv: s.sv ?? 0, name: s.name, avatar: s.avatar, exp }, env.SESSION_SECRET);
       headers['Set-Cookie'] = setCookie(SESSION_COOKIE, token, { path: '/', maxAge: Math.floor((exp - now) / 1000) });
     }
   }
   return json({ user: publicUser(s) }, 200, headers);
 }
 
-function logout(request, env) {
+async function logout(request, env) {
   // 防 CSRF：只接受來自網站來源的請求
   if (request.headers.get('Origin') !== env.SITE_ORIGIN) return json({ error: 'forbidden' }, 403);
+  // 讓這個帳號所有舊 token（包含被偷走的）立即失效；原本沒有有效 session 就只清 cookie
+  const s = await readSession(request, env);
+  if (s) {
+    try { await bumpSessionVersion(env, s.uid); } catch { return json({ error: 'server_error' }, 500, { 'Set-Cookie': clearCookie(SESSION_COOKIE) }); }
+  }
   return json({ ok: true }, 200, { 'Set-Cookie': clearCookie(SESSION_COOKIE) });
+}
+
+/** 懷疑某人的 cookie 被盜：GM 或開發者把他的 session 版本號加一（不用把人移出白名單）。body：{ "uid": "Discord ID" } */
+async function revoke(request, env) {
+  if (request.headers.get('Origin') !== env.SITE_ORIGIN) return json({ error: 'forbidden' }, 403);
+  const s = await readSession(request, env);
+  if (!s || !isAllowed(env, s.uid)) return json({ error: 'unauthenticated' }, 401);
+  if (![...parseAllowlist(env.GM_DISCORD_IDS), ...parseAllowlist(env.ADMIN_DISCORD_IDS)].includes(s.uid)) return json({ error: 'forbidden' }, 403);
+  let target = null;
+  try { target = (await request.json())?.uid; } catch { /* 下面一併當作格式錯誤 */ }
+  if (!validUid(target)) return json({ error: 'bad_request' }, 400);
+  try { await bumpSessionVersion(env, target); } catch { return json({ error: 'server_error' }, 500); }
+  return json({ ok: true });
 }
 
 // ---------- 固定團房間（階段 1-B） ----------
@@ -246,6 +288,7 @@ export default {
       'GET /auth/callback': callback,
       'GET /auth/me': me,
       'POST /auth/logout': logout,
+      'POST /auth/revoke': revoke,
     };
     const handler = routes[`${request.method} ${path}`];
     if (!handler) return withCors(json({ error: 'not_found' }, path.startsWith('/auth/') ? 405 : 404), request, env);

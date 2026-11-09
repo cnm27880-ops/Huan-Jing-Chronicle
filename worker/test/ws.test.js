@@ -19,7 +19,7 @@ function fakeRoom() {
     seen,
     ns: {
       idFromName: (n) => { seen.names.push(n); return n; },
-      get: () => ({ fetch: async (req) => { seen.requests.push(req); return new Response('upgraded', { status: 200 }); } }),
+      get: () => ({ fetch: async (req) => { if (new URL(req.url).pathname.startsWith('/sv/')) return Response.json({ v: 0 }); seen.requests.push(req); return new Response('upgraded', { status: 200 }); } }),
     },
   };
 }
@@ -47,7 +47,7 @@ test('WebSocket：登入且在白名單內才會轉給房間，並帶上伺服�
   const room = fakeRoom();
   const res = await ws('/rooms/main/ws', { headers: { Cookie: await cookie('300', { name: '福德 Fude' }) }, env: { ...baseEnv, ROOM: room.ns } });
   assert.equal(res.status, 200);
-  assert.deepEqual(room.seen.names, ['main']);
+  assert.ok(room.seen.names.length >= 1 && room.seen.names.every((n) => n === 'main')); // 只會用 main 這一間（含 session 版本號查詢）
   const h = room.seen.requests[0].headers;
   assert.equal(h.get('X-HJ-Uid'), '300');
   assert.equal(decodeURIComponent(h.get('X-HJ-Name')), '福德 Fude');
