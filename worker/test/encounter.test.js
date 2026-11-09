@@ -406,3 +406,21 @@ test('GM 移除輪到的人前面的怪物：輪到的人不變', () => {
   const after = encOf(send(core, GM, { t: 'encRemove', id: enc.order[0].id }));
   assert.deepEqual(after.order[after.turn], cur);
 });
+
+test('中途加入先攻：只有 GM、玩家要在線、不能重複，插進隨機位置且輪到的人不變', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: SPEC });
+  assert.equal(errorOf(send(core, GM, { t: 'encJoin', uid: '300' }, { online: ['300'] }))?.code, 'bad_enc'); // 還沒抽先攻
+  send(core, GM, { t: 'encInit' }, { online: ['300'] });
+  send(core, GM, { t: 'encStart' });
+  const before = encOf(send(core, GM, { t: 'encNext' }));
+  const cur = before.order[before.turn];
+  assert.equal(errorOf(send(core, P2, { t: 'encJoin', uid: '400' }, { online: ['300', '400'] }))?.code, 'forbidden');
+  assert.equal(errorOf(send(core, GM, { t: 'encJoin', uid: '400' }, { online: ['300'] }))?.code, 'bad_enc'); // 不在線
+  assert.equal(errorOf(send(core, GM, { t: 'encJoin', uid: '300' }, { online: ['300', '400'] }))?.code, 'bad_enc'); // 已在順序
+  const after = encOf(send(core, GM, { t: 'encJoin', uid: '400' }, { online: ['300', '400'] }));
+  assert.equal(after.order.length, before.order.length + 1);
+  assert.ok(after.order.some((o) => o.kind === 'player' && o.uid === '400'));
+  assert.deepEqual(after.order[after.turn], cur);
+  assert.equal(errorOf(send(core, GM, { t: 'encJoin', uid: '400' }, { online: ['300', '400'] }))?.code, 'bad_enc'); // 不能重複
+});

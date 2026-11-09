@@ -468,8 +468,13 @@ export function createEncounterCard({ getState, commit, rerender }) {
         : null;
     }
     if (!isGm()) return null;
+    const room = getRoomStatus();
+    const late = enc.order?.length // 在線、還不在先攻順序裡的玩家（中途加入）
+      ? (room.members ?? []).filter((m) => m.online && m.uid !== room.me?.uid && !enc.order.some((o) => o.kind === 'player' && o.uid === m.uid))
+      : [];
     return h('div', { class: 'row stage__gm' },
       h('span', { class: 'hint', text: `第 ${enc.round ?? 0} 回合` }),
+      ...late.map((m) => h('button', { type: 'button', class: 'btn btn--small', title: '插進先攻順序的隨機位置', onclick: () => act({ t: 'encJoin', uid: m.uid }) }, `加入先攻：${room.vitals?.[m.uid]?.name || m.name}`)),
       h('button', { type: 'button', class: 'btn btn--small', title: '回合數 +1，敵人的技能次數與蓄力恢復（有先攻順序時，繞完一圈會自動進下一回合）', disabled: !!enc.locked, onclick: () => act({ t: 'encRound' }) }, '新回合'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !!enc.locked, onclick: () => { ui.swapFrom = null; act({ t: 'encInit' }); } }, '抽先攻'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.order?.length || enc.locked, onclick: () => act({ t: 'encStart' }) }, '開打（鎖定）'),

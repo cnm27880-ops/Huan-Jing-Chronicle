@@ -301,7 +301,7 @@ export class RoomCore {
       case 'mailClaim': return this.onMailClaim(user, msg, rid);
       case 'tradeList': return this.onTradeList(user, rid);
       case 'tradeRespond': return this.onTradeRespond(user, msg, rid);
-      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encHp': case 'encInit': case 'encSwap': case 'encStart': case 'encNext': case 'encPrev': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
+      case 'encAdd': case 'encRemove': case 'encClear': case 'encHit': case 'encHp': case 'encInit': case 'encJoin': case 'encSwap': case 'encStart': case 'encNext': case 'encPrev': case 'encUse': case 'encRound': return this.onEncounter(user, msg, rid, online);
       case 'encAlly': case 'encAllyDel': case 'encAllyAtk': case 'encAllyTake': case 'encAllyHp': case 'encAllySup': return this.onAlly(user, msg, rid);
       case 'encAllyFeed': return this.onAllyFeed(user, msg, rid);
       case 'encImg': return this.onEncImg(user, msg, rid);
@@ -756,6 +756,15 @@ export class RoomCore {
       this.saveEncounter(enc);
       const names = order.map((o, i) => `${i + 1}. ${o.kind === 'monster' ? o.id : o.name}`);
       return this.encOk(enc, rid, user, { label: '遭遇：先攻位置（隨機）', lines: [...names, '玩家可以討論並交換自己的位置，GM 按「開打」後鎖定。'] });
+    }
+    if (msg.t === 'encJoin') { // 中途加入先攻：已抽過先攻後才連線的玩家，插進順序的隨機位置（比照怪物增援）
+      if (!enc.order?.length) return err(rid, 'bad_enc', '還沒有先攻順序，請先抽先攻。');
+      const m = typeof msg.uid === 'string' ? this.db.exec('SELECT uid, name FROM members WHERE uid = ?', msg.uid)[0] : null;
+      if (!m || !online.includes(m.uid) || this.isGm(m.uid) || this.accessState(m.uid) !== 'ok') return err(rid, 'bad_enc', '這位玩家不在線上，或不能加入先攻。');
+      if (enc.order.some((o) => o.kind === 'player' && o.uid === m.uid)) return err(rid, 'bad_enc', '這位玩家已經在先攻順序裡了。');
+      const at = insertRandom(enc, { kind: 'player', uid: m.uid, name: m.name }, this.rng);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user, { label: `遭遇：${m.name} 中途加入先攻`, lines: [`先攻：排在第 ${at + 1} 位（隨機）`, ...(enc.locked ? [`目前輪到第 ${enc.turn + 1} 位`] : [])] });
     }
     if (msg.t === 'encStart') {
       if (!enc.order.length) return err(rid, 'bad_enc', '還沒有先攻順序，請先抽先攻。');
