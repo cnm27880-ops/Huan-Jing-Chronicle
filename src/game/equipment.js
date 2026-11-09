@@ -63,19 +63,26 @@ export function identifiable(state) {
     .sort((a, b) => GEAR_TIERS.indexOf(b.tier) - GEAR_TIERS.indexOf(a.tier) || a.slot.localeCompare(b.slot));
 }
 
+/** 鑑定共用迴圈（M3）：一次扣背包一個 itemName，呼叫 mint() 產生並存好一個新實例；背包不夠就停。回傳新產生的 */
+function consumeAndMint(state, itemName, times, mint) {
+  const made = [];
+  for (let i = 0; i < times; i++) {
+    if (!removeItem(state, itemName)) break;
+    made.push(mint());
+  }
+  return made;
+}
+
 /** 鑑定 times 件（會消耗通用裝備），結果存入 state.gear。回傳新產生的裝備陣列 */
 export function identify(state, genericName, times, rng = Math.random) {
   const g = parseGeneric(genericName);
   if (!g) return [];
-  const made = [];
-  for (let i = 0; i < times; i++) {
-    if (!removeItem(state, genericName)) break;
-    const rolled = rollGear(g.tier, g.slot, rng);
+  return consumeAndMint(state, genericName, times, () => {
+    const rolled = rollGear(g.tier, g.slot, rng); // 先擲骰、再取編號（順序不能換）
     const inst = { id: state.nextGearId++, tier: g.tier, slot: g.slot, ...rolled };
     state.gear.push(inst);
-    made.push(inst);
-  }
-  return made;
+    return inst;
+  });
 }
 
 export const findGear = (state, id) => state.gear.find((g) => g.id === id) ?? null;
@@ -150,14 +157,11 @@ export function identifyGems(state, gemItemName, times, rng = Math.random) {
   if (!stat) return [];
   state.gems ??= [];
   state.nextGemId ??= 1;
-  const made = [];
-  for (let i = 0; i < times; i++) {
-    if (!removeItem(state, gemItemName)) break;
+  return consumeAndMint(state, gemItemName, times, () => {
     const inst = { id: state.nextGemId++, ...rollGem(stat, rng) };
     state.gems.push(inst);
-    made.push(inst);
-  }
-  return made;
+    return inst;
+  });
 }
 
 /** 找一件已鑑定的裝備（背包或身上）。回傳 { g, worn } 或 null */
