@@ -9,7 +9,7 @@ function loc(id, name, region, extra = {}) {
     id,
     name,
     region,
-    status: 'revealed', // 目前全圖都已揭露；revealed = 已揭露 | hidden = 未揭露 | draft = 草稿
+    status: 'hidden', // 預設未揭露（只顯示地名與「情報尚未公開」），要揭露再一個一個改成 'revealed'；revealed = 已揭露 | hidden = 未揭露 | draft = 草稿
     ...extra,
   };
 }
