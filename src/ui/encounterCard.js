@@ -544,7 +544,6 @@ export function createEncounterCard({ getState, commit, rerender }) {
   };
 
   /** A／B／C 三格數值 */
-  const sumAbc = (abc) => TRACKS.reduce((n, t) => n + (abc?.[t] ?? 0), 0);
   const abcCells = (abc) => h('span', { class: 'abc' },
     TRACKS.map((t) => h('span', { class: 'abc__cell', dataset: { track: t } }, h('b', { text: t }), h('span', { class: 'num', text: fmt(abc[t]) }))));
 
@@ -608,7 +607,9 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('span', { class: 'mob__hp', 'aria-hidden': 'true' }, h('span', { class: 'mob__fill', style: `width:${pctOf(m.hp, m.maxHp)}%` })),
       h('span', { class: 'mob__pct num', text: `${Math.floor(pctOf(m.hp, m.maxHp))}%` }),
       orderBadge(m.id),
-      h('span', { class: 'mob__stat num', 'aria-hidden': 'true', text: `攻 ${fmt(sumAbc(m.atk))}・防 ${fmt(sumAbc(m.def))}` })),
+      h('span', { class: 'mob__stat num', 'aria-hidden': 'true' },
+        h('span', { text: `攻 ${formatAbc(m.atk)}` }),
+        h('span', { text: `防 ${formatAbc(m.def)}` }))),
       h('button', {
         type: 'button', class: 'mob__hit', disabled: downed, dataset: { armed: ui.armed === m.id ? '1' : '0' },
         title: ui.armed === m.id ? '再點一次確認' : `承受 ${m.id} 的攻擊（${formatAbc(m.atk)}），要點兩下`,

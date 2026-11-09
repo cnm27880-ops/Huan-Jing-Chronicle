@@ -44,9 +44,10 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
     btn.disabled = true;
     try {
       const res = await sendMail({ to: uid, kind: 'potion', potion });
-      toast(`已餵出${potion}（回復 ${res.heal}），紀錄會顯示在戰鬥紀錄裡。`);
+      toast(`已餵出${potion}，對方領取後生效（擲出回復 ${res.heal}，實際回復看戰鬥紀錄）。`);
       modal?.fed.add(`${uid}:${potion}`);
     } catch (e) {
+      if (e.uncertain) { toast(`不確定有沒有餵出去（${e.message}）。藥水先不退還，請看戰鬥紀錄確認；確定沒送出再請 GM 補發。`); draw(); return; }
       refundItems(state, { [potion]: 1 });
       commit();
       toast(`沒有餵出去：${e.message}`);

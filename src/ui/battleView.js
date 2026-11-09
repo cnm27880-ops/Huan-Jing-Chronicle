@@ -218,6 +218,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         : await sendMail({ to: ui.feedTo, kind: 'potion', potion: name });
       toast(`已餵出${name}，對方領取後生效（擲出回復 ${res.heal}，實際回復看戰鬥紀錄）。`);
     } catch (e) {
+      if (e.uncertain) return toast(`不確定有沒有餵出去（${e.message}）。藥水先不退還，請看戰鬥紀錄確認；確定沒送出再請 GM 補發。`);
       refundItems(state, { [name]: 1 });
       commit();
       toast(`沒有餵出去：${e.message}`);
@@ -391,7 +392,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         tone: 'ok',
         lines: [
           r.kind === 'heal'
-            ? `自己：最大生命 ${t.pct}% = ${r.amount}，生命 ${before} → ${state.hp} / ${maxHp(state)}`
+            ? `自己：最大生命 ${t.pct}%（理論 ${r.amount}），實際回復 ${r.healed}，生命 ${before} → ${state.hp} / ${maxHp(state)}`
             : `自己：護盾 = 最大生命 ${t.pct}% = ${r.amount}${r.res ? `，抗性免疫 +${r.res}（護盾破了才消失）` : ''}`,
           sent.length ? `同時施放給：${sent.map((u) => mates.find((mm) => mm.uid === u)?.name ?? u).join('、')}` : null,
           `花費：${costText(r.cost)}`,
@@ -699,7 +700,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
               publish({ who: state.name, kind: 'note', label: '魔女：放棄主動動作', lines: [`回復 ${r.gained} 魔力（現在 ${r.now}）`] });
               commit();
             },
-          }, `放棄行動・回復 ${WITCH_EXTRA_COST} 魔力`)
+          }, `放棄行動・回復魔力（最多 ${WITCH_EXTRA_COST}）`)
         : null,
       uniqueCard(state),
       douRow(state),

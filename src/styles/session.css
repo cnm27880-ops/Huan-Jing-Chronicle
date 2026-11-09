@@ -269,8 +269,10 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .mob__img.portrait--empty { display: grid; place-items: center; font-size: 1.1rem; background: var(--paper); }
 .mob__name { min-width: 0; overflow: hidden; font-size: 0.85rem; text-overflow: ellipsis; white-space: nowrap; }
 .mob__pct { color: var(--soft); font-size: 0.75rem; }
-/* 攻防總強度：獨立一排，右邊留給「承受」鈕，避免兩者疊在一起 */
-.mob__stat { grid-column: 1 / -1; min-height: 20px; padding-right: 56px; overflow: hidden; color: var(--soft); font-size: 0.72rem; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+/* 攻／防各軌數值：各自一行，「承受」鈕在底部自己的一條 */
+.mob__stat { grid-column: 1 / -1; display: grid; gap: 2px; min-width: 0; color: var(--soft); font-size: 0.72rem; line-height: 1.3; }
+.mob__stat > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mob__pick { padding-bottom: 36px; } /* 底部留一條給「承受」鈕，不壓到上面的數字 */
 .mob__hp { grid-column: 1 / -1; display: block; height: 6px; overflow: hidden; background: var(--paper); border-radius: var(--r-pill); }
 .mob__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--rose2), var(--rose)); transition: width 0.25s ease; }
 .mob__pick .pick-no { top: 6px; right: 6px; }
