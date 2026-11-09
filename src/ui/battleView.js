@@ -178,8 +178,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       h('span', { class: 'num', text: `${fmt(hp.now)}/${fmt(hp.max)}` })),
     h('span', { class: 'mini-hud__res' }, HUD_KEYS(state).slice(1).map((k) => {
       const r = readout(state, k);
-      return r.max > 0 ? h('span', { class: 'mini-hud__chip', dataset: { hud: k } }, h('b', { text: k.slice(0, 1) }), h('span', { class: 'num', text: fmt(r.now) })) : null;
-    })),
+      return r.max > 0 ? h('span', { class: 'mini-hud__chip', dataset: { hud: k } }, h('b', { text: k.slice(0, 1) }), h('span', { class: 'num', text: k === '毒性' ? `${fmt(r.now)}/${fmt(r.max)}` : fmt(r.now) })) : null;
+    }),
+    state.shield?.hp > 0 ? h('span', { class: 'mini-hud__chip', dataset: { hud: '護盾' } }, h('b', { text: '盾' }), h('span', { class: 'num', text: fmt(state.shield.hp) })) : null),
     h('span', { class: 'mini-hud__caret', 'aria-hidden': 'true', text: open ? '▴' : '▾' }));
   }
 

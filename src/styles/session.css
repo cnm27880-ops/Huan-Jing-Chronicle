@@ -197,6 +197,7 @@
 .boss__tabs .seg { min-height: var(--ctl-h-sm); padding: 0 10px; font: inherit; font-size: 0.8rem; color: var(--soft); background: var(--paper); border: 0; border-radius: var(--r-pill); box-shadow: var(--sx-ring); cursor: pointer; }
 .boss__tabs .seg[aria-selected='true'] { color: var(--gold); box-shadow: var(--sx-ring-hi); }
 .boss__tabs .seg[data-down='1'] { opacity: 0.4; }
+.seg__hp { margin-left: 6px; color: var(--soft); font-size: 0.72rem; }
 .boss__art, .mob { --fx-delay: 0ms; }
 .boss__art {
   position: relative; display: grid; place-items: center; box-sizing: border-box; width: 100%; height: clamp(240px, 40vh, 460px); padding: 8px; overflow: hidden;
@@ -268,6 +269,8 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .mob__img.portrait--empty { display: grid; place-items: center; font-size: 1.1rem; background: var(--paper); }
 .mob__name { min-width: 0; overflow: hidden; font-size: 0.85rem; text-overflow: ellipsis; white-space: nowrap; }
 .mob__pct { color: var(--soft); font-size: 0.75rem; }
+/* 攻防總強度：獨立一排，右邊留給「承受」鈕，避免兩者疊在一起 */
+.mob__stat { grid-column: 1 / -1; min-height: 20px; padding-right: 56px; overflow: hidden; color: var(--soft); font-size: 0.72rem; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
 .mob__hp { grid-column: 1 / -1; display: block; height: 6px; overflow: hidden; background: var(--paper); border-radius: var(--r-pill); }
 .mob__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--rose2), var(--rose)); transition: width 0.25s ease; }
 .mob__pick .pick-no { top: 6px; right: 6px; }
