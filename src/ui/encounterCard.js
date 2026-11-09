@@ -306,6 +306,18 @@ export function createEncounterCard({ getState, commit, rerender }) {
     sel.yuwai = false; // 域外魔祖要花 30 靈氣，跟加骰一樣只對這一次出招有效
     sel.daoDun = false;
     if (!online()) Object.keys(extraAbs).forEach((id) => spendEnemyB(state.encounter, id)); // 本機模式：蓄力用掉了（房間模式由伺服器扣）
+    // 房間模式：先把傷害回報給伺服器，紀錄的「生命 前 → 後」以伺服器實際的為準（兩人同時打同一隻時，本機算的「前」不準）。
+    // 回報失敗不回滾（骰已擲、資源已扣），但紀錄會明講怪物血量沒更新，請 GM 核對，不再假裝成功
+    const server = new Map();
+    let hitError = '';
+    if (online()) {
+      const hits = r.hits.filter((x, i) => r.hits.findIndex((y) => y.target.id === x.target.id) === i) // 同一個目標被連打好幾下：只回報一次（總共打掉多少）
+        .map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp), ...(extraAbs[x.target.id] ? { usedB: true } : {}), ...(x.absCut ? { absCut: x.absCut } : {}) })).filter((x) => x.dmg > 0 || x.usedB || x.absCut);
+      if (hits.length) {
+        try { ((await encounterAction({ t: 'encHit', hits })).results ?? []).forEach((x) => server.set(x.id, x)); } catch (err) { hitError = err.message || '連線失敗'; }
+      }
+      if (hitError) toast(`傷害沒有回報成功（${hitError}）。怪物血量沒有更新，請 GM 核對。`);
+    }
     if (r.reveal) playShadowFx('reveal', { n: r.burst }); // 暗影斗篷現身爆發
     // 打擊特效：同一個目標被連打好幾下（守密人）就連播好幾次，種類看第一下
     for (const id of new Set(r.hits.map((x) => x.target.id))) {
@@ -319,9 +331,15 @@ export function createEncounterCard({ getState, commit, rerender }) {
       if (multi) lines.push(targetLine(h2.stage ? `${h2.target.id} 第 ${h2.stage} 段` : h2.target.id, h2.result.total));
       lines.push(...trackLines(h2.result));
       if (h2.ignoreAbs) lines.push('終焉武裝：無視絕對防禦'); else if (h2.abs) lines.push(`敵人絕對防禦 ${h2.abs}${h2.extraAbs ? `（含 B 技能 +${h2.extraAbs}）` : ''}`);
-      if (isLastOfTarget) lines.push(`${h2.target.id} 生命 ${fmt(befores.get(h2.target.id))} → ${fmt(h2.target.hp)} / ${fmt(h2.target.maxHp)}${h2.target.hp <= 0 ? '　倒下了！' : ''}`);
+      if (isLastOfTarget) {
+        const sv = server.get(h2.target.id);
+        const from = sv?.before ?? befores.get(h2.target.id);
+        const to = sv?.after ?? h2.target.hp;
+        lines.push(`${h2.target.id} 生命 ${fmt(from)} → ${fmt(to)} / ${fmt(h2.target.maxHp)}${to <= 0 ? '　倒下了！' : ''}`);
+      }
     });
     lines.push(...r.notes);
+    if (hitError) lines.push(`⚠ 怪物血量沒有更新（${hitError}），請 GM 核對`);
     if (r.potion) lines.push(`藥水加成：真實傷害 +${r.potion} 骰`);
     if (r.dou) lines.push(`鬥氣 −${r.dou}：真實傷害 +${r.douDice} 骰（用到的每一軌）`);
     lines.push(`花費：${costText(r.cost)}`);
@@ -333,11 +351,6 @@ export function createEncounterCard({ getState, commit, rerender }) {
       tone: r.hits.some((x) => x.result.total > 0) ? 'ok' : 'fail',
       lines,
     }, { draw });
-    if (online()) { // 怪物生命由伺服器改：回報這次打掉多少
-      const hits = r.hits.filter((x, i) => r.hits.findIndex((y) => y.target.id === x.target.id) === i) // 同一個目標被連打好幾下：只回報一次（總共打掉多少）
-        .map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp), ...(extraAbs[x.target.id] ? { usedB: true } : {}), ...(x.absCut ? { absCut: x.absCut } : {}) })).filter((x) => x.dmg > 0 || x.usedB || x.absCut);
-      if (hits.length) await act({ t: 'encHit', hits });
-    }
     commit();
   }
 
@@ -353,8 +366,14 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const before = state.hp;
     // 敵人這回合還能打幾次（普通 1、菁英 2、BOSS 3）；A 技能蓄力過就多加骰。房間模式由伺服器扣次數
     let extraAtk = 0;
+    let spentOnline = false; // 伺服器已經扣了這次攻擊次數：後面擲骰失敗要還回去
+    const giveBack = async () => { // 沒有實際承受到攻擊，把敵人的攻擊次數（與 A 蓄力）還回去
+      if (!spentOnline) return;
+      spentOnline = false;
+      try { await encounterAction({ t: 'encUse', id: m.id, use: 'atkBack', restoreA: extraAtk > 0 }); toast('沒有擲成，已把這次攻擊次數還給敵人。'); } catch { toast(`沒有擲成，而且攻擊次數沒能還回去，請 GM 把 ${m.id} 的次數補回來。`); }
+    };
     try {
-      if (online()) extraAtk = (await encounterAction({ t: 'encUse', id: m.id, use: 'atk' })).extraAtk ?? 0;
+      if (online()) { extraAtk = (await encounterAction({ t: 'encUse', id: m.id, use: 'atk' })).extraAtk ?? 0; spentOnline = true; }
       else {
         const spent = spendEnemyAttack(state.encounter, m.id);
         if (spent.error) return toast(spent.error);
@@ -365,8 +384,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
     let draw;
     try {
       ({ r, draw } = await withRoomEncounter(state, () => rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng, { extraAtk }))));
-    } catch (e) { return rollFailed(e); }
-    if (r.error) return toast(r.error);
+    } catch (e) { await giveBack(); return rollFailed(e); }
+    if (r.error) { await giveBack(); return toast(r.error); }
     playFx(m.id, 'strike'); // 怪物撲過來
     publish({
       who: state.name, kind: 'defend', label: `${m.id} 攻擊${m.kind === 'boss' ? `（${BOSS_ATK_MODES[modes.atk]}）` : ''}`,
@@ -383,7 +402,9 @@ export function createEncounterCard({ getState, commit, rerender }) {
     }, { draw });
     if (r.reflect && !r.reflect.skipped) {
       toast(`賽博駭客觸發：${m.id} 立刻扣 ${fmt(r.reflect.lost)} 生命（${r.reflect.dice}D4 = ${fmt(r.reflect.rolled)}）。${(currentEnc(state)?.round ?? 0) > 0 ? '' : '還沒開始回合計數，一回合只能 1 次請自行確認。'}`);
-      if (online() && r.reflect.lost > 0) await act({ t: 'encHit', hits: [{ id: m.id, dmg: r.reflect.lost }] }); // 怪物生命由伺服器改：回報這次反擊扣多少
+      if (online() && r.reflect.lost > 0) { // 怪物生命由伺服器改：回報這次反擊扣多少
+        try { await encounterAction({ t: 'encHit', hits: [{ id: m.id, dmg: r.reflect.lost }] }); } catch (err) { toast(`反擊的傷害沒有回報成功（${err.message || '連線失敗'}），請 GM 核對 ${m.id} 的血量。`); }
+      }
     } else if (r.reflect?.skipped) toast('賽博駭客：這回合已經觸發過了（一回合只能 1 次）。');
     commit();
   }

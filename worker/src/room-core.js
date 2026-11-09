@@ -10,7 +10,7 @@ import { d20 } from '../../src/game/engine.js';
 import { diceEvent, checkEvent, trackLine } from '../../src/game/events.js';
 import { LIFE_SKILLS, ART_SKILLS, POTIONS, TOXICITY_MAX } from '../../src/game/rules.js';
 import { newEncounter, addMobs, addBosses, isDowned, SPLIT_TYPES, SPLIT_FOCUS } from '../../src/game/combat.js';
-import { useEnemySkill, spendEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
+import { useEnemySkill, spendEnemyAttack, refundEnemyAttack, spendEnemyB, nextRound, SKILL_NAMES } from '../../src/game/enemy.js';
 import {
   validateAlly, addAlly, removeAlly, allyAttack, monsterHitsAlly, setAllyHp, healAlly, retreatTurn, insertRandom, alliesOf, findAlly, MAX_ALLIES, SUPPORT_KINDS,
 } from '../../src/game/ally.js';
@@ -637,18 +637,21 @@ export class RoomCore {
       const hits = msg.hits;
       if (!Array.isArray(hits) || hits.length < 1 || hits.length > 12) return err(rid, 'bad_enc', '傷害回報格式錯誤。');
       let applied = 0;
+      const results = []; // 每個目標實際的 前→後 生命：前端的紀錄以這個為準（兩人同時打同一隻時，各自本機算的「前」不準）
       for (const hit of hits) {
         if (!hit || typeof hit.id !== 'string' || !isInt(hit.dmg, 0, 10_000_000)) return err(rid, 'bad_enc', '傷害回報格式錯誤。');
         const m = enc.monsters.find((x) => x.id === hit.id);
         if (!m) continue; // 怪物剛好被 GM 移除：略過
-        m.hp = Math.max(0, m.hp - hit.dmg);
+        const hpBefore = m.hp;
+        m.hp = Math.max(0, m.hp - hit.dmg); // 已經倒下的怪物不會再扣（hp 本來就是 0）
         if (isInt(hit.absCut, 1, 100_000)) m.absCut = Math.max(m.absCut ?? 0, hit.absCut); // 泰坦：絕對防禦永久減少（不疊加，取最大）
         if (hit.usedB === true) spendEnemyB(enc, m.id); // 這一下用掉了敵人的 B 技能（防禦強化）蓄力
+        results.push({ id: m.id, before: hpBefore, after: m.hp });
         applied++;
       }
       if (!applied) return err(rid, 'bad_enc', '找不到這些怪物，可能已被移除。');
       this.saveEncounter(enc);
-      return this.encOk(enc, rid, user);
+      return this.encOk(enc, rid, user, undefined, { results });
     }
     if (msg.t === 'encSwap') { // 換位置：GM 隨時可以；玩家只能在 GM 開打之前、而且其中一格是自己的
       const { a, b } = msg;
@@ -669,6 +672,13 @@ export class RoomCore {
       if (r.error) return err(rid, 'bad_enc', r.error);
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user, undefined, { extraAtk: r.extraAtk, left: r.left });
+    }
+    if (msg.t === 'encUse' && msg.use === 'atkBack') { // 承受攻擊時擲骰失敗：把剛扣的攻擊次數（與 A 蓄力）還回去，任何玩家都可以
+      if (typeof msg.id !== 'string') return err(rid, 'bad_enc', '缺少敵人編號。');
+      const back = refundEnemyAttack(enc, msg.id, msg.restoreA === true);
+      if (back.error) return err(rid, 'bad_enc', back.error);
+      this.saveEncounter(enc);
+      return this.encOk(enc, rid, user);
     }
     if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以操作遭遇戰。');
 

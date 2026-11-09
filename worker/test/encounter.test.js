@@ -434,3 +434,23 @@ test('開新戰鬥：同時清空舊的敵人與先攻順序', () => {
   assert.deepEqual(core.encounter().order, []);
   assert.equal(res.out.find((o) => o.msg.t === 'enc').msg.encounter.monsters.length, 0);
 });
+
+test('encHit：回覆實際的 前→後 生命，兩人同時打同一隻以伺服器為準；已倒下的不會再扣', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 1, hp: 100 } });
+  const a = send(core, P1, { t: 'encHit', rid: 'a', hits: [{ id: '小怪1', dmg: 60 }] });
+  assert.deepEqual(replyOf(a).results, [{ id: '小怪1', before: 100, after: 40 }]);
+  const b = send(core, P2, { t: 'encHit', rid: 'b', hits: [{ id: '小怪1', dmg: 60 }] }); // 第二個人本機以為還有 100
+  assert.deepEqual(replyOf(b).results, [{ id: '小怪1', before: 40, after: 0 }]);
+  const c = send(core, P1, { t: 'encHit', rid: 'c', hits: [{ id: '小怪1', dmg: 30 }] }); // 已倒下
+  assert.deepEqual(replyOf(c).results, [{ id: '小怪1', before: 0, after: 0 }]);
+});
+
+test('承受攻擊擲骰失敗：atkBack 把攻擊次數還回去，任何玩家都能用', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 1 } });
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'a', id: '小怪1', use: 'atk' })).left, 0);
+  assert.match(errorOf(send(core, P1, { t: 'encUse', rid: 'b', id: '小怪1', use: 'atk' })).message, /已經攻擊/);
+  assert.ok(replyOf(send(core, P1, { t: 'encUse', rid: 'c', id: '小怪1', use: 'atkBack' })) !== undefined);
+  assert.equal(replyOf(send(core, P2, { t: 'encUse', rid: 'd', id: '小怪1', use: 'atk' })).left, 0); // 次數回來了，又能承受一次
+});
