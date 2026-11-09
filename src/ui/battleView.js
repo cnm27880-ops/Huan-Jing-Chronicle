@@ -14,7 +14,7 @@ import {
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
-  SKILL_CATALOG, bindableSkills, attackResponses, ATTACK_RESPONSES, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
+  SKILL_CATALOG, bindableSkills, attackResponses, ATTACK_RESPONSES, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult, PASSIVE_RIDERS,
   choosableTracks, DAODUN, daoDunLeft, daoDunUses, SWELL, swellCap,
 } from '../game/skills.js';
 import {
@@ -200,7 +200,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           type: 'button', class: 'btn btn--small',
           onclick: async (e) => {
             if (!(await askConfirm(e.currentTarget, { title: '結束戰鬥？', lines: ['毒性歸零、藥水加成清除、護盾清除、敵人清空。'], okText: '結束戰鬥', danger: true }))) return;
-            const r = endBattle(state); sel.modes = {};
+            const r = endBattle(state); sel.modes = {}; sel.dou = 0; sel.mage = 0; sel.yuwai = false; // 沒出完的加骰不帶進下一場
             publish({ who: state.name, kind: 'note', label: '戰鬥結束', lines: [`毒性 ${r.toxicity} → 0`] });
             commit();
           },
@@ -321,7 +321,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const m = resolveChosenTrack(state, m0, sel.trackPick[m0.id]); // 機甲駕駛員：預覽選到的那一軌
     const pooled = m.mode === 'all' || m.mode === 'abs';
     const support = m.kind === 'heal' || m.kind === 'shield';
-    const cost = actionCost(state, m);
+    // 域外魔祖勾選時，預覽花費也要含追加的靈氣（出招時才會扣，先讓玩家看到、也先擋住付不起）
+    const yuwai = sel.yuwai && m.id === sel.moveId && skillLevel(state, '域外魔祖') > 0 && m.school === '修仙';
+    const cost = actionCost(state, m, yuwai ? PASSIVE_RIDERS.域外魔祖.cost : {});
     const bits = [];
     if (m.school) bits.push(m.school);
     if (support) {
@@ -594,7 +596,8 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   /** 鬥氣加骰：直接輸入這次出招花幾點鬥氣（不能超過現有的），每點 +1 顆真實傷害骰（冠軍勇士每點 4 顆）；出招後歸零 */
   function douRow(state) {
     if (resourceMax(state, '鬥氣') <= 0) return null;
-    const have = resourceNow(state, '鬥氣');
+    const own = state.moves.find((x) => x.id === sel.moveId)?.cost?.鬥氣 ?? 0; // 招式本身要花的鬥氣先扣掉，加骰只能用剩下的
+    const have = Math.max(0, resourceNow(state, '鬥氣') - own);
     sel.dou = Math.max(0, Math.min(sel.dou, have));
     const mult = douMult(state);
     const input = h('input', {

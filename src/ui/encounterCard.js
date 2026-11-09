@@ -284,7 +284,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     // 敵人 B 技能（防禦強化）蓄力過的，這一下絕對防禦多一些；鬥氣加骰：這次花幾點
     const encNow = currentEnc(state);
     const extraAbs = Object.fromEntries(targetIds.map((id) => [id, pendingEnemyB(encNow, encNow.monsters.find((x) => x.id === id) ?? { hp: 0 })]).filter(([, n]) => n > 0));
-    const dou = Math.min(sel.dou, resourceNow(state, '鬥氣'));
+    const dou = Math.min(sel.dou, Math.max(0, resourceNow(state, '鬥氣') - (currentMove(state)?.cost?.鬥氣 ?? 0)));
     let r;
     let draw;
     let befores;
@@ -300,6 +300,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     if (r.error) return toast(r.error);
     sel.dou = 0;
     sel.mage = 0;
+    sel.yuwai = false; // 域外魔祖要花 30 靈氣，跟加骰一樣只對這一次出招有效
     sel.daoDun = false;
     if (!online()) Object.keys(extraAbs).forEach((id) => spendEnemyB(state.encounter, id)); // 本機模式：蓄力用掉了（房間模式由伺服器扣）
     if (r.reveal) playShadowFx('reveal', { n: r.burst }); // 暗影斗篷現身爆發
