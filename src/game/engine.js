@@ -112,11 +112,13 @@ export function modifier(state, skill, ctx, keepsakes = [], kctx) {
 }
 
 // ---------- 胃袋 ----------
+const XIWEI_TIME_CAP = 2; // 惜未央：每次刷新之間最多 2 次獲得時間（RULES_OVERVIEW §9）
+
 /** 食物真正進胃袋（背包已先扣好）。惜未央：吃下時獲得 1 時間，每次刷新之間最多 2 次（RULES_OVERVIEW §9） */
 function enterStomach(state, food, ctx) {
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
   stomach.push(ctx === 'rest' ? { food, left: REST_FOOD_CHECKS } : { food });
-  if (food === '惜未央' && (state.xiweiTime ?? 0) < 2) { state.time += 1; state.xiweiTime = (state.xiweiTime ?? 0) + 1; }
+  if (food === '惜未央' && (state.xiweiTime ?? 0) < XIWEI_TIME_CAP) { state.time += 1; state.xiweiTime = (state.xiweiTime ?? 0) + 1; }
 }
 
 export function eat(state, food, ctx) {

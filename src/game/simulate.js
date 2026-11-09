@@ -89,6 +89,8 @@ function bestDefMode(monster, move) {
   return best;
 }
 
+const D4_AVG = 2.5; // 每顆 1D4 的平均點數（預期傷害 = D4_AVG × 骰數差）
+
 /** 被 BOSS 打的玩家挑預期傷害最低的攻擊（每顆 1D4，平均 2.5） */
 function bestAtkMode(monster, player) {
   if (monster.kind !== 'boss') return 0;
@@ -96,7 +98,7 @@ function bestAtkMode(monster, player) {
   let best = 0; let bestVal = Infinity;
   for (let mode = 0; mode < 3; mode++) {
     const atk = monsterAtk(monster, mode);
-    const v = TRACKS.reduce((a, t) => a + Math.max(0, 2.5 * (atk[t] - def[t])), 0);
+    const v = TRACKS.reduce((a, t) => a + Math.max(0, D4_AVG * (atk[t] - def[t])), 0);
     if (v < bestVal) { best = mode; bestVal = v; }
   }
   return best;
@@ -110,10 +112,10 @@ function expectedDamage(p, move0, target, bonus, extraAbs) {
   const move = resolveChosenTrack(p, move0); // 機甲駕駛員：擇一軌，和 playerAttack 沒選軌道時一樣
   const abs = (passivesOf(p).ignoreAbs ? 0 : monsterAbs(target)) + extraAbs;
   const base = monsterDef(target, bestDefMode(target, move));
-  if (move.mode === 'all') return Math.max(0, 2.5 * (pooledAttack(p, move, bonus, 0).dice - (base.A + base.B + base.C + abs)));
-  if (move.mode === 'abs') return Math.max(0, 2.5 * (pooledAttack(p, move, bonus, 0).dice - abs));
+  if (move.mode === 'all') return Math.max(0, D4_AVG * (pooledAttack(p, move, bonus, 0).dice - (base.A + base.B + base.C + abs)));
+  if (move.mode === 'abs') return Math.max(0, D4_AVG * (pooledAttack(p, move, bonus, 0).dice - abs));
   const a = attackDice(p, move, bonus, 0).dice;
-  return TRACKS.reduce((acc, t) => acc + Math.max(0, 2.5 * (a[t] - (base[t] + (move.tracks.includes(t) ? abs : 0)))), 0);
+  return TRACKS.reduce((acc, t) => acc + Math.max(0, D4_AVG * (a[t] - (base[t] + (move.tracks.includes(t) ? abs : 0)))), 0);
 }
 
 const buffPotions = (state, kind) => Object.keys(POTIONS)
