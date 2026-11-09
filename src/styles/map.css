@@ -31,6 +31,20 @@
   pointer-events: none;
 }
 
+/* 縮放按鈕（H10）：放在地圖右下角，手機避開底部導覽列 */
+.map-controls {
+  position: absolute;
+  right: 1rem;
+  bottom: 1.2rem;
+  z-index: 3;
+  display: flex;
+  gap: 0.4rem;
+}
+@media (max-width: 899px) {
+  .map-controls { bottom: calc(var(--nav-h, 0px) + 1.2rem + env(safe-area-inset-bottom, 0px)); }
+}
+.map-viewport:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+
 /* ---------- 熱點 ---------- */
 .map-hotspots {
   position: absolute;
@@ -50,6 +64,18 @@
 .hotspot:hover,
 .hotspot:focus-visible {
   outline: none;
+}
+
+/* 透明的可點範圍：地圖縮得很小時，熱點的實際大小會小於 24px（無障礙下限），
+   用置中的假元素把可點範圍撐到至少 28px（--map-inv 是 1/目前縮放，由 mapView.js 設定）。不放大畫面上的圖示 */
+.hotspot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, calc(28px * var(--map-inv, 1)));
+  height: max(100%, calc(28px * var(--map-inv, 1)));
+  transform: translate(-50%, -50%);
 }
 
 .hotspot[data-locked='true']:hover,
