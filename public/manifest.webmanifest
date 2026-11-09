@@ -2,6 +2,8 @@
   "name": "幻境編年史",
   "short_name": "幻境編年史",
   "description": "幻境編年史：世界地圖、修整日、背包、裝備、交易與跑團。",
+  "id": "./",
+  "categories": ["games"],
   "lang": "zh-Hant",
   "start_url": "./",
   "scope": "./",

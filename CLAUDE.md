@@ -12,6 +12,11 @@ GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原
 - 小改動用局部編輯，不要整檔重寫。改完只回報改了哪些檔案、各一句話，不要貼整段程式碼。
 - 不要主動重構、改名、加套件或改其他沒提到的檔案。
 
+## 部署檢查清單
+- 推上 `main` ＝ 前端自動部署到正式站，合併前先確認 `npm test`、`npm run build` 都過。
+- **改了 `public/img/` 或 `public/icons/` 底下的圖片（檔名沒有雜湊），必須把 `public/sw.js` 的 `CACHE` 版本號 +1**，否則玩家的 Service Worker 會一直吐舊圖。
+- `worker/` 的改動不在自動部署流程裡，要另外部署，且沒有露葵明確同意不要執行 `wrangler deploy`。
+
 ## 技術
 Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 指令：`npm run dev`（開發）、`npm run build`（建置到 dist/）、`npm test`（規則測試）。

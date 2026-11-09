@@ -5,8 +5,9 @@
 // （API 在另一個網域 huan-jing-api.*，這裡本來就攔不到）、WebSocket。
 // 所以不會出現「登出了畫面還是舊的」或存檔版本衝突；網頁永遠拿最新的，沒網路就和沒裝一樣打不開。
 // 改版後要讓舊快取失效：把 CACHE 的版本號 +1。
+// ⚠ 改了 public/img/ 或 public/icons/ 裡的圖（檔名沒雜湊）就一定要 +1，否則玩家會一直看到舊圖。
 // ============================================================
-const CACHE = 'huanjing-static-v3';
+const CACHE = 'huanjing-static-v4';
 const PREFIXES = ['/assets/', '/icons/', '/img/'];
 
 /** 要不要由 Service Worker 快取這個請求 */
