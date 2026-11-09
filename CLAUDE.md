@@ -15,7 +15,7 @@ GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原
 ## 部署檢查清單
 - 推上 `main` ＝ 前端自動部署到正式站，合併前先確認 `npm test`、`npm run build` 都過。
 - **改了 `public/img/` 或 `public/icons/` 底下的圖片（檔名沒有雜湊），必須把 `public/sw.js` 的 `CACHE` 版本號 +1**，否則玩家的 Service Worker 會一直吐舊圖。
-- `worker/` 的改動不在自動部署流程裡，要另外部署，且沒有露葵明確同意不要執行 `wrangler deploy`。
+- `worker/`：Cloudflare 後台的 Workers Builds 已連到本 repo 的 `main`（露葵 2026-11-09 截圖確認，生產分支 `main`），所以**合併到 `main` 也會自動部署 Worker**。Claude Code 不要自己執行 `wrangler deploy`。
 
 ## 技術
 Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
