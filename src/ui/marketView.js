@@ -33,7 +33,7 @@ async function doBlackBuy(state, item, qty, commit) {
   try { ({ r, draw } = await rollWith(state, (st, rng) => blackBuy(st, item, qty, rng))); } catch (e) { return rollFailed(e); }
   if (r.error) return toast(r.error);
   publish({
-    who: state.name, kind: 'deal', label: `黑市購買 ${item} ×${fmt(qty)}`, big: `${fmt(r.total)} 金幣`,
+    who: state.name, kind: 'deal', label: `黑市購買 ${item} ×${fmt(qty)}`, big: r.labor ? `付 ${fmt(r.paid)} 金幣＋勞動 ${r.labor} 時間` : `${fmt(r.total)} 金幣`,
     tone: r.labor ? 'fail' : undefined,
     lines: [
       `${diceText(BLACK_BUY_DICE)} → ${r.roll}（溢價 ×${r.rate}）`,
@@ -42,7 +42,7 @@ async function doBlackBuy(state, item, qty, commit) {
     ].filter(Boolean),
   }, { draw });
   toast(r.labor ? `金幣不夠，勞動抵債 ${r.labor} 時間` : `花了 ${fmt(r.total)} 金幣`);
-  logActivity(state, { cat: 'item', text: `黑市購買 ${item} ×${fmt(qty)}，${fmt(r.total)} 金幣`, lines: [`溢價 ×${r.rate}`, r.labor ? `付不起，勞動抵債 ${r.labor} 時間` : ''].filter(Boolean) });
+  logActivity(state, { cat: 'item', text: r.labor ? `黑市購買 ${item} ×${fmt(qty)}，付 ${fmt(r.paid)} 金幣＋勞動 ${r.labor} 時間` : `黑市購買 ${item} ×${fmt(qty)}，${fmt(r.total)} 金幣`, lines: [`溢價 ×${r.rate}`, r.labor ? `付不起，勞動抵債 ${r.labor} 時間` : ''].filter(Boolean) });
   commit();
 }
 
@@ -201,7 +201,7 @@ export function createMarketView({ root, getState, commit }) {
         h('ul', { class: 'trade-list' }, row(state, {
           key: 'ex', item: VOUCHER, have: vouchers, max: canEx, price: '1 張 = 1 金幣',
           button: (q) => `換 ${fmt(q)}`, disabled: canEx < 1,
-          onGo: (q) => { const r = exchangeVouchers(state, q); if (r.error) return toast(r.error); toast(`換到 ${fmt(q)} 金幣`); logActivity(state, { cat: 'item', text: `代金券換金幣：${fmt(q)} 張`, lines: [] }); commit(); },
+          onGo: (q) => { const r = exchangeVouchers(state, q); if (r.error) return toast(r.error); toast(`換到 ${fmt(q)} 金幣`); logActivity(state, { cat: 'item', text: `代金券換金幣：用 ${fmt(q)} 張代金券換到 ${fmt(q)} 金幣`, lines: [] }); commit(); },
         }))),
     ];
   }

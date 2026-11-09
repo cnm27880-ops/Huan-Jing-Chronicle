@@ -6,7 +6,12 @@ import { parseTrackLine, parseTargetLine } from '../game/events.js';
 import { TRACKS, TRACK_ATK_STAT } from '../game/rules.js';
 import { getLog, subscribe } from '../state/rollLog.js';
 
-const clock = (t) => new Date(t).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+const clock = (t) => {
+  const d = new Date(t);
+  const time = d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+  // 非今天的紀錄加註日期，跨日長團才分得出是哪一天
+  return d.toDateString() === new Date().toDateString() ? time : `${d.getMonth() + 1}/${d.getDate()} ${time}`;
+};
 const MAX_FACES = 30; // 一般檢定最多畫幾顆骰面，其餘只寫「另 N 顆」
 
 /** 右上角的結果徽章（膠囊）文字 */
@@ -24,6 +29,11 @@ function badgeText(ev) {
 export function readFaces(ev) {
   const lines = ev.lines ?? [];
   if (ev.kind === 'check') {
+    const adv = String(lines[0] ?? '').match(/^優勢骰 2D20（(\d+)、(\d+) 取高 (\d+)）\+ (-?\d+)$/);
+    if (adv) { // 優勢：兩顆都畫出來，被捨棄的那顆標暗
+      const [a, b, hi] = adv.slice(1, 4).map(Number);
+      return { faces: [a, b], sides: 20, formula: `優勢 2D20 取高 + ${adv[4]}`, dropped: a === hi ? 1 : 0, rest: lines.slice(1) };
+    }
     const m = String(lines[0] ?? '').match(/^1D20（(\d+)）\+ (-?\d+)$/);
     if (!m) return null;
     return { faces: [Number(m[1])], sides: 20, formula: `1D20 + ${m[2]}`, rest: lines.slice(1) };
@@ -46,11 +56,11 @@ export function readFaces(ev) {
 }
 
 /** 六角形骰面列 */
-function faceRow({ faces, sides }) {
+function faceRow({ faces, sides, dropped }) {
   const shown = faces.slice(0, MAX_FACES);
   return h('div', { class: 'dice-faces', role: 'img', 'aria-label': `骰面 ${faces.join('、')}` },
-    shown.map((n) => h('span', {
-      class: 'die', dataset: { max: n === sides ? '1' : '0', min: n === 1 ? '1' : '0' }, text: String(n),
+    shown.map((n, i) => h('span', {
+      class: 'die', dataset: { max: n === sides ? '1' : '0', min: n === 1 ? '1' : '0', ...(dropped === i ? { dropped: '1' } : {}) }, text: String(n),
     })),
     faces.length > shown.length ? h('span', { class: 'dice-faces__more', text: `另 ${faces.length - shown.length} 顆` }) : null);
 }

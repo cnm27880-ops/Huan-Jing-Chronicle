@@ -14,7 +14,7 @@ import {
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
-  SKILL_CATALOG, bindableSkills, attackResponses, ATTACK_RESPONSES, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult,
+  SKILL_CATALOG, bindableSkills, attackResponses, ATTACK_RESPONSES, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult, PASSIVE_RIDERS,
   choosableTracks, DAODUN, daoDunLeft, daoDunUses, SWELL, swellCap,
 } from '../game/skills.js';
 import {
@@ -178,8 +178,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       h('span', { class: 'num', text: `${fmt(hp.now)}/${fmt(hp.max)}` })),
     h('span', { class: 'mini-hud__res' }, HUD_KEYS(state).slice(1).map((k) => {
       const r = readout(state, k);
-      return r.max > 0 ? h('span', { class: 'mini-hud__chip', dataset: { hud: k } }, h('b', { text: k.slice(0, 1) }), h('span', { class: 'num', text: fmt(r.now) })) : null;
-    })),
+      return r.max > 0 ? h('span', { class: 'mini-hud__chip', dataset: { hud: k } }, h('b', { text: k.slice(0, 1) }), h('span', { class: 'num', text: k === '毒性' ? `${fmt(r.now)}/${fmt(r.max)}` : fmt(r.now) })) : null;
+    }),
+    state.shield?.hp > 0 ? h('span', { class: 'mini-hud__chip', dataset: { hud: '護盾' } }, h('b', { text: '盾' }), h('span', { class: 'num', text: fmt(state.shield.hp) })) : null),
     h('span', { class: 'mini-hud__caret', 'aria-hidden': 'true', text: open ? '▴' : '▾' }));
   }
 
@@ -198,8 +199,8 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         h('button', {
           type: 'button', class: 'btn btn--small',
           onclick: async (e) => {
-            if (!(await askConfirm(e.currentTarget, { title: '結束戰鬥？', lines: ['毒性歸零、藥水加成清除、敵人清空。'], okText: '結束戰鬥', danger: true }))) return;
-            const r = endBattle(state); sel.modes = {};
+            if (!(await askConfirm(e.currentTarget, { title: '結束戰鬥？', lines: ['毒性歸零、藥水加成清除、護盾清除、敵人清空。'], okText: '結束戰鬥', danger: true }))) return;
+            const r = endBattle(state); sel.modes = {}; sel.dou = 0; sel.mage = 0; sel.yuwai = false; // 沒出完的加骰不帶進下一場
             publish({ who: state.name, kind: 'note', label: '戰鬥結束', lines: [`毒性 ${r.toxicity} → 0`] });
             commit();
           },
@@ -215,8 +216,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       const res = ui.feedTo.startsWith('ally:')
         ? await encounterAction({ t: 'encAllyFeed', id: ui.feedTo.slice(5), potion: name })
         : await sendMail({ to: ui.feedTo, kind: 'potion', potion: name });
-      toast(`已餵出${name}（回復 ${res.heal}），紀錄會顯示在戰鬥紀錄裡。`);
+      toast(`已餵出${name}，對方領取後生效（擲出回復 ${res.heal}，實際回復看戰鬥紀錄）。`);
     } catch (e) {
+      if (e.uncertain) return toast(`不確定有沒有餵出去（${e.message}）。藥水先不退還，請看戰鬥紀錄確認；確定沒送出再請 GM 補發。`);
       refundItems(state, { [name]: 1 });
       commit();
       toast(`沒有餵出去：${e.message}`);
@@ -229,8 +231,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const heals = Object.keys(POTIONS).filter((n) => POTIONS[n].heal && countOf(state, n) > 0);
     if ((!mates.length && !npcs.length) || !heals.length) return null;
     if (ui.feedTo.startsWith('ally:') && !npcs.some((a) => `ally:${a.id}` === ui.feedTo)) ui.feedTo = ''; // NPC 已離開戰鬥
+    if (ui.feedTo && !ui.feedTo.startsWith('ally:') && !mates.some((m) => m.uid === ui.feedTo)) ui.feedTo = ''; // 隊友已離開房間
     return h('div', { class: 'feedbox' },
-      h('p', { class: 'field-label', text: '餵給隊友或友方 NPC（對方不用同意；倒地的也能拉起來，毒性算玩家自己的、NPC 沒有毒性）' }),
+      h('p', { class: 'field-label', text: '餵給隊友或友方 NPC（對方不用同意；倒地的也能拉起來，毒性算在被餵的那位玩家身上、NPC 沒有毒性）' }),
       h('div', { class: 'row' },
         h('select', { class: 'field', 'aria-label': '餵給誰', onchange: (e) => { ui.feedTo = e.target.value; rerender(); } },
           h('option', { value: '', text: '選擇隊友…' }),
@@ -319,7 +322,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const m = resolveChosenTrack(state, m0, sel.trackPick[m0.id]); // 機甲駕駛員：預覽選到的那一軌
     const pooled = m.mode === 'all' || m.mode === 'abs';
     const support = m.kind === 'heal' || m.kind === 'shield';
-    const cost = actionCost(state, m);
+    // 域外魔祖勾選時，預覽花費也要含追加的靈氣（出招時才會扣，先讓玩家看到、也先擋住付不起）
+    const yuwai = sel.yuwai && m.id === sel.moveId && skillLevel(state, '域外魔祖') > 0 && m.school === '修仙';
+    const cost = actionCost(state, m, yuwai ? PASSIVE_RIDERS.域外魔祖.cost : {});
     const bits = [];
     if (m.school) bits.push(m.school);
     if (support) {
@@ -390,7 +395,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         tone: 'ok',
         lines: [
           r.kind === 'heal'
-            ? `自己：最大生命 ${t.pct}% = ${r.amount}，生命 ${before} → ${state.hp} / ${maxHp(state)}`
+            ? `自己：最大生命 ${t.pct}%（理論 ${r.amount}），實際回復 ${r.healed}，生命 ${before} → ${state.hp} / ${maxHp(state)}`
             : `自己：護盾 = 最大生命 ${t.pct}% = ${r.amount}${r.res ? `，抗性免疫 +${r.res}（護盾破了才消失）` : ''}`,
           sent.length ? `同時施放給：${sent.map((u) => mates.find((mm) => mm.uid === u)?.name ?? u).join('、')}` : null,
           `花費：${costText(r.cost)}`,
@@ -592,13 +597,14 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   /** 鬥氣加骰：直接輸入這次出招花幾點鬥氣（不能超過現有的），每點 +1 顆真實傷害骰（冠軍勇士每點 4 顆）；出招後歸零 */
   function douRow(state) {
     if (resourceMax(state, '鬥氣') <= 0) return null;
-    const have = resourceNow(state, '鬥氣');
+    const own = state.moves.find((x) => x.id === sel.moveId)?.cost?.鬥氣 ?? 0; // 招式本身要花的鬥氣先扣掉，加骰只能用剩下的
+    const have = Math.max(0, resourceNow(state, '鬥氣') - own);
     sel.dou = Math.max(0, Math.min(sel.dou, have));
     const mult = douMult(state);
     const input = h('input', {
       class: 'dou__input', type: 'number', inputmode: 'numeric', min: '0', max: String(have), step: '1', value: String(sel.dou), placeholder: '0',
       'aria-label': '鬥氣加骰（點數）',
-      oninput: (e) => { const n = Math.floor(Number(e.target.value)) || 0; sel.dou = Math.max(0, Math.min(have, n)); field.dataset.on = sel.dou > 0 ? '1' : '0'; }, // 打字途中不重畫，免得輸入框被換掉
+      oninput: (e) => { const n = Math.floor(Number(e.target.value)) || 0; sel.dou = Math.max(0, Math.min(have, n)); if (n > have) e.target.value = String(sel.dou); field.dataset.on = sel.dou > 0 ? '1' : '0'; }, // 打字途中不重畫，免得輸入框被換掉
       onchange: (e) => { e.target.value = String(sel.dou); rerender(); },
       onfocus: (e) => e.target.select(),
     });
@@ -620,7 +626,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const input = h('input', {
       class: 'dou__input', type: 'number', inputmode: 'numeric', min: '0', max: String(cap), step: '1', value: String(sel.mage), placeholder: '0',
       'aria-label': '大魔導師加骰（顆數）', disabled: fits ? null : true,
-      oninput: (e) => { sel.mage = Math.max(0, Math.min(cap, Math.floor(Number(e.target.value)) || 0)); field.dataset.on = sel.mage > 0 ? '1' : '0'; },
+      oninput: (e) => { const n = Math.floor(Number(e.target.value)) || 0; sel.mage = Math.max(0, Math.min(cap, n)); if (n > cap) e.target.value = String(sel.mage); field.dataset.on = sel.mage > 0 ? '1' : '0'; },
       onchange: (e) => { e.target.value = String(sel.mage); rerender(); },
       onfocus: (e) => e.target.select(),
     });
@@ -661,7 +667,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
    */
   function fireBar(state) {
     const attacks = state.moves.filter((m) => m.kind !== 'heal' && m.kind !== 'shield');
-    if (!attacks.length) return null;
+    if (!attacks.length) return h('p', { class: 'hint', text: '沒有攻擊招式，請到招式頁新增。' });
     if (!attacks.some((m) => m.id === sel.moveId)) sel.moveId = attacks[0].id;
     const cur = attacks.find((m) => m.id === sel.moveId);
     const lack = shortfall(state, moveDetail(state, cur).cost);
@@ -698,7 +704,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
               publish({ who: state.name, kind: 'note', label: '魔女：放棄主動動作', lines: [`回復 ${r.gained} 魔力（現在 ${r.now}）`] });
               commit();
             },
-          }, `放棄行動・回復 ${WITCH_EXTRA_COST} 魔力`)
+          }, `放棄行動・回復魔力（最多 ${WITCH_EXTRA_COST}）`)
         : null,
       uniqueCard(state),
       douRow(state),

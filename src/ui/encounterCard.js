@@ -10,7 +10,7 @@ import { h, fmt } from './dom.js';
 import { toast, rollFailed, addBox } from './controls.js';
 import { TRACKS, TRACK_ATK_STAT, TRACK_DEF_STAT } from '../game/rules.js';
 import {
-  formatAbc, monsterAbs, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
+  formatAbc, abcLeftover, monsterAbs, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
   isDowned, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES, SPLIT_FOCUS,
 } from '../game/combat.js';
 import {
@@ -217,7 +217,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
   /** 清掉不存在或已倒下的目標，並裁到目前招式的上限（換成目標比較少的招式時） */
   function pruneTargets(state) {
     const enc = currentEnc(state);
-    sel.targets = sel.targets.filter((id) => { const m = enc.monsters.find((x) => x.id === id); return m && !isDowned(m); }).slice(0, capOf(state));
+    const alive = sel.targets.filter((id) => { const m = enc.monsters.find((x) => x.id === id); return m && !isDowned(m); });
+    const kept = alive.slice(0, capOf(state));
+    if (kept.length < alive.length) toast(`這招最多 ${capOf(state)} 個目標，已改選前 ${kept.length} 個。`); // 換招後多的目標被裁掉要讓玩家知道
+    sel.targets = kept;
     if (sel.focusBoss && !enc.monsters.some((m) => m.id === sel.focusBoss)) sel.focusBoss = null;
   }
 
@@ -284,7 +287,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
     // 敵人 B 技能（防禦強化）蓄力過的，這一下絕對防禦多一些；鬥氣加骰：這次花幾點
     const encNow = currentEnc(state);
     const extraAbs = Object.fromEntries(targetIds.map((id) => [id, pendingEnemyB(encNow, encNow.monsters.find((x) => x.id === id) ?? { hp: 0 })]).filter(([, n]) => n > 0));
-    const dou = Math.min(sel.dou, resourceNow(state, '鬥氣'));
+    const dou = Math.min(sel.dou, Math.max(0, resourceNow(state, '鬥氣') - (currentMove(state)?.cost?.鬥氣 ?? 0)));
     let r;
     let draw;
     let befores;
@@ -300,8 +303,21 @@ export function createEncounterCard({ getState, commit, rerender }) {
     if (r.error) return toast(r.error);
     sel.dou = 0;
     sel.mage = 0;
+    sel.yuwai = false; // 域外魔祖要花 30 靈氣，跟加骰一樣只對這一次出招有效
     sel.daoDun = false;
     if (!online()) Object.keys(extraAbs).forEach((id) => spendEnemyB(state.encounter, id)); // 本機模式：蓄力用掉了（房間模式由伺服器扣）
+    // 房間模式：先把傷害回報給伺服器，紀錄的「生命 前 → 後」以伺服器實際的為準（兩人同時打同一隻時，本機算的「前」不準）。
+    // 回報失敗不回滾（骰已擲、資源已扣），但紀錄會明講怪物血量沒更新，請 GM 核對，不再假裝成功
+    const server = new Map();
+    let hitError = '';
+    if (online()) {
+      const hits = r.hits.filter((x, i) => r.hits.findIndex((y) => y.target.id === x.target.id) === i) // 同一個目標被連打好幾下：只回報一次（總共打掉多少）
+        .map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp), ...(extraAbs[x.target.id] ? { usedB: true } : {}), ...(x.absCut ? { absCut: x.absCut } : {}) })).filter((x) => x.dmg > 0 || x.usedB || x.absCut);
+      if (hits.length) {
+        try { ((await encounterAction({ t: 'encHit', hits })).results ?? []).forEach((x) => server.set(x.id, x)); } catch (err) { hitError = err.message || '連線失敗'; }
+      }
+      if (hitError) toast(`傷害沒有回報成功（${hitError}）。怪物血量沒有更新，請 GM 核對。`);
+    }
     if (r.reveal) playShadowFx('reveal', { n: r.burst }); // 暗影斗篷現身爆發
     // 打擊特效：同一個目標被連打好幾下（守密人）就連播好幾次，種類看第一下
     for (const id of new Set(r.hits.map((x) => x.target.id))) {
@@ -315,9 +331,15 @@ export function createEncounterCard({ getState, commit, rerender }) {
       if (multi) lines.push(targetLine(h2.stage ? `${h2.target.id} 第 ${h2.stage} 段` : h2.target.id, h2.result.total));
       lines.push(...trackLines(h2.result));
       if (h2.ignoreAbs) lines.push('終焉武裝：無視絕對防禦'); else if (h2.abs) lines.push(`敵人絕對防禦 ${h2.abs}${h2.extraAbs ? `（含 B 技能 +${h2.extraAbs}）` : ''}`);
-      if (isLastOfTarget) lines.push(`${h2.target.id} 生命 ${fmt(befores.get(h2.target.id))} → ${fmt(h2.target.hp)} / ${fmt(h2.target.maxHp)}${h2.target.hp <= 0 ? '　倒下了！' : ''}`);
+      if (isLastOfTarget) {
+        const sv = server.get(h2.target.id);
+        const from = sv?.before ?? befores.get(h2.target.id);
+        const to = sv?.after ?? h2.target.hp;
+        lines.push(`${h2.target.id} 生命 ${fmt(from)} → ${fmt(to)} / ${fmt(h2.target.maxHp)}${to <= 0 ? '　倒下了！' : ''}`);
+      }
     });
     lines.push(...r.notes);
+    if (hitError) lines.push(`⚠ 怪物血量沒有更新（${hitError}），請 GM 核對`);
     if (r.potion) lines.push(`藥水加成：真實傷害 +${r.potion} 骰`);
     if (r.dou) lines.push(`鬥氣 −${r.dou}：真實傷害 +${r.douDice} 骰（用到的每一軌）`);
     lines.push(`花費：${costText(r.cost)}`);
@@ -329,11 +351,6 @@ export function createEncounterCard({ getState, commit, rerender }) {
       tone: r.hits.some((x) => x.result.total > 0) ? 'ok' : 'fail',
       lines,
     }, { draw });
-    if (online()) { // 怪物生命由伺服器改：回報這次打掉多少
-      const hits = r.hits.filter((x, i) => r.hits.findIndex((y) => y.target.id === x.target.id) === i) // 同一個目標被連打好幾下：只回報一次（總共打掉多少）
-        .map((x) => ({ id: x.target.id, dmg: Math.max(0, befores.get(x.target.id) - x.target.hp), ...(extraAbs[x.target.id] ? { usedB: true } : {}), ...(x.absCut ? { absCut: x.absCut } : {}) })).filter((x) => x.dmg > 0 || x.usedB || x.absCut);
-      if (hits.length) await act({ t: 'encHit', hits });
-    }
     commit();
   }
 
@@ -349,8 +366,14 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const before = state.hp;
     // 敵人這回合還能打幾次（普通 1、菁英 2、BOSS 3）；A 技能蓄力過就多加骰。房間模式由伺服器扣次數
     let extraAtk = 0;
+    let spentOnline = false; // 伺服器已經扣了這次攻擊次數：後面擲骰失敗要還回去
+    const giveBack = async () => { // 沒有實際承受到攻擊，把敵人的攻擊次數（與 A 蓄力）還回去
+      if (!spentOnline) return;
+      spentOnline = false;
+      try { await encounterAction({ t: 'encUse', id: m.id, use: 'atkBack', restoreA: extraAtk > 0 }); toast('沒有擲成，已把這次攻擊次數還給敵人。'); } catch { toast(`沒有擲成，而且攻擊次數沒能還回去，請 GM 把 ${m.id} 的次數補回來。`); }
+    };
     try {
-      if (online()) extraAtk = (await encounterAction({ t: 'encUse', id: m.id, use: 'atk' })).extraAtk ?? 0;
+      if (online()) { extraAtk = (await encounterAction({ t: 'encUse', id: m.id, use: 'atk' })).extraAtk ?? 0; spentOnline = true; }
       else {
         const spent = spendEnemyAttack(state.encounter, m.id);
         if (spent.error) return toast(spent.error);
@@ -361,8 +384,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
     let draw;
     try {
       ({ r, draw } = await withRoomEncounter(state, () => rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng, { extraAtk }))));
-    } catch (e) { return rollFailed(e); }
-    if (r.error) return toast(r.error);
+    } catch (e) { await giveBack(); return rollFailed(e); }
+    if (r.error) { await giveBack(); return toast(r.error); }
     playFx(m.id, 'strike'); // 怪物撲過來
     publish({
       who: state.name, kind: 'defend', label: `${m.id} 攻擊${m.kind === 'boss' ? `（${BOSS_ATK_MODES[modes.atk]}）` : ''}`,
@@ -378,8 +401,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
       ].filter(Boolean),
     }, { draw });
     if (r.reflect && !r.reflect.skipped) {
-      toast(`賽博駭客觸發：${m.id} 立刻扣 ${fmt(r.reflect.lost)} 生命（${r.reflect.dice}D4 = ${fmt(r.reflect.rolled)}）。`);
-      if (online() && r.reflect.lost > 0) await act({ t: 'encHit', hits: [{ id: m.id, dmg: r.reflect.lost }] }); // 怪物生命由伺服器改：回報這次反擊扣多少
+      toast(`賽博駭客觸發：${m.id} 立刻扣 ${fmt(r.reflect.lost)} 生命（${r.reflect.dice}D4 = ${fmt(r.reflect.rolled)}）。${(currentEnc(state)?.round ?? 0) > 0 ? '' : '還沒開始回合計數，一回合只能 1 次請自行確認。'}`);
+      if (online() && r.reflect.lost > 0) { // 怪物生命由伺服器改：回報這次反擊扣多少
+        try { await encounterAction({ t: 'encHit', hits: [{ id: m.id, dmg: r.reflect.lost }] }); } catch (err) { toast(`反擊的傷害沒有回報成功（${err.message || '連線失敗'}），請 GM 核對 ${m.id} 的血量。`); }
+      }
     } else if (r.reflect?.skipped) toast('賽博駭客：這回合已經觸發過了（一回合只能 1 次）。');
     commit();
   }
@@ -443,7 +468,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       return act({ t: 'encSwap', a: from, b: i });
     };
     return h('div', { class: 'init' },
-      h('p', { class: 'init__label', text: enc.locked ? `第 ${enc.round} 回合・輪到 ${name(enc.order[enc.turn])}` : '先攻位置（隨機）：玩家可以點選交換，GM 按「開打」後鎖定' }),
+      h('p', { class: 'init__label', text: enc.locked ? `第 ${enc.round} 回合・輪到 ${enc.order[enc.turn] ? name(enc.order[enc.turn]) : '—'}` : '先攻位置（隨機）：玩家可以點選交換，GM 按「開打」後鎖定' }),
       h('ol', { class: 'init__list' }, enc.order.map((o, i) => {
         const down = (o.kind === 'monster' && isDowned(enc.monsters.find((m) => m.id === o.id) ?? { hp: 1 }))
           || (o.kind === 'ally' && isDowned(alliesOf(enc).find((a) => a.id === o.id) ?? { hp: 1 }));
@@ -468,10 +493,15 @@ export function createEncounterCard({ getState, commit, rerender }) {
         : null;
     }
     if (!isGm()) return null;
+    const room = getRoomStatus();
+    const late = enc.order?.length // 在線、還不在先攻順序裡的玩家（中途加入）
+      ? (room.members ?? []).filter((m) => m.online && m.uid !== room.me?.uid && !enc.order.some((o) => o.kind === 'player' && o.uid === m.uid))
+      : [];
     return h('div', { class: 'row stage__gm' },
       h('span', { class: 'hint', text: `第 ${enc.round ?? 0} 回合` }),
-      h('button', { type: 'button', class: 'btn btn--small', title: '回合數 +1，敵人的技能次數與蓄力恢復（有先攻順序時，繞完一圈會自動進下一回合）', onclick: () => act({ t: 'encRound' }) }, '新回合'),
-      h('button', { type: 'button', class: 'btn btn--small', onclick: () => { ui.swapFrom = null; act({ t: 'encInit' }); } }, '抽先攻'),
+      ...late.map((m) => h('button', { type: 'button', class: 'btn btn--small', title: '插進先攻順序的隨機位置', onclick: () => act({ t: 'encJoin', uid: m.uid }) }, `加入先攻：${room.vitals?.[m.uid]?.name || m.name}`)),
+      h('button', { type: 'button', class: 'btn btn--small', title: '回合數 +1，敵人的技能次數與蓄力恢復（有先攻順序時，繞完一圈會自動進下一回合）', disabled: !!enc.locked, onclick: () => act({ t: 'encRound' }) }, '新回合'),
+      h('button', { type: 'button', class: 'btn btn--small', disabled: !!enc.locked, onclick: () => { ui.swapFrom = null; act({ t: 'encInit' }); } }, '抽先攻'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.order?.length || enc.locked, onclick: () => act({ t: 'encStart' }) }, '開打（鎖定）'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, title: '退回上一位（有人的回合被跳過時用；敵人已用掉的技能不會恢復）', onclick: () => act({ t: 'encPrev' }) }, '上一位'),
       h('button', { type: 'button', class: 'btn btn--small', disabled: !enc.locked, onclick: () => act({ t: 'encNext' }) }, '下一位'));
@@ -557,7 +587,8 @@ export function createEncounterCard({ getState, commit, rerender }) {
         ? h('div', { class: 'boss__tabs', role: 'tablist', 'aria-label': '切換 BOSS' }, bosses.map((b) => h('button', {
             type: 'button', role: 'tab', class: 'seg', 'aria-selected': String(b.id === m.id), dataset: { down: isDowned(b) ? '1' : '0' },
             onclick: () => { sel.focusBoss = b.id; rerender(); },
-          }, b.id, sel.targets.includes(b.id) ? ` ・${sel.targets.indexOf(b.id) + 1}` : '')))
+          }, b.id, sel.targets.includes(b.id) ? ` ・${sel.targets.indexOf(b.id) + 1}` : '',
+          h('small', { class: 'seg__hp num', text: isDowned(b) ? '倒下' : `${Math.floor(pctOf(b.hp, b.maxHp))}%` }))))
         : null,
       layeredBar(m, downed),
       art,
@@ -599,8 +630,11 @@ export function createEncounterCard({ getState, commit, rerender }) {
       portrait(m, 'mob__img'),
       h('span', { class: 'mob__name', text: m.id }),
       h('span', { class: 'mob__hp', 'aria-hidden': 'true' }, h('span', { class: 'mob__fill', style: `width:${pctOf(m.hp, m.maxHp)}%` })),
-      h('span', { class: 'mob__pct num', text: `${Math.ceil(pctOf(m.hp, m.maxHp))}%` }),
-      orderBadge(m.id)),
+      h('span', { class: 'mob__pct num', text: `${Math.floor(pctOf(m.hp, m.maxHp))}%` }),
+      orderBadge(m.id),
+      h('span', { class: 'mob__stat num', 'aria-hidden': 'true' },
+        h('span', { text: `攻 ${formatAbc(m.atk)}` }),
+        h('span', { text: `防 ${formatAbc(m.def)}` }))),
       h('button', {
         type: 'button', class: 'mob__hit', disabled: downed, dataset: { armed: ui.armed === m.id ? '1' : '0' },
         title: ui.armed === m.id ? '再點一次確認' : `承受 ${m.id} 的攻擊（${formatAbc(m.atk)}），要點兩下`,
@@ -676,6 +710,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
         type: 'button', class: 'btn btn--primary btn--small',
         onclick: () => {
           if (f.count > 20) return toast('一次最多 20 隻。');
+          for (const [label, text] of [['攻擊補正', f.atkMod], ['防禦補正', f.defMod]]) { // 打錯字（例如「五A」）會被當成 0，先擋下來
+            const bad = abcLeftover(text);
+            if (bad) return toast(`${label}看不懂「${bad}」，請寫成像「5A 3C」的格式。`);
+          }
           const spec = { count: f.count, atkPower: f.atk, defPower: f.def, hp: f.hp, atkMod: f.atkMod, defMod: f.defMod, absDef: f.absDef };
           for (const side of ['atk', 'def']) { // 指定的分配方式（沒選＝隨機，不送）
             if (f[`${side}Type`]) spec[`${side}Type`] = f[`${side}Type`];
@@ -696,10 +734,12 @@ export function createEncounterCard({ getState, commit, rerender }) {
   }
 
   /** GM 直接改敵人生命（BOSS、小怪都可以；填的比最大生命高就連上限一起拉高）。房間模式由伺服器改，本機模式改自己的 */
-  function setEnemyHp(state, m, raw) {
+  async function setEnemyHp(state, m, raw) {
+    if (String(raw ?? '').trim() === '') return toast('請先填要設定的生命（要設成 0 請明確輸入 0）。'); // 空欄位不能當 0，不然手滑就把怪打倒
     const v = Math.floor(Number(raw));
+    if (!Number.isFinite(v) || v < 0) { delete ui.mobHp[m.id]; return toast('生命要填 0 以上的整數。'); }
+    if (v > m.maxHp && !(await askConfirm(null, { title: `把 ${m.id} 的生命設成 ${fmt(v)}？`, lines: [`超過目前的最大生命 ${fmt(m.maxHp)}，最大生命也會一起拉高到 ${fmt(v)}。`], okText: '確定拉高' }))) return;
     delete ui.mobHp[m.id];
-    if (!Number.isFinite(v) || v < 0) return toast('生命要填 0 以上的整數。');
     if (online()) return act({ t: 'encHp', id: m.id, hp: v });
     m.hp = v;
     if (m.hp > m.maxHp) m.maxHp = m.hp;
@@ -781,7 +821,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
               class: 'field', type: 'number', inputmode: 'numeric', max: a.maxHp, value: ui.allyHp[a.id] ?? a.hp, style: 'max-width: 7em;', 'aria-label': `${a.name} 的生命`,
               oninput: (e) => { ui.allyHp[a.id] = e.target.value; },
             }),
-            h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { const v = Math.floor(Number(ui.allyHp[a.id] ?? a.hp)); delete ui.allyHp[a.id]; act({ t: 'encAllyHp', id: a.id, hp: Number.isFinite(v) ? v : a.hp }); } }, '設定生命'))
+            h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { const raw = ui.allyHp[a.id] ?? a.hp; if (String(raw).trim() === '') return toast('請先填要設定的生命。'); let v = Math.floor(Number(raw)); delete ui.allyHp[a.id]; if (!Number.isFinite(v)) v = a.hp; if (v > a.maxHp) { v = a.maxHp; toast(`不能超過最大生命，已改成 ${a.maxHp}。`); } act({ t: 'encAllyHp', id: a.id, hp: v }); } }, '設定生命'))
         : null,
       mine
         ? h('button', {
@@ -824,6 +864,11 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('button', {
         type: 'button', class: 'btn btn--primary btn--small',
         onclick: async () => {
+          const hp = Math.floor(Number(f.hp));
+          if (!String(f.name ?? '').trim()) return toast('請填名稱。');
+          if (!Number.isFinite(hp) || hp < 1) return toast('血量要填 1 以上的整數。');
+          if (f.sup) { const pct = Math.floor(Number(f.pct)); if (!Number.isFinite(pct) || pct < 1 || pct > 100) return toast('輔助百分比要填 1～100。'); }
+          for (const [label, text] of [['攻擊', f.atk], ['防禦', f.def]]) { const bad = abcLeftover(text); if (bad) return toast(`${label}看不懂「${bad}」，請寫成像「30A 20B」的格式。`); }
           const npc = { name: f.name, hp: Math.floor(Number(f.hp)), atk: f.atk, def: f.def, abs: Math.floor(Number(f.abs) || 0), ...(f.sup ? { support: { kind: f.sup, pct: Math.floor(Number(f.pct)) } } : {}) };
           try { await encounterAction({ t: 'encAlly', npc }); ui.allyForm = { ...f, name: '' }; toast(`${npc.name} 加入戰鬥。`); } catch (e) { toast(e.message || '操作失敗。'); }
         },

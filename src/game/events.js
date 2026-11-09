@@ -29,7 +29,7 @@ const int = (s) => Number(String(s).replace(/,/g, ''));
 
 /** clash()／clashPool() 的一條軌道 → 「A 軌　攻 12 顆＝30　防 8 顆＝20　傷害 10」 */
 export const trackLine = (t) =>
-  `${t.track} 軌　攻 ${num(t.atkDice)} 顆＝${num(t.atkRoll)}　防 ${num(t.defDice)} 顆＝${num(t.defRoll)}　傷害 ${num(t.damage)}`;
+  `${t.track} 軌　攻 ${num(Math.max(0, t.atkDice))} 顆＝${num(t.atkRoll)}　防 ${num(Math.max(0, t.defDice))} 顆＝${num(t.defRoll)}　傷害 ${num(t.damage)}`;
 
 /** trackLine 的反向；不是軌道行就回傳 null */
 export function parseTrackLine(line) {

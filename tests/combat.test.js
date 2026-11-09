@@ -552,3 +552,12 @@ test('舊存檔沒有各藥水記錄也能載入、能喝', () => {
   const loaded = normalizeCharacter({ ...fresh(), buffs: { atk: 2, def: 1 } });
   assert.deepEqual(loaded.buffs, { atk: 2, def: 1, atkBy: {}, defBy: {} });
 });
+
+test('abcLeftover：看得懂的格式沒有殘字，打錯字會回傳殘字', async () => {
+  const { abcLeftover } = await import('../src/game/combat.js');
+  assert.equal(abcLeftover('5A 3C'), '');
+  assert.equal(abcLeftover('5a,3c'), '');
+  assert.equal(abcLeftover(''), '');
+  assert.equal(abcLeftover('五A'), '五A');
+  assert.equal(abcLeftover('5A 3'), '3');
+});

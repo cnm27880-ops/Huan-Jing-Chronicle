@@ -102,6 +102,16 @@ export function spendEnemyAttack(enc, id) {
   return { ok: true, extraAtk, left: info.attacks - m.uses.atk };
 }
 
+/** 退還一次攻擊（玩家按了「承受攻擊」、但後面擲骰失敗時）：次數 −1，用掉的 A 蓄力也還回去。找不到怪物就什麼都不做 */
+export function refundEnemyAttack(enc, id, restoreA = false) {
+  const m = enc.monsters.find((x) => x.id === id);
+  if (!m) return { error: '找不到這隻敵人。' };
+  touch(enc, m);
+  if (m.uses.atk > 0) m.uses.atk -= 1;
+  if (restoreA) m.charge.A += 1;
+  return { ok: true };
+}
+
 /** 敵人被打時：有 B 蓄力就消耗一次，回傳多出來的絕對防禦骰數（沒有就 0） */
 export function spendEnemyB(enc, id) {
   const m = enc.monsters.find((x) => x.id === id);

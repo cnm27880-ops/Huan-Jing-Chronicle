@@ -124,7 +124,7 @@ export function createRestView({ root, getState, commit }) {
     return [
       section('選擇採集', actionCards(state, GATHER_ACTIONS, a, (x) => { ui.gatherAction = x; render(); })),
       ...(max <= 0
-        ? [h('p', { class: 'notice notice--bad', text: '今天的時間用完了。點上方的「新的一天」恢復 10 點。' })]
+        ? [h('p', { class: 'notice notice--bad', text: '今天的時間用完了。點上方的「新的一天」把時間補滿到 10 點（欠的時間會先扣掉）。' })]
         : runBlock(state, a, {
             kctx: { kind: 'gather' }, label: `${a} ${ui.times} 次`, hint: `每次 1 點時間，今天還剩 ${max} 點`, max, quick: [1, 3, 5],
             onRun: () => blockedByDraw() || pushResult({ kind: 'gather', action: a, ...gather(state, a, ui.times, [...ui.keepsakes]) }),
@@ -443,7 +443,7 @@ export function createRestView({ root, getState, commit }) {
 
   function learnPanel(state) {
     if (!usesSkillTable(state)) {
-      return section('學習技能', h('p', { class: 'notice', text: '這是舊式存檔，還不能在這裡升級技能。請請 GM 用「匯入角色卡」更新。' }));
+      return section('學習技能', h('p', { class: 'notice', text: '這是舊式存檔，還不能在這裡升級技能。請 GM 用「匯入角色卡」更新。' }));
     }
     const learned = Object.keys(state.skills ?? {}).filter(inCatalog).sort(byTier);
     const unlearned = Object.keys(SKILL_TABLE).filter((n) => !(n in (state.skills ?? {}))).sort(byTier);

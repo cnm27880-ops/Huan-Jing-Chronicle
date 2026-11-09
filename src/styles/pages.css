@@ -591,6 +591,7 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 }
 .die[data-max='1'] { color: var(--gold); background: var(--gold2); }
 .die[data-min='1'] { color: var(--rose); }
+.die[data-dropped='1'] { opacity: 0.4; }
 .dice-faces__more { color: var(--soft); font-size: 0.78rem; }
 /* ============================================================
    修整日（restView.js）：HUD → 行動分頁 → 左邊一步步設定＋大按鈕，右邊結果

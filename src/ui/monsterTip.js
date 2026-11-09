@@ -51,7 +51,14 @@ function showTip(el, getMonster) {
   tip.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
   tip.style.top = `${Math.max(8, below ? r.bottom + 8 : r.top - 8 - hgt)}px`;
   clearInterval(watch);
-  watch = setInterval(() => { if (!el.isConnected) hideTip(); }, 250);
+  let sig = JSON.stringify(m);
+  watch = setInterval(() => {
+    if (!el.isConnected) return hideTip();
+    const now = getMonster(); // 開著的時候隊友打了怪：數值變了就即時重畫內容（位置不動）
+    if (!now) return hideTip();
+    const s = JSON.stringify(now);
+    if (s !== sig) { sig = s; tip.replaceChildren(...monsterTipBody(now)); }
+  }, 250);
 }
 const hideTip = () => { clearTimeout(hideTimer); clearInterval(watch); if (tip) tip.dataset.show = '0'; };
 

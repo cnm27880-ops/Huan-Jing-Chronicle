@@ -375,3 +375,82 @@ test('上一位（encPrev）：只有 GM、開打後才能用；退回上一回�
   assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'b', id: '菁英1', use: 'atk' })).left, 0); // 沒補滿：只剩最後 1 次
   assert.match(errorOf(send(core, P1, { t: 'encUse', rid: 'c', id: '菁英1', use: 'atk' })).message, /已經攻擊 2 次/);
 });
+
+test('先攻防呆：開打後不能重抽先攻、不能按新回合，重按開打不重設回合', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: SPEC });
+  send(core, GM, { t: 'encInit' }, { online: ['300'] });
+  send(core, GM, { t: 'encStart' });
+  send(core, GM, { t: 'encNext' });
+  const before = encOf(send(core, GM, { t: 'encNext' }));
+  assert.equal(errorOf(send(core, GM, { t: 'encInit' }, { online: ['300'] }))?.code, 'bad_enc');
+  assert.equal(errorOf(send(core, GM, { t: 'encRound' }))?.code, 'bad_enc');
+  const again = encOf(send(core, GM, { t: 'encStart' }));
+  assert.equal(again.round, before.round);
+  assert.equal(again.turn, before.turn);
+  assert.deepEqual(again.order, before.order);
+});
+
+test('GM 移除輪到的人前面的怪物：輪到的人不變', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: SPEC }); // 2 隻怪＋1 位玩家
+  let enc;
+  for (let i = 0; i < 20; i++) { // 重抽到「第一位是怪物」為止（先攻是隨機的）
+    enc = encOf(send(core, GM, { t: 'encInit' }, { online: ['300'] }));
+    if (enc.order[0].kind === 'monster') break;
+  }
+  assert.equal(enc.order[0].kind, 'monster');
+  send(core, GM, { t: 'encStart' });
+  enc = encOf(send(core, GM, { t: 'encNext' })); // turn = 1，輪到第二位
+  const cur = enc.order[1];
+  const after = encOf(send(core, GM, { t: 'encRemove', id: enc.order[0].id }));
+  assert.deepEqual(after.order[after.turn], cur);
+});
+
+test('中途加入先攻：只有 GM、玩家要在線、不能重複，插進隨機位置且輪到的人不變', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: SPEC });
+  assert.equal(errorOf(send(core, GM, { t: 'encJoin', uid: '300' }, { online: ['300'] }))?.code, 'bad_enc'); // 還沒抽先攻
+  send(core, GM, { t: 'encInit' }, { online: ['300'] });
+  send(core, GM, { t: 'encStart' });
+  const before = encOf(send(core, GM, { t: 'encNext' }));
+  const cur = before.order[before.turn];
+  assert.equal(errorOf(send(core, P2, { t: 'encJoin', uid: '400' }, { online: ['300', '400'] }))?.code, 'forbidden');
+  assert.equal(errorOf(send(core, GM, { t: 'encJoin', uid: '400' }, { online: ['300'] }))?.code, 'bad_enc'); // 不在線
+  assert.equal(errorOf(send(core, GM, { t: 'encJoin', uid: '300' }, { online: ['300', '400'] }))?.code, 'bad_enc'); // 已在順序
+  const after = encOf(send(core, GM, { t: 'encJoin', uid: '400' }, { online: ['300', '400'] }));
+  assert.equal(after.order.length, before.order.length + 1);
+  assert.ok(after.order.some((o) => o.kind === 'player' && o.uid === '400'));
+  assert.deepEqual(after.order[after.turn], cur);
+  assert.equal(errorOf(send(core, GM, { t: 'encJoin', uid: '400' }, { online: ['300', '400'] }))?.code, 'bad_enc'); // 不能重複
+});
+
+test('開新戰鬥：同時清空舊的敵人與先攻順序', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { count: 2, atkPower: 12, defPower: 9, hp: 100 } });
+  assert.equal(core.encounter().monsters.length, 2);
+  const res = send(core, GM, { t: 'newBattle' });
+  assert.equal(core.encounter().monsters.length, 0);
+  assert.deepEqual(core.encounter().order, []);
+  assert.equal(res.out.find((o) => o.msg.t === 'enc').msg.encounter.monsters.length, 0);
+});
+
+test('encHit：回覆實際的 前→後 生命，兩人同時打同一隻以伺服器為準；已倒下的不會再扣', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 1, hp: 100 } });
+  const a = send(core, P1, { t: 'encHit', rid: 'a', hits: [{ id: '小怪1', dmg: 60 }] });
+  assert.deepEqual(replyOf(a).results, [{ id: '小怪1', before: 100, after: 40 }]);
+  const b = send(core, P2, { t: 'encHit', rid: 'b', hits: [{ id: '小怪1', dmg: 60 }] }); // 第二個人本機以為還有 100
+  assert.deepEqual(replyOf(b).results, [{ id: '小怪1', before: 40, after: 0 }]);
+  const c = send(core, P1, { t: 'encHit', rid: 'c', hits: [{ id: '小怪1', dmg: 30 }] }); // 已倒下
+  assert.deepEqual(replyOf(c).results, [{ id: '小怪1', before: 0, after: 0 }]);
+});
+
+test('承受攻擊擲骰失敗：atkBack 把攻擊次數還回去，任何玩家都能用', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { ...SPEC, count: 1 } });
+  assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'a', id: '小怪1', use: 'atk' })).left, 0);
+  assert.match(errorOf(send(core, P1, { t: 'encUse', rid: 'b', id: '小怪1', use: 'atk' })).message, /已經攻擊/);
+  assert.ok(replyOf(send(core, P1, { t: 'encUse', rid: 'c', id: '小怪1', use: 'atkBack' })) !== undefined);
+  assert.equal(replyOf(send(core, P2, { t: 'encUse', rid: 'd', id: '小怪1', use: 'atk' })).left, 0); // 次數回來了，又能承受一次
+});
