@@ -35,7 +35,7 @@ def read_catalog(path):
         n = ws.cell(r, 1).value
         tier = ws.cell(r, 2).value
         if isinstance(n, str) and n.strip() and tier in TIERS + ['神級']:
-            text = str(ws.cell(r, 5).value or '').replace('\r', '').strip()
+            text = str(ws.cell(r, 5).value or '').replace('\r', '').strip().replace('體魄韌性', '體魄強韌')  # 試算表說明文字的固定錯字
             info[n.strip()] = {'tier': tier, 'kind': ws.cell(r, 3).value, 'school': ws.cell(r, 4).value, 'text': text}
     ws = wb['後台_技能計算']
     c0, c1 = CI('AN'), CI('BL')

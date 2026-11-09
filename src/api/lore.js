@@ -24,7 +24,8 @@ function loadMarkers() {
       if (!res.ok) throw new Error(`markers.json 讀取失敗（${res.status}）`);
       return res.json();
     })
-    .then((data) => data.markers ?? []);
+    .then((data) => data.markers ?? [])
+    .catch((e) => { markersPromise = null; throw e; }); // 失敗不留著：下次呼叫可以重試，不用整頁重新整理
   return markersPromise;
 }
 

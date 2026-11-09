@@ -297,7 +297,8 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
   // drainAvg = 各項平均（毒性算一項）
   const drain = {};
   for (const r of OTHER_RESOURCES) {
-    const owners = team.filter((p) => resourceMax(p, r) > 0 && r === '鬥氣' || p.moves.some((m) => (actionCost(p, m)[r] ?? 0) > 0)); // 鬥氣有基礎用法（加骰），一律算
+    // 兩種情況算「擁有者」：(1) 有鬥氣上限的鬥氣（鬥氣有基礎用法加骰，一律算）；(2) 招式真的會花這種資源。括號只是寫清楚，邏輯不變（&& 本來就比 || 先算）
+    const owners = team.filter((p) => (resourceMax(p, r) > 0 && r === '鬥氣') || p.moves.some((m) => (actionCost(p, m)[r] ?? 0) > 0));
     if (owners.length) drain[r] = owners.reduce((a, p) => a + (1 - resourceNow(p, r) / resourceMax(p, r)), 0) / owners.length;
   }
   drain.毒性 = team.reduce((a, p) => a + Math.min(1, p.toxicity / TOXICITY_MAX), 0) / (team.length || 1);

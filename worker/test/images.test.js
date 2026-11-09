@@ -132,7 +132,7 @@ const workerEnv = {
   SITE_ORIGIN: SITE, DISCORD_CLIENT_ID: '1', DISCORD_CLIENT_SECRET: 's', DISCORD_REDIRECT_URI: `${API}/auth/callback`,
   SESSION_SECRET: 'secret', DISCORD_ALLOWED_IDS: '100,300', GM_DISCORD_IDS: '100', ADMIN_DISCORD_IDS: '',
 };
-const cookie = async (uid) => `hj_session=${await signToken({ uid, name: '玩家', avatar: null, iat: Date.now(), exp: Date.now() + 1e6 }, workerEnv.SESSION_SECRET)}`;
+const cookie = async (uid) => `__Host-hj_session=${await signToken({ uid, name: '玩家', avatar: null, iat: Date.now(), exp: Date.now() + 1e6 }, workerEnv.SESSION_SECRET)}`;
 
 test('立繪網址：登入且在白名單內才轉給房間；其他情況擋下', async () => {
   const seen = [];

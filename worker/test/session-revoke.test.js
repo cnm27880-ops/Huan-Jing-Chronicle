@@ -34,7 +34,7 @@ function makeRoom() {
 }
 const tokenFor = async (uid, extra = {}) => signToken({ uid, name: 'x', avatar: null, iat: Date.now(), exp: Date.now() + 1e7, ...extra }, baseEnv.SESSION_SECRET);
 const call = (env, path, { token, method = 'GET', body } = {}) => worker.fetch(new Request(API + path, {
-  method, headers: { Origin: SITE, ...(token ? { Cookie: `hj_session=${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined,
+  method, headers: { Origin: SITE, ...(token ? { Cookie: `__Host-hj_session=${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined,
 }), env);
 const meUser = async (env, token) => (await (await call(env, '/auth/me', { token })).json()).user;
 
@@ -69,7 +69,7 @@ test('續期換發的新 token 保留版本號', async () => {
   const res = await call(env, '/auth/me', { token: near });
   const setCookie = res.headers.getSetCookie()[0];
   assert.ok(setCookie, '剩 2 天要換發');
-  const renewed = setCookie.split(';')[0].slice('hj_session='.length);
+  const renewed = setCookie.split(';')[0].slice('__Host-hj_session='.length);
   assert.equal((await meUser(env, renewed)).id, '300'); // 換發後版本號仍是 1，還能用
 });
 
