@@ -96,8 +96,7 @@ function parseGear(raw) {
   return { gear };
 }
 
-/** 顯示用的角色名稱由前端送來（角色資料還在前端）；但「系統」保留給伺服器，不能冒用 */
-const whoOf = (raw, user) => { const w = cleanStr(raw, 40); return !w || w === '系統' ? user.name : w; };
+const cleanWho = (raw) => cleanStr(raw, 40);
 
 const err = (rid, code, message) => ({ out: [{ to: 'self', msg: { t: 'error', rid, code, message } }], close: null });
 const closing = (code, reason) => ({ out: [], close: { code, reason } });
@@ -135,6 +134,22 @@ export class RoomCore {
     this.db.exec('INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', key, String(value));
   }
   deleteMeta(key) { this.db.exec('DELETE FROM meta WHERE key = ?', key); }
+
+  /**
+   * 紀錄上的發言人（M18）：預設就是 Discord 名稱；前端送來的 who 只有這幾種情況才採用：
+   * 跟這位玩家「伺服器上存的角色名字」一樣（顯示角色名，不能冒充別人）、GM／開發者（要用 NPC 名義發言）。
+   * 「系統」保留給伺服器，不能冒用。
+   */
+  whoOf(raw, user) {
+    const w = cleanWho(raw);
+    if (!w || w === '系統') return user.name;
+    if (w === user.name || this.isGm(user.uid) || this.isAdmin(user.uid)) return w;
+    try {
+      const rows = this.db.exec('SELECT json FROM characters WHERE uid = ?', user.uid);
+      if (rows.length && JSON.parse(rows[0].json)?.name === w) return w;
+    } catch { /* 讀不到角色就用 Discord 名稱 */ }
+    return user.name;
+  }
 
   // ---------- session 版本號（H6：登出／被盜時讓舊 token 失效） ----------
   // 每位使用者一個版本號，預設 0；token 簽發時帶著當時的版本號，不一致就拒絕。
@@ -311,7 +326,7 @@ export class RoomCore {
     const expr = typeof msg.expr === 'string' && msg.expr.length <= 40 ? parseDiceExpr(msg.expr) : { error: '格式不對，請輸入像 1D20 或 2D6+3 這樣的骰式。' };
     if (expr.error) return err(rid, 'bad_dice', expr.error); // 顆數、面數上限由 parseDiceExpr 把關（MAX_DICE、MAX_SIDES）
     const r = rollExpr(expr, this.rng);
-    const ev = this.record({ ...diceEvent(whoOf(msg.who, user), r), srv: true }, user);
+    const ev = this.record({ ...diceEvent(this.whoOf(msg.who, user), r), srv: true }, user);
     return this.broadcastEvent(ev, [{ to: 'self', msg: { t: 'rolled', rid, event: ev } }]);
   }
 
@@ -329,7 +344,7 @@ export class RoomCore {
     const rolls = msg.adv === true ? [d20(this.rng), d20(this.rng)] : null; // 優勢骰（張亮的驚人發現）：兩顆取高
     const roll = rolls ? Math.max(...rolls) : d20(this.rng);
     const r = { skill, roll, mod, parts: clean, total: roll + mod, isLife: LIFE_SKILLS.includes(skill), ...(rolls ? { rolls } : {}) };
-    const ev = this.record({ ...checkEvent(whoOf(msg.who, user), r), srv: true }, user);
+    const ev = this.record({ ...checkEvent(this.whoOf(msg.who, user), r), srv: true }, user);
     return this.broadcastEvent(ev, [{ to: 'self', msg: { t: 'rolled', rid, event: ev, roll, total: r.total, ...(rolls ? { rolls } : {}) } }]);
   }
 
@@ -370,7 +385,7 @@ export class RoomCore {
     }
     if (SIDE_KINDS.has(e.kind)) return { out: [{ to: 'self', msg: { t: 'posted', rid } }], close: null }; // 骰點已消耗；內容由前端另外記到日誌
     const ev = this.record({
-      who: whoOf(e.who, user), kind: e.kind, label, big, lines, srv,
+      who: this.whoOf(e.who, user), kind: e.kind, label, big, lines, srv,
       tone: TONES.has(e.tone) ? e.tone : undefined,
     }, user);
     return this.broadcastEvent(ev, [{ to: 'self', msg: { t: 'posted', rid, id: ev.id } }]);

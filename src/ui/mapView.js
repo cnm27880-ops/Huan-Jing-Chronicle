@@ -6,7 +6,7 @@
 
 const MAP_W = 1280;
 const MAP_H = 714;
-const MAX_SCALE = 2.2; // 原圖寬 1884 像素（= 1.47 倍），再大一點還看得清楚，更大只會糊
+const MAX_SCALE = 2.2; // 地圖圖檔寬 1280 像素（桌機 1 倍），放大到 2.2 倍已經會偏糊；手機載的是 800 像素的小圖（index.html 的 srcset），放大時更糊一點，是為了省流量的取捨
 const DRAG_THRESHOLD = 6; // 移動超過幾像素就算拖曳，不算點擊
 const DOUBLE_TAP_MS = 300;
 

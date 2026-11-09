@@ -89,6 +89,8 @@ function bestDefMode(monster, move) {
   return best;
 }
 
+const D4_AVG = 2.5; // 每顆 1D4 的平均點數（預期傷害 = D4_AVG × 骰數差）
+
 /** 被 BOSS 打的玩家挑預期傷害最低的攻擊（每顆 1D4，平均 2.5） */
 function bestAtkMode(monster, player) {
   if (monster.kind !== 'boss') return 0;
@@ -96,7 +98,7 @@ function bestAtkMode(monster, player) {
   let best = 0; let bestVal = Infinity;
   for (let mode = 0; mode < 3; mode++) {
     const atk = monsterAtk(monster, mode);
-    const v = TRACKS.reduce((a, t) => a + Math.max(0, 2.5 * (atk[t] - def[t])), 0);
+    const v = TRACKS.reduce((a, t) => a + Math.max(0, D4_AVG * (atk[t] - def[t])), 0);
     if (v < bestVal) { best = mode; bestVal = v; }
   }
   return best;
@@ -110,10 +112,10 @@ function expectedDamage(p, move0, target, bonus, extraAbs) {
   const move = resolveChosenTrack(p, move0); // 機甲駕駛員：擇一軌，和 playerAttack 沒選軌道時一樣
   const abs = (passivesOf(p).ignoreAbs ? 0 : monsterAbs(target)) + extraAbs;
   const base = monsterDef(target, bestDefMode(target, move));
-  if (move.mode === 'all') return Math.max(0, 2.5 * (pooledAttack(p, move, bonus, 0).dice - (base.A + base.B + base.C + abs)));
-  if (move.mode === 'abs') return Math.max(0, 2.5 * (pooledAttack(p, move, bonus, 0).dice - abs));
+  if (move.mode === 'all') return Math.max(0, D4_AVG * (pooledAttack(p, move, bonus, 0).dice - (base.A + base.B + base.C + abs)));
+  if (move.mode === 'abs') return Math.max(0, D4_AVG * (pooledAttack(p, move, bonus, 0).dice - abs));
   const a = attackDice(p, move, bonus, 0).dice;
-  return TRACKS.reduce((acc, t) => acc + Math.max(0, 2.5 * (a[t] - (base[t] + (move.tracks.includes(t) ? abs : 0)))), 0);
+  return TRACKS.reduce((acc, t) => acc + Math.max(0, D4_AVG * (a[t] - (base[t] + (move.tracks.includes(t) ? abs : 0)))), 0);
 }
 
 const buffPotions = (state, kind) => Object.keys(POTIONS)
@@ -297,7 +299,8 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
   // drainAvg = 各項平均（毒性算一項）
   const drain = {};
   for (const r of OTHER_RESOURCES) {
-    const owners = team.filter((p) => resourceMax(p, r) > 0 && r === '鬥氣' || p.moves.some((m) => (actionCost(p, m)[r] ?? 0) > 0)); // 鬥氣有基礎用法（加骰），一律算
+    // 兩種情況算「擁有者」：(1) 有鬥氣上限的鬥氣（鬥氣有基礎用法加骰，一律算）；(2) 招式真的會花這種資源。括號只是寫清楚，邏輯不變（&& 本來就比 || 先算）
+    const owners = team.filter((p) => (resourceMax(p, r) > 0 && r === '鬥氣') || p.moves.some((m) => (actionCost(p, m)[r] ?? 0) > 0));
     if (owners.length) drain[r] = owners.reduce((a, p) => a + (1 - resourceNow(p, r) / resourceMax(p, r)), 0) / owners.length;
   }
   drain.毒性 = team.reduce((a, p) => a + Math.min(1, p.toxicity / TOXICITY_MAX), 0) / (team.length || 1);

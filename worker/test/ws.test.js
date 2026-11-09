@@ -24,7 +24,7 @@ function fakeRoom() {
   };
 }
 const cookie = async (uid = '300', { exp = Date.now() + 1e6, name = '玩家' } = {}) =>
-  `hj_session=${await signToken({ uid, name, avatar: null, iat: Date.now(), exp }, baseEnv.SESSION_SECRET)}`;
+  `__Host-hj_session=${await signToken({ uid, name, avatar: null, iat: Date.now(), exp }, baseEnv.SESSION_SECRET)}`;
 const ws = (path, { headers = {}, env = baseEnv, method = 'GET' } = {}) =>
   worker.fetch(new Request(API + path, { method, headers: { Upgrade: 'websocket', Origin: SITE, ...headers } }), env);
 
@@ -80,7 +80,7 @@ test('WebSocket：錯誤 Origin、沒有 Origin、未登入、不在白名單、
   assert.equal(noOrigin.status, 403);
 
   assert.equal((await ws('/rooms/main/ws', { env })).status, 401);
-  assert.equal((await ws('/rooms/main/ws', { headers: { Cookie: 'hj_session=garbage' }, env })).status, 401);
+  assert.equal((await ws('/rooms/main/ws', { headers: { Cookie: '__Host-hj_session=garbage' }, env })).status, 401);
   assert.equal((await ws('/rooms/main/ws', { headers: { Cookie: await cookie('300', { exp: Date.now() - 1 }) }, env })).status, 401);
   const notAllowed = await ws('/rooms/main/ws', { headers: { Cookie: await cookie('999') }, env });
   assert.equal(notAllowed.status, 403);

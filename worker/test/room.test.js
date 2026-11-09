@@ -61,7 +61,7 @@ test('伺服器擲骰：自訂骰用伺服器 rng，廣播給所有人並寫入�
   assert.equal(ev.kind, 'dice');
   assert.equal(ev.label, '2D6+3');
   assert.equal(ev.big, 12);
-  assert.equal(ev.who, '福德');
+  assert.equal(ev.who, '玩家一'); // 沒有存過角色：發言人用 Discord 名稱，不採用前端自己填的名字
   assert.equal(ev.by, '300');
   assert.equal(ev.srv, true);
   assert.deepEqual(res.out.map((o) => [o.to, o.msg.t]), [['all', 'event'], ['self', 'rolled']]);
@@ -288,5 +288,12 @@ test('「系統」這個名稱保留給伺服器，前端不能冒用；空名�
   assert.equal(eventOf(send(core, P1, { t: 'post', event: { kind: 'note', label: 'x', who: '系統' } })).who, '玩家一');
   assert.equal(eventOf(send(core, P1, { t: 'dice', who: '系統', expr: '1D6' })).who, '玩家一');
   assert.equal(eventOf(send(core, P1, { t: 'post', event: { kind: 'note', label: 'x', who: '   ' } })).who, '玩家一');
+  // M18：填別人的名字沒用，仍顯示自己的 Discord 名稱
+  assert.equal(eventOf(send(core, P1, { t: 'post', event: { kind: 'note', label: 'x', who: '福德' } })).who, '玩家一');
+  assert.equal(eventOf(send(core, P1, { t: 'dice', who: '玩家二', expr: '1D6' })).who, '玩家一');
+  // 但跟自己伺服器存檔的角色名字一樣就顯示角色名；GM 可以用 NPC 名義發言
+  send(core, P1, { t: 'charPut', rid: 'c', base: 0, data: { name: '福德' } });
   assert.equal(eventOf(send(core, P1, { t: 'post', event: { kind: 'note', label: 'x', who: '福德' } })).who, '福德');
+  assert.equal(eventOf(send(core, P1, { t: 'post', event: { kind: 'note', label: 'x', who: '玩家二的角色' } })).who, '玩家一');
+  assert.equal(eventOf(send(core, GM, { t: 'post', event: { kind: 'note', label: 'x', who: '神秘商人' } })).who, '神秘商人');
 });

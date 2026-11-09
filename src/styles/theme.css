@@ -83,6 +83,8 @@
   --an-fill: rgba(var(--ink-rgb), 0.35);           /* 比例細線（非最高） */
   --an-chip-bg: rgba(255, 255, 255, 0.05);         /* 流派膠囊標籤 */
   --an-pos: #7bc47f;                               /* 領先基準的差值（柔和綠） */
+  --ctl-disabled-text: #8a7d62;                    /* 停用按鈕的文字：實色（對 #100d09 約 4.7:1），不靠透明度 */
+  --ctl-disabled-bg: rgba(var(--ink-rgb), 0.05);   /* 停用按鈕的底色（蓋掉主色按鈕的金底） */
   --line-soft: rgba(var(--ink-rgb), 0.08);        /* 去框列表的底部分隔線 */
   --ctl-bg: rgba(var(--ink-rgb), 0.04);           /* Secondary 按鈕、輸入框的底色 */
   --ctl-line: rgba(var(--gold-rgb), 0.18);        /* Secondary 按鈕、輸入框的邊線（古銅金 18%） */

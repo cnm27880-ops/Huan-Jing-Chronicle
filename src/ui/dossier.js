@@ -83,8 +83,23 @@ export function createDossier({ panel, onClose }) {
     return nodes;
   }
 
+  // 開著情報面板時鎖住背後的地圖與頂部列（M11）：面板在 #main 裡面，不能對整個 #main 設 inert（面板自己也會被鎖），
+  // 所以只鎖背景的幾塊；另外 Tab 到面板最後一個控制項會繞回第一個。
+  const BACKGROUND = '#map-viewport, .map-controls, .topbar, .skip-link';
+  const setBackground = (locked) => document.querySelectorAll(BACKGROUND).forEach((n) => { n.inert = locked; });
+  const focusables = () => [...panel.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter((n) => !n.closest('[inert]'));
+  panel.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || panel.dataset.open !== 'true') return;
+    const items = focusables();
+    if (!items.length) return;
+    const first = items[0]; const last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
   function open(loc, region) {
     if (panel.dataset.open !== 'true') layer = pushLayer({ tier: 'drawer', modal: false, close });
+    setBackground(true);
     lastFocus = document.activeElement;
     panel.dataset.theme = region.theme;
     body.replaceChildren(...(loc.locked ? renderLocked(loc, region) : renderRevealed(loc, region)));
@@ -97,6 +112,7 @@ export function createDossier({ panel, onClose }) {
   function close() {
     layer?.remove();
     layer = null;
+    setBackground(false);
     panel.dataset.open = 'false';
     panel.setAttribute('aria-hidden', 'true');
     onClose?.();

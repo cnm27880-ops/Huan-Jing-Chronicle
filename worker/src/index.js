@@ -9,7 +9,7 @@ import { ROOM_IDS, DEFAULT_ROOM_ID } from './config.js';
 
 export { parseAllowlist, isAllowed }; // 階段 1-A 起就從這裡匯出（測試在用）
 
-const SESSION_COOKIE = 'hj_session';
+const SESSION_COOKIE = '__Host-hj_session'; // __Host- 前綴：瀏覽器強制 Secure、Path=/、不能帶 Domain，別的子網域蓋不掉
 const STATE_COOKIE = 'hj_state';
 const DAY_MS = 24 * 3600 * 1000;
 const SESSION_TTL_MS = 30 * DAY_MS; // 每次簽發的有效期
@@ -291,7 +291,7 @@ export default {
       'POST /auth/revoke': revoke,
     };
     const handler = routes[`${request.method} ${path}`];
-    if (!handler) return withCors(json({ error: 'not_found' }, path.startsWith('/auth/') ? 405 : 404), request, env);
+    if (!handler) return withCors(json({ error: 'not_found' }, 404), request, env);
 
     if (!configured(env)) return withCors(json({ error: 'server_misconfigured' }, 500), request, env);
     return withCors(await handler(request, env), request, env);

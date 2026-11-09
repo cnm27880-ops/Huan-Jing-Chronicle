@@ -218,35 +218,36 @@ export const newEncounter = () => ({ monsters: [], next: { mob: 1, boss: 1, elit
 /** GM 指定的分配方式：{ atkType, atkFocus, defType, defFocus }（都可以不給＝隨機） */
 const splitOpts = (spec, side) => ({ type: spec[`${side}Type`], focus: spec[`${side}Focus`] });
 
-export function addMobs(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, rank, ...split }, rng = Math.random) {
+/** 新增怪物的共用迴圈（M3）：做 count 隻（make 每次回傳一隻，亂數與編號的順序由 make 內部決定），放進遭遇戰並回傳新增的 */
+function spawn(enc, count, make) {
   const added = [];
-  const elite = rank === 'elite'; // 菁英：2 打（見 enemy.js）；沒給就是普通
   for (let i = 0; i < count; i++) {
-    enc.next.elite ??= 1;
-    const m = {
-      id: elite ? `菁英${enc.next.elite++}` : `小怪${enc.next.mob++}`, kind: 'mob', ...(elite ? { rank: 'elite' } : {}), hp, maxHp: hp, abs: absDef,
-      atk: generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk')),
-      def: generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def')),
-    };
+    const m = make();
     enc.monsters.push(m);
     added.push(m);
   }
   return added;
 }
 
+export function addMobs(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, rank, ...split }, rng = Math.random) {
+  const elite = rank === 'elite'; // 菁英：2 打（見 enemy.js）；沒給就是普通
+  return spawn(enc, count, () => {
+    enc.next.elite ??= 1;
+    return {
+      id: elite ? `菁英${enc.next.elite++}` : `小怪${enc.next.mob++}`, kind: 'mob', ...(elite ? { rank: 'elite' } : {}), hp, maxHp: hp, abs: absDef,
+      atk: generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk')),
+      def: generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def')),
+    };
+  });
+}
+
 /** 新增 BOSS：攻擊 3 組（輕擊/重擊/絕殺）、防禦 3 組（常規/變換/極限） */
 export function addBosses(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, ...split }, rng = Math.random) {
-  const added = [];
-  for (let i = 0; i < count; i++) {
-    const m = {
-      id: `BOSS${enc.next.boss++}`, kind: 'boss', hp, maxHp: hp, abs: absDef,
-      atk: [0, 1, 2].map(() => generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk'))), // 指定時三組都用同一種分配（比例各自隨機）
-      def: [0, 1, 2].map(() => generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def'))),
-    };
-    enc.monsters.push(m);
-    added.push(m);
-  }
-  return added;
+  return spawn(enc, count, () => ({
+    id: `BOSS${enc.next.boss++}`, kind: 'boss', hp, maxHp: hp, abs: absDef,
+    atk: [0, 1, 2].map(() => generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk'))), // 指定時三組都用同一種分配（比例各自隨機）
+    def: [0, 1, 2].map(() => generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def'))),
+  }));
 }
 
 export const removeMonster = (enc, id) => {
@@ -340,6 +341,81 @@ export function resolveChosenTrack(state, move, track) {
   return { ...move, tracks: [pick] };
 }
 
+/**
+ * 出招結算後的響應與被動效果（M1：從 playerAttack 拆出來，內容與順序不變）：
+ * 破防額外扣血、域外魔祖、吸血回復、現身爆發、龍、泰坦。notes 會直接加上說明文字。回傳 { healed, burst, dragon }
+ */
+function applyPostHitEffects(state, move, hits, notes, yuwai) {
+  // 響應：萬物歸一破防時，額外扣目標現有生命 %
+  const cat = move.skill ? catalogOf(move.skill) : null;
+  if (cat?.bonusCurrentPct) {
+    for (const h of hits) if (h.result.total > 0 && h.target.hp > 0) {
+      const x = Math.floor((h.target.hp * cat.bonusCurrentPct) / 100);
+      h.target.hp -= x; h.lost += x; h.bonus = x;
+      notes.push(`${cat.bonusCurrentPct}% 現有生命：${h.target.id} 額外 −${x}`);
+    }
+  }
+  // 響應：域外魔祖（修仙招式造成傷害後，直接扣現有生命 10%）
+  if (yuwai) {
+    for (const h of hits) if (h.result.total > 0 && h.target.hp > 0) {
+      const x = Math.floor((h.target.hp * PASSIVE_RIDERS.域外魔祖.currentPct) / 100);
+      h.target.hp -= x; h.lost += x; h.yuwai = x;
+      notes.push(`域外魔祖：${h.target.id} 現有生命 10% = −${x}`);
+    }
+  }
+  // 回復類：吞天噬血陣（招式內建）、不可名狀（被動，神秘招式）。回復的是「目標扣除的生命」的一半，總量有上限
+  const drains = [];
+  if (move.skill && catalogOf(move.skill)?.drain) {
+    const d = catalogOf(move.skill).drain;
+    drains.push({ name: move.name, ratio: d.ratio, cap: Math.floor((maxHp(state) * d.capPct) / 100) });
+  }
+  const lvUnn = skillLevel(state, '不可名狀');
+  if (lvUnn > 0 && move.school === PASSIVE_RIDERS.不可名狀.school) {
+    const r = PASSIVE_RIDERS.不可名狀;
+    drains.push({ name: '不可名狀', ratio: r.ratio, cap: Math.floor((maxHp(state) * (r.capBasePct + r.capPerLevelPct * lvUnn)) / 100) });
+  }
+  let healed = 0;
+  for (const d of drains) {
+    const lost = hits.reduce((a, h) => a + h.lost, 0);
+    const want = Math.min(Math.floor(lost * d.ratio), d.cap);
+    const before = state.hp;
+    healPlayer(state, want);
+    const got = state.hp - before;
+    healed += got;
+    notes.push(`${d.name}：目標共損失 ${lost} 生命，回復 ${got}（上限 ${d.cap}）`);
+  }
+
+  // 現身爆發：把聚集的能量傷害骰全打出去（已經加進這一招），隱身解除、點數歸零
+  const burst = move.skill === SHADOW_SKILL ? gatheredOf(state) : 0;
+  if (move.skill === SHADOW_SKILL) {
+    clearShadow(state);
+    notes.push(burst > 0 ? `現身！爆發暗影斗篷聚集的 ${burst} 顆能量傷害骰` : '現身（沒有聚集到能量傷害）');
+  }
+
+  // 響應：龍（造成能量傷害後，自己的能量傷害 +3／級，直到戰鬥結束；這一下已經打完，從下一次出招開始算）
+  const gain = dragonGain(state);
+  const dealtEnergy = gain > 0 && hits.some((h) => h.result.tracks.some((t) => (t.track === 'B' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0));
+  let dragon = 0;
+  if (dealtEnergy) {
+    state.buffs.dragon = (state.buffs.dragon ?? 0) + gain;
+    dragon = gain;
+    notes.push(`響應「龍」：造成能量傷害，能量傷害 +${gain}（累計 +${state.buffs.dragon}，直到戰鬥結束）`);
+  }
+
+  // 響應：泰坦（造成物理傷害後，目標絕對防禦永久減少 3／級，不疊加）
+  const cut = titanCut(state);
+  if (cut > 0 && move.mode !== 'abs') {
+    for (const h of hits) {
+      const physical = h.result.tracks.some((t) => (t.track === 'A' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0);
+      if (physical && (h.target.absCut ?? 0) < cut) {
+        h.target.absCut = cut; h.absCut = cut;
+        notes.push(`響應「泰坦」：${h.target.id} 絕對防禦永久 −${cut}（到戰鬥結束）`);
+      }
+    }
+  }
+  return { healed, burst, dragon };
+}
+
 export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math.random, opts = {}) {
   const found = state.moves.find((m) => m.id === moveId);
   const move = found ? resolveChosenTrack(state, found, opts.track) : found; // 機甲駕駛員：只打選的那一軌
@@ -417,73 +493,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   }
   for (const r of responses) notes.push(`響應「${r.name}」：${r.free ? '' : `花 ${costText(r.cost)}，`}${r.tracks.join('')} 軌 +${r.dice} 顆傷害骰`);
 
-  // 響應：萬物歸一破防時，額外扣目標現有生命 %
-  const cat = move.skill ? catalogOf(move.skill) : null;
-  if (cat?.bonusCurrentPct) {
-    for (const h of hits) if (h.result.total > 0 && h.target.hp > 0) {
-      const x = Math.floor((h.target.hp * cat.bonusCurrentPct) / 100);
-      h.target.hp -= x; h.lost += x; h.bonus = x;
-      notes.push(`${cat.bonusCurrentPct}% 現有生命：${h.target.id} 額外 −${x}`);
-    }
-  }
-  // 響應：域外魔祖（修仙招式造成傷害後，直接扣現有生命 10%）
-  if (yuwai) {
-    for (const h of hits) if (h.result.total > 0 && h.target.hp > 0) {
-      const x = Math.floor((h.target.hp * PASSIVE_RIDERS.域外魔祖.currentPct) / 100);
-      h.target.hp -= x; h.lost += x; h.yuwai = x;
-      notes.push(`域外魔祖：${h.target.id} 現有生命 10% = −${x}`);
-    }
-  }
-  // 回復類：吞天噬血陣（招式內建）、不可名狀（被動，神秘招式）。回復的是「目標扣除的生命」的一半，總量有上限
-  const drains = [];
-  if (move.skill && catalogOf(move.skill)?.drain) {
-    const d = catalogOf(move.skill).drain;
-    drains.push({ name: move.name, ratio: d.ratio, cap: Math.floor((maxHp(state) * d.capPct) / 100) });
-  }
-  const lvUnn = skillLevel(state, '不可名狀');
-  if (lvUnn > 0 && move.school === PASSIVE_RIDERS.不可名狀.school) {
-    const r = PASSIVE_RIDERS.不可名狀;
-    drains.push({ name: '不可名狀', ratio: r.ratio, cap: Math.floor((maxHp(state) * (r.capBasePct + r.capPerLevelPct * lvUnn)) / 100) });
-  }
-  let healed = 0;
-  for (const d of drains) {
-    const lost = hits.reduce((a, h) => a + h.lost, 0);
-    const want = Math.min(Math.floor(lost * d.ratio), d.cap);
-    const before = state.hp;
-    healPlayer(state, want);
-    const got = state.hp - before;
-    healed += got;
-    notes.push(`${d.name}：目標共損失 ${lost} 生命，回復 ${got}（上限 ${d.cap}）`);
-  }
-
-  // 現身爆發：把聚集的能量傷害骰全打出去（已經加進這一招），隱身解除、點數歸零
-  const burst = move.skill === SHADOW_SKILL ? gatheredOf(state) : 0;
-  if (move.skill === SHADOW_SKILL) {
-    clearShadow(state);
-    notes.push(burst > 0 ? `現身！爆發暗影斗篷聚集的 ${burst} 顆能量傷害骰` : '現身（沒有聚集到能量傷害）');
-  }
-
-  // 響應：龍（造成能量傷害後，自己的能量傷害 +3／級，直到戰鬥結束；這一下已經打完，從下一次出招開始算）
-  const gain = dragonGain(state);
-  const dealtEnergy = gain > 0 && hits.some((h) => h.result.tracks.some((t) => (t.track === 'B' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0));
-  let dragon = 0;
-  if (dealtEnergy) {
-    state.buffs.dragon = (state.buffs.dragon ?? 0) + gain;
-    dragon = gain;
-    notes.push(`響應「龍」：造成能量傷害，能量傷害 +${gain}（累計 +${state.buffs.dragon}，直到戰鬥結束）`);
-  }
-
-  // 響應：泰坦（造成物理傷害後，目標絕對防禦永久減少 3／級，不疊加）
-  const cut = titanCut(state);
-  if (cut > 0 && move.mode !== 'abs') {
-    for (const h of hits) {
-      const physical = h.result.tracks.some((t) => (t.track === 'A' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0);
-      if (physical && (h.target.absCut ?? 0) < cut) {
-        h.target.absCut = cut; h.absCut = cut;
-        notes.push(`響應「泰坦」：${h.target.id} 絕對防禦永久 −${cut}（到戰鬥結束）`);
-      }
-    }
-  }
+  const { healed, burst, dragon } = applyPostHitEffects(state, move, hits, notes, yuwai);
 
   state.buffs.atk = 0;
   state.buffs.atkBy = {};
@@ -595,6 +605,14 @@ export function buffActive(state, name) {
   return Boolean((def?.atk && state.buffs?.atkBy?.[name] > 0) || (def?.def && state.buffs?.defBy?.[name] > 0));
 }
 
+/** 擲回復骰並回血（自己喝與餵隊友共用，M3）：回傳 { rolled, healed } */
+function rollHeal(target, heal, rng) {
+  const rolled = rollSum(heal.n, heal.sides, rng);
+  const before = target.hp;
+  healPlayer(target, rolled);
+  return { rolled, healed: target.hp - before };
+}
+
 /**
  * 喝藥水：消耗 1 個、累積毒性、回血或加成「下次攻擊／防禦」。
  * 毒性上限 15：加上這瓶會超過 15 就不能喝；戰鬥結束時清零（見 endBattle）。
@@ -611,11 +629,9 @@ export function drinkPotion(state, name, rng = Math.random) {
   state.toxicity += def.toxicity;
   const out = { name, toxicity: state.toxicity, atLimit: state.toxicity >= TOXICITY_MAX };
   if (def.heal) {
-    const rolled = rollSum(def.heal.n, def.heal.sides, rng);
-    const before = state.hp;
-    healPlayer(state, rolled);
+    const { rolled, healed } = rollHeal(state, def.heal, rng);
     out.rolled = rolled;
-    out.healed = state.hp - before;
+    out.healed = healed;
     out.dice = `${def.heal.n}D${def.heal.sides}`;
   }
   if (def.restore) {
@@ -658,10 +674,8 @@ export function giveHealPotion(giver, target, name, rng = Math.random) {
   if (!removeItem(giver, name)) return { error: `背包裡沒有${name}。` };
   const wasDowned = isDowned(target);
   target.toxicity += def.toxicity;
-  const rolled = rollSum(def.heal.n, def.heal.sides, rng);
-  const before = target.hp;
-  healPlayer(target, rolled);
-  return { name, rolled, healed: target.hp - before, toxicity: target.toxicity, revived: wasDowned && !isDowned(target) };
+  const { rolled, healed } = rollHeal(target, def.heal, rng);
+  return { name, rolled, healed, toxicity: target.toxicity, revived: wasDowned && !isDowned(target) };
 }
 
 /** 結束戰鬥：毒性歸零、藥水加成清除、清空遭遇戰（使用者口述：戰鬥結束毒性清零） */

@@ -56,7 +56,7 @@ function sync() {
   const html = document.documentElement;
   if (plan.page) html.dataset.modal = 'open'; else delete html.dataset.modal;
   if (coverActive()) return; // 封面還在：背景的 inert 由 cover.js 管，不去動
-  document.querySelectorAll('#main, .topbar').forEach((el) => { el.inert = plan.page; });
+  document.querySelectorAll('#main, .topbar, .skip-link').forEach((el) => { el.inert = plan.page; });
 }
 
 function onKey(e) {

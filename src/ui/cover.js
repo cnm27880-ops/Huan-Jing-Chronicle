@@ -7,7 +7,7 @@ import { h } from './dom.js';
 import { loginUrl, logout } from '../api/auth.js';
 
 export function showCover({ onEnter, notice, onUserChange } = {}) {
-  const background = [...document.querySelectorAll('.topbar, main')];
+  const background = [...document.querySelectorAll('.skip-link, .topbar, main')];
   const setInert = (v) => background.forEach((el) => { el.inert = v; });
 
   const enter = h('button', { type: 'button', class: 'btn btn--primary cover__btn', onclick: close }, '以訪客進入');
@@ -39,7 +39,7 @@ export function showCover({ onEnter, notice, onUserChange } = {}) {
   }
 
   // 封面骨架在 index.html（第一個畫面就是封面）；找不到時（例如測試）才自己建
-  const INTRO_MS = 2600; // 入場動畫時間：這段時間後按鈕才浮現（點一下或按任意鍵可跳過）
+  const INTRO_MS = 800; // 入場動畫時間：這段時間後按鈕才浮現（點一下或按任意鍵可跳過；原本 2.6 秒太久）
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const actions = h('div', { class: 'cover__actions is-wait' }, userBox, enter, discord);
   let root = document.getElementById('cover');
@@ -50,7 +50,7 @@ export function showCover({ onEnter, notice, onUserChange } = {}) {
       h('div', { class: 'cover__fx', 'aria-hidden': 'true' }),
       h('div', { class: 'cover__inner' },
         h('p', { class: 'cover__kicker', text: '網遊 · 跑團 · 編年史' }),
-        h('h1', { id: 'cover-title', class: 'cover__title', text: '幻境編年史' }),
+        h('div', { id: 'cover-title', class: 'cover__title', role: 'heading', 'aria-level': '2', text: '幻境編年史' }),
         h('p', { class: 'cover__lead', text: '踏入幻境，書寫屬於你的篇章。' }),
         actions, note));
     document.body.prepend(root);
@@ -89,6 +89,7 @@ export function showCover({ onEnter, notice, onUserChange } = {}) {
 
   setInert(true);
   root.addEventListener('keydown', (e) => { if (!revealed) return reveal(); if (e.key === 'Escape') close(); return undefined; });
-  document.addEventListener('keydown', reveal, { once: true }); // 還在播入場動畫時，按任意鍵跳過
+  // 還在播入場動畫時，按任意鍵跳過；按 Tab 時直接把焦點放到按鈕（不讓這一下 Tab 白白浪費）
+  document.addEventListener('keydown', (e) => { if (e.key === 'Tab' && !revealed) e.preventDefault(); reveal(); }, { once: true });
   return { close, setUser };
 }

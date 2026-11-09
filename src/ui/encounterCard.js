@@ -7,7 +7,7 @@
 // ============================================================
 import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
-import { toast, rollFailed } from './controls.js';
+import { toast, rollFailed, addBox } from './controls.js';
 import { TRACKS, TRACK_ATK_STAT, TRACK_DEF_STAT } from '../game/rules.js';
 import {
   formatAbc, monsterAbs, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
@@ -181,13 +181,6 @@ export function createEncounterCard({ getState, commit, rerender }) {
     ui.armed = key;
     armTimer = setTimeout(() => { ui.armed = null; rerender(); }, 3000);
     rerender();
-  }
-
-  function addBox(key, summary, ...children) {
-    return h('details', {
-      class: 'add-box', open: ui.openBoxes.has(key),
-      ontoggle: (e) => { if (e.target.open) ui.openBoxes.add(key); else ui.openBoxes.delete(key); },
-    }, h('summary', { text: summary }), ...children);
   }
 
   const online = () => getEncounter() !== null;
@@ -947,7 +940,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
             h('span', { text: '域外魔祖：這次攻擊花 30 靈氣，追加扣目標現有生命 10%' }))
         : null,
       canEdit
-        ? addBox('gm', online() ? '敵人、友方 NPC 與立繪（GM）' : '新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), allyForm(), manageBox(state, enc), presetBox(enc), libraryBox()))
+        ? addBox(ui.openBoxes, 'gm', online() ? '敵人、友方 NPC 與立繪（GM）' : '新增與管理敵人', h('div', { class: 'gm-tools' }, enemyForm(state), allyForm(), manageBox(state, enc), presetBox(enc), libraryBox()))
         : null);
   }
 

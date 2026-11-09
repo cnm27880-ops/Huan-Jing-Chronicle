@@ -18,6 +18,7 @@ import { SAMPLE_CHARACTER } from './data/sample/fude.js';
 import { setCustomSpecial } from './game/special.js';
 import { setCustomSkills } from './game/skillTable.js';
 import { loadCachedCustomSkills, saveCachedCustomSkills } from './state/customSkills.js';
+import { installTabKeys } from './ui/tabKeys.js';
 import { onStorageProblem, notify as storageNotify } from './state/storageIssue.js';
 import { loadCharacter, saveCharacter, hasSavedCharacter, isLoadBroken, watchOtherTabs, importCharacter, stashLocalCharacter, unstashLocalCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
@@ -71,6 +72,7 @@ async function init() {
 
   // ---------- 角色資料與分頁 ----------
   setCustomSkills(loadCachedCustomSkills()); // 先放進上次的 GM 專屬技能，再載入角色（載入時會依數值上限修正生命與資源）
+  installTabKeys(); // 分頁列的方向鍵（M12）
   onStorageProblem(toast); // 存檔寫不進去（容量滿）或讀壞時跳提示（先接上，才收得到載入時的訊息）
   let character = loadCharacter();
   let otherTabShown = 0;

@@ -81,13 +81,13 @@ test('登入成功：設 session cookie、導回網站、不保存 access token'
   const { res, d } = await fullLogin({ id: '42', username: 'fude', global_name: '福德', avatar: 'abc123' });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get('Location'), `${SITE}/?login=ok`);
-  const session = cookieOf(res, 'hj_session');
+  const session = cookieOf(res, '__Host-hj_session');
   assert.ok(session);
   assert.ok(!res.headers.getSetCookie().join('\n').includes('AT-secret'));
   assert.ok(!session.includes('AT-secret'));
   assert.ok(d.calls.some((c) => c.url.endsWith('/oauth2/token')));
 
-  const meRes = await call('/auth/me', { headers: { Cookie: `hj_session=${session}`, Origin: SITE } });
+  const meRes = await call('/auth/me', { headers: { Cookie: `__Host-hj_session=${session}`, Origin: SITE } });
   const body = await meRes.json();
   assert.equal(body.user.id, '42');
   assert.equal(body.user.name, '福德');
@@ -97,7 +97,7 @@ test('登入成功：設 session cookie、導回網站、不保存 access token'
 
 test('沒有自訂頭像時使用 Discord 預設頭像', async () => {
   const { res } = await fullLogin({ id: '42', username: 'fude', avatar: null });
-  const meRes = await call('/auth/me', { headers: { Cookie: `hj_session=${cookieOf(res, 'hj_session')}` } });
+  const meRes = await call('/auth/me', { headers: { Cookie: `__Host-hj_session=${cookieOf(res, '__Host-hj_session')}` } });
   assert.match((await meRes.json()).user.avatarUrl, /^https:\/\/cdn\.discordapp\.com\/embed\/avatars\/\d\.png$/);
 });
 
@@ -108,24 +108,24 @@ test('未登入：/auth/me 回 user: null', async () => {
 
 test('簽名被竄改：視為未登入', async () => {
   const { res } = await fullLogin({ id: '42', username: 'fude', avatar: null });
-  const [body, sig] = cookieOf(res, 'hj_session').split('.');
+  const [body, sig] = cookieOf(res, '__Host-hj_session').split('.');
   // 改 payload 成別人的 id，沿用舊簽名
   const forged = Buffer.from(JSON.stringify({ uid: '999', name: 'evil', avatar: null, exp: Date.now() + 1e9 })).toString('base64url');
   for (const bad of [`${forged}.${sig}`, `${body}.${sig.slice(0, -2)}AA`, `${body}.`, 'garbage', `${body}.${sig}.x`]) {
-    const out = await (await call('/auth/me', { headers: { Cookie: `hj_session=${bad}` } })).json();
+    const out = await (await call('/auth/me', { headers: { Cookie: `__Host-hj_session=${bad}` } })).json();
     assert.equal(out.user, null, bad);
   }
 });
 
 test('用別的密鑰簽的 session 無效', async () => {
   const token = await signToken({ uid: '42', name: 'x', avatar: null, exp: Date.now() + 1e6 }, 'other-secret');
-  const out = await (await call('/auth/me', { headers: { Cookie: `hj_session=${token}` } })).json();
+  const out = await (await call('/auth/me', { headers: { Cookie: `__Host-hj_session=${token}` } })).json();
   assert.equal(out.user, null);
 });
 
 test('session 過期：視為未登入', async () => {
   const token = await signToken({ uid: '42', name: 'x', avatar: null, exp: Date.now() - 1000 }, env.SESSION_SECRET);
-  const out = await (await call('/auth/me', { headers: { Cookie: `hj_session=${token}` } })).json();
+  const out = await (await call('/auth/me', { headers: { Cookie: `__Host-hj_session=${token}` } })).json();
   assert.equal(out.user, null);
   assert.deepEqual(await verifyToken(await signToken({ exp: 1000 }, "s"), "s", 999), { exp: 1000 });
   assert.equal(await verifyToken(await signToken({ exp: 1000 }, 's'), 's', 1000), null);
@@ -138,7 +138,7 @@ test('state 不符：不呼叫 Discord，導回 login=state', async () => {
     const res = await call('/auth/callback?code=abc&state=WRONG', { headers: { Cookie: `hj_state=${stateCookie}` } });
     assert.equal(res.headers.get('Location'), `${SITE}/?login=state`);
     assert.equal(d.calls.length, 0);
-    assert.equal(cookieOf(res, 'hj_session'), null);
+    assert.equal(cookieOf(res, '__Host-hj_session'), null);
   } finally { d.restore(); }
 });
 
@@ -168,7 +168,7 @@ test('Discord 換 token 失敗：導回 login=error，沒有 session', async () 
   try {
     const res = await call(`/auth/callback?code=abc&state=${state}`, { headers: { Cookie: `hj_state=${stateCookie}` } });
     assert.equal(res.headers.get('Location'), `${SITE}/?login=error`);
-    assert.equal(cookieOf(res, 'hj_session'), null);
+    assert.equal(cookieOf(res, '__Host-hj_session'), null);
   } finally { d.restore(); }
 });
 
@@ -184,18 +184,18 @@ test('白名單：空 = 一律拒絕；有名單時只放行名單內', async ()
   assert.equal(okLogin.res.headers.get('Location'), `${SITE}/?login=ok`);
   const denied = await fullLogin({ id: '43', username: 'b' }, e);
   assert.equal(denied.res.headers.get('Location'), `${SITE}/?login=denied`);
-  assert.equal(cookieOf(denied.res, 'hj_session'), null);
+  assert.equal(cookieOf(denied.res, '__Host-hj_session'), null);
 
   // 名單為空：任何 Discord 帳號登入都被拒絕
   const empty = { ...env, DISCORD_ALLOWED_IDS: '' };
   const emptyLogin = await fullLogin({ id: '42', username: 'a' }, empty);
   assert.equal(emptyLogin.res.headers.get('Location'), `${SITE}/?login=denied`);
-  assert.equal(cookieOf(emptyLogin.res, 'hj_session'), null);
+  assert.equal(cookieOf(emptyLogin.res, '__Host-hj_session'), null);
 
   // 先登入、之後名單收緊：舊 session 也失效
-  const token = cookieOf(okLogin.res, 'hj_session');
+  const token = cookieOf(okLogin.res, '__Host-hj_session');
   const tight = { ...env, DISCORD_ALLOWED_IDS: '7' };
-  const out = await (await call('/auth/me', { headers: { Cookie: `hj_session=${token}` } }, tight)).json();
+  const out = await (await call('/auth/me', { headers: { Cookie: `__Host-hj_session=${token}` } }, tight)).json();
   assert.equal(out.user, null);
 });
 
@@ -222,11 +222,11 @@ test('登出：只接受網站來源的 POST，並清除 session cookie', async 
   const bad = await call('/auth/logout', { method: 'POST', headers: { Origin: 'https://evil.example' } });
   assert.equal(bad.status, 403);
   assert.equal((await call('/auth/logout', { method: 'POST' })).status, 403);
-  assert.equal((await call('/auth/logout')).status, 405);
+  assert.equal((await call('/auth/logout')).status, 404); // 未知路徑（含 GET /auth/logout）統一回 404
 
   const res = await call('/auth/logout', { method: 'POST', headers: { Origin: SITE } });
   assert.equal(res.status, 200);
-  assert.match(res.headers.getSetCookie()[0], /^hj_session=; .*Max-Age=0/);
+  assert.match(res.headers.getSetCookie()[0], /^__Host-hj_session=; .*Max-Age=0/);
   assert.equal(res.headers.get('Access-Control-Allow-Origin'), SITE);
 });
 
@@ -246,13 +246,13 @@ const DAY = 24 * 3600 * 1000;
 const sessionToken = (iatAgoDays, expInDays) => signToken({
   uid: '42', name: 'x', avatar: null, iat: Date.now() - iatAgoDays * DAY, exp: Date.now() + expInDays * DAY,
 }, env.SESSION_SECRET);
-const meWith = (token, e = env) => call('/auth/me', { headers: { Cookie: `hj_session=${token}` } }, e);
+const meWith = (token, e = env) => call('/auth/me', { headers: { Cookie: `__Host-hj_session=${token}` } }, e);
 const maxAgeDays = (res) => Number(/Max-Age=(\d+)/.exec(res.headers.getSetCookie()[0])[1]) / 86400;
 
 test('登入簽發的 session 有效期 30 天，並記錄原始登入時間', async () => {
   const { res } = await fullLogin({ id: '42', username: 'a' });
-  assert.match(res.headers.getSetCookie().find((c) => c.startsWith('hj_session=')), /Max-Age=2592000/);
-  const payload = await verifyToken(cookieOf(res, 'hj_session'), env.SESSION_SECRET);
+  assert.match(res.headers.getSetCookie().find((c) => c.startsWith('__Host-hj_session=')), /Max-Age=2592000/);
+  const payload = await verifyToken(cookieOf(res, '__Host-hj_session'), env.SESSION_SECRET);
   assert.ok(Math.abs(payload.iat - Date.now()) < 5000);
   assert.ok(Math.abs(payload.exp - payload.iat - 30 * DAY) < 1000);
 });
@@ -266,17 +266,17 @@ test('續期門檻：剩 16 天不換發；剩 14 天換發新 30 天 token 且�
   const res = await meWith(old);
   assert.equal((await res.json()).user.id, '42');
   const line = res.headers.getSetCookie()[0];
-  assert.match(line, /^hj_session=/);
+  assert.match(line, /^__Host-hj_session=/);
   assert.match(line, /HttpOnly/); assert.match(line, /Secure/); assert.match(line, /SameSite=Lax/);
   assert.doesNotMatch(line, /Domain=/i);
   assert.ok(Math.abs(maxAgeDays(res) - 30) < 0.01);
 
-  const renewed = await verifyToken(cookieOf(res, 'hj_session'), env.SESSION_SECRET);
+  const renewed = await verifyToken(cookieOf(res, '__Host-hj_session'), env.SESSION_SECRET);
   const original = await verifyToken(old, env.SESSION_SECRET);
   assert.equal(renewed.iat, original.iat);
   assert.ok(renewed.exp - Date.now() > 29.9 * DAY);
   // 新 token 本身可以繼續使用
-  assert.equal((await (await meWith(cookieOf(res, 'hj_session'))).json()).user.id, '42');
+  assert.equal((await (await meWith(cookieOf(res, '__Host-hj_session'))).json()).user.id, '42');
 });
 
 test('90 天上限：到期日不超過原始登入 + 90 天；已達上限就不再續期', async () => {
@@ -288,7 +288,7 @@ test('90 天上限：到期日不超過原始登入 + 90 天；已達上限就�
   // 原始登入 70 天前，剩 5 天 → 換發，但新到期日封頂在第 90 天（約再 20 天）
   const capped = await meWith(await sessionToken(70, 5));
   assert.ok(Math.abs(maxAgeDays(capped) - 20) < 0.01);
-  const payload = await verifyToken(cookieOf(capped, 'hj_session'), env.SESSION_SECRET);
+  const payload = await verifyToken(cookieOf(capped, '__Host-hj_session'), env.SESSION_SECRET);
   assert.ok(payload.exp - payload.iat <= 90 * DAY);
 
   // 原始登入超過 90 天（token 已過期）→ 未登入，必須重新登入
