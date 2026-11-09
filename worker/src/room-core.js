@@ -683,6 +683,7 @@ export class RoomCore {
       return this.encOk(enc, rid, user, note);
     }
     if (msg.t === 'encRound') { // 進下一回合（沒有用先攻順序時）：回合數 +1，敵人的技能次數與蓄力自動歸零
+      if (enc.locked) return err(rid, 'bad_enc', '已經有先攻順序，請用「下一位」推進，繞完一圈會自動進下一回合。');
       nextRound(enc);
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user, { label: `遭遇：第 ${enc.round} 回合` });
@@ -718,7 +719,9 @@ export class RoomCore {
     if (msg.t === 'encRemove') {
       if (typeof msg.id !== 'string') return err(rid, 'bad_enc', '缺少敵人編號。');
       enc.monsters = enc.monsters.filter((m) => m.id !== msg.id);
+      const idx = enc.order.findIndex((o) => o.kind === 'monster' && o.id === msg.id);
       enc.order = enc.order.filter((o) => !(o.kind === 'monster' && o.id === msg.id));
+      if (idx >= 0 && idx < enc.turn) enc.turn -= 1; // 移除的在輪到的人前面：指標跟著前移，免得跳過現任（比照 removeAlly）
       enc.turn = enc.order.length ? Math.min(enc.turn, enc.order.length - 1) : 0;
       this.saveEncounter(enc);
       return this.encOk(enc, rid, user);
@@ -738,6 +741,7 @@ export class RoomCore {
       return this.encOk(this.encounter(), rid, user, { label: '遭遇：戰鬥結束，清空敵人' });
     }
     if (msg.t === 'encInit') { // 先攻：在線玩家（不含 GM）與還活著的怪物，純隨機洗牌
+      if (enc.locked) return err(rid, 'bad_enc', '已經開打了，不能重抽先攻。要重來請先按「結束戰鬥」清空。');
       const players = this.db.exec('SELECT uid, name FROM members ORDER BY first_seen, uid')
         .filter((m) => online.includes(m.uid) && !this.isGm(m.uid) && this.accessState(m.uid) === 'ok')
         .map((m) => ({ kind: 'player', uid: m.uid, name: m.name }));
@@ -755,6 +759,7 @@ export class RoomCore {
     }
     if (msg.t === 'encStart') {
       if (!enc.order.length) return err(rid, 'bad_enc', '還沒有先攻順序，請先抽先攻。');
+      if (enc.locked) return this.encOk(enc, rid, user); // 已經開打：回傳現狀，不重設回合
       Object.assign(enc, { locked: true, turn: 0, round: 1 });
       this.saveEncounter(enc);
       const names = enc.order.map((o, i) => `${i + 1}. ${o.kind === 'monster' ? o.id : o.name}`);

@@ -375,3 +375,34 @@ test('上一位（encPrev）：只有 GM、開打後才能用；退回上一回�
   assert.equal(replyOf(send(core, P1, { t: 'encUse', rid: 'b', id: '菁英1', use: 'atk' })).left, 0); // 沒補滿：只剩最後 1 次
   assert.match(errorOf(send(core, P1, { t: 'encUse', rid: 'c', id: '菁英1', use: 'atk' })).message, /已經攻擊 2 次/);
 });
+
+test('先攻防呆：開打後不能重抽先攻、不能按新回合，重按開打不重設回合', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: SPEC });
+  send(core, GM, { t: 'encInit' }, { online: ['300'] });
+  send(core, GM, { t: 'encStart' });
+  send(core, GM, { t: 'encNext' });
+  const before = encOf(send(core, GM, { t: 'encNext' }));
+  assert.equal(errorOf(send(core, GM, { t: 'encInit' }, { online: ['300'] }))?.code, 'bad_enc');
+  assert.equal(errorOf(send(core, GM, { t: 'encRound' }))?.code, 'bad_enc');
+  const again = encOf(send(core, GM, { t: 'encStart' }));
+  assert.equal(again.round, before.round);
+  assert.equal(again.turn, before.turn);
+  assert.deepEqual(again.order, before.order);
+});
+
+test('GM 移除輪到的人前面的怪物：輪到的人不變', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: SPEC }); // 2 隻怪＋1 位玩家
+  let enc;
+  for (let i = 0; i < 20; i++) { // 重抽到「第一位是怪物」為止（先攻是隨機的）
+    enc = encOf(send(core, GM, { t: 'encInit' }, { online: ['300'] }));
+    if (enc.order[0].kind === 'monster') break;
+  }
+  assert.equal(enc.order[0].kind, 'monster');
+  send(core, GM, { t: 'encStart' });
+  enc = encOf(send(core, GM, { t: 'encNext' })); // turn = 1，輪到第二位
+  const cur = enc.order[1];
+  const after = encOf(send(core, GM, { t: 'encRemove', id: enc.order[0].id }));
+  assert.deepEqual(after.order[after.turn], cur);
+});
