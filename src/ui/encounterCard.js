@@ -379,7 +379,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       ].filter(Boolean),
     }, { draw });
     if (r.reflect && !r.reflect.skipped) {
-      toast(`賽博駭客觸發：${m.id} 立刻扣 ${fmt(r.reflect.lost)} 生命（${r.reflect.dice}D4 = ${fmt(r.reflect.rolled)}）。`);
+      toast(`賽博駭客觸發：${m.id} 立刻扣 ${fmt(r.reflect.lost)} 生命（${r.reflect.dice}D4 = ${fmt(r.reflect.rolled)}）。${(currentEnc(state)?.round ?? 0) > 0 ? '' : '還沒開始回合計數，一回合只能 1 次請自行確認。'}`);
       if (online() && r.reflect.lost > 0) await act({ t: 'encHit', hits: [{ id: m.id, dmg: r.reflect.lost }] }); // 怪物生命由伺服器改：回報這次反擊扣多少
     } else if (r.reflect?.skipped) toast('賽博駭客：這回合已經觸發過了（一回合只能 1 次）。');
     commit();

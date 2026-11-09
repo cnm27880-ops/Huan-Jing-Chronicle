@@ -70,7 +70,9 @@ export function pickMove(state) {
     if (isSupport(m) || m.id === 'basic') continue;
     const casts = castsAffordable(state, m);
     if (casts < 1) continue;
-    const power = sum(attackDice(state, resolveChosenTrack(state, m)).dice); // 機甲駕駛員：擇一軌（攻擊骰多的那軌）
+    const mv = resolveChosenTrack(state, m); // 機甲駕駛員：擇一軌（攻擊骰多的那軌）
+    // 萬物歸一／大羅真仙是單池，真傷只算一次（和實戰 pooledAttack 一致），不能用逐軌加總
+    const power = mv.mode === 'all' || mv.mode === 'abs' ? pooledAttack(state, mv).dice : sum(attackDice(state, mv).dice);
     if (!best || casts > best.casts || (casts === best.casts && power > best.power)) best = { move: m, casts, power };
   }
   return best?.move ?? state.moves.find((m) => m.id === 'basic') ?? null;
@@ -107,10 +109,10 @@ function bestAtkMode(monster, player) {
 const healPotions = (state) => Object.keys(POTIONS).filter((n) => POTIONS[n].heal && countOf(state, n) > 0)
   .sort((a, b) => POTIONS[b].heal.n * (POTIONS[b].heal.sides + 1) - POTIONS[a].heal.n * (POTIONS[a].heal.sides + 1)); // 大瓶的在前
 
-/** 這一招對這隻怪的預期傷害（每顆 1D4 平均 2.5；bonus = 藥水加成顆數） */
+/** 這一招對這隻怪的預期傷害（每顆 1D4 平均 2.5；bonus = 藥水加成顆數）。只算基礎骰＋藥水，沒算鬥氣、響應等額外加成，所以是偏低的下限估計（攻擊藥水會稍微喝得保守） */
 function expectedDamage(p, move0, target, bonus, extraAbs) {
   const move = resolveChosenTrack(p, move0); // 機甲駕駛員：擇一軌，和 playerAttack 沒選軌道時一樣
-  const abs = (passivesOf(p).ignoreAbs ? 0 : monsterAbs(target)) + extraAbs;
+  const abs = passivesOf(p).ignoreAbs ? 0 : monsterAbs(target) + extraAbs; // 和實戰 resolveHit 一樣：終焉武裝無視全部絕防（含 B 蓄力）
   const base = monsterDef(target, bestDefMode(target, move));
   if (move.mode === 'all') return Math.max(0, D4_AVG * (pooledAttack(p, move, bonus, 0).dice - (base.A + base.B + base.C + abs)));
   if (move.mode === 'abs') return Math.max(0, D4_AVG * (pooledAttack(p, move, bonus, 0).dice - abs));
@@ -181,7 +183,7 @@ export function buildEncounter(specs, rng = Math.random) {
 /** 固定敵人的複本：生命補滿（不影響原本的資料） */
 export function fixedEncounter(src) {
   const enc = newEncounter();
-  enc.monsters = structuredClone(src.monsters ?? []).map((m) => { const x = { ...m, hp: m.maxHp }; delete x.uses; delete x.charge; delete x.usedC; return x; });
+  enc.monsters = structuredClone(src.monsters ?? []).map((m) => { const x = { ...m, hp: m.maxHp }; delete x.uses; delete x.charge; delete x.usedC; delete x.absCut; return x; });
   return enc;
 }
 
@@ -284,9 +286,10 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
         const spent = spendEnemyAttack(enc, m.id);
         if (spent.error) break;
         const victim = pickVictim(victims, team, stat, focus, rng, focusOrder);
-        stat[team.indexOf(victim)].hit++;
         const before = victim.hp;
-        monsterAttack(victim, enc, m.id, bestAtkMode(m, victim), rng, { extraAtk: spent.extraAtk });
+        const atkRes = monsterAttack(victim, enc, m.id, bestAtkMode(m, victim), rng, { extraAtk: spent.extraAtk });
+        if (atkRes?.error) break; // 怪物剛死（例如被賽博駭客反擊打倒）：這次不算命中，也不再打
+        stat[team.indexOf(victim)].hit++;
         stat[team.indexOf(victim)].taken += before - victim.hp;
         const hk = hitKinds[m.kind === 'boss' ? 'boss' : m.rank === 'elite' ? 'elite' : 'mob'];
         hk.n++; hk.frac += (before - victim.hp) / Math.max(1, maxHp(victim));
@@ -300,7 +303,7 @@ export function simulateBattle(players, specs, { maxRounds = DEFAULT_MAX_ROUNDS,
   const drain = {};
   for (const r of OTHER_RESOURCES) {
     // 兩種情況算「擁有者」：(1) 有鬥氣上限的鬥氣（鬥氣有基礎用法加骰，一律算）；(2) 招式真的會花這種資源。括號只是寫清楚，邏輯不變（&& 本來就比 || 先算）
-    const owners = team.filter((p) => (resourceMax(p, r) > 0 && r === '鬥氣') || p.moves.some((m) => (actionCost(p, m)[r] ?? 0) > 0));
+    const owners = team.filter((p) => resourceMax(p, r) > 0 && (r === '鬥氣' || p.moves.some((m) => (actionCost(p, m)[r] ?? 0) > 0))); // 上限 0 的資源不算，免得除以 0 變 NaN
     if (owners.length) drain[r] = owners.reduce((a, p) => a + (1 - resourceNow(p, r) / resourceMax(p, r)), 0) / owners.length;
   }
   drain.毒性 = team.reduce((a, p) => a + Math.min(1, p.toxicity / TOXICITY_MAX), 0) / (team.length || 1);
