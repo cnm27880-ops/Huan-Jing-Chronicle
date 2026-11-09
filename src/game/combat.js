@@ -341,6 +341,81 @@ export function resolveChosenTrack(state, move, track) {
   return { ...move, tracks: [pick] };
 }
 
+/**
+ * 出招結算後的響應與被動效果（M1：從 playerAttack 拆出來，內容與順序不變）：
+ * 破防額外扣血、域外魔祖、吸血回復、現身爆發、龍、泰坦。notes 會直接加上說明文字。回傳 { healed, burst, dragon }
+ */
+function applyPostHitEffects(state, move, hits, notes, yuwai) {
+  // 響應：萬物歸一破防時，額外扣目標現有生命 %
+  const cat = move.skill ? catalogOf(move.skill) : null;
+  if (cat?.bonusCurrentPct) {
+    for (const h of hits) if (h.result.total > 0 && h.target.hp > 0) {
+      const x = Math.floor((h.target.hp * cat.bonusCurrentPct) / 100);
+      h.target.hp -= x; h.lost += x; h.bonus = x;
+      notes.push(`${cat.bonusCurrentPct}% 現有生命：${h.target.id} 額外 −${x}`);
+    }
+  }
+  // 響應：域外魔祖（修仙招式造成傷害後，直接扣現有生命 10%）
+  if (yuwai) {
+    for (const h of hits) if (h.result.total > 0 && h.target.hp > 0) {
+      const x = Math.floor((h.target.hp * PASSIVE_RIDERS.域外魔祖.currentPct) / 100);
+      h.target.hp -= x; h.lost += x; h.yuwai = x;
+      notes.push(`域外魔祖：${h.target.id} 現有生命 10% = −${x}`);
+    }
+  }
+  // 回復類：吞天噬血陣（招式內建）、不可名狀（被動，神秘招式）。回復的是「目標扣除的生命」的一半，總量有上限
+  const drains = [];
+  if (move.skill && catalogOf(move.skill)?.drain) {
+    const d = catalogOf(move.skill).drain;
+    drains.push({ name: move.name, ratio: d.ratio, cap: Math.floor((maxHp(state) * d.capPct) / 100) });
+  }
+  const lvUnn = skillLevel(state, '不可名狀');
+  if (lvUnn > 0 && move.school === PASSIVE_RIDERS.不可名狀.school) {
+    const r = PASSIVE_RIDERS.不可名狀;
+    drains.push({ name: '不可名狀', ratio: r.ratio, cap: Math.floor((maxHp(state) * (r.capBasePct + r.capPerLevelPct * lvUnn)) / 100) });
+  }
+  let healed = 0;
+  for (const d of drains) {
+    const lost = hits.reduce((a, h) => a + h.lost, 0);
+    const want = Math.min(Math.floor(lost * d.ratio), d.cap);
+    const before = state.hp;
+    healPlayer(state, want);
+    const got = state.hp - before;
+    healed += got;
+    notes.push(`${d.name}：目標共損失 ${lost} 生命，回復 ${got}（上限 ${d.cap}）`);
+  }
+
+  // 現身爆發：把聚集的能量傷害骰全打出去（已經加進這一招），隱身解除、點數歸零
+  const burst = move.skill === SHADOW_SKILL ? gatheredOf(state) : 0;
+  if (move.skill === SHADOW_SKILL) {
+    clearShadow(state);
+    notes.push(burst > 0 ? `現身！爆發暗影斗篷聚集的 ${burst} 顆能量傷害骰` : '現身（沒有聚集到能量傷害）');
+  }
+
+  // 響應：龍（造成能量傷害後，自己的能量傷害 +3／級，直到戰鬥結束；這一下已經打完，從下一次出招開始算）
+  const gain = dragonGain(state);
+  const dealtEnergy = gain > 0 && hits.some((h) => h.result.tracks.some((t) => (t.track === 'B' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0));
+  let dragon = 0;
+  if (dealtEnergy) {
+    state.buffs.dragon = (state.buffs.dragon ?? 0) + gain;
+    dragon = gain;
+    notes.push(`響應「龍」：造成能量傷害，能量傷害 +${gain}（累計 +${state.buffs.dragon}，直到戰鬥結束）`);
+  }
+
+  // 響應：泰坦（造成物理傷害後，目標絕對防禦永久減少 3／級，不疊加）
+  const cut = titanCut(state);
+  if (cut > 0 && move.mode !== 'abs') {
+    for (const h of hits) {
+      const physical = h.result.tracks.some((t) => (t.track === 'A' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0);
+      if (physical && (h.target.absCut ?? 0) < cut) {
+        h.target.absCut = cut; h.absCut = cut;
+        notes.push(`響應「泰坦」：${h.target.id} 絕對防禦永久 −${cut}（到戰鬥結束）`);
+      }
+    }
+  }
+  return { healed, burst, dragon };
+}
+
 export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math.random, opts = {}) {
   const found = state.moves.find((m) => m.id === moveId);
   const move = found ? resolveChosenTrack(state, found, opts.track) : found; // 機甲駕駛員：只打選的那一軌
@@ -418,73 +493,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   }
   for (const r of responses) notes.push(`響應「${r.name}」：${r.free ? '' : `花 ${costText(r.cost)}，`}${r.tracks.join('')} 軌 +${r.dice} 顆傷害骰`);
 
-  // 響應：萬物歸一破防時，額外扣目標現有生命 %
-  const cat = move.skill ? catalogOf(move.skill) : null;
-  if (cat?.bonusCurrentPct) {
-    for (const h of hits) if (h.result.total > 0 && h.target.hp > 0) {
-      const x = Math.floor((h.target.hp * cat.bonusCurrentPct) / 100);
-      h.target.hp -= x; h.lost += x; h.bonus = x;
-      notes.push(`${cat.bonusCurrentPct}% 現有生命：${h.target.id} 額外 −${x}`);
-    }
-  }
-  // 響應：域外魔祖（修仙招式造成傷害後，直接扣現有生命 10%）
-  if (yuwai) {
-    for (const h of hits) if (h.result.total > 0 && h.target.hp > 0) {
-      const x = Math.floor((h.target.hp * PASSIVE_RIDERS.域外魔祖.currentPct) / 100);
-      h.target.hp -= x; h.lost += x; h.yuwai = x;
-      notes.push(`域外魔祖：${h.target.id} 現有生命 10% = −${x}`);
-    }
-  }
-  // 回復類：吞天噬血陣（招式內建）、不可名狀（被動，神秘招式）。回復的是「目標扣除的生命」的一半，總量有上限
-  const drains = [];
-  if (move.skill && catalogOf(move.skill)?.drain) {
-    const d = catalogOf(move.skill).drain;
-    drains.push({ name: move.name, ratio: d.ratio, cap: Math.floor((maxHp(state) * d.capPct) / 100) });
-  }
-  const lvUnn = skillLevel(state, '不可名狀');
-  if (lvUnn > 0 && move.school === PASSIVE_RIDERS.不可名狀.school) {
-    const r = PASSIVE_RIDERS.不可名狀;
-    drains.push({ name: '不可名狀', ratio: r.ratio, cap: Math.floor((maxHp(state) * (r.capBasePct + r.capPerLevelPct * lvUnn)) / 100) });
-  }
-  let healed = 0;
-  for (const d of drains) {
-    const lost = hits.reduce((a, h) => a + h.lost, 0);
-    const want = Math.min(Math.floor(lost * d.ratio), d.cap);
-    const before = state.hp;
-    healPlayer(state, want);
-    const got = state.hp - before;
-    healed += got;
-    notes.push(`${d.name}：目標共損失 ${lost} 生命，回復 ${got}（上限 ${d.cap}）`);
-  }
-
-  // 現身爆發：把聚集的能量傷害骰全打出去（已經加進這一招），隱身解除、點數歸零
-  const burst = move.skill === SHADOW_SKILL ? gatheredOf(state) : 0;
-  if (move.skill === SHADOW_SKILL) {
-    clearShadow(state);
-    notes.push(burst > 0 ? `現身！爆發暗影斗篷聚集的 ${burst} 顆能量傷害骰` : '現身（沒有聚集到能量傷害）');
-  }
-
-  // 響應：龍（造成能量傷害後，自己的能量傷害 +3／級，直到戰鬥結束；這一下已經打完，從下一次出招開始算）
-  const gain = dragonGain(state);
-  const dealtEnergy = gain > 0 && hits.some((h) => h.result.tracks.some((t) => (t.track === 'B' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0));
-  let dragon = 0;
-  if (dealtEnergy) {
-    state.buffs.dragon = (state.buffs.dragon ?? 0) + gain;
-    dragon = gain;
-    notes.push(`響應「龍」：造成能量傷害，能量傷害 +${gain}（累計 +${state.buffs.dragon}，直到戰鬥結束）`);
-  }
-
-  // 響應：泰坦（造成物理傷害後，目標絕對防禦永久減少 3／級，不疊加）
-  const cut = titanCut(state);
-  if (cut > 0 && move.mode !== 'abs') {
-    for (const h of hits) {
-      const physical = h.result.tracks.some((t) => (t.track === 'A' || (move.mode === 'all' && t.track === '全部')) && t.damage > 0);
-      if (physical && (h.target.absCut ?? 0) < cut) {
-        h.target.absCut = cut; h.absCut = cut;
-        notes.push(`響應「泰坦」：${h.target.id} 絕對防禦永久 −${cut}（到戰鬥結束）`);
-      }
-    }
-  }
+  const { healed, burst, dragon } = applyPostHitEffects(state, move, hits, notes, yuwai);
 
   state.buffs.atk = 0;
   state.buffs.atkBy = {};
