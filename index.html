@@ -36,11 +36,12 @@
       <div class="cover__fx" aria-hidden="true"></div>
       <div class="cover__inner">
         <p class="cover__kicker">網遊 · 跑團 · 編年史</p>
-        <h1 id="cover-title" class="cover__title">幻境編年史</h1>
+        <div id="cover-title" class="cover__title" role="heading" aria-level="2">幻境編年史</div>
         <p class="cover__lead">踏入幻境，書寫屬於你的篇章。</p>
         <div class="cover__load" aria-hidden="true"><span class="cover__load-text">幻境載入中…</span><span class="cover__load-bar"></span></div>
       </div>
     </div>
+    <a class="skip-link" href="#main">跳到主要內容</a>
     <header class="topbar">
       <h1 class="brand">幻境編年史</h1>
       <nav class="tabs" aria-label="主選單">
@@ -64,7 +65,7 @@
     </header>
 
     <!-- 整個網站只有一個 <main>；各分頁是裡面的 <section>（main.js 用 data-view 切換顯示） -->
-    <main id="main">
+    <main id="main" tabindex="-1">
     <section class="atlas view" id="view-map" data-view="map" aria-label="世界地圖">
       <div id="map-viewport" class="map-viewport" data-zoomed="false" tabindex="0" role="group" aria-label="世界地圖。方向鍵移動，加號與減號縮放，0 回到整張圖，Tab 可切換到各地點">
         <div id="map-stage" class="map-stage">

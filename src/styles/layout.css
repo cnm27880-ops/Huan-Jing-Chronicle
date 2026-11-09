@@ -426,3 +426,19 @@ body::after { /* 1.5px 星點，7 秒緩慢閃爍 */
    手機測試後調整：數字框置中、沒有圖示的物品不留空格
    ============================================================ */
 input[type='number'] { text-align: center; }
+
+/* 跳到主要內容（M12）：平常藏在畫面外，用鍵盤 Tab 到才會出現 */
+.skip-link {
+  position: fixed;
+  left: 12px;
+  top: -64px;
+  z-index: var(--z-toast, 9999);
+  padding: 10px 16px;
+  background: var(--raise);
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  border-radius: var(--r-panel, 8px);
+  text-decoration: none;
+}
+.skip-link:focus { top: 12px; }
+#main:focus { outline: none; }
