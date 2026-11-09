@@ -5,7 +5,7 @@
 // ============================================================
 import { askConfirm } from './confirmPop.js';
 import { h, fmt } from './dom.js';
-import { toast, rollFailed } from './controls.js';
+import { toast, rollFailed, addBox } from './controls.js';
 import { TRACKS, POTIONS, TOXICITY_MAX, CLEANSE_ITEMS, potionEffectText } from '../game/rules.js';
 import {
   attackDice, pooledAttack, endBattle, monsterAbs, ATTACK_MODES, defenseDice, formatAbc, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
@@ -61,13 +61,6 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
   };
 
   /** 可收合的「＋新增」區塊。記住展開狀態，按裡面的按鈕重畫後不會自己收起來 */
-  function addBox(key, summary, ...children) {
-    return h('details', {
-      class: 'add-box', open: ui.openBoxes.has(key),
-      ontoggle: (e) => { if (e.target.open) ui.openBoxes.add(key); else ui.openBoxes.delete(key); },
-    }, h('summary', { text: summary }), ...children);
-  }
-
   // ---------- 頂部固定列：生命與資源（點了才調整） ----------
   // 資源沒有就顯示 0 / 0（毒性存檔裡沒有數字時當 0），六個小格才排得整齊
   const HUD_KEYS = () => ['生命', ...OTHER_RESOURCES, '毒性'];
@@ -642,7 +635,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const f = ui.convert;
     const targets = CONVERT_TARGETS[f.from];
     if (!targets.includes(f.to)) f.to = targets[0];
-    return addBox('convert', '資源轉換（靈氣→生命、能量→任意資源）',
+    return addBox(ui.openBoxes, 'convert', '資源轉換（靈氣→生命、能量→任意資源）',
       h('p', { class: 'hint', text: '靈氣可以 1 比 1 換成生命；能量可以 1 比 1 換成任意資源；魔力、算力沒有基礎用法。換到的量不會超過上限。' }),
       h('div', { class: 'row' },
         h('select', { class: 'field', 'aria-label': '用哪種資源換', onchange: (e) => { f.from = e.target.value; rerender(); } },
@@ -715,7 +708,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         ? h('ul', { class: 'move-list' }, state.moves.map((m) => moveRow(state, m)))
         : h('p', { class: 'notice', text: '還沒有自訂招式。下面綁定一個主動技能新增。' }),
       convertBox(state),
-      addBox('move', '新增自訂招式',
+      addBox(ui.openBoxes, 'move', '新增自訂招式',
         h('p', { class: 'hint', text: '招式要綁定一個已學會的主動技能；傷害軌道、目標數、消耗、每級加成都照技能（學過的響應會在出招時自動觸發），只要取個自己的招式名稱。' }),
         learned.length
           ? h('div', {},

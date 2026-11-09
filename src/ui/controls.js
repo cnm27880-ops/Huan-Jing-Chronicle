@@ -90,3 +90,11 @@ if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' &
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
 }
+
+/** 可收合的「＋新增」區塊（<details>）。openSet 記住展開狀態，按裡面的按鈕重畫後不會自己收起來。battleView 與 encounterCard 共用 */
+export function addBox(openSet, key, summary, ...children) {
+  return h('details', {
+    class: 'add-box', open: openSet.has(key),
+    ontoggle: (e) => { if (e.target.open) openSet.add(key); else openSet.delete(key); },
+  }, h('summary', { text: summary }), ...children);
+}
