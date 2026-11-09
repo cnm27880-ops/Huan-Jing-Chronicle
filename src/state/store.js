@@ -88,6 +88,19 @@ export function normalizeCharacter(data) {
   return upgrade(clone(data));
 }
 
+// ---------- 多分頁提示 ----------
+/** 這個 storage 事件是不是「別的分頁改了角色存檔」（瀏覽器只會對其他分頁發 storage 事件；排除壞存檔副本與帳號收納用的 key） */
+export function isOtherTabCharacterSave(e) {
+  return Boolean(e) && e.key === KEY && e.newValue !== null;
+}
+
+/** 別的分頁存了角色就呼叫 onChange（不自動合併：合併寫錯比覆蓋更危險，只提示玩家重新整理） */
+export function watchOtherTabs(onChange, target = globalThis) {
+  const handler = (e) => { if (isOtherTabCharacterSave(e)) onChange(); };
+  target.addEventListener?.('storage', handler);
+  return () => target.removeEventListener?.('storage', handler);
+}
+
 // ---------- 讀取失敗保護 ----------
 // 讀到的存檔壞了（JSON 解析失敗、升級中丟錯）時：原始文字原封不動另存一份、不覆蓋原本的 key，
 // 並且在玩家處理之前不再寫入本機存檔（否則畫面上的示範角色會蓋掉壞存檔）。

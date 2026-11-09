@@ -132,3 +132,18 @@ test('其他寫入錯誤也有提示，不是空 catch', async () => {
   assert.equal(messages.length, 1);
   assert.match(messages[0], /存不進/);
 });
+
+test('多分頁：只有別的分頁改了角色存檔才提示（H3）', async () => {
+  const { store } = await fresh(fakeStorage());
+  assert.equal(store.isOtherTabCharacterSave({ key: KEY, newValue: '{}' }), true);
+  assert.equal(store.isOtherTabCharacterSave({ key: KEY, newValue: null }), false); // 被刪除
+  assert.equal(store.isOtherTabCharacterSave({ key: `${KEY}:corrupt`, newValue: 'x' }), false);
+  assert.equal(store.isOtherTabCharacterSave({ key: 'huanjing:rolllog:v1', newValue: '[]' }), false);
+  let called = 0;
+  const handlers = {};
+  const target = { addEventListener: (n, f) => { handlers[n] = f; }, removeEventListener: () => {} };
+  store.watchOtherTabs(() => { called += 1; }, target);
+  handlers.storage({ key: KEY, newValue: '{}' });
+  handlers.storage({ key: 'other', newValue: '1' });
+  assert.equal(called, 1);
+});
