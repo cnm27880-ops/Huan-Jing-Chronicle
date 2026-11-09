@@ -30,12 +30,13 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
     return Object.fromEntries(Object.entries(r.vitals ?? {}).filter(([uid]) => !gm.has(uid) && (!hidden.has(uid) || uid === r.me?.uid)));
   };
 
-  /** 要救誰：倒地／危急的那位；全隊吃緊就救最危險的那位隊友（不含自己） */
-  function targetOf(ev) {
-    if (ev.uid) return ev.uid;
+  /** 要救的人（依危險程度排序、不含自己）：倒地／危急只有那位；全隊吃緊列最危險的前 2 位，免得第二個人沒有餵藥鈕 */
+  function targetsOf(ev) {
+    if (ev.uid) return [ev.uid];
     const me = getRoomStatus().me?.uid;
-    return (ev.uids ?? []).filter((u) => u !== me && vitals[u]).sort((a, b) => pctOf(vitals[a]) - pctOf(vitals[b]))[0] ?? null;
+    return (ev.uids ?? []).filter((u) => u !== me && vitals[u]).sort((a, b) => pctOf(vitals[a]) - pctOf(vitals[b])).slice(0, 2);
   }
+  const targetOf = (ev) => targetsOf(ev)[0] ?? null;
 
   async function feed(uid, potion, btn) {
     const state = getState();
@@ -67,17 +68,17 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
 
   /** 一個事件的卡片；同一位隊友只在第一個事件出現餵藥選項（covered），喝得下的藥水最多列 3 瓶，全都喝不下就改成一句話 */
   function eventBlock(ev, opts, covered) {
-    const uid = targetOf(ev);
-    const mate = uid ? vitals[uid] : null;
     const meta = metaOf(ev);
     const rows = [];
-    if (mate && !covered.has(uid)) {
+    for (const uid of targetsOf(ev)) {
+      const mate = vitals[uid];
+      if (!mate || covered.has(uid)) continue;
       covered.add(uid);
       const fit = opts.heals.filter((p) => canFeed(mate, p.name) || modal.fed.has(`${uid}:${p.name}`)).slice(0, 3);
       if (fit.length) {
         rows.push(h('div', { class: 'nudge__acts' }, fit.map((p) => {
           const done = modal.fed.has(`${uid}:${p.name}`);
-          return h('button', { type: 'button', class: 'nudge__potion', disabled: done ? true : null, onclick: (e) => feed(uid, p.name, e.currentTarget) },
+          return h('button', { type: 'button', class: 'nudge__potion', dataset: { nkey: `${uid}:${p.name}` }, disabled: done ? true : null, onclick: (e) => feed(uid, p.name, e.currentTarget) },
             h('span', { class: 'nudge__pname', text: p.name }),
             h('span', { class: 'nudge__pdesc', text: `約回復 ${fmt(Math.round(p.avg))}・剩 ${fmt(p.qty)}` }),
             h('span', { class: 'nudge__pgo', text: done ? '✓ 已餵' : `餵給 ${mate.name}` }));
@@ -106,6 +107,9 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
     const onSession = location.hash === '#session';
     const dismiss = modal.dismiss;
     const covered = new Set();
+    // 整窗重畫會搶走焦點（正在按餵藥鈕時最糟）：先記住焦點在哪，畫完放回去
+    const active = document.activeElement;
+    const focusKey = modal.panel.contains(active) ? (active === dismiss.btn ? '__dismiss' : active.dataset?.nkey ?? null) : null;
     modal.panel.replaceChildren(...[ // replaceChildren 不收陣列也不收 null，先攤平
       h('header', { class: 'nudge__head' },
         h('span', { class: 'nudge__icon', 'aria-hidden': 'true', text: '!' }),
@@ -118,6 +122,10 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
       h('div', { class: 'nudge__foot' },
         onSession ? null : h('button', { type: 'button', class: 'btn btn--ghost', onclick: () => { dismiss(); location.hash = '#session'; } }, '到跑團頁'),
         dismiss.btn)].flat());
+    if (focusKey) {
+      const back = focusKey === '__dismiss' ? dismiss.btn : [...modal.panel.querySelectorAll('[data-nkey]')].find((el) => el.dataset.nkey === focusKey);
+      if (back && !back.disabled) back.focus({ preventScroll: true });
+    }
   }
 
   function show(events) {
@@ -153,6 +161,11 @@ export function mountNudges({ getState, commit, room = defaultRoom }) {
     const inBattle = Boolean(getEncounter()?.monsters?.some((m) => m.hp > 0));
     gate.recovered(next);
     if (!inBattle) return;
+    if (!before) { // 剛連線／重連的第一份狀態：不跳必須按掉的提醒（會誤報），但已經倒地的隊友用輕量提示讓你知道
+      const downed = Object.entries(next).filter(([uid, v]) => v.downed && uid !== r.me.uid).map(([, v]) => v.name);
+      if (downed.length) toast(`${downed.join('、')} 目前倒地，需要幫忙。`);
+      return;
+    }
     const events = detectEvents(before, next, { me: r.me.uid }).filter((ev) => gate.allow(ev, next, Date.now()));
     if (events.length) show(events);
   });
