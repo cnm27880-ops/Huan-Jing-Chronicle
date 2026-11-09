@@ -5,6 +5,7 @@
 // ============================================================
 import { sendActivity, getRoomStatus } from './rollLog.js';
 import { cleanActivity } from '../game/activity.js';
+import { reportStorageProblem } from './storageIssue.js';
 
 const KEY = 'huanjing:activity:v1';
 const LOCAL_MAX = 300;
@@ -28,5 +29,5 @@ export function logActivity(state, raw) {
   try {
     const entry = { id: `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, t: Date.now(), uid: 'local', name: who, who, ...clean };
     localStorage.setItem(KEY, JSON.stringify([entry, ...readLocal()].slice(0, LOCAL_MAX)));
-  } catch { /* 存不進去就算了 */ }
+  } catch (err) { reportStorageProblem(err, '日誌'); } // 日誌只是紀錄：不中斷遊戲，但容量滿要讓玩家知道
 }

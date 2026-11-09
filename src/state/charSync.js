@@ -8,6 +8,7 @@
 // 伺服器端規則見 worker/src/room-core.js 的「角色存檔」。
 // ============================================================
 import * as defaultRoom from './rollLog.js';
+import { reportStorageProblem } from './storageIssue.js';
 
 const { roomRequest } = defaultRoom;
 
@@ -22,7 +23,7 @@ function readMeta() {
   return { uid: null, version: 0, dirty: false, waiting: false };
 }
 function writeMeta(meta) {
-  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch { /* 忽略 */ }
+  try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (err) { reportStorageProblem(err, '同步狀態'); }
 }
 
 const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) : '不明');
@@ -107,7 +108,7 @@ export function createCharSync({
     const metaStash = (uid) => `${META_KEY}:stash:${uid}`;
     if (!meta.waiting) { // 等待中表示本機只是示範角色，不用收
       stashLocal(meta.uid);
-      try { localStorage.setItem(metaStash(meta.uid), JSON.stringify(meta)); } catch { /* 忽略 */ }
+      try { localStorage.setItem(metaStash(meta.uid), JSON.stringify(meta)); } catch (err) { reportStorageProblem(err, '同步狀態'); }
     }
     let next = { uid: toUid, version: 0, dirty: false, waiting: false };
     if (unstashLocal(toUid)) {

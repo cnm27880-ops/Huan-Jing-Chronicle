@@ -18,7 +18,8 @@ import { SAMPLE_CHARACTER } from './data/sample/fude.js';
 import { setCustomSpecial } from './game/special.js';
 import { setCustomSkills } from './game/skillTable.js';
 import { loadCachedCustomSkills, saveCachedCustomSkills } from './state/customSkills.js';
-import { loadCharacter, saveCharacter, hasSavedCharacter, importCharacter, stashLocalCharacter, unstashLocalCharacter } from './state/store.js';
+import { onStorageProblem } from './state/storageIssue.js';
+import { loadCharacter, saveCharacter, hasSavedCharacter, isLoadBroken, importCharacter, stashLocalCharacter, unstashLocalCharacter } from './state/store.js';
 import { createCharSync } from './state/charSync.js';
 import { createMailbox } from './state/mailbox.js';
 import { createShadowWatcher } from './state/shadowRound.js';
@@ -70,6 +71,7 @@ async function init() {
 
   // ---------- 角色資料與分頁 ----------
   setCustomSkills(loadCachedCustomSkills()); // 先放進上次的 GM 專屬技能，再載入角色（載入時會依數值上限修正生命與資源）
+  onStorageProblem(toast); // 存檔寫不進去（容量滿）或讀壞時跳提示（先接上，才收得到載入時的訊息）
   let character = loadCharacter();
   const getState = () => character;
   const views = {}; // 各分頁的 view：第一次進入該分頁才下載並建立（見 ensureView），沒載入前是 undefined，所以用到都要寫 views[名稱]?.
@@ -77,7 +79,7 @@ async function init() {
   let vitals = null;
   const commit = () => {
     saveCharacter(character);
-    sync?.markDirty(); // 已連上房間時，稍後同步到伺服器
+    if (!isLoadBroken()) sync?.markDirty(); // 已連上房間時，稍後同步到伺服器（存檔讀壞、畫面是示範角色時不能上傳）
     vitals?.changed(); // 生命、資源有變就回報給房間（隊友看得到）
     views[currentView]?.render();
   };

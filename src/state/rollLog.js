@@ -21,6 +21,8 @@ import { getRoomAccess, roomWsUrl, DEFAULT_ROOM_ID, API_BASE } from '../api/auth
 import { createRoomClient } from './roomClient.js';
 import { planDice, applyDice, TapeError } from './diceTape.js';
 
+import { reportStorageProblem } from './storageIssue.js';
+
 const KEY = 'huanjing:rolllog:v1';
 const MAX = 100;
 const subs = new Set();
@@ -39,8 +41,8 @@ let log = load();
 function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify(log));
-  } catch {
-    /* 儲存失敗不中斷遊戲 */
+  } catch (err) {
+    reportStorageProblem(err, '擲骰紀錄'); // 不中斷遊戲，但要讓玩家知道
   }
 }
 
