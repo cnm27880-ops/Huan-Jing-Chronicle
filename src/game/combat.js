@@ -218,35 +218,36 @@ export const newEncounter = () => ({ monsters: [], next: { mob: 1, boss: 1, elit
 /** GM 指定的分配方式：{ atkType, atkFocus, defType, defFocus }（都可以不給＝隨機） */
 const splitOpts = (spec, side) => ({ type: spec[`${side}Type`], focus: spec[`${side}Focus`] });
 
-export function addMobs(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, rank, ...split }, rng = Math.random) {
+/** 新增怪物的共用迴圈（M3）：做 count 隻（make 每次回傳一隻，亂數與編號的順序由 make 內部決定），放進遭遇戰並回傳新增的 */
+function spawn(enc, count, make) {
   const added = [];
-  const elite = rank === 'elite'; // 菁英：2 打（見 enemy.js）；沒給就是普通
   for (let i = 0; i < count; i++) {
-    enc.next.elite ??= 1;
-    const m = {
-      id: elite ? `菁英${enc.next.elite++}` : `小怪${enc.next.mob++}`, kind: 'mob', ...(elite ? { rank: 'elite' } : {}), hp, maxHp: hp, abs: absDef,
-      atk: generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk')),
-      def: generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def')),
-    };
+    const m = make();
     enc.monsters.push(m);
     added.push(m);
   }
   return added;
 }
 
+export function addMobs(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, rank, ...split }, rng = Math.random) {
+  const elite = rank === 'elite'; // 菁英：2 打（見 enemy.js）；沒給就是普通
+  return spawn(enc, count, () => {
+    enc.next.elite ??= 1;
+    return {
+      id: elite ? `菁英${enc.next.elite++}` : `小怪${enc.next.mob++}`, kind: 'mob', ...(elite ? { rank: 'elite' } : {}), hp, maxHp: hp, abs: absDef,
+      atk: generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk')),
+      def: generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def')),
+    };
+  });
+}
+
 /** 新增 BOSS：攻擊 3 組（輕擊/重擊/絕殺）、防禦 3 組（常規/變換/極限） */
 export function addBosses(enc, { count, atkPower, defPower, hp, atkMod = '', defMod = '', absDef = 0, ...split }, rng = Math.random) {
-  const added = [];
-  for (let i = 0; i < count; i++) {
-    const m = {
-      id: `BOSS${enc.next.boss++}`, kind: 'boss', hp, maxHp: hp, abs: absDef,
-      atk: [0, 1, 2].map(() => generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk'))), // 指定時三組都用同一種分配（比例各自隨機）
-      def: [0, 1, 2].map(() => generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def'))),
-    };
-    enc.monsters.push(m);
-    added.push(m);
-  }
-  return added;
+  return spawn(enc, count, () => ({
+    id: `BOSS${enc.next.boss++}`, kind: 'boss', hp, maxHp: hp, abs: absDef,
+    atk: [0, 1, 2].map(() => generateAbcSplit(atkPower, parseAbc(atkMod), rng, splitOpts(split, 'atk'))), // 指定時三組都用同一種分配（比例各自隨機）
+    def: [0, 1, 2].map(() => generateAbcSplit(defPower, parseAbc(defMod), rng, splitOpts(split, 'def'))),
+  }));
 }
 
 export const removeMonster = (enc, id) => {
