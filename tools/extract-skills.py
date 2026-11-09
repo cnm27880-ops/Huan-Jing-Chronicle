@@ -94,6 +94,7 @@ def main(paths):
     order = sorted(table, key=lambda n: (TIERS.index(table[n]['tier']) if table[n]['tier'] in TIERS else 9, n))
     out = ['// ============================================================',
            '// 技能目錄（自動產生，請勿手改；來源與更新方式見 tools/extract-skills.py）',
+           '// 注意：多數技能 10 級的獎勵都是「真實傷害 +1、絕對防禦 +1」，這是 GM 定案的刻意設計（2026-11-09 確認），不是錯誤，請不要改數字。',
            '// fx[N-1] = 技能 N 級時「累積」的數值加成；啟動類技能（activate）要啟動後才算，且啟動時扣算力上限；manual = 沒有自動數值',
            '// ============================================================',
            f'export const EXP_TABLE = {json.dumps(exp, ensure_ascii=False)}; // 位階 → 升到 1~10 級各要多少經驗（試算表「技能等階」）',

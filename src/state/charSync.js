@@ -37,6 +37,7 @@ const when = (t) => (t ? new Date(t).toLocaleString('zh-TW', { hour12: false }) 
 export function createCharSync({
   getState, adopt, hasLocalSave, confirmFn = (t) => window.confirm(t), notify = () => {}, room = defaultRoom,
   stashLocal = () => {}, unstashLocal = () => false, onAccountSwitch = () => {},
+  isBlocked = () => false, // 本機存檔讀壞、畫面上是示範角色時為 true：絕不能把畫面上的角色上傳去蓋伺服器
 }) {
   const { roomRequest: request, getRoomStatus, subscribeRoom } = room;
   let timer = null;
@@ -66,6 +67,7 @@ export function createCharSync({
   const run = (fn) => { chain = chain.then(async () => { await fn(); if (online()) resetRetry(); }).catch(failed); return chain; };
 
   async function push(base) {
+    if (isBlocked()) return;
     const sent = gen;
     const res = await request({ t: 'charPut', base, data: getState() });
     if (res.ok) {

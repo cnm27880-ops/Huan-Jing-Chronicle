@@ -118,6 +118,7 @@ async function init() {
   sync = createCharSync({
     getState,
     hasLocalSave: hasSavedCharacter,
+    isBlocked: isLoadBroken,
     stashLocal: stashLocalCharacter,
     unstashLocal: unstashLocalCharacter,
     onAccountSwitch: () => { // 換帳號：畫面改讀這個帳號的本機存檔（沒有就是示範角色，之後等 GM 匯入）

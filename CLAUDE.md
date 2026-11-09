@@ -141,10 +141,10 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 
 ## 不可違反的規則
 1. **防劇透**：未揭露（`hidden`）與草稿（`draft`）的內容只能在 `src/api/lore.js` 被過濾掉，不能只在畫面上隱藏。UI 拿到的資料就不該包含它們。（注意：這只是前端過濾，`public/` 底下的原始檔是公開的。）
-2. 內容文字一律用 `textContent` 放進頁面，**禁止用 `innerHTML` 放資料內容**（之後內容由 GM 輸入，要防 XSS）。
+2. 內容文字一律用 `textContent` 放進頁面，**禁止用 `innerHTML` 放資料內容**（之後內容由 GM 輸入，要防 XSS）。`dom.js` 的 `h()` 照現況使用，**不要幫它加 `innerHTML` 之類的選項**。
 3. `src/api/lore.js` 的函式名稱與回傳格式要保持穩定（待辦：之後可能換成向 Cloudflare Worker 要資料，目前還是讀本機檔案）。
 4. 機密（Token、金鑰）和 `players_data.json` 永遠不能進 git。
-5. 擲骰結果一律用 `rollLog.publish()` 發布，UI 不要自己維護另一份「大家看得到的紀錄」。
+5. 擲骰結果一律用 `rollLog.publish()` 發布，UI 不要自己維護另一份「大家看得到的紀錄」。本機模式（沒登入）的骰子是前端自己擲的，可被改前端的人操縱；這是接受的現況（不防作弊），不要宣稱本機骰子公平。
 6. 圖片路徑用相對路徑（`img/...`，不要開頭的 `/`），GitHub Pages 子路徑才不會壞。
 
 ## 未來規劃（現在不要做，除非我明確要求）
