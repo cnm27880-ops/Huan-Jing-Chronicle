@@ -45,7 +45,7 @@ export function mountRoomPanel(container) {
       if (r.me?.isGm) {
         groups.push(
           group('戰鬥', [
-            gmBtn('新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, 'main'),
+            gmBtn('新戰鬥', async (e) => { if (await askConfirm(e.currentTarget, { title: '開始新的一場戰鬥？', lines: ['紀錄裡會插入一條分隔線，並清空場上的敵人、友方 NPC 與先攻順序（不會改動任何角色資料）。'], okText: '開始' })) startNewBattle(); }, 'main'),
             gmBtn('發放獎勵', lazyTool(() => import('./rewardSheet.js'), 'openRewardSheet', '發放獎勵'), 'main'),
             gmBtn('模擬戰', lazyTool(() => import('./simPanel.js'), 'openSimPanel', '模擬戰'))]),
           group('玩家資料', [

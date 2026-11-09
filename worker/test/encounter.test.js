@@ -424,3 +424,13 @@ test('中途加入先攻：只有 GM、玩家要在線、不能重複，插進�
   assert.deepEqual(after.order[after.turn], cur);
   assert.equal(errorOf(send(core, GM, { t: 'encJoin', uid: '400' }, { online: ['300', '400'] }))?.code, 'bad_enc'); // 不能重複
 });
+
+test('開新戰鬥：同時清空舊的敵人與先攻順序', () => {
+  const core = room();
+  send(core, GM, { t: 'encAdd', kind: 'mob', spec: { count: 2, atkPower: 12, defPower: 9, hp: 100 } });
+  assert.equal(core.encounter().monsters.length, 2);
+  const res = send(core, GM, { t: 'newBattle' });
+  assert.equal(core.encounter().monsters.length, 0);
+  assert.deepEqual(core.encounter().order, []);
+  assert.equal(res.out.find((o) => o.msg.t === 'enc').msg.encounter.monsters.length, 0);
+});

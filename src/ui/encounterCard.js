@@ -10,7 +10,7 @@ import { h, fmt } from './dom.js';
 import { toast, rollFailed, addBox } from './controls.js';
 import { TRACKS, TRACK_ATK_STAT, TRACK_DEF_STAT } from '../game/rules.js';
 import {
-  formatAbc, monsterAbs, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
+  formatAbc, abcLeftover, monsterAbs, addMobs, addBosses, removeMonster, newEncounter, playerAttack, monsterAttack,
   isDowned, monsterAtk, monsterDef, BOSS_ATK_MODES, BOSS_DEF_MODES, SPLIT_FOCUS,
 } from '../game/combat.js';
 import {
@@ -686,6 +686,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
         type: 'button', class: 'btn btn--primary btn--small',
         onclick: () => {
           if (f.count > 20) return toast('一次最多 20 隻。');
+          for (const [label, text] of [['攻擊補正', f.atkMod], ['防禦補正', f.defMod]]) { // 打錯字（例如「五A」）會被當成 0，先擋下來
+            const bad = abcLeftover(text);
+            if (bad) return toast(`${label}看不懂「${bad}」，請寫成像「5A 3C」的格式。`);
+          }
           const spec = { count: f.count, atkPower: f.atk, defPower: f.def, hp: f.hp, atkMod: f.atkMod, defMod: f.defMod, absDef: f.absDef };
           for (const side of ['atk', 'def']) { // 指定的分配方式（沒選＝隨機，不送）
             if (f[`${side}Type`]) spec[`${side}Type`] = f[`${side}Type`];
@@ -706,10 +710,12 @@ export function createEncounterCard({ getState, commit, rerender }) {
   }
 
   /** GM 直接改敵人生命（BOSS、小怪都可以；填的比最大生命高就連上限一起拉高）。房間模式由伺服器改，本機模式改自己的 */
-  function setEnemyHp(state, m, raw) {
+  async function setEnemyHp(state, m, raw) {
+    if (String(raw ?? '').trim() === '') return toast('請先填要設定的生命（要設成 0 請明確輸入 0）。'); // 空欄位不能當 0，不然手滑就把怪打倒
     const v = Math.floor(Number(raw));
+    if (!Number.isFinite(v) || v < 0) { delete ui.mobHp[m.id]; return toast('生命要填 0 以上的整數。'); }
+    if (v > m.maxHp && !(await askConfirm(null, { title: `把 ${m.id} 的生命設成 ${fmt(v)}？`, lines: [`超過目前的最大生命 ${fmt(m.maxHp)}，最大生命也會一起拉高到 ${fmt(v)}。`], okText: '確定拉高' }))) return;
     delete ui.mobHp[m.id];
-    if (!Number.isFinite(v) || v < 0) return toast('生命要填 0 以上的整數。');
     if (online()) return act({ t: 'encHp', id: m.id, hp: v });
     m.hp = v;
     if (m.hp > m.maxHp) m.maxHp = m.hp;
@@ -791,7 +797,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
               class: 'field', type: 'number', inputmode: 'numeric', max: a.maxHp, value: ui.allyHp[a.id] ?? a.hp, style: 'max-width: 7em;', 'aria-label': `${a.name} 的生命`,
               oninput: (e) => { ui.allyHp[a.id] = e.target.value; },
             }),
-            h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { const v = Math.floor(Number(ui.allyHp[a.id] ?? a.hp)); delete ui.allyHp[a.id]; act({ t: 'encAllyHp', id: a.id, hp: Number.isFinite(v) ? v : a.hp }); } }, '設定生命'))
+            h('button', { type: 'button', class: 'btn btn--ghost btn--small', onclick: () => { const raw = ui.allyHp[a.id] ?? a.hp; if (String(raw).trim() === '') return toast('請先填要設定的生命。'); let v = Math.floor(Number(raw)); delete ui.allyHp[a.id]; if (!Number.isFinite(v)) v = a.hp; if (v > a.maxHp) { v = a.maxHp; toast(`不能超過最大生命，已改成 ${a.maxHp}。`); } act({ t: 'encAllyHp', id: a.id, hp: v }); } }, '設定生命'))
         : null,
       mine
         ? h('button', {
@@ -834,6 +840,11 @@ export function createEncounterCard({ getState, commit, rerender }) {
       h('button', {
         type: 'button', class: 'btn btn--primary btn--small',
         onclick: async () => {
+          const hp = Math.floor(Number(f.hp));
+          if (!String(f.name ?? '').trim()) return toast('請填名稱。');
+          if (!Number.isFinite(hp) || hp < 1) return toast('血量要填 1 以上的整數。');
+          if (f.sup) { const pct = Math.floor(Number(f.pct)); if (!Number.isFinite(pct) || pct < 1 || pct > 100) return toast('輔助百分比要填 1～100。'); }
+          for (const [label, text] of [['攻擊', f.atk], ['防禦', f.def]]) { const bad = abcLeftover(text); if (bad) return toast(`${label}看不懂「${bad}」，請寫成像「30A 20B」的格式。`); }
           const npc = { name: f.name, hp: Math.floor(Number(f.hp)), atk: f.atk, def: f.def, abs: Math.floor(Number(f.abs) || 0), ...(f.sup ? { support: { kind: f.sup, pct: Math.floor(Number(f.pct)) } } : {}) };
           try { await encounterAction({ t: 'encAlly', npc }); ui.allyForm = { ...f, name: '' }; toast(`${npc.name} 加入戰鬥。`); } catch (e) { toast(e.message || '操作失敗。'); }
         },

@@ -39,6 +39,11 @@ export function formatAbc(dice) {
   return parts.length ? parts.join(' ') : '0';
 }
 
+/** parseAbc 看不懂的殘字（例如「五A」「3 D」）；空字串＝格式沒問題。給輸入表單提示用 */
+export function abcLeftover(text) {
+  return String(text ?? '').toUpperCase().replace(/\d+\s*[ABC]/g, '').replace(/[\s,，、]+/g, '').trim();
+}
+
 // ---------- 出招與防禦的骰數 ----------
 /**
  * 一招的攻擊骰數。move = { tracks:['C'], extra:{ C: 4 } }

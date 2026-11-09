@@ -391,16 +391,17 @@ export class RoomCore {
     return this.broadcastEvent(ev, [{ to: 'self', msg: { t: 'posted', rid, id: ev.id } }]);
   }
 
-  /** GM 才能開新戰鬥：只在紀錄裡插一條分隔訊息，不改任何規則狀態 */
+  /** GM 才能開新戰鬥：紀錄插一條分隔訊息，並清空舊的遭遇戰（敵人、友方 NPC、先攻順序、回合數）；不改任何角色資料 */
   onNewBattle(user, rid) {
     if (!this.isGm(user.uid)) return err(rid, 'forbidden', '只有 GM 可以開始新戰鬥。');
     let ev;
     this.db.tx(() => {
       const n = this.battleNo() + 1;
       this.setMeta('battle_no', n);
-      ev = this.record({ who: '', kind: 'divider', label: `第 ${n} 場戰鬥`, lines: [`由 ${user.name} 開始`], battleNo: n }, user);
+      this.saveEncounter({ ...newEncounter(), round: 0, order: [], turn: 0, locked: false });
+      ev = this.record({ who: '', kind: 'divider', label: `第 ${n} 場戰鬥`, lines: [`由 ${user.name} 開始`, '舊的敵人與先攻順序已清空'], battleNo: n }, user);
     });
-    return this.broadcastEvent(ev);
+    return this.broadcastEvent(ev, [{ to: 'all', msg: { t: 'enc', encounter: this.encounter() } }]);
   }
 
   /** 暫代 GM：ADMIN_DISCORD_IDS 的人可以接管，之後再還給原 GM（測試網站用） */
