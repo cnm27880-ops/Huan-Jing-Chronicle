@@ -217,7 +217,10 @@ export function createEncounterCard({ getState, commit, rerender }) {
   /** 清掉不存在或已倒下的目標，並裁到目前招式的上限（換成目標比較少的招式時） */
   function pruneTargets(state) {
     const enc = currentEnc(state);
-    sel.targets = sel.targets.filter((id) => { const m = enc.monsters.find((x) => x.id === id); return m && !isDowned(m); }).slice(0, capOf(state));
+    const alive = sel.targets.filter((id) => { const m = enc.monsters.find((x) => x.id === id); return m && !isDowned(m); });
+    const kept = alive.slice(0, capOf(state));
+    if (kept.length < alive.length) toast(`這招最多 ${capOf(state)} 個目標，已改選前 ${kept.length} 個。`); // 換招後多的目標被裁掉要讓玩家知道
+    sel.targets = kept;
     if (sel.focusBoss && !enc.monsters.some((m) => m.id === sel.focusBoss)) sel.focusBoss = null;
   }
 
@@ -444,7 +447,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       return act({ t: 'encSwap', a: from, b: i });
     };
     return h('div', { class: 'init' },
-      h('p', { class: 'init__label', text: enc.locked ? `第 ${enc.round} 回合・輪到 ${name(enc.order[enc.turn])}` : '先攻位置（隨機）：玩家可以點選交換，GM 按「開打」後鎖定' }),
+      h('p', { class: 'init__label', text: enc.locked ? `第 ${enc.round} 回合・輪到 ${enc.order[enc.turn] ? name(enc.order[enc.turn]) : '—'}` : '先攻位置（隨機）：玩家可以點選交換，GM 按「開打」後鎖定' }),
       h('ol', { class: 'init__list' }, enc.order.map((o, i) => {
         const down = (o.kind === 'monster' && isDowned(enc.monsters.find((m) => m.id === o.id) ?? { hp: 1 }))
           || (o.kind === 'ally' && isDowned(alliesOf(enc).find((a) => a.id === o.id) ?? { hp: 1 }));

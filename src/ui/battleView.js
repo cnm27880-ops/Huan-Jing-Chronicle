@@ -231,6 +231,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const heals = Object.keys(POTIONS).filter((n) => POTIONS[n].heal && countOf(state, n) > 0);
     if ((!mates.length && !npcs.length) || !heals.length) return null;
     if (ui.feedTo.startsWith('ally:') && !npcs.some((a) => `ally:${a.id}` === ui.feedTo)) ui.feedTo = ''; // NPC 已離開戰鬥
+    if (ui.feedTo && !ui.feedTo.startsWith('ally:') && !mates.some((m) => m.uid === ui.feedTo)) ui.feedTo = ''; // 隊友已離開房間
     return h('div', { class: 'feedbox' },
       h('p', { class: 'field-label', text: '餵給隊友或友方 NPC（對方不用同意；倒地的也能拉起來，毒性算在被餵的那位玩家身上、NPC 沒有毒性）' }),
       h('div', { class: 'row' },
@@ -603,7 +604,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const input = h('input', {
       class: 'dou__input', type: 'number', inputmode: 'numeric', min: '0', max: String(have), step: '1', value: String(sel.dou), placeholder: '0',
       'aria-label': '鬥氣加骰（點數）',
-      oninput: (e) => { const n = Math.floor(Number(e.target.value)) || 0; sel.dou = Math.max(0, Math.min(have, n)); field.dataset.on = sel.dou > 0 ? '1' : '0'; }, // 打字途中不重畫，免得輸入框被換掉
+      oninput: (e) => { const n = Math.floor(Number(e.target.value)) || 0; sel.dou = Math.max(0, Math.min(have, n)); if (n > have) e.target.value = String(sel.dou); field.dataset.on = sel.dou > 0 ? '1' : '0'; }, // 打字途中不重畫，免得輸入框被換掉
       onchange: (e) => { e.target.value = String(sel.dou); rerender(); },
       onfocus: (e) => e.target.select(),
     });
@@ -625,7 +626,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
     const input = h('input', {
       class: 'dou__input', type: 'number', inputmode: 'numeric', min: '0', max: String(cap), step: '1', value: String(sel.mage), placeholder: '0',
       'aria-label': '大魔導師加骰（顆數）', disabled: fits ? null : true,
-      oninput: (e) => { sel.mage = Math.max(0, Math.min(cap, Math.floor(Number(e.target.value)) || 0)); field.dataset.on = sel.mage > 0 ? '1' : '0'; },
+      oninput: (e) => { const n = Math.floor(Number(e.target.value)) || 0; sel.mage = Math.max(0, Math.min(cap, n)); if (n > cap) e.target.value = String(sel.mage); field.dataset.on = sel.mage > 0 ? '1' : '0'; },
       onchange: (e) => { e.target.value = String(sel.mage); rerender(); },
       onfocus: (e) => e.target.select(),
     });
@@ -666,7 +667,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
    */
   function fireBar(state) {
     const attacks = state.moves.filter((m) => m.kind !== 'heal' && m.kind !== 'shield');
-    if (!attacks.length) return null;
+    if (!attacks.length) return h('p', { class: 'hint', text: '沒有攻擊招式，請到招式頁新增。' });
     if (!attacks.some((m) => m.id === sel.moveId)) sel.moveId = attacks[0].id;
     const cur = attacks.find((m) => m.id === sel.moveId);
     const lack = shortfall(state, moveDetail(state, cur).cost);

@@ -491,7 +491,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
       const h = resolveHit(state, move, targets[0], opts.modes?.[targets[0].id] ?? mode, a, rng, opts.extraAbs?.[targets[0].id] ?? 0);
       hits.push({ ...h, stage: i + 1, stageDice: add });
     });
-    notes.push(hits.length < stages.length ? `${move.name}：連續 ${hits.length} 段（目標倒下，後面的段數取消）` : `${move.name}：連續 ${stages.length} 段，各段額外 +${stages.map((s) => Object.values(s)[0]).join('／+')} 顆傷害骰`);
+    notes.push(hits.length < stages.length ? `${move.name}：連續 ${hits.length} 段（目標倒下，後面的段數取消）` : `${move.name}：連續 ${stages.length} 段，各段額外 +${stages.map((s) => Object.values(s).join('+')).join('／+')} 顆傷害骰`);
   } else {
     atk = pooled ? pooledAttack(state, atkMove, potion, douDice, respDice) : attackDice(state, atkMove, potion, douDice, respDice);
     hits = targets.map((t) => resolveHit(state, move, t, opts.modes?.[t.id] ?? mode, atk, rng, opts.extraAbs?.[t.id] ?? 0));
@@ -505,7 +505,7 @@ export function playerAttack(state, enc, moveId, monsterId, mode = 0, rng = Math
   const h0 = hits[0];
   return {
     move, target: h0.target, mode, atk, def: h0.def, result: h0.result, potion, ignoreAbs: h0.ignoreAbs, abs: h0.abs,
-    hits, cost, healed, notes, dou, douDice, mage, respDice, responses, dragon, burst, reveal: move.skill === SHADOW_SKILL, downed: isDowned(h0.target),
+    hits, cost, healed, notes, dou, douDice, mage, respDice, responses, dragon, burst, reveal: move.skill === SHADOW_SKILL, downed: hits.some((x) => isDowned(x.target)),
   };
 }
 

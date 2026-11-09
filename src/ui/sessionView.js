@@ -125,7 +125,7 @@ export function createSessionView({ root, getState, commit }) {
     const mod = modifier(state, skill, 'session');
     return h('button', { type: 'button', class: 'skill-btn', onclick: () => checkSkill(skill) },
       h('span', { class: 'skill-btn__name', text: skill }),
-      h('span', { class: 'skill-btn__mod', text: `+${mod.total}` }),
+      h('span', { class: 'skill-btn__mod', text: mod.total < 0 ? `${mod.total}` : `+${mod.total}` }),
       h('small', { text: isLife ? `${value} + 熟練` : `技能 ${value}` }));
   }
 
@@ -269,8 +269,10 @@ export function createSessionView({ root, getState, commit }) {
   const MAX_CHAT = 120;
 
   function sendChat() {
-    const text = ui.text.trim().slice(0, MAX_CHAT);
+    const full = ui.text.trim();
+    const text = full.slice(0, MAX_CHAT);
     if (!text) return;
+    if (full.length > MAX_CHAT) toast(`訊息太長，只送出前 ${MAX_CHAT} 個字。`);
     if (getRoomStatus().phase !== 'online') return toast('連上房間後才能聊天。');
     publish({ who: getState().name, kind: 'chat', label: text });
     ui.text = '';
@@ -280,7 +282,7 @@ export function createSessionView({ root, getState, commit }) {
   async function rollCustom() {
     if (isChat()) return sendChat();
     const expr = expression();
-    if (expr.error) return;
+    if (expr.error) return toast(expr.error);
     try {
       const ev = await rollDice(getState().name, expr);
       const f = ev && readFaces(ev);
@@ -300,7 +302,7 @@ export function createSessionView({ root, getState, commit }) {
     const rollLabel = () => (isChat() ? '傳送' : '投骰');
     const rollOff = () => expression().error && !isChat();
     diceBox.dataset.collapsed = folded ? '1' : '0';
-    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(rollOff()), title: rollTitle(), onclick: rollCustom }, folded ? `投骰 ${expr.error ? '' : expr.text}` : rollLabel());
+    const rollBtn = h('button', { type: 'button', class: 'btn btn--primary sx-dice__roll', disabled: Boolean(rollOff()), title: rollTitle(), onclick: rollCustom }, folded ? `${rollLabel()} ${expr.error ? '' : expr.text}` : rollLabel());
     const fold = h('button', {
       type: 'button', class: 'btn btn--quiet btn--small sx-dice__fold', 'aria-expanded': String(!ui.diceCollapsed), 'aria-label': ui.diceCollapsed ? '展開骰盤' : '收合骰盤',
       onclick: () => { ui.diceCollapsed = !ui.diceCollapsed; saveDiceCollapsed(ui.diceCollapsed); renderDice(); },
