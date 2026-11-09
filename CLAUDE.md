@@ -1,6 +1,6 @@
 # 幻境編年史（網遊網站）
 
-GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原型**：世界地圖、修整日、背包、裝備、交易、跑團（三欄工作台：角色與招式、遭遇戰舞台、擲骰紀錄）分頁，資料存在瀏覽器（localStorage）。
+GM 原本用 Discord 機器人跑的網遊，改成網站。後端（Cloudflare Worker：Discord 登入、房間、角色存檔同步、每日備份）**已經上線**；前端有地圖、修整日、背包、裝備、交易、跑團（三欄工作台）、日誌、分析 8 個分頁。角色存檔本機（localStorage）仍是主要存檔，登入連上房間後同步到伺服器（`charSync.js`）。**伺服器不防作弊**（規則由前端算，GM 2026-10-08 決定）。
 **改到遊戲規則、擲骰、加值、胃袋、紀念品、裝備、戰鬥、藥水時，先讀 `GAME_RULES.md`，並在改完後執行 `npm test`。**
 開發者是程式新手：回覆用繁體中文，步驟要具體，指令要能直接複製貼上。
 **所有 UI 樣式依 `DESIGN.md`（黑金主題）。** 色碼只能寫在 `src/styles/theme.css`，其他檔案用變數。
@@ -15,7 +15,11 @@ GM 原本用 Discord 機器人跑的網遊，正在改成網站。目前是**原
 ## 部署檢查清單
 - 推上 `main` ＝ 前端自動部署到正式站，合併前先確認 `npm test`、`npm run build` 都過。
 - **改了 `public/img/` 或 `public/icons/` 底下的圖片（檔名沒有雜湊），必須把 `public/sw.js` 的 `CACHE` 版本號 +1**，否則玩家的 Service Worker 會一直吐舊圖。
-- `worker/`：Cloudflare 後台的 Workers Builds 已連到本 repo 的 `main`（露葵 2026-11-09 截圖確認，生產分支 `main`），所以**合併到 `main` 也會自動部署 Worker**。Claude Code 不要自己執行 `wrangler deploy`。
+- `worker/`：Cloudflare 後台的 Workers Builds 已連到本 repo 的 `main`（露葵 2026-11-09 截圖確認，生產分支 `main`），所以**合併到 `main` 也會自動部署 Worker**（Root directory 與 Deploy command 設定尚未確認，需驗證）。Claude Code 不要自己執行 `wrangler deploy`。
+- Worker 的 Discord ID（`DISCORD_ALLOWED_IDS`、`GM_DISCORD_IDS`、`ADMIN_DISCORD_IDS`）目前同時寫在 `worker/wrangler.jsonc` 與後台「執行時變數」；改名單要兩邊一致（部署時以 `wrangler.jsonc` 為準，需驗證）。登入白名單為空 = 拒絕所有人。
+- **部署後手動檢查清單**（測試只用 Node 模擬，沒驗證真的 Cloudflare、Discord、R2；每次部署 Worker 後照著走一遍）：① 用 Discord 登入成功 ② 進房間、看到成員 ③ 擲一次骰，大家都看得到 ④ 改一點角色，重新整理後仍在（角色同步）⑤ 登出後舊分頁不能再操作（session 撤銷）⑥ R2 `huan-jing-backup` 有今天或昨天的新檔案。
+- 備份失敗目前**沒有通知**：每月手動看一次 R2 有沒有新檔案。
+- 限流只是記憶體計數（重新部署歸零），`/auth/*` 沒有限流；不要宣稱有完整防刷。
 
 ## 技術
 Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
@@ -93,8 +97,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/sheetImport.js` | GM 專用的「匯入角色卡」面板（跑團頁的房間區塊）：貼上文字、預覽、寫入伺服器 |
 | `src/ui/rewardSheet.js` | GM 專用「發放獎勵」面板（跑團頁房間區塊）：勾選玩家（預設全員；暫代 GM 的人自己也在名單裡，`rewardTargets`）＋物品（技能書快捷鈕）、金幣、經驗、時間、備註，一次發出；也拿來補償（例如玩家忘了喝惜未央，直接補時間）。伺服器 `room-core.js` 的 `onReward`（只有 GM，走信箱 `kind:'reward'`，不用扣任何人的背包，上限：經驗 100 萬、時間 1000、60 位玩家），玩家端 `mail.js` 的 `applyMail` 套用（時間沒有上限）並跳通知 |
 | `src/ui/gmCharEdit.js` | GM 專用的「玩家角色」面板：清單每位玩家旁有「不顯示於資源條」開關（`setVitalsHidden`）；看並改玩家的手動調整、技能等級、啟動；「生活技能補算」（`skillTable.js` 的 `lifeBackfill`／`applyLifeBackfill`，升級時自動記 `lifeGainDone`，沒記錄的由 GM 逐一勾選補上；也能直接改生活技能與技藝數值） |
-| `public/manifest.webmanifest`、`public/sw.js`、`public/icons/` | PWA（可加到主畫面）：manifest、Service Worker（只快取 /assets、/icons、/img，網頁與 API 不碰，改版後要讓舊快取失效就把 `sw.js` 的 `CACHE` 版本號 +1）、圖示（暫用，`tools/make-icons.py` 產生；換正式圖示：`python3 tools/make-icons.py --source 圖片.png`） |
-| `src/state/store.js` | 角色存檔（目前 localStorage，之後換 Cloudflare 只改這裡） |
+| `public/manifest.webmanifest`、`public/sw.js`、`public/icons/` | PWA（可加到主畫面）：manifest、Service Worker（只快取 /assets、/icons、/img 來加快載入，**不做離線、不自稱 PWA**，網頁與 API 不碰，改版後要讓舊快取失效就把 `sw.js` 的 `CACHE` 版本號 +1）、圖示（暫用，`tools/make-icons.py` 產生；換正式圖示：`python3 tools/make-icons.py --source 圖片.png`） |
+| `src/state/store.js` | 角色存檔（localStorage，key `huanjing:character:v1` 不能改）：存檔內容有 `version`（`CURRENT_VERSION`；舊存檔沒有 = 第 1 版），`upgrade()` 依版本升級；讀取失敗（JSON 壞、升級丟錯）時原文另存 `…:corrupt`、不寫入、跳提示，用 `savedCharacterStatus()`（none／ok／broken）分辨；寫入失敗（含容量滿）經 `storageIssue.js` 跳提示；`watchOtherTabs` 別的分頁存檔時提示。伺服器同步在 `charSync.js` |
 | `src/data/sample/fude.js` | 示範角色資料 |
 | `src/ui/skillTile.js` | 技能方格（一格一行：名稱、位階類型、等級；電腦滑過浮動顯示效果、手機點開面板）：修整日學習與裝備頁技能共用 |
 | `src/ui/restView.js` | 修整日頁面：上方 HUD、採集／製作／跑團檢定分頁、設定步驟＋大按鈕、結果卡 |
@@ -114,7 +118,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/battleSelect.js` | 跑團頁共用的「目前選擇」（出招招式、選中的目標、顯示哪隻 BOSS、怪物攻防模式），不存檔 |
 | `src/ui/rollFeed.js` | 擲骰紀錄的畫面：一般檢定畫骰面、戰鬥畫 A／B／C 三軌摘要；`oldestFirst` 時新的在下並自動捲到底 |
 | `src/ui/dom.js` | 建立元素的小工具 |
-| `src/api/lore.js` | **資料存取層**。UI 只能透過這裡拿資料 |
+| `src/api/lore.js` | **資料存取層**。UI 只能透過這裡拿資料。目前讀的是公開的靜態檔（`public/lore-data/`），未揭露內容只在這一層過濾——**原始 JSON 仍是公開檔案，不要放真正不能劇透的內容**；待辦：之後把過濾搬到 Worker（函式介面要保持不變） |
 | `src/data/regions.js` | 四大區域＋中央海域 |
 | `src/data/locations.js` | 地點內容與揭露狀態。格式見 `src/data/CLAUDE.md` |
 | `public/map-data/markers.json` | 地圖標記位置（百分比座標、類型、簡介、設定集 id） |
@@ -135,9 +139,9 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `public/lore-data/*.json` | 設定集文字（Discord 匯出），點「查看設定集」時由 `lore.js` 讀取 |
 
 ## 不可違反的規則
-1. **防劇透**：未揭露（`hidden`）與草稿（`draft`）的內容只能在 `src/api/lore.js` 被過濾掉，不能只在畫面上隱藏。UI 拿到的資料就不該包含它們。
+1. **防劇透**：未揭露（`hidden`）與草稿（`draft`）的內容只能在 `src/api/lore.js` 被過濾掉，不能只在畫面上隱藏。UI 拿到的資料就不該包含它們。（注意：這只是前端過濾，`public/` 底下的原始檔是公開的。）
 2. 內容文字一律用 `textContent` 放進頁面，**禁止用 `innerHTML` 放資料內容**（之後內容由 GM 輸入，要防 XSS）。
-3. `src/api/lore.js` 的函式名稱與回傳格式要保持穩定，之後會換成向 Cloudflare Worker 要資料。
+3. `src/api/lore.js` 的函式名稱與回傳格式要保持穩定（待辦：之後可能換成向 Cloudflare Worker 要資料，目前還是讀本機檔案）。
 4. 機密（Token、金鑰）和 `players_data.json` 永遠不能進 git。
 5. 擲骰結果一律用 `rollLog.publish()` 發布，UI 不要自己維護另一份「大家看得到的紀錄」。
 6. 圖片路徑用相對路徑（`img/...`，不要開頭的 `/`），GitHub Pages 子路徑才不會壞。
