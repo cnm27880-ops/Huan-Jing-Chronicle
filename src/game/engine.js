@@ -151,15 +151,20 @@ export function queueGroups(state) {
   return state.restQueueGroups;
 }
 
+/** 把一份料理排進修整等候佇列（背包已先扣好；單吃的料理自成一組，M3 共用） */
+function enqueueFood(state, food) {
+  queueGroups(state);
+  restQueue(state).push(food);
+  state.restQueueGroups.push({ n: 1 });
+}
+
 /** 修整時吃：有空格直接進胃袋，滿了就排進等候佇列 */
 export function eatOrQueue(state, food) {
   if (!FOODS[food]) return '這不是可以吃的食物。';
   if (state.restStomach.length < STOMACH_SLOTS) return eat(state, food, 'rest');
   if (restQueue(state).length >= QUEUE_MAX) return `等候佇列已滿，最多 ${QUEUE_MAX} 份。`;
   if (!removeItem(state, food)) return `背包裡沒有${food}。`;
-  queueGroups(state);
-  restQueue(state).push(food);
-  state.restQueueGroups.push({ n: 1 });
+  enqueueFood(state, food);
   return null;
 }
 
@@ -281,7 +286,7 @@ function eatOrQueueUnchecked(state, food, ctx) {
   removeItem(state, food);
   const stomach = ctx === 'rest' ? state.restStomach : state.sessionStomach;
   if (stomach.length < STOMACH_SLOTS) enterStomach(state, food, ctx);
-  else { queueGroups(state); restQueue(state).push(food); state.restQueueGroups.push({ n: 1 }); }
+  else enqueueFood(state, food);
 }
 
 // ---------- 福瑞保溫針織袋（特殊配方，RULES_OVERVIEW §9；使用者 2026-10-12 要求放在跑團頁「技能檢定」的跑團胃袋下方） ----------
