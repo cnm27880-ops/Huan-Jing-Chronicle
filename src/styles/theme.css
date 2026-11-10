@@ -65,6 +65,8 @@
   --font-display: var(--font-body);
   --font-ui: var(--font-body);
   --font-mono: var(--font-num);
+  /* 小字（--fs-xs／--fs-sm）用黑體：明體的橫筆在舊螢幕（非高解析度）上不到 1px 會糊掉；用系統字體，不多下載 */
+  --font-small: system-ui, -apple-system, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
 
   /* ---------- 形狀與質感 ---------- */
   --r-panel: 14px;
