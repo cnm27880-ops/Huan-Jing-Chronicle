@@ -17,23 +17,33 @@ export function parseGeneric(name) {
   return { tier: GEAR_TIER_ALIAS[m[1]] ?? m[1], slot };
 }
 
-/** 擲一件裝備的數值。回傳 { effects, special?, roll } 不含 id */
+/**
+ * 飾品：由已擲好的骰點算出數值。d15 = 15 是「特殊」，用 extra（兩顆 D14）得到兩條屬性，不會再骰到特殊
+ * （使用者推論，未經 GM 確認）；兩顆骰到同一屬性就把數值相加成一條（我的假設，需驗證）。
+ * 不是 15 時 extra 不採用。
+ */
+function accessoryFromDice(tier, r, extra) {
+  const v = ACC_VALUES[tier];
+  const one = (n) => { const stat = ACC_STATS[n - 1]; return { stat, value: n <= 8 ? v.attr : v[stat] }; };
+  if (r !== ACC_SPECIAL_ROLL) return { effects: [one(r)], roll: { d15: r } };
+  const effects = [];
+  for (const n of extra) {
+    const e = one(n);
+    const hit = effects.find((x) => x.stat === e.stat);
+    if (hit) hit.value += e.value; else effects.push(e);
+  }
+  return { effects, special: true, roll: { d15: r, extra } };
+}
+
+/**
+ * 擲一件裝備的數值。回傳 { effects, special?, roll } 不含 id。
+ * 飾品固定擲 3 顆（1D15 + 2D14），沒擲到 15 時後兩顆不採用：房間模式要事先告訴伺服器擲幾顆
+ * （見 diceTape.js），顆數不能取決於擲出的點數，否則擲到 15 會對不上、整次鑑定被取消。
+ */
 export function rollGear(tier, slot, rng = Math.random) {
   if (slot === 'accessory') {
     const r = rollDie(15, rng);
-    const v = ACC_VALUES[tier];
-    const one = (n) => { const stat = ACC_STATS[n - 1]; return { stat, value: n <= 8 ? v.attr : v[stat] }; };
-    if (r !== ACC_SPECIAL_ROLL) return { effects: [one(r)], roll: { d15: r } };
-    // 「特殊」：再骰兩次 D14 得到兩條屬性，不會再骰到特殊（使用者推論，未經 GM 確認）；
-    // 兩次骰到同一屬性就把數值相加成一條（我的假設，需驗證）
-    const extra = [rollDie(14, rng), rollDie(14, rng)];
-    const effects = [];
-    for (const n of extra) {
-      const e = one(n);
-      const hit = effects.find((x) => x.stat === e.stat);
-      if (hit) hit.value += e.value; else effects.push(e);
-    }
-    return { effects, special: true, roll: { d15: r, extra } };
+    return accessoryFromDice(tier, r, [rollDie(14, rng), rollDie(14, rng)]);
   }
   const b = GEAR_BONUS[tier];
   const base = rollSum(b.n, b.sides, rng);
@@ -77,12 +87,23 @@ function consumeAndMint(state, itemName, times, mint) {
 export function identify(state, genericName, times, rng = Math.random) {
   const g = parseGeneric(genericName);
   if (!g) return [];
-  return consumeAndMint(state, genericName, times, () => {
-    const rolled = rollGear(g.tier, g.slot, rng); // 先擲骰、再取編號（順序不能換）
+  const add = (rolled) => {
     const inst = { id: state.nextGearId++, tier: g.tier, slot: g.slot, ...rolled };
     state.gear.push(inst);
     return inst;
-  });
+  };
+  if (g.slot === 'accessory') {
+    // 一批飾品先擲完所有 D15、再擲完所有 D14：伺服器的骰子組數有上限（同面數連續才併成一組），交錯著擲會超過
+    const n = Math.max(0, Math.min(Math.floor(times) || 0, state.inventory[genericName] ?? 0));
+    const d15 = Array.from({ length: n }, () => rollDie(15, rng));
+    const d14 = Array.from({ length: n * 2 }, () => rollDie(14, rng));
+    let i = 0;
+    return consumeAndMint(state, genericName, n, () => {
+      const k = i++;
+      return add(accessoryFromDice(g.tier, d15[k], [d14[k * 2], d14[k * 2 + 1]]));
+    });
+  }
+  return consumeAndMint(state, genericName, times, () => add(rollGear(g.tier, g.slot, rng))); // 先擲骰、再取編號（順序不能換）
 }
 
 export const findGear = (state, id) => state.gear.find((g) => g.id === id) ?? null;

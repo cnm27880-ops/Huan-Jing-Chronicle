@@ -274,3 +274,30 @@ test('groupGear：同部位階級屬性疊一組、數值由高到低；寶石�
   assert.equal(groups.length, 6); // 靈魂傷害組、寶石、取名、能量傷害武器、飾品、特殊飾品
   assert.ok(groups.filter((x) => x.items.length === 1).length === 5);
 });
+
+// ---------- 房間模式（伺服器擲骰）也要抽得到特殊飾品 ----------
+import { planDice as _planDice, applyDice as _applyDice } from '../src/state/diceTape.js';
+
+test('飾品鑑定：骰子顆數固定（每件 1D15 + 2D14），伺服器擲到 15 也能得到雙屬性', () => {
+  const s = fresh();
+  s.inventory['傳說飾品'] = 40;
+  const run = (st, rng) => identify(st, '傳說飾品', 40, rng);
+  const plan = _planDice(s, run);
+  // 一批不管幾件都只有兩組：全部的 D15、全部的 D14（伺服器一次最多 32 組）
+  assert.deepEqual(plan.pools, [[15, 40], [14, 80]]);
+  // 第 1 件擲到 15（特殊：魂傷 3＋生命 9）、第 2 件擲到 14（靈氣，後兩顆不採用）、其餘都是 1
+  const values = [15, 14, ...Array(38).fill(1), 3, 9, 5, 6, ...Array(76).fill(1)];
+  const made = _applyDice(s, run, values, plan.pools);
+  assert.equal(made.length, 40);
+  assert.equal(made[0].special, true);
+  assert.deepEqual(made[0].effects, [{ stat: '靈魂傷害', value: 12 }, { stat: '生命', value: 40 }]);
+  assert.deepEqual(made[0].roll, { d15: 15, extra: [3, 9] });
+  assert.deepEqual(made[1].effects, [{ stat: '靈氣', value: 24 }]);
+  assert.deepEqual(made[1].roll, { d15: 14 });
+  assert.equal(s.inventory['傳說飾品'] ?? 0, 0);
+  // 要鑑定的比背包多：只擲背包有的件數
+  const t = fresh();
+  t.inventory['傳說飾品'] = 2;
+  assert.deepEqual(_planDice(t, (st, rng) => identify(st, '傳說飾品', 5, rng)).pools, [[15, 2], [14, 4]]);
+  assert.equal(identify(t, '傳說飾品', 5).length, 2);
+});
