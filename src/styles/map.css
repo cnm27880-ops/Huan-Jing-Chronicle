@@ -111,7 +111,7 @@
    ============================================================ */
 .map-viewport::before, .map-viewport::after { display: none; }
 .hotspot { transition: box-shadow .15s ease, background-color .15s ease; }
-.map-hint { left: 50%; bottom: 16px; padding: 5px 10px; background: rgba(var(--paper-rgb), .88); border: 1px solid var(--line); font-size: .72rem; }
+.map-hint { left: 50%; bottom: 16px; padding: 5px 10px; background: rgba(var(--paper-rgb), .88); border: 1px solid var(--line); font-size: var(--fs-xs); font-family: var(--font-small); }
 @media (max-width: 700px) {
   .map-viewport { inset: 5px; }
   .map-hint { left: 8px; transform: none; max-width: calc(100% - 80px); white-space: normal; }

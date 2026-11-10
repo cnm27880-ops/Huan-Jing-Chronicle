@@ -73,3 +73,15 @@ test('一般頁面不用外發光：layout／pages／session／gm／base 的 box
   }
   assert.deepEqual(bad, []);
 });
+
+test('字級只用 tokens.css 的 --fs-* 變數；不能寫死 14px 等級以下的小字（最小 12px，舊螢幕才看得清楚）', () => {
+  const bad = [];
+  for (const f of files.filter((x) => x !== 'tokens.css' && x !== 'theme.css')) {
+    for (const m of read(f).matchAll(/font-size:\s*(\d*\.?\d+)(rem|px)/g)) {
+      const px = Number(m[1]) * (m[2] === 'rem' ? 14 : 1);
+      if (/^html\s*\{/m.test(m.input.slice(m.input.lastIndexOf('}', m.index) + 1, m.index).trim())) continue; // html 的基準字級（14px）本來就要寫死
+      if (px >= 8 && px < 16) bad.push(`${f}: ${m[0]}`); // 8px 以下是純裝飾字（標誌副標）；16px 以上的大字不在這條規則裡
+    }
+  }
+  assert.deepEqual(bad, []);
+});

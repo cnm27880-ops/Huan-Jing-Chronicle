@@ -127,7 +127,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/ui/mapView.js` | 地圖拖曳、縮放、熱點 |
 | `src/ui/dossier.js` | 地點情報面板（點地圖標記打開） |
 | `src/styles/theme.css` | **主題檔**：全站色碼、字體、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
-| `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線）與**全站圖層階層 `--z-*`**（其他 CSS 檔 25 以上的 z-index 一律用 `var(--z-…)`，不能寫死數字，測試會檢查） |
+| `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線）、**字級 `--fs-xs`～`--fs-xl`（其他 CSS 檔 16px 以下的字級一律用這幾級，最小 12px；xs／sm 要加 `font-family: var(--font-small)` 黑體，測試會檢查）**與**全站圖層階層 `--z-*`**（其他 CSS 檔 25 以上的 z-index 一律用 `var(--z-…)`，不能寫死數字，測試會檢查） |
 | `src/styles/layout.css` | 整頁外殼：背景星點、頂部列、分頁、手機底部導覽與「更多」選單、吐司、全站捲軸與焦點、`.view--page` |
 | `src/styles/map.css` | 世界地圖外框與熱點 |
 | `src/styles/dossier.css` | 地點情報面板與四大區域主題 |

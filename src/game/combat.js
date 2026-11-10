@@ -18,10 +18,10 @@ import { derivedStats, maxHp } from './stats.js';
 import { removeItem } from './engine.js';
 import { recordMoveUse } from './moveUse.js';
 import {
-  passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS, douMult, attackResponses, dragonGain, hasCyberHacker, addCost, MAGE, mageApplies, titanCut,
+  passivesOf, skillLevel, moveExtra, catalogOf, SKILL_CATALOG, PASSIVE_RIDERS, douMult, attackResponses, dragonGain, hasCyberHacker, addCost, MAGE, mageApplies, titanCut, DEFENSE_RESPONSES, MAGE_GUARD,
   choosableTracks, poolFromOf, DAODUN, daoDunLeft, SWELL, swellCap,
 } from './skills.js';
-import { actionCost, shortfall, pay, costText } from './resources.js';
+import { actionCost, shortfall, pay, costText, resourceNow } from './resources.js';
 import { SHADOW_SKILL, isHidden, gatheredOf, clearShadow } from './shadowCloak.js';
 
 /** 每 1 點 = 1 顆 D4 */
@@ -565,7 +565,39 @@ export function monsterAttack(state, enc, monsterId, mode = 0, rng = Math.random
   // 敵人 A 技能（攻擊強化）：這招用到的每一軌各加 extraAtk 顆攻擊骰（沒有攻擊骰的軌道不加）
   const extraAtk = Math.max(0, Math.floor(Number(opts.extraAtk) || 0));
   const base = monsterAtk(monster, mode);
-  const atk = extraAtk ? Object.fromEntries(TRACKS.map((t) => [t, base[t] > 0 ? base[t] + extraAtk : base[t]])) : base;
+  const atk = extraAtk ? Object.fromEntries(TRACKS.map((t) => [t, base[t] > 0 ? base[t] + extraAtk : base[t]])) : { ...base };
+  // 防禦響應與大魔導師減傷（opts.defResp 為真才處理：玩家自己按「承受」時；模擬戰不開，結果不變）
+  const defNotes = [];
+  let guard = 0;
+  if (opts.defResp) {
+    const off = new Set(opts.respOff ?? []);
+    for (const [name, r] of Object.entries(DEFENSE_RESPONSES)) {
+      const lv = skillLevel(state, name);
+      if (lv <= 0 || off.has(name) || !(atk[r.on] > 0) || shortfall(state, r.cost)) continue;
+      let n = r.amountAt(lv);
+      if (r.convert) { // 鬥氣鐵鎧：體魄強韌的一半轉成抗性免疫（有上限）
+        n = Math.min(n, Math.floor(derivedStats(state)[TRACK_DEF_STAT.A].total / 2));
+        if (n <= 0) continue;
+        def.dice.A -= n; def.dice.B += n;
+        defNotes.push(`${name}：−${costText(r.cost)}，體魄強韌 ${n} 點轉成抗性免疫`);
+      } else {
+        def.dice[r.on] += n;
+        defNotes.push(`${name}：−${costText(r.cost)}，${TRACK_DEF_STAT[r.on]} +${n}`);
+      }
+      pay(state, r.cost);
+    }
+    // 大魔導師：每 6 魔力無效化 1 顆非能量（物理、靈魂）傷害骰；從骰數多的那一軌先扣
+    if (skillLevel(state, '大魔導師') > 0) {
+      const want = Math.max(0, Math.floor(Number(opts.guard) || 0));
+      guard = Math.min(want, Math.floor(resourceNow(state, '魔力') / MAGE_GUARD.cost), atk.A + atk.C);
+      const cut = { A: 0, C: 0 };
+      for (let i = 0; i < guard; i++) { const t = atk.A >= atk.C ? 'A' : 'C'; atk[t] -= 1; cut[t] += 1; }
+      if (guard > 0) {
+        pay(state, { 魔力: guard * MAGE_GUARD.cost });
+        defNotes.push(`大魔導師：−${guard * MAGE_GUARD.cost} 魔力，無效化 ${guard} 顆傷害骰（${[cut.A ? `物理 ${cut.A}` : '', cut.C ? `靈魂 ${cut.C}` : ''].filter(Boolean).join('、')}）`);
+      }
+    }
+  }
   const result = clash(atk, def.dice, rng);
   state.buffs.def = 0;
   state.buffs.defBy = {};
@@ -587,7 +619,7 @@ export function monsterAttack(state, enc, monsterId, mode = 0, rng = Math.random
       reflect = { dice, rolled, lost: before - monster.hp, round };
     }
   }
-  return { monster, mode, atk, def, result, potion, extraAtk, absorbed, reflect, downed: isDowned(state), newlyDowned: !wasDowned && isDowned(state) };
+  return { monster, mode, atk, def, result, potion, extraAtk, absorbed, reflect, defNotes, guard, downed: isDowned(state), newlyDowned: !wasDowned && isDowned(state) };
 }
 
 // ---------- 藥水 ----------

@@ -56,7 +56,7 @@
 
 .dossier__text {
   font-family: var(--font-body);
-  font-size: 1rem;
+  font-size: var(--fs-md);
   margin: 0 0 1em;
   text-align: justify;
 }
@@ -94,7 +94,7 @@
 .faction__name {
   margin: 0;
   font-family: var(--d-head-font);
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
   letter-spacing: 0.12em;
   padding: 0.2rem 0.6rem;
@@ -104,7 +104,7 @@
 
 .faction__seat {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--fs-sm); font-family: var(--font-small);
   color: var(--d-muted);
 }
 
@@ -142,7 +142,7 @@
 
 .leader__role {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm); font-family: var(--font-small);
   color: var(--d-muted);
 }
 
@@ -157,7 +157,7 @@
 .leader__desc {
   margin: 0;
   font-family: var(--font-body);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   line-height: 1.8;
 }
 
@@ -207,7 +207,7 @@
 .dossier__close { margin: 12px 12px 0; color: var(--muted); background: var(--card); border-color: var(--line); }
 .dossier__close:hover { color: var(--gold); border-color: var(--gold-deep); }
 .dossier__body { padding: 8px 22px 35px; }
-.dossier__region { font-size: .72rem; letter-spacing: .08em; }
+.dossier__region { font-size: var(--fs-xs); font-family: var(--font-small); letter-spacing: .08em; }
 .dossier__title { font-size: 2.2rem; letter-spacing: .04em; }
 .dossier__text { color: var(--ink2); line-height: 1.9; }
 .dossier__section { border-bottom-color: var(--line); }
@@ -258,7 +258,7 @@
 }
 .dossier { --d-bg: var(--paper2); --d-text: var(--ink); --d-muted: var(--soft); --d-rule: var(--line); }
 .dossier__title { color: var(--ink); text-shadow: none; }
-.dossier__section { color: var(--gold); font-size: 12px; letter-spacing: 0.14em; }
+.dossier__section { color: var(--gold); font-size: var(--fs-sm); font-family: var(--font-small); letter-spacing: 0.14em; }
 .dossier__section::after { background: linear-gradient(90deg, var(--line3), transparent); }
 /* 面板右上的「收起／關閉」：大小、高度、圓角統一 */
-.dossier__close { min-width: 64px; min-height: 36px; padding: 0 14px; font: inherit; font-size: 0.85rem; line-height: 1; white-space: nowrap; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.dossier__close { min-width: 64px; min-height: 36px; padding: 0 14px; font: inherit; font-size: var(--fs-sm); font-family: var(--font-small); line-height: 1; white-space: nowrap; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
