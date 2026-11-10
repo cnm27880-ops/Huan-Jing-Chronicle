@@ -77,7 +77,7 @@ export function rollFailed(e) {
 
 // 數字輸入框跟著位數變寬：輸入時（與新出現時）依字數撐寬，最小寬度由 base.css 決定
 if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined' && document.documentElement) {
-  const SEL = 'input[type="number"].field, input[type="number"].amount__input';
+  const SEL = 'input[type="number"].field'; // 數量選擇器（amount__input）不在這裡：它固定撐滿 −／＋ 中間，設了行內寬度反而會縮回去
   const grow = (el) => { el.style.width = `calc(${Math.max(String(el.value).length, 2)}ch + 36px)`; };
   const onType = (e) => { if (e.target instanceof HTMLInputElement && e.target.matches(SEL)) grow(e.target); };
   document.addEventListener('input', onType);
