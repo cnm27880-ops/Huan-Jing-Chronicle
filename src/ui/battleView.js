@@ -14,7 +14,7 @@ import {
 } from '../game/combat.js';
 import { maxHp } from '../game/stats.js';
 import {
-  SKILL_CATALOG, bindableSkills, attackResponses, ATTACK_RESPONSES, MAGE, mageApplies, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult, PASSIVE_RIDERS,
+  SKILL_CATALOG, bindableSkills, attackResponses, ATTACK_RESPONSES, MAGE, mageApplies, DEFENSE_RESPONSES, MAGE_GUARD, basicMove, passivesOf, skillLevel, moveFromCatalog, WITCH_EXTRA_COST, douMult, PASSIVE_RIDERS,
   choosableTracks, DAODUN, daoDunLeft, daoDunUses, SWELL, swellCap,
 } from '../game/skills.js';
 import {
@@ -451,13 +451,13 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         !support && max > 1 ? h('span', { class: 'move__targets', text: `${max} 目標` }) : null,
         support ? null : h('small', { class: 'move__cost', text: `消耗：${costText(d.costShown)}` }),
         open ? h('small', { class: 'move__detail', text: d.text }) : null,
-        lack ? h('small', { class: 'move__lack', text: `缺少：${lack}` }) : null),
+        lack ? h('small', { class: 'move__lack', text: `缺少：${lack}${!support && fallsBack(state, m) ? '（出招會自動改用普攻）' : ''}` }) : null),
         support && open ? supportButtons(state, m) : null,
         choices ? trackChooser(state, m, choices) : null,
         armed
           ? h('button', {
-              type: 'button', class: 'btn btn--primary move__fire', disabled: Boolean(lack) || !fire.ready || isDowned(state), onclick: () => onFire(),
-            }, fire.ready ? `出招 → ${fire.text}` : `出招（${fire.text || '先在中間選目標'}）`)
+              type: 'button', class: 'btn btn--primary move__fire', disabled: (Boolean(lack) && !fallsBack(state, m)) || !fire.ready || isDowned(state), onclick: () => onFire(),
+            }, fire.ready ? `${fallsBack(state, m) ? '資源不足，改用普攻' : '出招'} → ${fire.text}` : `出招（${fire.text || '先在中間選目標'}）`)
           : null),
       h('button', {
         type: 'button', class: 'move__del', 'aria-label': `刪除招式 ${m.name}`, title: '刪除招式',
@@ -609,9 +609,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       onfocus: (e) => e.target.select(),
     });
     const field = h('label', { class: 'dou__field', dataset: { on: sel.dou > 0 ? '1' : '0' }, title: `每點鬥氣 +${mult} 顆真實傷害骰${mult > 1 ? '（冠軍勇士）' : ''}，只對下一次出招有效` },
-      h('span', { class: 'dou__label', text: '鬥氣加骰' }),
+      h('span', { class: 'dou__label', text: '鬥氣' }),
       input);
-    return h('div', { class: 'dou' }, field);
+    return field;
   }
 
   /** 大魔導師加骰：造成能量傷害時每花 5 魔力多 1 顆能量傷害骰，上限 12 顆；學了就常駐（跟鬥氣加骰一樣），選中的招式沒有能量軌時變淡、不能填；出招後歸零 */
@@ -631,9 +631,47 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
       onfocus: (e) => e.target.select(),
     });
     const field = h('label', { class: 'dou__field', dataset: { on: sel.mage > 0 ? '1' : '0', na: fits ? '0' : '1' }, title: fits ? `每顆花 ${MAGE.cost} 魔力 +1 顆能量傷害骰，上限 ${MAGE.max} 顆；只對下一次出招有效` : '大魔導師的響應只在「造成能量傷害」時生效，選中的招式沒有能量軌' },
-      h('span', { class: 'dou__label', text: fits ? `大魔導師加骰（${MAGE.cost} 魔力／顆，最多 ${cap}）` : '大魔導師加骰（這個招式沒有能量傷害）' }),
+      h('span', { class: 'dou__label', text: '魔導' }),
       input);
-    return h('div', { class: 'dou' }, field);
+    return field;
+  }
+
+  /** 大魔導師減傷：下一次承受攻擊時，每顆花 6 魔力抵掉怪物 1 顆非能量（物理、靈魂）傷害骰；承受一次後歸零 */
+  function guardRow(state) {
+    if (skillLevel(state, '大魔導師') <= 0) { sel.mageGuard = 0; return null; }
+    const cap = Math.floor(resourceNow(state, '魔力') / MAGE_GUARD.cost);
+    sel.mageGuard = Math.max(0, Math.min(sel.mageGuard, cap));
+    const input = h('input', {
+      class: 'dou__input', type: 'number', inputmode: 'numeric', min: '0', max: String(cap), step: '1', value: String(sel.mageGuard), placeholder: '0',
+      'aria-label': '大魔導師減傷（顆數）',
+      oninput: (e) => { const n = Math.floor(Number(e.target.value)) || 0; sel.mageGuard = Math.max(0, Math.min(cap, n)); if (n > cap) e.target.value = String(sel.mageGuard); field.dataset.on = sel.mageGuard > 0 ? '1' : '0'; },
+      onchange: (e) => { e.target.value = String(sel.mageGuard); rerender(); },
+      onfocus: (e) => e.target.select(),
+    });
+    const field = h('label', { class: 'dou__field', dataset: { on: sel.mageGuard > 0 ? '1' : '0', kind: 'def' }, title: `大魔導師減傷：下一次承受攻擊時，每顆花 ${MAGE_GUARD.cost} 魔力，抵掉怪物 1 顆物理或靈魂傷害骰（現在最多 ${cap} 顆）；承受一次後歸零` },
+      h('span', { class: 'dou__label', text: '減傷' }),
+      input);
+    return field;
+  }
+
+  /** 防禦響應（周天吐納法、鬥氣鐵鎧）：預設全開，被打時符合條件、付得起就自動觸發；點一下關掉 */
+  function defRespChips(state) {
+    return Object.entries(DEFENSE_RESPONSES).filter(([n]) => skillLevel(state, n) > 0).map(([name, r]) => {
+      const off = sel.respOff.has(name);
+      const lack = !off && shortfall(state, r.cost);
+      return h('button', {
+        type: 'button', class: 'resp__chip', 'aria-pressed': String(!off), dataset: { state: off ? 'off' : lack ? 'lack' : 'on', kind: 'def' },
+        title: `${name}${off ? '（已關閉）' : lack ? '（資源不足，這次會略過）' : ''}：被${r.on === 'A' ? '物理' : '能量'}傷害攻擊時，消耗 ${costText(r.cost)}，${r.convert ? '把體魄強韌的一半轉成抗性免疫' : '增加體魄強韌'}。點一下${off ? '打開' : '關掉'}`,
+        onclick: () => { if (off) sel.respOff.delete(name); else sel.respOff.add(name); rerender(); },
+      }, `防・${name}`);
+    });
+  }
+
+  /** 加骰與響應：全部收在同一塊、自動換行的小格子（鬥氣、魔導加骰、減傷的數字＋攻擊／防禦響應開關），不各佔一整排；說明放在滑鼠提示 */
+  function boostBar(state) {
+    const items = [douRow(state), mageRow(state), guardRow(state), respBar(state), ...defRespChips(state)].filter(Boolean);
+    if (!items.length) return null;
+    return h('div', { class: 'boost', role: 'group', 'aria-label': '加骰與響應' }, items);
   }
 
   /** 資源轉換：靈氣 1 比 1 換生命；能量 1 比 1 換任意資源 */
@@ -666,7 +704,7 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
    * 電腦版用 CSS 隱藏（左欄就有出招按鈕）。沒有可出的攻擊招式就不顯示。
    */
   function fireBar(state) {
-    const attacks = state.moves.filter((m) => m.kind !== 'heal' && m.kind !== 'shield');
+    const attacks = shownMoves(state).filter((m) => m.kind !== 'heal' && m.kind !== 'shield');
     if (!attacks.length) return h('p', { class: 'hint', text: '沒有攻擊招式，請到招式頁新增。' });
     if (!attacks.some((m) => m.id === sel.moveId)) sel.moveId = attacks[0].id;
     const cur = attacks.find((m) => m.id === sel.moveId);
@@ -678,12 +716,20 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
         onchange: (e) => { sel.moveId = e.target.value; rerender(); },
       }, attacks.map((m) => h('option', { value: m.id, selected: m.id === sel.moveId ? true : null, text: `${m.name}（${moveDetail(state, m).dice}）` }))),
       h('button', {
-        type: 'button', class: 'btn btn--primary firebar__fire', disabled: Boolean(lack) || !fire.ready || isDowned(state), onclick: () => onFire(),
-      }, fire.ready ? `出招 → ${fire.text}` : `出招（${fire.text || '先選目標'}）`));
+        type: 'button', class: 'btn btn--primary firebar__fire', disabled: (Boolean(lack) && !fallsBack(state, cur)) || !fire.ready || isDowned(state), onclick: () => onFire(),
+      }, fire.ready ? `${fallsBack(state, cur) ? '改用普攻' : '出招'} → ${fire.text}` : `出招（${fire.text || '先選目標'}）`));
   }
 
+  /** 招式表不列普攻（改成資源不足時自動兜底）；一個攻擊招式都沒有時才列出來，不然沒東西可按 */
+  const shownMoves = (state) => {
+    const hasAttack = state.moves.some((m) => m.id !== 'basic' && m.kind !== 'heal' && m.kind !== 'shield');
+    return hasAttack ? state.moves.filter((m) => m.id !== 'basic') : state.moves;
+  };
+  /** 這招自己的花費付不起、但普攻付得起（魔女還要付得起額外的 30 魔力）→ 出招會自動改成普攻 */
+  const fallsBack = (state, m) => m.id !== 'basic' && Boolean(shortfall(state, actionCost(state, m))) && !shortfall(state, actionCost(state, basicMove()));
+
   function moveCard(state) {
-    if (!state.moves.some((m) => m.id === sel.moveId)) sel.moveId = state.moves.find((m) => m.kind !== 'heal' && m.kind !== 'shield')?.id ?? state.moves[0]?.id ?? null;
+    if (!state.moves.some((m) => m.id === sel.moveId)) sel.moveId = shownMoves(state).find((m) => m.kind !== 'heal' && m.kind !== 'shield')?.id ?? state.moves[0]?.id ?? null;
     const f = ui.moveForm;
     const learned = bindableSkills(state);
     const skillSummary = (n) => {
@@ -707,11 +753,9 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
           }, `放棄行動・回復魔力（最多 ${WITCH_EXTRA_COST}）`)
         : null,
       uniqueCard(state),
-      douRow(state),
-      mageRow(state),
-      respBar(state),
+      boostBar(state),
       state.moves.length
-        ? h('ul', { class: 'move-list' }, state.moves.map((m) => moveRow(state, m)))
+        ? h('ul', { class: 'move-list' }, shownMoves(state).map((m) => moveRow(state, m)))
         : h('p', { class: 'notice', text: '還沒有自訂招式。下面綁定一個主動技能新增。' }),
       convertBox(state),
       addBox(ui.openBoxes, 'move', '新增自訂招式',

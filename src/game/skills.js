@@ -45,6 +45,18 @@ export const MAGE = { cost: 5, max: 12 };
 export const mageApplies = (state, move) =>
   skillLevel(state, '大魔導師') > 0 && move && move.kind !== 'heal' && move.kind !== 'shield' && (move.mode === 'all' || (move.tracks ?? []).includes('B'));
 
+/**
+ * 防禦響應（被怪物攻擊時；使用者 2026-11-10 要求補做）：有學、怪物這一招有對應的傷害、付得起就自動觸發，可在招式區點掉。
+ *   周天吐納法：被物理傷害攻擊時，消耗 2 靈氣，體魄強韌 +1／2／3／4（1／4／7／9 級）
+ *   鬥氣鐵鎧：被能量傷害攻擊時，消耗 1 鬥氣，把體魄強韌的一半「轉成」抗性免疫（體魄減、抗性加），上限 2／3／4／5／6（1／3／5／7／9 級）——「轉成」是照字面解讀，需驗證
+ */
+export const DEFENSE_RESPONSES = {
+  周天吐納法: { on: 'A', cost: { 靈氣: 2 }, amountAt: (lv) => (lv >= 9 ? 4 : lv >= 7 ? 3 : lv >= 4 ? 2 : 1) },
+  鬥氣鐵鎧: { on: 'B', cost: { 鬥氣: 1 }, convert: true, amountAt: (lv) => (lv >= 9 ? 6 : lv >= 7 ? 5 : lv >= 5 ? 4 : lv >= 3 ? 3 : 2) },
+};
+/** 大魔導師的減傷：受到非能量傷害（物理、靈魂）時，每花 6 魔力無效化怪物 1 顆傷害骰（玩家自己填顆數，承受一次後歸零） */
+export const MAGE_GUARD = { cost: 6 };
+
 /** 泰坦（傳說）：造成物理傷害後，目標的絕對防禦永久（到戰鬥結束）減少 3／級；不疊加，5 級永遠是 −15 */
 export const titanCut = (state) => 3 * skillLevel(state, '泰坦');
 

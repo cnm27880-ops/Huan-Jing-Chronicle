@@ -17,7 +17,7 @@ import {
   ENEMY_RANKS, SKILL_NAMES, enemyLeft, useEnemySkill, spendEnemyAttack, spendEnemyB, pendingEnemyB, nextRound,
 } from '../game/enemy.js';
 import { maxHp } from '../game/stats.js';
-import { costText, resourceNow } from '../game/resources.js';
+import { costText, resourceNow, shortfall, actionCost } from '../game/resources.js';
 import {
   publish, rollWith, getEncounter, encounterAction, getRoomStatus, imageUrl, uploadImage, deleteImage, presetAction,
 } from '../state/rollLog.js';
@@ -208,7 +208,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
   const isAttackMove = (m) => m.kind !== 'heal' && m.kind !== 'shield';
   /** 出招用的招式：沒選或選的招式不見了，就挑第一個攻擊招式 */
   function ensureMove(state) {
-    if (!state.moves.some((m) => m.id === sel.moveId)) sel.moveId = state.moves.find(isAttackMove)?.id ?? state.moves[0]?.id ?? null;
+    if (!state.moves.some((m) => m.id === sel.moveId)) sel.moveId = (state.moves.find((m) => isAttackMove(m) && m.id !== 'basic') ?? state.moves.find(isAttackMove))?.id ?? state.moves[0]?.id ?? null; // 普攻只當兜底，不預設選它
   }
   const currentMove = (state) => state.moves.find((m) => m.id === sel.moveId);
   /** 目前招式能打幾個目標（招式／技能規定，沒寫就是 1） */
@@ -281,13 +281,19 @@ export function createEncounterCard({ getState, commit, rerender }) {
     const blocked = turnBlock(currentEnc(state));
     if (blocked) return toast(blocked);
     if (!sel.targets.length) return toast('先在中間點選目標。');
-    const targetIds = [...sel.targets];
+    // 普攻自動兜底：選的招式「自己的花費」付不起（不看響應、加骰的花費）、而普攻付得起 → 這次改用普攻（只打第一個目標）
+    const picked = currentMove(state);
+    const basic = state.moves.find((x) => x.id === 'basic');
+    const useBasic = Boolean(picked && basic && picked.id !== 'basic' && shortfall(state, actionCost(state, picked)) && !shortfall(state, actionCost(state, basic)));
+    const moveId = useBasic ? 'basic' : sel.moveId;
+    const targetIds = useBasic ? sel.targets.slice(0, 1) : [...sel.targets];
+    if (useBasic) toast(`「${picked.name}」資源不足，這次改用普攻。`);
     const modes = Object.fromEntries(targetIds.map((id) => [id, defModeOf(id)]));
     const hpBefore = state.hp;
     // 敵人 B 技能（防禦強化）蓄力過的，這一下絕對防禦多一些；鬥氣加骰：這次花幾點
     const encNow = currentEnc(state);
     const extraAbs = Object.fromEntries(targetIds.map((id) => [id, pendingEnemyB(encNow, encNow.monsters.find((x) => x.id === id) ?? { hp: 0 })]).filter(([, n]) => n > 0));
-    const dou = Math.min(sel.dou, Math.max(0, resourceNow(state, '鬥氣') - (currentMove(state)?.cost?.鬥氣 ?? 0)));
+    const dou = Math.min(sel.dou, Math.max(0, resourceNow(state, '鬥氣') - (useBasic ? 0 : picked?.cost?.鬥氣 ?? 0)));
     let r;
     let draw;
     let befores;
@@ -296,7 +302,7 @@ export function createEncounterCard({ getState, commit, rerender }) {
       ({ r, draw, befores, bosses } = await withRoomEncounter(state, async () => {
         const before = new Map(state.encounter.monsters.map((x) => [x.id, x.hp]));
         const boss = new Set(state.encounter.monsters.filter((x) => x.kind === 'boss').map((x) => x.id));
-        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, sel.moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai, targetIds, modes, dou, extraAbs, respOff: [...sel.respOff], mage: sel.mage, track: sel.trackPick[sel.moveId], daoDun: sel.daoDun }));
+        const res = await rollWith(state, (st, rng) => playerAttack(st, st.encounter, moveId, targetIds[0], modes[targetIds[0]], rng, { yuwai: sel.yuwai && !useBasic, targetIds, modes, dou, extraAbs, respOff: [...sel.respOff], mage: sel.mage, track: useBasic ? undefined : sel.trackPick[sel.moveId], daoDun: sel.daoDun }));
         return { ...res, befores: before, bosses: boss };
       }));
     } catch (e) { return rollFailed(e); }
@@ -383,15 +389,17 @@ export function createEncounterCard({ getState, commit, rerender }) {
     let r;
     let draw;
     try {
-      ({ r, draw } = await withRoomEncounter(state, () => rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng, { extraAtk }))));
+      ({ r, draw } = await withRoomEncounter(state, () => rollWith(state, (st, rng) => monsterAttack(st, st.encounter, m.id, modes.atk, rng, { extraAtk, defResp: true, respOff: [...sel.respOff], guard: sel.mageGuard }))));
     } catch (e) { await giveBack(); return rollFailed(e); }
     if (r.error) { await giveBack(); return toast(r.error); }
+    sel.mageGuard = 0; // 減傷只管這一次
     playFx(m.id, 'strike'); // 怪物撲過來
     publish({
       who: state.name, kind: 'defend', label: `${m.id} 攻擊${m.kind === 'boss' ? `（${BOSS_ATK_MODES[modes.atk]}）` : ''}`,
       big: r.result.total, tone: r.result.total > 0 ? 'fail' : 'ok',
       lines: [
         r.extraAtk ? `敵人 A 技能：這招每一軌各 +${r.extraAtk} 顆攻擊骰` : null,
+        ...(r.defNotes ?? []),
         ...trackLines(r.result),
         r.potion ? `藥水加成：絕對防禦 +${r.potion} 骰（三軌）` : null,
         r.absorbed?.toShield ? `護盾吸收 ${fmt(r.absorbed.toShield)}` : null,

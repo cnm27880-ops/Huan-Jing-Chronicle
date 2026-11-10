@@ -99,6 +99,15 @@
 
 /* 鬥氣／大魔導師加骰、響應列 */
 .dou { margin: 0; }
+/* 加骰與響應：一塊自動換行的小格子（數字格＋響應開關），不各佔一整排 */
+.boost { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.boost .resp { display: contents; }
+.boost .resp__title { display: none; }
+.boost .dou__field { flex: none; gap: 6px; padding: 2px 4px 2px 10px; border-radius: var(--r-pill); }
+.boost .dou__label { flex: none; }
+.boost .dou__input { width: 3.2rem; }
+.dou__field[data-kind='def'], .resp__chip[data-kind='def'] { color: var(--sky); }
+.resp__chip[data-kind='def'][aria-pressed='false'] { color: var(--faint); }
 .dou__field { display: flex; align-items: center; gap: var(--space-3); padding: 4px 10px; color: var(--soft); font-size: var(--fs-sm); font-family: var(--font-small); background: var(--paper); border-radius: 10px; box-shadow: var(--sx-ring); }
 .dou__field[data-on='1'] { color: var(--gold); box-shadow: var(--sx-ring-hi); }
 .dou__field[data-na='1'] { opacity: 0.55; }
@@ -459,7 +468,7 @@ button.eskill:disabled { opacity: 0.4; cursor: default; }
 .sx-dice__top { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .sx-dice__sides { display: flex; flex: 1; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .sx-dice__sides::-webkit-scrollbar { display: none; }
-.sx-side { flex: none; min-height: 24px; padding: 0 8px; font: inherit; font-size: var(--fs-xs); font-family: var(--font-small); color: var(--soft); background: var(--paper); border: 0; border-radius: var(--radius-ctl); box-shadow: var(--sx-ring); cursor: pointer; }
+.sx-side { flex: none; min-height: 24px; padding: 0 6px; font: inherit; font-size: var(--fs-xs); font-family: var(--font-small); color: var(--soft); background: var(--paper); border: 0; border-radius: var(--radius-ctl); box-shadow: var(--sx-ring); cursor: pointer; }
 .sx-side:hover { color: var(--gold); }
 .sx-side[aria-checked='true'] { color: var(--gold); background: var(--ctl-primary-bg); box-shadow: var(--sx-ring-hi); }
 .sx-dice__row { display: flex; align-items: center; gap: 6px; min-width: 0; }

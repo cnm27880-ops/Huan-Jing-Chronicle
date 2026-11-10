@@ -561,3 +561,39 @@ test('abcLeftover：看得懂的格式沒有殘字，打錯字會回傳殘字', 
   assert.equal(abcLeftover('五A'), '五A');
   assert.equal(abcLeftover('5A 3'), '3');
 });
+
+test('防禦響應：周天吐納法（物理 +體魄）、鬥氣鐵鎧（體魄轉抗性）、大魔導師減傷（6 魔力抵 1 顆非能量骰）；不開 defResp 就不觸發', async () => {
+  const { setResource, resourceNow } = await import('../src/game/resources.js');
+  const mk = () => {
+    const s = fresh();
+    s.skills = { ...(s.skills ?? {}), 周天吐納法: 4, 鬥氣鐵鎧: 3, 大魔導師: 1 };
+    const enc = newEncounter();
+    addMobs(enc, { count: 1, atkPower: 0, defPower: 0, hp: 100 });
+    enc.monsters[0].atk = { A: 10, B: 10, C: 4 };
+    return { s, enc };
+  };
+  // 沒開：防禦骰與資源都不變
+  const a = mk();
+  const base = monsterAttack(a.s, a.enc, '小怪1', 0, d4(1));
+  assert.deepEqual(base.defNotes, []);
+  // 開了：周天 +2 體魄（4 級）、鐵鎧 3 點體魄轉抗性（3 級上限 3），所以 A = 原本 +2 −3、B = 原本 +3
+  const b = mk();
+  const ling = resourceNow(b.s, '靈氣');
+  const dou = resourceNow(b.s, '鬥氣');
+  const r = monsterAttack(b.s, b.enc, '小怪1', 0, d4(1), { defResp: true, guard: 3 });
+  assert.equal(r.def.dice.A, base.def.dice.A + 2 - 3);
+  assert.equal(r.def.dice.B, base.def.dice.B + 3);
+  assert.equal(resourceNow(b.s, '靈氣'), ling - 2);
+  assert.equal(resourceNow(b.s, '鬥氣'), dou - 1);
+  // 大魔導師：3 顆 = 18 魔力，從骰數多的物理先扣
+  assert.equal(r.guard, 3);
+  assert.deepEqual([r.atk.A, r.atk.B, r.atk.C], [7, 10, 4]);
+  assert.equal(r.defNotes.length, 3);
+  // 關掉的不觸發；魔力不夠只抵付得起的顆數
+  const c = mk();
+  setResource(c.s, '魔力', 7);
+  const r2 = monsterAttack(c.s, c.enc, '小怪1', 0, d4(1), { defResp: true, guard: 5, respOff: ['周天吐納法', '鬥氣鐵鎧'] });
+  assert.equal(r2.guard, 1);
+  assert.equal(r2.def.dice.A, base.def.dice.A);
+  assert.equal(resourceNow(c.s, '魔力'), 1);
+});
