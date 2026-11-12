@@ -11,6 +11,7 @@ import {
 import { rollDie } from './dice.js';
 import { skillParts } from './skillTable.js';
 import { isKeepsake, KEEPSAKES } from './keepsakes.js';
+import { rollSink } from './activity.js';
 
 export const d20 = (rng = Math.random) => rollDie(20, rng);
 const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
@@ -383,9 +384,9 @@ export function useKeepsake(state, name) {
 }
 
 // ---------- 採集 ----------
-/** 執行 times 次採集；時間用完就停。回傳每一骰的紀錄與總戰利品 */
-export function gather(state, action, times, keepsakes = [], rng = Math.random) {
-  const rolls = [];
+/** 執行 times 次採集；時間用完就停。回傳每一骰的紀錄與總戰利品（opts.maxRolls：次數超過就只回統計 sum，見 activity.js 的 rollSink） */
+export function gather(state, action, times, keepsakes = [], rng = Math.random, opts = {}) {
+  const sink = rollSink(times, opts.maxRolls);
   const loot = {};
   let exp = 0;
   for (let i = 0; i < times; i++) {
@@ -408,10 +409,10 @@ export function gather(state, action, times, keepsakes = [], rng = Math.random) 
       got[item] = (got[item] ?? 0) + 1;
       loot[item] = (loot[item] ?? 0) + 1;
     }
-    rolls.push({ roll, mod: mod.total, parts: mod.parts, total, tier, exp: gained, got, used });
+    sink.add({ roll, mod: mod.total, parts: mod.parts, total, tier, exp: gained, got, used });
     tickRestStomach(state);
   }
-  return { rolls, loot, exp };
+  return { ...sink.done(), loot, exp };
 }
 
 // ---------- 製作 ----------
@@ -421,9 +422,9 @@ export function craftableTimes(state, action, diff) {
 }
 
 /** 執行 times 次製作；原料不足就停。製作不消耗時間（與機器人相同） */
-export function craft(state, action, diff, times, keepsakes = [], rng = Math.random) {
+export function craft(state, action, diff, times, keepsakes = [], rng = Math.random, opts = {}) {
   const recipe = RECIPES[action][diff];
-  const rolls = [];
+  const sink = rollSink(times, opts.maxRolls);
   const loot = {};
   for (let i = 0; i < times; i++) {
     if (!removeItem(state, recipe.cost, CRAFT_COST_AMOUNT)) break;
@@ -445,10 +446,10 @@ export function craft(state, action, diff, times, keepsakes = [], rng = Math.ran
         loot[item] = (loot[item] ?? 0) + copies;
       }
     }
-    rolls.push({ roll, mod: mod.total, parts: mod.parts, total, dc: recipe.dc, success, got, used, doubled: copies > 1 });
+    sink.add({ roll, mod: mod.total, parts: mod.parts, total, dc: recipe.dc, success, got, used, doubled: copies > 1 });
     tickRestStomach(state);
   }
-  return { rolls, loot, cost: recipe.cost };
+  return { ...sink.done(), loot, cost: recipe.cost };
 }
 
 // ---------- 跑團檢定 ----------

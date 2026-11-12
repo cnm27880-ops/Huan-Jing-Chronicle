@@ -10,6 +10,7 @@
 // ============================================================
 import { LIFE_SKILLS, ART_SKILLS, FOODS, POTIONS, CLEANSE_ITEMS } from './rules.js';
 import { modifier, countOf, addItem, removeItem, keepsakeApplies, consumeKeepsakes, tickRestStomach, d20 } from './engine.js';
+import { rollSink } from './activity.js';
 
 export const SPECIAL_RECIPES = {
   祕製桃花酒: { type: '進階料理', skill: '烹飪', dc: 20, materials: { 寧神花: 9, 鮮美肉: 9 }, effect: '熟練 +2，持續 1 天（10 次檢定）' },
@@ -101,10 +102,10 @@ export const specialMaxTimes = (state, name) =>
   Math.min(...Object.entries(allRecipes()[name].materials).map(([item, n]) => Math.floor(countOf(state, item) / n)));
 
 /** 製作特殊配方 times 次；材料不足就停。回傳 { rolls, loot, name }（格式跟一般製作的結果卡相同） */
-export function craftSpecial(state, name, times, keepsakes = [], rng = Math.random) {
+export function craftSpecial(state, name, times, keepsakes = [], rng = Math.random, opts = {}) {
   const r = allRecipes()[name];
   if (!r) return { rolls: [], loot: {} };
-  const rolls = [];
+  const sink = rollSink(times, opts.maxRolls);
   const loot = {};
   for (let i = 0; i < times; i++) {
     if (specialMaxTimes(state, name) < 1) break;
@@ -123,10 +124,10 @@ export function craftSpecial(state, name, times, keepsakes = [], rng = Math.rand
       got[name] = 1;
       loot[name] = (loot[name] ?? 0) + 1;
     }
-    rolls.push({ roll, mod: mod.total, parts: mod.parts, total, dc: r.dc, success, got, used });
+    sink.add({ roll, mod: mod.total, parts: mod.parts, total, dc: r.dc, success, got, used });
     tickRestStomach(state);
   }
-  return { rolls, loot };
+  return { ...sink.done(), loot };
 }
 
 /** 使用特殊物品（花雕怪味魚滴露等）。回傳 { ok, error?, gives? } */

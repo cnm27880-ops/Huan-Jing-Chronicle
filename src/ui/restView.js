@@ -12,7 +12,7 @@ import { itemTile, amountPicker, toast } from './controls.js';
 import { iconOf, TIERS } from './items.js';
 import { keepsakeTag } from '../game/keepsakes.js';
 import { logActivity } from '../state/activityLog.js';
-import { restEntry } from '../game/activity.js';
+import { restEntry, summarizeRolls } from '../game/activity.js';
 import {
   GATHER_ACTIONS, CRAFT_ACTIONS, DIFFICULTIES, RECIPES,
   CRAFT_COST_AMOUNT, LIFE_SKILLS,
@@ -51,6 +51,10 @@ export function createRestView({ root, getState, commit }) {
 
   const partsText = (list) => list.map((p) => `${p.label} +${p.value}`).join('　');
   /** cat：日誌分類，修整頁的結果預設算「修整」；使用特殊物品這類算「物品」 */
+  /** 超過這個數量就不畫骰面（太卡），改顯示統計 */
+  const DICE_FACE_MAX = 100;
+  /** 交給規則函式：次數超過 DICE_FACE_MAX 就只回統計（sum），不保留每一骰的明細（結果卡本來就不畫骰面，留著只會卡） */
+  const BIG = { maxRolls: DICE_FACE_MAX };
   const pushResult = (r, cat = 'rest') => { logActivity(getState(), { ...restEntry(r), cat }); ui.results.unshift(r); ui.results.length = Math.min(ui.results.length, 20); ui.fresh = true; commit(); };
 
   /** 抽取的技能還沒選完就不能做其他事（RULES_OVERVIEW 5.1）：擋下並打開選擇面板 */
@@ -127,7 +131,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: '今天的時間用完了。點上方的「新的一天」把時間補滿到 10 點（欠的時間會先扣掉）。' })]
         : runBlock(state, a, {
             kctx: { kind: 'gather' }, label: `${a} ${ui.times} 次`, hint: `每次 1 點時間，今天還剩 ${max} 點`, max, quick: [1, 3, 5],
-            onRun: () => blockedByDraw() || pushResult({ kind: 'gather', action: a, ...gather(state, a, ui.times, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'gather', action: a, ...gather(state, a, ui.times, [...ui.keepsakes], undefined, BIG) }),
           })),
     ];
   }
@@ -161,7 +165,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: `${name}的材料不足。` })]
         : runBlock(state, r.skill, {
             kctx: { kind: 'synth' }, label: `合成 ${name} ${ui.synthTimes} 次`, timesKey: 'synthTimes', hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀；不算進 500 次徽章', max, quick: [1, 5, 10],
-            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSynth(state, name, ui.synthTimes, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSynth(state, name, ui.synthTimes, [...ui.keepsakes], undefined, BIG) }),
           })),
     ];
   }
@@ -194,7 +198,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: `${recipe.cost}不足 ${CRAFT_COST_AMOUNT} 個，先去採集吧。` })]
         : runBlock(state, a, {
             kctx: { kind: 'craft', diff: d }, label: `${a}（${d}）${ui.times} 次`, hint: '製作不消耗時間', max, quick: [1, 5, 10],
-            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: a, diff: d, ...craft(state, a, d, ui.times, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: a, diff: d, ...craft(state, a, d, ui.times, [...ui.keepsakes], undefined, BIG) }),
           })),
       ...synthPanel(state), // 合成（強效藥水、套餐）直接接在製作下面，不另開分頁
     ];
@@ -204,20 +208,18 @@ export function createRestView({ root, getState, commit }) {
   const lootTiles = (loot) =>
     h('div', { class: 'loot' }, Object.entries(loot).sort((x, y) => y[1] - x[1]).map(([n, q]) => itemTile(n, q, { size: 'sm' })));
 
-  /** 超過這個數量就不畫骰面（太卡），改顯示統計 */
-  const DICE_FACE_MAX = 100;
-  function rollStats(rolls, gatherKind) {
-    const totals = rolls.map((x) => x.total);
-    const n = rolls.length;
+  /** 骰子太多時的統計（s 是 summarizeRolls 的結果；不能用 Math.min(...陣列)，十幾萬個參數會超過瀏覽器上限） */
+  function rollStats(s, gatherKind) {
+    const { n, lo, hi, total: sum } = s;
     const rows = gatherKind
-      ? TIERS.map((t) => [t, rolls.filter((x) => x.tier === t).length]).filter(([, c]) => c > 0)
-      : [['成功', rolls.filter((x) => x.success).length], ['失敗', rolls.filter((x) => !x.success).length]];
+      ? TIERS.map((t) => [t, s.tiers[t] ?? 0]).filter(([, c]) => c > 0)
+      : [['成功', s.ok], ['失敗', n - s.ok]];
     return [
       h('p', { class: 'hint', text: `骰子超過 ${DICE_FACE_MAX} 顆，改顯示統計（不畫骰面）` }),
       h('ul', { class: 'learn-cost' }, rows.map(([label, c]) => h('li', { class: 'learn-cost__row' },
         h('span', { text: label }),
         h('span', { class: 'num', text: `${fmt(c)}（${(c / n * 100).toFixed(1)}%）` })))),
-      h('p', { class: 'hint', text: `總分：最低 ${Math.min(...totals)}、最高 ${Math.max(...totals)}、平均 ${(totals.reduce((a, b) => a + b, 0) / n).toFixed(1)}` }),
+      h('p', { class: 'hint', text: `總分：最低 ${lo}、最高 ${hi}、平均 ${(sum / n).toFixed(1)}` }),
     ];
   }
 
@@ -225,18 +227,18 @@ export function createRestView({ root, getState, commit }) {
   function resultCard(r, latest) {
     if (r.kind === 'note') return h('li', { class: 'rres rres--note', text: r.text });
     const gatherKind = r.kind === 'gather';
-    if (!r.rolls.length) return h('li', { class: 'rres rres--note', text: gatherKind ? '時間不足，沒有採集。' : '原料不足，沒有製作。' });
-    const best = gatherKind ? Math.max(...r.rolls.map((x) => TIERS.indexOf(x.tier))) : -1;
-    const ok = gatherKind ? 0 : r.rolls.filter((x) => x.success).length;
-    const used = r.rolls.flatMap((x) => x.used);
+    const s = r.sum ?? summarizeRolls(r.rolls);
+    if (!s.n) return h('li', { class: 'rres rres--note', text: gatherKind ? '時間不足，沒有採集。' : '原料不足，沒有製作。' });
+    const best = gatherKind ? Object.keys(s.tiers).reduce((m, t) => Math.max(m, TIERS.indexOf(t)), -1) : -1;
+    const ok = gatherKind ? 0 : s.ok;
     const tone = gatherKind ? 'tier' : ok > 0 ? 'ok' : 'fail';
     return h('li', { class: 'rres', dataset: { tone, tier: gatherKind ? best : 'none' } },
       h('div', { class: 'rres__head' },
-        h('strong', { class: 'rres__title', text: gatherKind ? `${r.action} ×${r.rolls.length}` : `${r.action}（${r.diff}）×${r.rolls.length}` }),
-        h('span', { class: 'rres__badge', dataset: { tone } , text: gatherKind ? `經驗 +${fmt(r.exp)}` : `成功 ${ok} / ${r.rolls.length}` })),
+        h('strong', { class: 'rres__title', text: gatherKind ? `${r.action} ×${s.n}` : `${r.action}（${r.diff}）×${s.n}` }),
+        h('span', { class: 'rres__badge', dataset: { tone } , text: gatherKind ? `經驗 +${fmt(r.exp)}` : `成功 ${ok} / ${s.n}` })),
       gatherKind && best >= 3 ? h('p', { class: 'rres__flash', text: `擲出${TIERS[best]}！` }) : null,
-      r.rolls.length > DICE_FACE_MAX
-        ? rollStats(r.rolls, gatherKind)
+      s.n > DICE_FACE_MAX
+        ? rollStats(s, gatherKind)
         : [
           h('div', { class: 'dice-faces' },
             r.rolls.map((x) => h('span', {
@@ -248,7 +250,7 @@ export function createRestView({ root, getState, commit }) {
           h('p', { class: 'dice-legend', text: gatherKind ? '每一骰的總分；顏色是評級（綠 簡單、藍 普通、紫 困難、金 史詩、白 神級）' : '每一骰的總分；藍色成功、紅色失敗' }),
         ],
       Object.keys(r.loot).length ? lootTiles(r.loot) : h('p', { class: 'hint', text: '全部失敗，原料全毀。' }),
-      used.length ? h('p', { class: 'hint', text: `用掉紀念品 ${used.length} 個${r.rolls.some((x) => x.doubled) ? '（成功的製作產出雙倍）' : ''}` }) : null);
+      s.used ? h('p', { class: 'hint', text: `用掉紀念品 ${s.used} 個${s.doubled ? '（成功的製作產出雙倍）' : ''}` }) : null);
   }
 
   /** 唯一的動畫：最新結果的數字先亂跳再定格 */
@@ -551,7 +553,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: `${name}的材料不足，先去取材料或採集。` })]
         : runBlock(state, r.skill, {
             kctx: { kind: 'special' }, label: `${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 5, 10],
-            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSpecial(state, name, ui.times, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSpecial(state, name, ui.times, [...ui.keepsakes], undefined, BIG) }),
           })),
     ];
   }

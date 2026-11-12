@@ -14,10 +14,10 @@
   --ctl-px-sm: 10px;
   --radius-ctl: 4px;         /* 按鈕、輸入框 */
   --radius-box: 6px;         /* 面板（最外層的區塊） */
-  /* 字級（全站只用這幾級；基準 14px。最小 12px：再小在舊螢幕上看不清楚）。xs／sm 要搭配 font-family: var(--font-small) */
-  --fs-xs: 0.857rem;  /* 12px：標籤、徽章、次要數值 */
-  --fs-sm: 0.929rem;  /* 13px：提示、說明、清單內文 */
-  --fs-md: 1rem;      /* 14px：內文 */
+  /* 字級（全站只用這幾級；rem 基準 14px。最小 13px：楷體比明體吃力，2026-11-12 內文三級各加 1px）。xs／sm 要搭配 font-family: var(--font-small) */
+  --fs-xs: 0.929rem;  /* 13px：標籤、徽章、次要數值 */
+  --fs-sm: 1rem;      /* 14px：提示、說明、清單內文 */
+  --fs-md: 1.071rem;  /* 15px：內文 */
   --fs-lg: 1.1rem;    /* 小標題 */
   --fs-xl: 1.25rem;   /* 區塊標題 */
   --space-1: 4px;

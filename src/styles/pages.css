@@ -239,7 +239,7 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 @media (max-width: 759px) {
   .rest-root { padding-inline: var(--space-3); }
   .bag-bar { padding: var(--space-4) var(--space-3) var(--space-2); }
-  .bag-bar__tools { flex-basis: 100%; flex-wrap: wrap; max-width: none; justify-content: stretch; }
+  .bag-bar__tools { flex-basis: 100%; flex-wrap: wrap; min-width: 0; max-width: none; justify-content: stretch; }
   .bag-bar__tools .field { flex: 1 1 100%; max-width: none; }
   .bag-bar__tools .btn { flex: 1; }
   .bag { padding-inline: var(--space-3); }

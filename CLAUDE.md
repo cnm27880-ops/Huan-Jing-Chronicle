@@ -65,7 +65,7 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `src/game/tuning.js` | 模擬戰的目標（4～8 回合、勝率至少 75%、每場約耗一半資源）、評價與策略建議、自動調整（保守版／激進版兩個方案 `PLANS`）：先找回合數的結構下限、必要時拿掉最弱的怪，再二分搜尋血量與攻擊強度（自訂強度 `scaleSpecs`／固定敵人 `scaleEncounter` 都能調）；新增輸出占比評分 `shareInfo`（純函式） |
 | `src/ui/analysisView.js` | 「分析」大分頁（`#analysis`，日誌旁邊）：把房間每位玩家回報的攻防數值（`vitals.stats`，伺服器 `onVitals` 驗證）與資源上限排成可排序的比較表。桌機三大群組（進攻傷害／防禦韌性／五系資源，各 5 欄，含四傷總和、四防總和）雙層表頭全展開；手機（< 900px）用底線分頁一次只顯示一組，不橫滑。只標該欄最高（金字）不標最低；「顯示與我的差值 (±)」開關（點玩家名稱可換基準）；表下 3 張戰力觀測摘要卡（`insights`）；名稱下有流派標籤（`archetypeOf`）。GM 隱藏的玩家一般玩家看不到。純函式 `analysisPlayers`／`columnStats`／`diffOf`／`insights` |
 | `src/ui/monsterTip.js` | 怪物詳細資料浮動窗（三攻三防、絕防、生命、等級）：電腦滑鼠移上去、手機長按 0.45 秒；小怪卡與 BOSS 立繪共用 |
-| `src/game/activity.js`、`src/state/activityLog.js`、`src/ui/logsView.js` | 玩家日誌：內容格式（修整／學習／物品）、回報點（房間伺服器，離線存本機）、「日誌」大分頁（`#logs`，所有玩家都看得到每位玩家的）；伺服器端在 `room-core.js` 的 `actPost`／`actList`，每人留 500 筆 |
+| `src/game/activity.js`、`src/state/activityLog.js`、`src/ui/logsView.js` | 玩家日誌：內容格式（修整／學習／物品；`activity.js` 另有大量擲骰的統計 `summarizeRolls`／`rollSink`——採集、製作、特殊、合成給 `opts.maxRolls` 時，次數超過就只回統計 `sum`、`rolls` 是 null，修整日畫面用 100）、回報點（房間伺服器，離線存本機）、「日誌」大分頁（`#logs`，所有玩家都看得到每位玩家的）；伺服器端在 `room-core.js` 的 `actPost`／`actList`，每人留 500 筆 |
 | `src/game/events.js` | 把結果變成「擲骰事件」（格式見 rollLog.js）；戰鬥逐軌文字行的格式與解析 |
 | `tests/*.test.js` | 規則測試（2026-10-12 跑團後的修正在 `tests/playtest-fixes.test.js`；遭遇戰的房間邏輯在 `worker/test/encounter.test.js`，立繪與隊友狀態在 `worker/test/images.test.js`）：engine（採集製作）、combat、equipment（含寶石）、dice、market（交易） |
 | `worker/` | Cloudflare Worker（`huan-jing-api`）：Discord 登入（1-A）＋固定團房間與即時共享擲骰（1-B）。設定在 `worker/wrangler.jsonc`（白名單、GM、開發者的 Discord ID 也在這），測試在 `worker/test/`，Secrets 放後台 |
@@ -126,8 +126,8 @@ Vite + 原生 JavaScript（ES modules）+ 純 CSS，沒有框架。
 | `public/map-data/markers.json` | 地圖標記位置（百分比座標、類型、簡介、設定集 id） |
 | `src/ui/mapView.js` | 地圖拖曳、縮放、熱點 |
 | `src/ui/dossier.js` | 地點情報面板（點地圖標記打開） |
-| `src/styles/theme.css` | **主題檔**：全站色碼、字體、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
-| `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線）、**字級 `--fs-xs`～`--fs-xl`（其他 CSS 檔 16px 以下的字級一律用這幾級，最小 12px；xs／sm 要加 `font-family: var(--font-small)` 黑體，測試會檢查）**與**全站圖層階層 `--z-*`**（其他 CSS 檔 25 以上的 z-index 一律用 `var(--z-…)`，不能寫死數字，測試會檢查） |
+| `src/styles/theme.css` | **主題檔**：全站色碼、字體（標題 `--font-display` 思源宋體、內文 `--font-body` 霞鶩文楷，Google Fonts 連結在 `index.html`）、稀有度色（改配色只改這裡，規格見 `DESIGN.md`） |
+| `src/styles/tokens.css` | 非顏色的代號（頁首高度、圓角、動畫曲線）、**字級 `--fs-xs`～`--fs-xl`（其他 CSS 檔 16px 以下的字級一律用這幾級，最小 13px；xs／sm 要加 `font-family: var(--font-small)`（現在等於內文的楷體），測試會檢查）**與**全站圖層階層 `--z-*`**（其他 CSS 檔 25 以上的 z-index 一律用 `var(--z-…)`，不能寫死數字，測試會檢查） |
 | `src/styles/layout.css` | 整頁外殼：背景星點、頂部列、分頁、手機底部導覽與「更多」選單、吐司、全站捲軸與焦點、`.view--page` |
 | `src/styles/map.css` | 世界地圖外框與熱點 |
 | `src/styles/dossier.css` | 地點情報面板與四大區域主題 |
