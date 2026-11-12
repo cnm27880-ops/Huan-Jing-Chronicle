@@ -445,10 +445,10 @@ export function createBattleView({ getState, commit, rerender, onFire = () => {}
             rerender();
           },
         },
-        h('span', { class: 'move__tags' }, support ? h('span', { class: 'trk', dataset: { track: 'S' }, text: '輔助' }) : tracks.map(trackTag)),
+        h('span', { class: 'move__tags' }, support ? h('span', { class: 'trk', dataset: { track: 'S' }, text: '輔助' }) : tracks.map(trackTag),
+          !support && max > 1 ? h('span', { class: 'move__targets', text: `${max} 目標` }) : null),
         h('span', { class: 'move__dice', text: d.dice }),
         h('strong', { class: 'move__name', text: m.skill ? `${m.name} Lv${skillLevel(state, m.skill)}` : m.name }),
-        !support && max > 1 ? h('span', { class: 'move__targets', text: `${max} 目標` }) : null,
         support ? null : h('small', { class: 'move__cost', text: `消耗：${costText(d.costShown)}` }),
         open ? h('small', { class: 'move__detail', text: d.text }) : null,
         lack ? h('small', { class: 'move__lack', text: `缺少：${lack}${!support && fallsBack(state, m) ? '（出招會自動改用普攻）' : ''}` }) : null),
