@@ -371,7 +371,7 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 .trade-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); column-gap: var(--gap-card); margin: 0; padding: 0; list-style: none; }
 /* 每張商品卡單列：左邊名稱、稀有度、持有數；中間價格（原價、黑心價、共多少合成一行）；右邊數量框加固定寬度的買／賣鈕。
    卡片本身不加框，只有底部淡線（稀有度左側色條照舊）；窄到放不下（手機）才改成上下兩層 */
-.trade-row { display: grid; grid-template-columns: minmax(7.5rem, 1fr) minmax(0, 1.3fr) auto; align-items: center; column-gap: var(--space-3); min-width: 0; padding: var(--space-2) 0; border-bottom: 1px solid var(--line-soft); }
+.trade-row { display: grid; grid-template-columns: minmax(7.5rem, 1fr) minmax(min-content, 1.3fr) auto; align-items: center; column-gap: var(--space-3); min-width: 0; padding: var(--space-2) 0; border-bottom: 1px solid var(--line-soft); }
 .trade-row.rarity { padding-left: var(--space-3); }
 .trade-row__icon { flex: none; font-size: var(--fs-xl); line-height: 1; }
 .trade-row__icon:empty { display: none; }
@@ -379,8 +379,8 @@ button.mini-slot:hover, .status__day:hover { color: var(--gold); border-color: v
 .trade-row__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--space-2); }
 .trade-row__have { color: var(--soft); }
 .trade-row__money { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); min-width: 0; }
-.trade-row__price { color: var(--ink2); font-size: var(--fs-sm); font-family: var(--font-small); }
-.trade-row__sub { color: var(--soft); font-size: var(--fs-xs); font-family: var(--font-small); }
+.trade-row__price { color: var(--ink2); font-size: var(--fs-sm); font-family: var(--font-small); white-space: nowrap; }
+.trade-row__sub { color: var(--soft); font-size: var(--fs-xs); font-family: var(--font-small); white-space: nowrap; }
 .trade-row__act { display: flex; align-items: center; gap: var(--space-2); }
 .trade-row__qty { flex: none; min-width: 3.2rem; padding-inline: 6px; text-align: center; }
 .trade-row__act .btn { flex: none; width: 5.6rem; min-width: 0; padding-inline: 4px; white-space: nowrap; }
