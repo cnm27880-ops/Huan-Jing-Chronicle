@@ -207,8 +207,10 @@ export function createRestView({ root, getState, commit }) {
   /** 超過這個數量就不畫骰面（太卡），改顯示統計 */
   const DICE_FACE_MAX = 100;
   function rollStats(rolls, gatherKind) {
-    const totals = rolls.map((x) => x.total);
     const n = rolls.length;
+    // 不能用 Math.min(...陣列)：十幾萬個參數會超過瀏覽器上限，整頁壞掉
+    let lo = Infinity, hi = -Infinity, sum = 0;
+    for (const x of rolls) { if (x.total < lo) lo = x.total; if (x.total > hi) hi = x.total; sum += x.total; }
     const rows = gatherKind
       ? TIERS.map((t) => [t, rolls.filter((x) => x.tier === t).length]).filter(([, c]) => c > 0)
       : [['成功', rolls.filter((x) => x.success).length], ['失敗', rolls.filter((x) => !x.success).length]];
@@ -217,7 +219,7 @@ export function createRestView({ root, getState, commit }) {
       h('ul', { class: 'learn-cost' }, rows.map(([label, c]) => h('li', { class: 'learn-cost__row' },
         h('span', { text: label }),
         h('span', { class: 'num', text: `${fmt(c)}（${(c / n * 100).toFixed(1)}%）` })))),
-      h('p', { class: 'hint', text: `總分：最低 ${Math.min(...totals)}、最高 ${Math.max(...totals)}、平均 ${(totals.reduce((a, b) => a + b, 0) / n).toFixed(1)}` }),
+      h('p', { class: 'hint', text: `總分：最低 ${lo}、最高 ${hi}、平均 ${(sum / n).toFixed(1)}` }),
     ];
   }
 
@@ -226,7 +228,7 @@ export function createRestView({ root, getState, commit }) {
     if (r.kind === 'note') return h('li', { class: 'rres rres--note', text: r.text });
     const gatherKind = r.kind === 'gather';
     if (!r.rolls.length) return h('li', { class: 'rres rres--note', text: gatherKind ? '時間不足，沒有採集。' : '原料不足，沒有製作。' });
-    const best = gatherKind ? Math.max(...r.rolls.map((x) => TIERS.indexOf(x.tier))) : -1;
+    const best = gatherKind ? r.rolls.reduce((m, x) => Math.max(m, TIERS.indexOf(x.tier)), -1) : -1;
     const ok = gatherKind ? 0 : r.rolls.filter((x) => x.success).length;
     const used = r.rolls.flatMap((x) => x.used);
     const tone = gatherKind ? 'tier' : ok > 0 ? 'ok' : 'fail';
