@@ -60,13 +60,13 @@
   --region-sea: var(--ink2);
 
   /* ---------- 字體 ---------- */
-  --font-num: 'Cinzel', 'Noto Serif TC', serif;   /* 數字與英文標籤 */
-  --font-body: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
-  --font-display: var(--font-body);
+  --font-num: 'Cinzel', 'LXGW WenKai TC', serif;   /* 數字與英文標籤 */
+  --font-body: 'LXGW WenKai TC', serif;             /* 內文：霞鶩文楷（400 一般、700 強調） */
+  --font-display: 'Noto Serif TC', serif;           /* 標題：思源宋體（900 大標題、600 副標題） */
   --font-ui: var(--font-body);
   --font-mono: var(--font-num);
-  /* 小字（--fs-xs／--fs-sm）用黑體：明體的橫筆在舊螢幕（非高解析度）上不到 1px 會糊掉；用系統字體，不多下載 */
-  --font-small: system-ui, -apple-system, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  /* 小字（--fs-xs／--fs-sm）跟內文一樣用楷體（使用者 2026-11-12：黑體太現代，和黑金奇幻風不搭）；楷體筆畫粗細平均，小字不像明體橫筆會糊 */
+  --font-small: var(--font-body);
 
   /* ---------- 形狀與質感 ---------- */
   --r-panel: 14px;

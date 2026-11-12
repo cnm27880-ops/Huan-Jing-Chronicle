@@ -36,8 +36,8 @@
 | 控制項 | `--ctl-bg`、`--ctl-line`、`--ctl-line-hi`、`--ctl-primary-bg`、`--ctl-primary-bg-hi`、`--ctl-primary-line` |
 
 ## 字體
-- 數字與英文標籤：Cinzel（500、700）；內文：Noto Serif TC（400、600、900），透過 Google Fonts 載入。基礎字級 14px，行高 1.6。
-- **字級只用 `tokens.css` 的 `--fs-*` 五級**：`--fs-xs` 12px、`--fs-sm` 13px、`--fs-md` 14px、`--fs-lg`、`--fs-xl`；更大的標題字才直接寫數值。**最小 12px**（使用者 2026-11-10：舊螢幕上小字看不清楚）。`--fs-xs`／`--fs-sm` 的小字一律搭配 `font-family: var(--font-small)`（系統黑體，明體的細橫筆在非高解析度螢幕會糊掉）；標題與內文維持明體。測試 `tests/styles.test.js` 會擋寫死的小字級。
+- 數字與英文標籤：Cinzel（500、700）；**標題**（網站名稱、h1～h3、區塊標題，變數 `--font-display`）：Noto Serif TC 思源宋體（900 大標題、600 副標題）；**內文**（`--font-body`）：LXGW WenKai TC 霞鶩文楷（400 一般、700 強調）。透過 Google Fonts 載入（`display=swap`）。內文 15px，行高 1.8（使用者 2026-11-12：黑體太現代，改楷體）。
+- **字級只用 `tokens.css` 的 `--fs-*` 五級**：`--fs-xs` 13px、`--fs-sm` 14px、`--fs-md` 15px、`--fs-lg`、`--fs-xl`；更大的標題字才直接寫數值。**最小 13px**（使用者 2026-11-10：舊螢幕上小字看不清楚）。`--fs-xs`／`--fs-sm` 的小字一律搭配 `font-family: var(--font-small)`（現在等於內文的楷體；不要用明體，細橫筆在非高解析度螢幕會糊掉）。測試 `tests/styles.test.js` 會擋寫死的小字級。
 
 ## 檔案與載入順序（`src/styles/index.js`）
 `theme`（色碼）→ `tokens`（非顏色代號、`--z-*` 圖層階層）→ `layout`（整頁外殼：背景星點、頂部列、手機底部導覽、吐司、全站捲軸與焦點）→ `map`／`dossier`（地圖、地點情報）→ `pages`（修整日、背包、裝備、交易、日誌、技能方格）→ `session`（跑團頁）→ `overlays`（封面、鑑定開獎、數值調整面板、確認框、戰鬥提醒、收到的東西、擲骰特效）→ `gm`（GM 工具面板）→ `shadowfx`（暗影斗篷特效）→ **`base`（最後載入：按鈕、輸入框、面板、列表、分頁、彈出面板、選項小按鈕）**。

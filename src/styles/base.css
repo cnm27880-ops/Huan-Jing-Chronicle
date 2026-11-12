@@ -278,7 +278,7 @@ select.field option:disabled { color: var(--faint); }
   padding: 0;
   border: 0;
   color: var(--gold);
-  font-family: var(--font-body);
+  font-family: var(--font-display);
   font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -529,7 +529,7 @@ button.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px
 .sheet[data-open='true'] .sheet__backdrop { opacity: 1; }
 .sheet[data-open='true'] .sheet__panel { opacity: 1; transform: none; }
 .sheet__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); }
-.sheet__title { margin: 0; color: var(--gold); font-family: var(--font-body); font-size: var(--fs-md); font-weight: 600; letter-spacing: 0.08em; }
+.sheet__title { margin: 0; color: var(--gold); font-family: var(--font-display); font-size: var(--fs-md); font-weight: 600; letter-spacing: 0.08em; }
 .sheet__body { overflow-y: auto; padding: var(--space-4); overscroll-behavior: contain; }
 .sheet__body section + section { margin-top: var(--space-5); }
 .sheet__body .tile-grid { margin-top: var(--space-3); }
@@ -620,3 +620,9 @@ button.tile:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px
 .chip:focus-visible, .toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .chip:disabled, .toggle:disabled { opacity: 0.45; cursor: not-allowed; }
 .chip[aria-pressed='true'], .chip[aria-checked='true'], .toggle[aria-pressed='true'] { color: var(--gold); background: var(--ctl-primary-bg); border-color: var(--ctl-primary-line); }
+
+/* ---------- 標題一律思源宋體（內文是楷體）；放在最後，蓋過前面各檔替小標題設的 --font-small ---------- */
+h1, h2, h3,
+.tray__title,
+.room__gtitle,
+.nudge__you-title { font-family: var(--font-display); }

@@ -1,7 +1,7 @@
 // 玩家日誌的內容格式：修整結果卡 → 日誌、輸入整理
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { restEntry, cleanActivity, lootLines, ACT_TEXT_MAX } from '../src/game/activity.js';
+import { restEntry, cleanActivity, lootLines, summarizeRolls, ACT_TEXT_MAX } from '../src/game/activity.js';
 
 test('採集結果 → 日誌：標題含次數與經驗，細節是戰利品（多的在前）與用掉的紀念品', () => {
   const e = restEntry({ kind: 'gather', action: '釣魚', exp: 450, loot: { 鮮美肉: 7, 乾癟肉: 23 }, rolls: [{ used: ['掉毛喵的私人釣點'] }, { used: [] }, { used: ['掉毛喵的私人釣點'] }] });
@@ -31,4 +31,18 @@ test('整理輸入：類別要對、文字不能空、太長會截斷、控制�
   assert.equal(c.lines.length, 3); // 空字串被濾掉；數字轉成字串保留
   assert.equal(c.lines[2].length, 80);
   assert.deepEqual(lootLines({ 甲: 1, 乙: 5 }), ['乙 ×5', '甲 ×1']);
+});
+
+test('骰子明細濃縮成統計：次數、成功數、評級、最低最高、紀念品；二十萬筆也不會壞（不用展開參數）', () => {
+  const s = summarizeRolls([
+    { total: 19, success: true, used: ['甲'], doubled: true },
+    { total: 38, success: true, used: [] },
+    { total: 5, success: false, used: ['甲', '乙'] },
+  ]);
+  assert.deepEqual(s, { n: 3, ok: 2, tiers: {}, lo: 5, hi: 38, total: 62, used: 3, doubled: true });
+  const g = summarizeRolls([{ total: 12, tier: '簡單', used: [] }, { total: 30, tier: '史詩', used: [] }, { total: 11, tier: '簡單', used: [] }]);
+  assert.deepEqual(g.tiers, { 簡單: 2, 史詩: 1 });
+  assert.equal(summarizeRolls([]).n, 0);
+  const big = summarizeRolls(Array.from({ length: 200000 }, (_, i) => ({ total: 19 + (i % 20), success: true, used: [] })));
+  assert.deepEqual([big.n, big.ok, big.lo, big.hi], [200000, 200000, 19, 38]);
 });

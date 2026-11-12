@@ -14,6 +14,24 @@ const clip = (s, n) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').tr
 /** 把「物品 → 數量」變成文字行（多的在前） */
 export const lootLines = (loot) => Object.entries(loot ?? {}).sort((a, b) => b[1] - a[1]).map(([n, c]) => q(n, c));
 
+/**
+ * 把每一骰的明細濃縮成統計（結果卡顯示用）：一次做十幾萬次時，不用把十幾萬筆骰子明細一直留在記憶體。
+ * 回傳 { n, ok, tiers: { 評級: 次數 }, lo, hi, total, used, doubled }
+ */
+export function summarizeRolls(rolls) {
+  const s = { n: rolls.length, ok: 0, tiers: {}, lo: Infinity, hi: -Infinity, total: 0, used: 0, doubled: false };
+  for (const x of rolls) {
+    if (x.success) s.ok += 1;
+    if (x.tier != null) s.tiers[x.tier] = (s.tiers[x.tier] ?? 0) + 1;
+    if (x.total < s.lo) s.lo = x.total;
+    if (x.total > s.hi) s.hi = x.total;
+    s.total += x.total;
+    s.used += x.used?.length ?? 0;
+    if (x.doubled) s.doubled = true;
+  }
+  return s;
+}
+
 /** 修整頁的結果卡（gather／craft／note）→ 日誌內容 { cat, text, lines } */
 export function restEntry(r) {
   if (r.kind === 'note') return { cat: 'rest', text: r.text, lines: [] };
