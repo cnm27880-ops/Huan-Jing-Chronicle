@@ -53,9 +53,9 @@ export function createRestView({ root, getState, commit }) {
   /** cat：日誌分類，修整頁的結果預設算「修整」；使用特殊物品這類算「物品」 */
   /** 超過這個數量就不畫骰面（太卡），改顯示統計 */
   const DICE_FACE_MAX = 100;
-  /** 骰子太多時只留統計（sum），把每一骰的明細丟掉：結果卡本來就不畫骰面，留著只是佔記憶體 */
-  const compact = (r) => (r.rolls?.length > DICE_FACE_MAX ? { ...r, sum: summarizeRolls(r.rolls), rolls: null } : r);
-  const pushResult = (r, cat = 'rest') => { logActivity(getState(), { ...restEntry(r), cat }); ui.results.unshift(compact(r)); ui.results.length = Math.min(ui.results.length, 20); ui.fresh = true; commit(); };
+  /** 交給規則函式：次數超過 DICE_FACE_MAX 就只回統計（sum），不保留每一骰的明細（結果卡本來就不畫骰面，留著只會卡） */
+  const BIG = { maxRolls: DICE_FACE_MAX };
+  const pushResult = (r, cat = 'rest') => { logActivity(getState(), { ...restEntry(r), cat }); ui.results.unshift(r); ui.results.length = Math.min(ui.results.length, 20); ui.fresh = true; commit(); };
 
   /** 抽取的技能還沒選完就不能做其他事（RULES_OVERVIEW 5.1）：擋下並打開選擇面板 */
   function blockedByDraw() {
@@ -131,7 +131,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: '今天的時間用完了。點上方的「新的一天」把時間補滿到 10 點（欠的時間會先扣掉）。' })]
         : runBlock(state, a, {
             kctx: { kind: 'gather' }, label: `${a} ${ui.times} 次`, hint: `每次 1 點時間，今天還剩 ${max} 點`, max, quick: [1, 3, 5],
-            onRun: () => blockedByDraw() || pushResult({ kind: 'gather', action: a, ...gather(state, a, ui.times, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'gather', action: a, ...gather(state, a, ui.times, [...ui.keepsakes], undefined, BIG) }),
           })),
     ];
   }
@@ -165,7 +165,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: `${name}的材料不足。` })]
         : runBlock(state, r.skill, {
             kctx: { kind: 'synth' }, label: `合成 ${name} ${ui.synthTimes} 次`, timesKey: 'synthTimes', hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀；不算進 500 次徽章', max, quick: [1, 5, 10],
-            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSynth(state, name, ui.synthTimes, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSynth(state, name, ui.synthTimes, [...ui.keepsakes], undefined, BIG) }),
           })),
     ];
   }
@@ -198,7 +198,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: `${recipe.cost}不足 ${CRAFT_COST_AMOUNT} 個，先去採集吧。` })]
         : runBlock(state, a, {
             kctx: { kind: 'craft', diff: d }, label: `${a}（${d}）${ui.times} 次`, hint: '製作不消耗時間', max, quick: [1, 5, 10],
-            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: a, diff: d, ...craft(state, a, d, ui.times, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: a, diff: d, ...craft(state, a, d, ui.times, [...ui.keepsakes], undefined, BIG) }),
           })),
       ...synthPanel(state), // 合成（強效藥水、套餐）直接接在製作下面，不另開分頁
     ];
@@ -553,7 +553,7 @@ export function createRestView({ root, getState, commit }) {
         ? [h('p', { class: 'notice notice--bad', text: `${name}的材料不足，先去取材料或採集。` })]
         : runBlock(state, r.skill, {
             kctx: { kind: 'special' }, label: `${name} ${ui.times} 次`, hint: '每次檢定扣一份材料，不消耗時間；失敗材料全毀', max, quick: [1, 5, 10],
-            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSpecial(state, name, ui.times, [...ui.keepsakes]) }),
+            onRun: () => blockedByDraw() || pushResult({ kind: 'craft', action: r.skill, diff: name, ...craftSpecial(state, name, ui.times, [...ui.keepsakes], undefined, BIG) }),
           })),
     ];
   }

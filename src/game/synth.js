@@ -6,16 +6,17 @@
 // ============================================================
 import { SYNTH_RECIPES } from './rules.js';
 import { modifier, countOf, addItem, removeItem, consumeKeepsakes, tickRestStomach, d20 } from './engine.js';
+import { rollSink } from './activity.js';
 
 /** 最多可以合成幾次（只看材料） */
 export const synthMaxTimes = (state, name) =>
   Math.min(...Object.entries(SYNTH_RECIPES[name].materials).map(([item, n]) => Math.floor(countOf(state, item) / n)));
 
 /** 合成 times 次；材料不足就停。回傳 { rolls, loot }（格式跟製作結果卡相同） */
-export function craftSynth(state, name, times, keepsakes = [], rng = Math.random) {
+export function craftSynth(state, name, times, keepsakes = [], rng = Math.random, opts = {}) {
   const r = SYNTH_RECIPES[name];
   if (!r) return { rolls: [], loot: {} };
-  const rolls = [];
+  const sink = rollSink(times, opts.maxRolls);
   const loot = {};
   for (let i = 0; i < times; i++) {
     if (synthMaxTimes(state, name) < 1) break;
@@ -32,8 +33,8 @@ export function craftSynth(state, name, times, keepsakes = [], rng = Math.random
       got[name] = 1;
       loot[name] = (loot[name] ?? 0) + 1;
     }
-    rolls.push({ roll, mod: mod.total, parts: mod.parts, total, dc: r.dc, success, got, used });
+    sink.add({ roll, mod: mod.total, parts: mod.parts, total, dc: r.dc, success, got, used });
     tickRestStomach(state);
   }
-  return { rolls, loot };
+  return { ...sink.done(), loot };
 }
