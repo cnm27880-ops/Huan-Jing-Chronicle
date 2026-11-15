@@ -166,13 +166,13 @@ export function createMarketView({ root, getState, commit }) {
     return [
       section('交易大廳・購買', `每天原價買＋賣合計 ${HALL_DAILY_LIMIT} 個，今天還剩 ${left} 個；超過的自動用黑心價。`,
         list(Object.entries(HALL_BUY).map(([item, [n, b]]) => row(state, {
-          key: `hb:${item}`, item, have: countOf(state, item), price: `原價 ${n}　黑心價 ${b} 金幣`,
+          key: `hb:${item}`, item, have: countOf(state, item), price: `原價 ${n}  黑心價 ${b} 金幣`,
           sub: (q) => `共 ${fmt(hallQuote(state, 'buy', item, q).total)} 金幣`,
           button: (q) => `買 ${q}`, onGo: (q) => doHall(state, 'buy', item, q, commit),
         })))),
       section('交易大廳・販賣', '收到的是金幣。',
         list(Object.entries(HALL_SELL).filter(([item]) => countOf(state, item) > 0).map(([item, [n, b]]) => row(state, {
-          key: `hs:${item}`, item, have: countOf(state, item), max: countOf(state, item), price: `原價 ${n}　黑心價 ${b} 金幣`,
+          key: `hs:${item}`, item, have: countOf(state, item), max: countOf(state, item), price: `原價 ${n}  黑心價 ${b} 金幣`,
           sub: (q) => `共 ${fmt(hallQuote(state, 'sell', item, q).total)} 金幣`,
           button: (q) => `賣 ${q}`, onGo: (q) => doHall(state, 'sell', item, q, commit),
         }))),
